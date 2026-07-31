@@ -711,6 +711,56 @@ func _populate(b) -> void:
 			add_child(shrine)
 			var sdir := _surface_dir()
 			shrine.global_transform = Transform3D(_basis_from_up(sdir), b.center + sdir * b.radius)
+			# --- a proper ROUND shrine around the gate ---
+			# stacked stone dais: three shrinking discs
+			var tiers := [[5.0, 0.7, 0.0], [3.8, 0.6, 0.7], [2.6, 0.6, 1.3]]
+			for tr in tiers:
+				var disc := MeshInstance3D.new()
+				var dm := CylinderMesh.new()
+				dm.top_radius = tr[0]
+				dm.bottom_radius = tr[0] + 0.3
+				dm.height = tr[1]
+				disc.mesh = dm
+				disc.material_override = Destructible.make_material(Color("#c9a45e"), 0.15)
+				shrine.add_child(disc)
+				disc.position = Vector3(0, tr[2] + tr[1] * 0.5, 0)
+			# ring of round pillars with glowing caps
+			for pi2 in 6:
+				var pang := TAU * float(pi2) / 6.0
+				var pil := MeshInstance3D.new()
+				var pm3 := CylinderMesh.new()
+				pm3.top_radius = 0.28
+				pm3.bottom_radius = 0.34
+				pm3.height = 4.2
+				pil.mesh = pm3
+				pil.material_override = Destructible.make_material(Color("#b8924e"), 0.1)
+				shrine.add_child(pil)
+				pil.position = Vector3(cos(pang) * 4.2, 2.4, sin(pang) * 4.2)
+				var cap := MeshInstance3D.new()
+				var cm3 := SphereMesh.new()
+				cm3.radius = 0.4
+				cm3.height = 0.8
+				cap.mesh = cm3
+				cap.material_override = Destructible.make_material(Color("#ff8c1a"), 2.2)
+				shrine.add_child(cap)
+				cap.position = Vector3(cos(pang) * 4.2, 4.8, sin(pang) * 4.2)
+			# the floating golden pi, visible from orbit
+			var pig := Label3D.new()
+			pig.text = "π"
+			pig.font_size = 400
+			pig.pixel_size = 0.03
+			pig.modulate = Color("#ffd166")
+			pig.outline_modulate = Color("#7a3c00")
+			pig.outline_size = 36
+			pig.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			shrine.add_child(pig)
+			pig.position = Vector3(0, 8.5, 0)
+			var slight := OmniLight3D.new()
+			slight.light_color = Color("#ffb04a")
+			slight.light_energy = 2.5
+			slight.omni_range = 26.0
+			shrine.add_child(slight)
+			slight.position = Vector3(0, 5.0, 0)
 			_spawn_res_nodes(b, 12, "raw_irid", 3)
 			_build_mine(b, MINE_DIRS["Pi"], "raw_irid", 5, Color("#2a8f6a"))
 		"sand":
