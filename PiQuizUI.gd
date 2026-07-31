@@ -49,7 +49,7 @@ func _ready() -> void:
 	col.add_child(_title)
 
 	var rules := Label.new()
-	rules.text = "Recite pi. Each digit pays your streak in coins.\nEvery 10 digits: an ULTIMA CRYSTAL. Miss once: ouch, start over."
+	rules.text = "Recite pi. Each digit pays 5x your streak in coins.\nEvery 10: 2 ULTIMA. Every 25: 4 semicircles. All 100: 25 PRISM.\nMiss once: ouch, start over. The worms know you're busy."
 	rules.add_theme_font_size_override("font_size", 13)
 	rules.modulate = Color(1, 1, 1, 0.7)
 	col.add_child(rules)
@@ -101,7 +101,7 @@ func close_ui() -> void:
 func _refresh() -> void:
 	_shown.text = "3." + PI_DIGITS.substr(0, _streak) + " _"
 	_status.text = "streak %d  ·  next digit pays %d coins  ·  best this visit: %d" % [
-		_streak, (_streak + 1) * 3, _best]
+		_streak, (_streak + 1) * 5, _best]
 
 func _guess(d: int) -> void:
 	if _streak >= PI_DIGITS.length():
@@ -110,14 +110,23 @@ func _guess(d: int) -> void:
 	if str(d) == PI_DIGITS[_streak]:
 		_streak += 1
 		_best = maxi(_best, _streak)
-		Inventory.add_coins(_streak * 3)
+		Inventory.add_coins(_streak * 5)
 		Sfx.play("coin", -16.0)
+		var hud := get_tree().get_first_node_in_group("hud")
 		if _streak % 10 == 0:
-			Inventory.give("ultima", 1)
+			Inventory.give("ultima", 2)
 			Sfx.play("learn")
-			var hud := get_tree().get_first_node_in_group("hud")
 			if hud:
-				hud.flash("THE SHRINE APPROVES: +1 ULTIMA CRYSTAL")
+				hud.flash("+2 ULTIMA")
+		if _streak % 25 == 0:
+			Inventory.give("semicircle", 4)
+			if hud:
+				hud.flash("+4 SEMICIRCLES")
+		if _streak >= PI_DIGITS.length():
+			Inventory.give("prism", 25)
+			Sfx.play("learn")
+			if hud:
+				hud.flash("100 DIGITS: +25 PRISM")
 	else:
 		Game.hurt(10.0)
 		Sfx.play("denied")
