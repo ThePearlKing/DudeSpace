@@ -13,6 +13,7 @@ var _tab: String = "Gear"
 var _tab_btns: Array = []
 var _creative_btn: Button
 var _equip_slots: Array = []
+var _eq_lbl: Label
 
 func _rebuild_grid() -> void:
 	for c in _grid.get_children():
@@ -120,10 +121,9 @@ func _ready() -> void:
 	_rebuild_grid()
 
 	# --- equipment: head/chest/legs/feet + the charm socket ---
-	var eq_lbl := Label.new()
-	eq_lbl.text = "EQUIPMENT   (right-click armor to wear · click a slot to take off)"
-	eq_lbl.add_theme_font_size_override("font_size", 14)
-	col.add_child(eq_lbl)
+	_eq_lbl = Label.new()
+	_eq_lbl.add_theme_font_size_override("font_size", 14)
+	col.add_child(_eq_lbl)
 	var eqrow := HBoxContainer.new()
 	eqrow.add_theme_constant_override("separation", 8)
 	col.add_child(eqrow)
@@ -185,6 +185,12 @@ func _make_cell(item: Dictionary) -> Control:
 	nm.clip_text = true
 	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	txt.add_child(nm)
+	if Inventory.armors.has(str(item.id)):
+		var defl := Label.new()
+		defl.text = "blocks %d%% damage" % int(Inventory.armors[str(item.id)]["def"])
+		defl.add_theme_font_size_override("font_size", 12)
+		defl.modulate = Color("#9adf9a")
+		txt.add_child(defl)
 	var cost := Label.new()
 	cost.text = Inventory.cost_text(item.id)
 	cost.add_theme_font_size_override("font_size", 12)
@@ -254,6 +260,9 @@ func _refresh() -> void:
 		_slot_panels[i].add_theme_stylebox_override("panel", _hot_style(i == Inventory.selected))
 	for ep in _equip_slots:
 		ep.refresh()
+	if _eq_lbl:
+		_eq_lbl.text = "EQUIPMENT — %d%% damage blocked (cap 60%%)   (right-click armor to wear · click a slot to take off)" \
+			% roundi(Inventory.armor_reduction() * 100.0)
 
 func _cell_style(owned: bool, afford: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -359,7 +368,7 @@ class _EquipSlot extends Panel:
 		if id == "charm":
 			nm = "Charm"
 		elif Inventory.armors.has(id):
-			nm = str(Inventory.armors[id]["name"])
+			nm = "%s  -%d%%" % [Inventory.armors[id]["name"], int(Inventory.armors[id]["def"])]
 		_lbl.text = slot_name.to_upper() + "\n" + (nm if nm != "" else "—")
 		_lbl.modulate = Color("#9adf9a") if nm != "" else Color(1, 1, 1, 0.5)
 
