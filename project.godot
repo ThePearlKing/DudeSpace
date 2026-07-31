@@ -11,7 +11,6 @@ config_version=5
 [application]
 
 config/name="DudeSpace"
-config/custom_user_dir_name="Claude The dude"
 run/main_scene="res://Title.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.png"
