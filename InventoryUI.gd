@@ -261,7 +261,7 @@ func _refresh() -> void:
 	for ep in _equip_slots:
 		ep.refresh()
 	if _eq_lbl:
-		_eq_lbl.text = "EQUIPMENT — %d%% damage blocked (cap 60%%)   (right-click armor to wear · click a slot to take off)" \
+		_eq_lbl.text = "EQUIPMENT — %d%% damage blocked (cap 60%%)   (drag or right-click armor to wear · click a slot to take off)" \
 			% roundi(Inventory.armor_reduction() * 100.0)
 
 func _cell_style(owned: bool, afford: bool) -> StyleBoxFlat:
@@ -385,6 +385,28 @@ class _EquipSlot extends Panel:
 			Inventory.give(id, 1)
 			Sfx.play("click", -12.0)
 			Inventory.changed.emit()
+
+	## drag a hotbar armor piece straight onto its slot to wear it
+	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
+		if not (data is Dictionary and data.get("kind") == "hswap"):
+			return false
+		var id := Inventory.slot_id(int(data["i"]))
+		if slot_name == "charm":
+			return id == "charm"
+		return Inventory.armors.has(id) and str(Inventory.armors[id]["slot"]) == slot_name
+
+	func _drop_data(_pos: Vector2, data: Variant) -> void:
+		var i: int = int(data["i"])
+		var id := Inventory.slot_id(i)
+		var old := str(Inventory.equip.get(slot_name, ""))
+		Inventory.equip[slot_name] = id
+		Inventory.hotbar[i]["n"] = int(Inventory.hotbar[i]["n"]) - 1
+		if int(Inventory.hotbar[i]["n"]) <= 0:
+			Inventory.hotbar[i] = Inventory.empty_slot()
+		if old != "":
+			Inventory.give(old, 1)   # worn piece back into your bags
+		Sfx.play("click")
+		Inventory.changed.emit()
 
 class _ItemCell extends Panel:
 	var id: String = ""

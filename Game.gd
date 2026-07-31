@@ -170,7 +170,7 @@ func wrath_event_over(caught: bool) -> void:
 
 var _hurt_sfx_t: float = 0.0
 
-func hurt(d: float) -> void:
+func hurt(d: float, vaporize: bool = false) -> void:
 	if dead or godmode:
 		return
 	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
@@ -193,8 +193,26 @@ func hurt(d: float) -> void:
 			Inventory.jet_max = 100.0
 			Inventory.jet_power = 1.0
 			Inventory.jet_on = false
+			_spill_hotbar(vaporize)
 		killed.emit()
 	changed.emit()
+
+## Death spills the hotbar where you fell -- fly back and reclaim it.
+## Suns (and black holes, via permadeath) vaporize it instead.
+func _spill_hotbar(vaporize: bool) -> void:
+	var p := get_tree().get_first_node_in_group("player")
+	for i in Inventory.hotbar.size():
+		var sid := str(Inventory.hotbar[i].get("id", ""))
+		if sid == "" or sid == "fists":
+			continue
+		if not vaporize and p and p.is_inside_tree():
+			var dr := ItemDrop.new()
+			dr.setup(sid, maxi(1, int(Inventory.hotbar[i].get("n", 1))))
+			p.get_parent().add_child(dr)
+			dr.global_position = p.global_position \
+				+ Vector3(randf_range(-1.5, 1.5), 0.5, randf_range(-1.5, 1.5))
+		Inventory.hotbar[i] = Inventory.empty_slot()
+	Inventory.changed.emit()
 
 func heal(a: float) -> void:
 	if dead:

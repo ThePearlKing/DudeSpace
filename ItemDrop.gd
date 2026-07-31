@@ -15,9 +15,7 @@ func setup(id_in: String, n: int) -> void:
 func _ready() -> void:
 	add_to_group("itemdrop")
 	_mesh = MeshInstance3D.new()
-	var m := BoxMesh.new()
-	m.size = Vector3(0.5, 0.5, 0.5)
-	_mesh.mesh = m
+	_mesh.mesh = _resource_mesh(id)
 	var col: Color = Inventory.items[id]["color"] if Inventory.items.has(id) \
 		else (Inventory.weapons[id]["color"] if Inventory.weapons.has(id) else Color("#cccccc"))
 	_mesh.material_override = Destructible.make_material(col, 1.2)
@@ -30,6 +28,56 @@ func _ready() -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.position = Vector3(0, 1.2, 0)
 	add_child(lbl)
+
+## Each ore/resource gets its own silhouette; everything else stays a cube.
+static func _resource_mesh(rid: String) -> Mesh:
+	match rid:
+		"raw_ingot":   # lumpy low-poly ore rock
+			var m := SphereMesh.new()
+			m.radius = 0.32; m.height = 0.5
+			m.radial_segments = 6; m.rings = 3
+			return m
+		"raw_irid":    # squatter, coarser lump
+			var m := SphereMesh.new()
+			m.radius = 0.34; m.height = 0.4
+			m.radial_segments = 5; m.rings = 2
+			return m
+		"coal":        # small dark nugget
+			var m := SphereMesh.new()
+			m.radius = 0.24; m.height = 0.36
+			m.radial_segments = 5; m.rings = 2
+			return m
+		"ingot":       # smelted bar
+			var m := BoxMesh.new()
+			m.size = Vector3(0.62, 0.18, 0.3)
+			return m
+		"irid":        # refined hex puck
+			var m := CylinderMesh.new()
+			m.top_radius = 0.28; m.bottom_radius = 0.28; m.height = 0.16
+			m.radial_segments = 6
+			return m
+		"ultima":      # octahedral gem
+			var m := SphereMesh.new()
+			m.radius = 0.26; m.height = 0.62
+			m.radial_segments = 4; m.rings = 2
+			return m
+		"prism":       # triangular shard, name says it all
+			var m := PrismMesh.new()
+			m.size = Vector3(0.34, 0.6, 0.24)
+			return m
+		"semicircle":  # half a dome
+			var m := SphereMesh.new()
+			m.radius = 0.32; m.height = 0.32
+			m.is_hemisphere = true
+			return m
+		"circle":      # a perfect ring
+			var m := TorusMesh.new()
+			m.inner_radius = 0.16; m.outer_radius = 0.34
+			return m
+		_:
+			var m := BoxMesh.new()
+			m.size = Vector3(0.5, 0.5, 0.5)
+			return m
 
 func _process(delta: float) -> void:
 	_t += delta

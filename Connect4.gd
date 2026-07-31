@@ -99,11 +99,12 @@ func drop(c: int) -> void:
 	if _check_end():
 		return
 	busy = true
-	var t := get_tree().create_timer(0.6)
-	t.timeout.connect(func() -> void:
-		busy = false
-		_ai_move()
-		_check_end())
+	get_tree().create_timer(0.6).timeout.connect(_ai_turn)
+
+func _ai_turn() -> void:
+	busy = false
+	_ai_move()
+	_check_end()
 
 func _place(c: int, who: int) -> bool:
 	for r in ROWS:
@@ -203,15 +204,16 @@ func _check_end() -> bool:
 		if hud:
 			hud.flash("draw. %d gold." % TIE_REWARD)
 	# board resets after a moment
-	var t := get_tree().create_timer(4.0)
-	t.timeout.connect(func() -> void:
-		for d2 in _discs:
-			if is_instance_valid(d2):
-				d2.queue_free()
-		_discs.clear()
-		_reset_grid()
-		over = false)
+	get_tree().create_timer(4.0).timeout.connect(_reset_board)
 	return true
+
+func _reset_board() -> void:
+	for d2 in _discs:
+		if is_instance_valid(d2):
+			d2.queue_free()
+	_discs.clear()
+	_reset_grid()
+	over = false
 
 class _Col extends StaticBody3D:
 	var board: Connect4

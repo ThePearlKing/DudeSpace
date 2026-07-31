@@ -7,6 +7,8 @@ var _mat: StandardMaterial3D
 
 func _ready() -> void:
 	add_to_group("spawn")
+	collision_layer = 2   # clickable (F still works), not a wall: spawn ON it
+	collision_mask = 0
 	# flat pad on the floor: dark rim, glowing green core panel
 	var rim := MeshInstance3D.new()
 	var rm := BoxMesh.new()

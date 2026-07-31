@@ -81,6 +81,10 @@ func dismantle(push_dir: Vector3) -> void:
 	Inventory.give("rocket", 1)
 	if hyperdrive:
 		Inventory.hyper_rockets += 1   # the drive stays IN the rocket's bones
+	# a waypoint riding the hull comes back too
+	for w in get_children():
+		if w is Waypoint:
+			Inventory.give("waypoint", 1)
 	Destructible.spawn_debris(get_parent(), global_position, Vector3(1.6, 3.0, 1.6), Color("#d8d8e0"), push_dir)
 	Sfx.play("explode", -10.0)
 	queue_free()

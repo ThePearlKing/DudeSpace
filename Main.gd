@@ -305,9 +305,9 @@ func _process(delta: float) -> void:
 				if _hud:
 					_hud.sun_fire()
 					_hud.flash("ABSORBED BY %s" % str(b.name).to_upper())
-				Game.hurt(100000.0)
+				Game.hurt(100000.0, true)   # star deaths vaporize your items
 			elif sd < b.radius * 1.6:
-				Game.hurt(50.0 * delta)
+				Game.hurt(50.0 * delta, true)
 				if _burn_t <= 0.0:
 					_burn_t = 2.0
 					if _hud:
@@ -344,11 +344,16 @@ func _process(delta: float) -> void:
 		if Game.permadead:
 			get_tree().change_scene_to_file("res://Title.tscn")
 		else:
-			Game.reset()
-			# death sends you HOME (or to your chosen beacon) -- never
-			# back to the spot that just killed you
+			# death sends you HOME (or to your chosen beacon) -- never back
+			# to the spot that just killed you. The reload reads the SAVE's
+			# pos, so write the save NOW (and before reset(), which wipes
+			# cheats/score that the reload then restores from this save).
 			Game.zone = ""
+			if _world_load_ok:
+				Save.set_world(collect_world())   # spilled items survive reload
 			Save.set_player_pos(Game.spawn_pos + Game.spawn_up * 1.5, false, false)
+			Save.save_progress()
+			Game.reset()
 			get_tree().reload_current_scene()
 
 func _notification(what: int) -> void:
@@ -1421,17 +1426,26 @@ func open_temple_door() -> void:
 	zone.add_child(col)
 	add_child(zone)
 	zone.global_transform = Transform3D(_temple_B, _temple_np + _temple_B * Vector3(0, 1.3, 4.5))
-	zone.body_entered.connect(func(bdy: Node3D) -> void:
-		if bdy is Player and Game.mode == Game.Mode.ON_FOOT:
-			Game.zone = "flat"
-			Game.zone_g = 9.0
-			bdy.respawn_at(Zones.temple_spawn(), Vector3.UP)
-			Sfx.play("warp")
-			if _hud:
-				_hud.flash("it is bigger on the inside")
-			# the hall wakes up 2 seconds after you step in
-			if not _trials_started:
-				get_tree().create_timer(2.0).timeout.connect(start_trials))
+	zone.body_entered.connect(_temple_door_entered)
+
+## Teleport DEFERRED: moving the body inside the area callback upsets
+## the physics server (Jolt "ref_count" flush errors).
+func _temple_door_entered(bdy: Node3D) -> void:
+	if bdy is Player and Game.mode == Game.Mode.ON_FOOT:
+		_temple_teleport.call_deferred(bdy)
+
+func _temple_teleport(bdy: Node3D) -> void:
+	if not is_instance_valid(bdy) or Game.mode != Game.Mode.ON_FOOT:
+		return
+	Game.zone = "flat"
+	Game.zone_g = 9.0
+	bdy.respawn_at(Zones.temple_spawn(), Vector3.UP)
+	Sfx.play("warp")
+	if _hud:
+		_hud.flash("it is bigger on the inside")
+	# the hall wakes up 2 seconds after you step in
+	if not _trials_started:
+		get_tree().create_timer(2.0).timeout.connect(start_trials)
 
 ## Trial button inside the hall: NOW the pyramids come. Never on top of you.
 ## Wrath maxed: spawn the descending noodle god above the player.

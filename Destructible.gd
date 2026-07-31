@@ -63,10 +63,8 @@ func destroy(push_dir: Vector3) -> void:
 		# tough block: flash + shrug it off
 		if _mesh:
 			_mesh.material_override = make_material(_color.lightened(0.5), _emit + 1.5)
-			var t := get_tree().create_timer(0.08)
-			t.timeout.connect(func() -> void:
-				if is_instance_valid(_mesh):
-					_mesh.material_override = make_material(_color, _emit))
+			# method callable: auto-disconnects if we die before it fires
+			get_tree().create_timer(0.08).timeout.connect(_unflash)
 		return
 	_dead = true
 	remove_from_group("destructible")
@@ -78,6 +76,10 @@ func destroy(push_dir: Vector3) -> void:
 		Game.anger(_anger)   # Claude is cool; the gods rage when you break him
 	Sfx.play("explode", -12.0)
 	queue_free()
+
+func _unflash() -> void:
+	if _mesh:
+		_mesh.material_override = make_material(_color, _emit)
 
 ## Shared shatter: N small rigid chunks flung outward.
 static func spawn_debris(world: Node, origin: Vector3, size: Vector3, color: Color, push_dir: Vector3) -> void:
@@ -105,8 +107,4 @@ static func spawn_debris(world: Node, origin: Vector3, size: Vector3, color: Col
 		kick += Vector3(randf_range(-3, 3), randf_range(3, 8), randf_range(-3, 3))
 		frag.apply_impulse(kick)
 		frag.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
-		var node := frag
-		var tm := frag.get_tree().create_timer(randf_range(2.5, 4.0))
-		tm.timeout.connect(func() -> void:
-			if is_instance_valid(node):
-				node.queue_free())
+		frag.life = randf_range(2.5, 4.0)   # self-expiring: no timer lambda

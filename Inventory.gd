@@ -30,10 +30,10 @@ var armors: Dictionary = {
 	"iron_helmet":  {"name": "Iron Helmet",  "slot": "head",  "def": 5,  "color": Color("#b8bcc8")},
 	"iron_chest":   {"name": "Iron Chestplate", "slot": "chest", "def": 10, "color": Color("#b8bcc8")},
 	"iron_legs":    {"name": "Iron Leggings","slot": "legs",  "def": 7,  "color": Color("#b8bcc8")},
-	"prism_helmet": {"name": "Prism Helmet", "slot": "head",  "def": 10, "color": Color("#ff7ce9")},
-	"prism_chest":  {"name": "Prism Chestplate", "slot": "chest", "def": 18, "color": Color("#ff7ce9")},
-	"prism_legs":   {"name": "Prism Leggings","slot": "legs", "def": 13, "color": Color("#ff7ce9")},
-	"prism_boots":  {"name": "Prism Boots",  "slot": "boots", "def": 7,  "color": Color("#ff7ce9")},
+	"prism_helmet": {"name": "Prism Helmet", "slot": "head",  "def": 16, "color": Color("#ff7ce9")},
+	"prism_chest":  {"name": "Prism Chestplate", "slot": "chest", "def": 28, "color": Color("#ff7ce9")},
+	"prism_legs":   {"name": "Prism Leggings","slot": "legs", "def": 21, "color": Color("#ff7ce9")},
+	"prism_boots":  {"name": "Prism Boots",  "slot": "boots", "def": 12, "color": Color("#ff7ce9")},
 	"ultima_helmet": {"name": "Ultima Helmet",  "slot": "head",  "def": 14, "color": Color("#7df9ff")},
 	"ultima_chest":  {"name": "Ultima Chestplate", "slot": "chest", "def": 24, "color": Color("#7df9ff")},
 	"ultima_legs":   {"name": "Ultima Leggings","slot": "legs",  "def": 18, "color": Color("#7df9ff")},
@@ -204,14 +204,14 @@ func _ready() -> void:
 		{"id": "iron_helmet","tab": "Armor",   "name": "Iron Helmet",    "cost": {"ingot": 6},  "desc": "HEAD. 5% damage off. Right-click to wear."},
 		{"id": "iron_chest","tab": "Armor",    "name": "Iron Chestplate","cost": {"ingot": 10}, "desc": "CHEST. 10% damage off. Right-click to wear."},
 		{"id": "iron_legs", "tab": "Armor",    "name": "Iron Leggings",  "cost": {"ingot": 8},  "desc": "LEGS. 7% damage off. Right-click to wear."},
-		{"id": "prism_helmet","tab": "Armor",  "name": "Prism Helmet",   "cost": {"prism": 6, "irid": 8},   "desc": "HEAD. 10% damage off. Shader-forged."},
-		{"id": "prism_chest","tab": "Armor",   "name": "Prism Chestplate","cost": {"prism": 12, "irid": 12},"desc": "CHEST. 18% damage off. Shader-forged."},
-		{"id": "prism_legs","tab": "Armor",    "name": "Prism Leggings", "cost": {"prism": 8, "irid": 10},  "desc": "LEGS. 13% damage off. Shader-forged."},
-		{"id": "prism_boots","tab": "Armor",   "name": "Prism Boots",    "cost": {"prism": 5, "irid": 6},   "desc": "FEET. 7% damage off. Shader-forged."},
 		{"id": "ultima_helmet","tab": "Armor", "name": "Ultima Helmet",  "cost": {"ultima": 8, "prism": 6},  "desc": "HEAD. 14% damage off. Crystal-grown."},
 		{"id": "ultima_chest","tab": "Armor",  "name": "Ultima Chestplate","cost": {"ultima": 15, "prism": 10}, "desc": "CHEST. 24% damage off. Crystal-grown."},
 		{"id": "ultima_legs","tab": "Armor",   "name": "Ultima Leggings","cost": {"ultima": 11, "prism": 8}, "desc": "LEGS. 18% damage off. Crystal-grown."},
 		{"id": "ultima_boots","tab": "Armor",  "name": "Ultima Boots",   "cost": {"ultima": 6, "prism": 5},  "desc": "FEET. 10% damage off. Crystal-grown."},
+		{"id": "prism_helmet","tab": "Armor",  "name": "Prism Helmet",   "cost": {"prism": 20, "irid": 8},   "desc": "HEAD. 16% damage off. Shader-forged."},
+		{"id": "prism_chest","tab": "Armor",   "name": "Prism Chestplate","cost": {"prism": 25, "irid": 12},"desc": "CHEST. 28% damage off. Shader-forged."},
+		{"id": "prism_legs","tab": "Armor",    "name": "Prism Leggings", "cost": {"prism": 22, "irid": 10},  "desc": "LEGS. 21% damage off. Shader-forged."},
+		{"id": "prism_boots","tab": "Armor",   "name": "Prism Boots",    "cost": {"prism": 18, "irid": 6},   "desc": "FEET. 12% damage off. Shader-forged."},
 		{"id": "magnet",    "tab": "Gear",     "name": "Coin Magnet",    "cost": {"coins": 55},  "desc": "Flavor. Coins feel closer."},
 		{"id": "backpack2", "tab": "Gear",     "name": "Prism Backpack", "cost": {"prism": 8, "irid": 6, "coins": 400}, "desc": "Its OWN 40-slot bag. Right-click to open."},
 		{"id": "ubackpack", "tab": "Gear",     "name": "Universe Backpack", "cost": {"ultima": 8, "prism": 6, "coins": 1000}, "desc": "20 slots that exist OUTSIDE SPACE. Every universe backpack opens the same storage."},
@@ -438,6 +438,7 @@ func use_item(slot: int) -> bool:
 		var aslot := str(armors[id]["slot"])
 		var old := str(equip.get(aslot, ""))
 		equip[aslot] = id
+		clear_slot(slot)   # the worn piece leaves your hand
 		if old != "":
 			give(old, 1)
 		Sfx.play("click")
@@ -446,6 +447,7 @@ func use_item(slot: int) -> bool:
 		var pw = get_tree().get_first_node_in_group("player")
 		if pw and pw.has_method("respawn_at") and Game.mode == Game.Mode.ON_FOOT:
 			Game.zone = ""
+			clear_slot(slot)   # single use: it crumbles
 			pw.respawn_at(Game.spawn_pos + Game.spawn_up * 1.5, Game.spawn_up)
 			Sfx.play("warp")
 			return true
@@ -453,6 +455,7 @@ func use_item(slot: int) -> bool:
 	if id == "charm":
 		var oldc := str(equip.get("charm", ""))
 		equip["charm"] = "charm"
+		clear_slot(slot)
 		if oldc != "":
 			give(oldc, 1)
 		Sfx.play("learn")

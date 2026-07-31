@@ -67,44 +67,70 @@ func dress(equip: Dictionary) -> void:
 	if Inventory.armors.has(head_id):
 		var hc: Color = Inventory.armors[head_id]["color"]
 		# helmet: dome cap + brim, open face
-		_armor_nodes.append(_bolt_on(_head_m, Vector3(0.62, 0.3, 0.62), Vector3(0, 0.22, 0), hc))
-		_armor_nodes.append(_bolt_on(_head_m, Vector3(0.66, 0.1, 0.66), Vector3(0, 0.05, 0), hc))
+		_armor_nodes.append(_bolt_on(_head_m, Vector3(0.62, 0.3, 0.62), Vector3(0, 0.22, 0), hc, head_id))
+		_armor_nodes.append(_bolt_on(_head_m, Vector3(0.66, 0.1, 0.66), Vector3(0, 0.05, 0), hc, head_id))
 	var chest_id := str(equip.get("chest", ""))
 	if Inventory.armors.has(chest_id):
 		var cc: Color = Inventory.armors[chest_id]["color"]
 		# chestplate: front+back plates and shoulder pads
-		_armor_nodes.append(_bolt_on(_torso, Vector3(0.96, 0.9, 0.14), Vector3(0, 0.1, -0.26), cc))
-		_armor_nodes.append(_bolt_on(_torso, Vector3(0.96, 0.9, 0.14), Vector3(0, 0.1, 0.26), cc))
-		_armor_nodes.append(_bolt_on(_torso, Vector3(0.34, 0.16, 0.5), Vector3(-0.44, 0.6, 0), cc))
-		_armor_nodes.append(_bolt_on(_torso, Vector3(0.34, 0.16, 0.5), Vector3(0.44, 0.6, 0), cc))
+		_armor_nodes.append(_bolt_on(_torso, Vector3(0.96, 0.9, 0.14), Vector3(0, 0.1, -0.26), cc, chest_id))
+		_armor_nodes.append(_bolt_on(_torso, Vector3(0.96, 0.9, 0.14), Vector3(0, 0.1, 0.26), cc, chest_id))
+		_armor_nodes.append(_bolt_on(_torso, Vector3(0.34, 0.16, 0.5), Vector3(-0.44, 0.6, 0), cc, chest_id))
+		_armor_nodes.append(_bolt_on(_torso, Vector3(0.34, 0.16, 0.5), Vector3(0.44, 0.6, 0), cc, chest_id))
 	var legs_id := str(equip.get("legs", ""))
 	if Inventory.armors.has(legs_id):
 		var lc: Color = Inventory.armors[legs_id]["color"]
 		# thigh guards riding the legs (they swing with the walk)
-		_armor_nodes.append(_bolt_on(_leg_l, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc))
-		_armor_nodes.append(_bolt_on(_leg_r, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc))
+		_armor_nodes.append(_bolt_on(_leg_l, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc, legs_id))
+		_armor_nodes.append(_bolt_on(_leg_r, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc, legs_id))
 	var boots_id := str(equip.get("boots", ""))
 	if Inventory.armors.has(boots_id):
 		var bc: Color = Inventory.armors[boots_id]["color"]
 		# chunky boots with a toe cap, on the feet
 		for leg in [_leg_l, _leg_r]:
-			_armor_nodes.append(_bolt_on(leg, Vector3(0.38, 0.26, 0.42), Vector3(0, -0.46, -0.03), bc))
-			_armor_nodes.append(_bolt_on(leg, Vector3(0.3, 0.14, 0.2), Vector3(0, -0.5, -0.24), bc.lightened(0.2)))
+			_armor_nodes.append(_bolt_on(leg, Vector3(0.38, 0.26, 0.42), Vector3(0, -0.46, -0.03), bc, boots_id))
+			_armor_nodes.append(_bolt_on(leg, Vector3(0.3, 0.14, 0.2), Vector3(0, -0.5, -0.24), bc.lightened(0.2), boots_id))
 	if str(equip.get("charm", "")) == "charm":
 		# the charm hangs glowing at the neck
 		var gem := _bolt_on(_torso, Vector3(0.14, 0.18, 0.1), Vector3(0, 0.48, -0.3), Color("#b56cff"))
 		gem.material_override = Destructible.make_material(Color("#b56cff"), 3.0)
 		_armor_nodes.append(gem)
 
-func _bolt_on(parent: MeshInstance3D, size: Vector3, pos: Vector3, c: Color) -> MeshInstance3D:
+func _bolt_on(parent: MeshInstance3D, size: Vector3, pos: Vector3, c: Color, id: String = "") -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var m := BoxMesh.new()
 	m.size = size
 	mi.mesh = m
 	mi.position = pos
-	mi.material_override = Destructible.make_material(c, 0.35)
+	if id.begins_with("prism_"):
+		mi.material_override = _prism_material()
+	else:
+		mi.material_override = Destructible.make_material(c, 0.35)
 	parent.add_child(mi)
 	return mi
+
+static var _prism_mat: ShaderMaterial
+
+## Iridescent shifting rainbow -- prism armor looks like the shards it costs.
+static func _prism_material() -> ShaderMaterial:
+	if _prism_mat:
+		return _prism_mat
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+void fragment() {
+	float fres = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.4);
+	float hue = fract(fres * 0.9 + TIME * 0.12);
+	vec3 rainbow = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
+	METALLIC = 0.85;
+	ROUGHNESS = 0.12;
+	EMISSION = rainbow * (0.25 + 0.55 * fres);
+}
+"""
+	_prism_mat = ShaderMaterial.new()
+	_prism_mat.shader = sh
+	return _prism_mat
 
 var _punch_t: float = 0.0
 var _jet_node: Node3D

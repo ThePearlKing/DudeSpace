@@ -682,10 +682,8 @@ func _tracer(a: Vector3, b: Vector3, color: Color) -> void:
 	im.surface_end()
 	mi.mesh = im
 	get_parent().add_child(mi)
-	var t := get_tree().create_timer(0.05)
-	t.timeout.connect(func() -> void:
-		if is_instance_valid(mi):
-			mi.queue_free())
+	# method callable on mi: auto-disconnects if the scene frees it first
+	get_tree().create_timer(0.05).timeout.connect(mi.queue_free)
 
 func _update_shake(delta: float) -> void:
 	if _shake > 0.0:
