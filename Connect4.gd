@@ -6,7 +6,7 @@ extends Node3D
 
 const COLS := 7
 const ROWS := 6
-const REWARD := 5000       # the AI is rigged; beating it should pay like it
+const REWARD := 800        # the AI is rigged, but gold inflation is real
 const TIE_REWARD := 350   # holding it to a draw still earns something
 
 var grid: Array = []        # grid[c][r] : 0 empty, 1 you, 2 island
