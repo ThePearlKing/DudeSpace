@@ -137,7 +137,7 @@ func _build_title() -> void:
 	_title_ui.add_child(col)
 
 	var title := Label.new()
-	title.text = "CLAUDE  THE  DUDE"
+	title.text = "DUDESPACE"
 	title.add_theme_font_size_override("font_size", 52)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
