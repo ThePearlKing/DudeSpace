@@ -1,0 +1,37 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Claude The dude"
+run/main_scene="res://Title.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+config/icon="res://icon.png"
+
+[autoload]
+
+Universe="*res://Universe.gd"
+Settings="*res://Settings.gd"
+Sfx="*res://Sfx.gd"
+Inventory="*res://Inventory.gd"
+Game="*res://Game.gd"
+Save="*res://Save.gd"
+
+[display]
+
+window/size/mode=3
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"

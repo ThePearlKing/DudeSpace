@@ -1,0 +1,276 @@
+extends Node
+## Autoload "Game". Run mode, score, and the noodle-god wrath meter.
+## You do NOT die from lack of destruction anymore -- breaking earns
+## coins. But the megalophobia destruction noodle gods grow angry when
+## you loiter near giant structures without destroying. Max wrath ->
+## you are turned into the Pythagorean theorem.
+
+signal changed
+signal transformed   # pythagoras "death"
+signal killed        # slain by aliens
+signal perma         # permadeath: save erased
+
+enum Mode { ON_FOOT, IN_ROCKET }
+
+const WRATH_MAX := 100.0
+const HEALTH_MAX := 100.0
+
+var mode: int = Mode.ON_FOOT
+var score: int = 0
+var wrath: float = 0.0          # rises ONLY from unholy acts (hidden meter)
+var health: float = HEALTH_MAX
+var dead: bool = false
+var trapped: bool = false       # caught by TIN 618
+var dilation: float = 1.0       # time-dilation factor near the black hole
+var _since_hit: float = 0.0
+var _salad_t: float = -1.0   # seconds since eating a salad (-1 = none)
+
+func eat_salad() -> void:
+	_salad_t = 0.0
+	heal(5.0)   # barely anything... at first
+	Sfx.play("eat")
+
+func salad_active() -> bool:
+	return _salad_t >= 0.0
+
+# ------------------------------------------------------------- calendar
+## One in-game day = 10 minutes of playtime. Week starts Monday.
+const DAY_SECS := 600.0
+const WEEKDAYS := ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+func day_index() -> int:
+	return int(playtime / DAY_SECS)
+
+func weekday() -> int:
+	return day_index() % 7
+
+func weekday_name() -> String:
+	return WEEKDAYS[weekday()]
+
+## The UFO market comes on Tuesdays, and SOMETIMES Saturdays.
+func is_ufo_day() -> bool:
+	if weekday() == 1:
+		return true
+	if weekday() == 5:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = day_index()
+		return rng.randf() < 0.5
+	return false
+
+func pet_following() -> bool:
+	# benefits require the pet actually AT your side: following AND nearby
+	var pet = get_tree().get_first_node_in_group("pet")
+	if pet == null or not is_instance_valid(pet) or pet.staying:
+		return false
+	var p = get_tree().get_first_node_in_group("player")
+	return p != null and pet.global_position.distance_to(p.global_position) < 30.0
+
+var spawn_pos: Vector3 = Vector3.ZERO
+var spawn_up: Vector3 = Vector3.UP
+var has_saved_spawn: bool = false   # a save carried its own spawn point
+var trials_done: bool = false       # temple guardians dead -> maze door open
+
+# --- locator gadget: a temporary green ping the HUD points at ---
+var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow temple · 3 ufo · 4 rifts
+var locator_target: Vector3 = Vector3.ZERO
+var locator_label: String = ""
+var locator_until: float = -1.0
+var permadead: bool = false
+
+# --- gravity zone for interior pocket dimensions ---
+var zone: String = ""        # "" radial | "flat" fixed down | "zero" none
+var zone_g: float = 9.0
+
+var timewarp: float = 1.0    # rocket time acceleration (1/2/3x; 5/10x coasting)
+var board_lock: float = 0.0  # playtime before which re-boarding is blocked
+
+# --- progression flags ---
+var door_open: bool = false   # euclid temple door (opens forever)
+var mind_core: bool = false   # unlocks the pyramid
+var playtime: float = 0.0     # for time-rift snapshots
+var cheated: bool = false     # any cheat = save branded illegitimate forever
+var hardcore: bool = false    # run mode: ANY death is permadeath
+var godmode: bool = false     # cheat: no damage at all
+var inf_fuel: bool = false    # cheat: tanks never drain
+var creative: bool = false    # cheat: creative inventory tab
+var keep_inv: bool = false    # cheat: no coin loss on death
+var free_craft: bool = false  # cheat: buy/craft anything, pay nothing
+
+## Irreversible death: erase the save. Black hole, or a Permadeath Apple.
+## An Anti-Permadeath Charm in the hotbar is consumed to survive instead.
+func permadeath() -> void:
+	if permadead:
+		return
+	if Inventory.consume_charm():
+		# saved by the charm: respawn, keep the rest of your items
+		health = HEALTH_MAX
+		dead = false
+		mode = Mode.ON_FOOT
+		var p := get_tree().get_first_node_in_group("player")
+		if p and p.has_method("respawn_at"):
+			p.respawn_at(spawn_pos, spawn_up)
+		changed.emit()
+		return
+	permadead = true
+	dead = true
+	Save.delete_slot(Save.current_slot)
+	perma.emit()
+	changed.emit()
+
+func set_spawn(pos: Vector3, up: Vector3) -> void:
+	spawn_pos = pos
+	spawn_up = up
+
+## Strip carried items (keep coins + character) and send you to spawn.
+func reset_character() -> void:
+	Inventory.lose_half()   # resetting costs you 50% of carried coins too
+	Inventory.hotbar = []
+	for i in 5:
+		Inventory.hotbar.append(Inventory.empty_slot())
+	Inventory.selected = 0
+	Inventory.fuel = 0.0
+	Inventory.jet_fuel = 0.0
+	Inventory.has_jetpack = false
+	Inventory.has_rcs = false
+	health = HEALTH_MAX
+	dead = false
+	mode = Mode.ON_FOOT
+	var p := get_tree().get_first_node_in_group("player")
+	if p and p.has_method("respawn_at"):
+		p.respawn_at(spawn_pos, spawn_up)
+	Inventory.changed.emit()
+	changed.emit()
+
+func report_mega() -> void:
+	pass   # loitering no longer angers the gods
+
+## The gods rage at unholy deeds (leaving the universe, alien starships...).
+func anger(amount: float) -> void:
+	if dead:
+		return
+	wrath = minf(WRATH_MAX, wrath + amount)
+	changed.emit()
+
+var wrath_event: bool = false   # the noodle god is currently descending
+
+## The descent ended: caught=true -> the pythagorean transformation.
+func wrath_event_over(caught: bool) -> void:
+	wrath_event = false
+	if not caught:
+		return
+	if hardcore:
+		permadeath()
+		changed.emit()
+		return
+	dead = true
+	if not keep_inv:
+		Inventory.lose_half()
+	transformed.emit()
+	changed.emit()
+
+var _hurt_sfx_t: float = 0.0
+
+func hurt(d: float) -> void:
+	if dead or godmode:
+		return
+	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
+	health = maxf(0.0, health - d)
+	_since_hit = 0.0
+	if playtime - _hurt_sfx_t > 0.3:   # throttle for per-frame burns
+		_hurt_sfx_t = playtime
+		Sfx.play("hurt", -10.0)
+	if health <= 0.0:
+		if hardcore:
+			permadeath()   # hardcore: every death is THE death (charm can save)
+			changed.emit()
+			return
+		dead = true
+		if not keep_inv:
+			Inventory.lose_half()   # drop 50% of carried coins on death
+			# the jetpack is CONSUMABLE: death burns it (and its upgrades)
+			Inventory.has_jetpack = false
+			Inventory.jet_fuel = 0.0
+			Inventory.jet_max = 100.0
+			Inventory.jet_power = 1.0
+			Inventory.jet_on = false
+		killed.emit()
+	changed.emit()
+
+func heal(a: float) -> void:
+	if dead:
+		return
+	health = minf(HEALTH_MAX, health + a)
+	changed.emit()
+
+func _process(delta: float) -> void:
+	if dead:
+		return
+	playtime += delta
+	if inf_fuel:
+		Inventory.fuel = Inventory.fuel_max
+		Inventory.jet_fuel = Inventory.jet_max
+	wrath = maxf(0.0, wrath - 0.4 * delta)      # anger slowly cools
+	# a FOLLOWING pet warms the heart: +2% regen
+	var pet_mult := 1.02 if pet_following() else 1.0
+	_since_hit += delta
+	if _since_hit > 4.0 and health < HEALTH_MAX:  # slow regen out of combat
+		health = minf(HEALTH_MAX, health + 5.0 * pet_mult * delta)
+
+	# --- salad regen curve: nothing for 3s, then it ACCELERATES to a
+	# ridiculous peak, then winds down and ends after about a minute ---
+	if _salad_t >= 0.0:
+		_salad_t += delta
+		var t := _salad_t
+		if t > 3.0:
+			var rate := minf(pow(t - 3.0, 1.7) * 0.35, 22.0)   # accelerating ramp
+			if t > 55.0:
+				rate *= clampf(1.0 - (t - 55.0) / 15.0, 0.0, 1.0)   # winding down
+			health = minf(HEALTH_MAX, health + rate * pet_mult * delta)
+		if t > 70.0:
+			_salad_t = -1.0
+	# MAX WRATH: the god COMES for you (a whole event, not an instant death)
+	if wrath >= WRATH_MAX and not wrath_event:
+		wrath_event = true
+		var cs := get_tree().current_scene
+		if cs and cs.has_method("noodle_wrath_event"):
+			cs.noodle_wrath_event()
+		else:
+			wrath_event_over(true)
+	changed.emit()
+
+signal broke   # something, somewhere, got smashed. worms have ears.
+
+func register_break(size: Vector3, coins: int) -> void:
+	if dead:
+		return
+	broke.emit()
+	var vol := clampf(size.x * size.y * size.z, 1.0, 200.0)
+	score += int(10.0 + vol)
+	Inventory.add_coins(coins if coins > 0 else int(1.0 + vol * 0.5))
+	changed.emit()
+
+func reset() -> void:
+	mode = Mode.ON_FOOT
+	score = 0
+	wrath = 0.0
+	health = HEALTH_MAX
+	dead = false
+	trapped = false
+	permadead = false
+	dilation = 1.0
+	timewarp = 1.0
+	zone = ""
+	zone_g = 9.0
+	door_open = false
+	mind_core = false
+	cheated = false
+	godmode = false
+	inf_fuel = false
+	creative = false
+	keep_inv = false
+	free_craft = false
+	playtime = 0.0
+	_since_hit = 0.0
+	_salad_t = -1.0
+	Inventory.reset()
+	changed.emit()
