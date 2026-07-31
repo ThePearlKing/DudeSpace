@@ -710,10 +710,11 @@ func _populate(b) -> void:
 				"color": Color("#ff8c1a")})
 			add_child(shrine)
 			var sdir := _surface_dir()
-			shrine.global_transform = Transform3D(_basis_from_up(sdir), b.center + sdir * b.radius)
+			# gate sits ON TOP of the dais so F always has a clear shot at it
+			shrine.global_transform = Transform3D(_basis_from_up(sdir), b.center + sdir * (b.radius + 1.9))
 			# --- a proper ROUND shrine around the gate ---
-			# stacked stone dais: three shrinking discs
-			var tiers := [[5.0, 0.7, 0.0], [3.8, 0.6, 0.7], [2.6, 0.6, 1.3]]
+			# stacked stone dais BELOW the gate: three shrinking discs
+			var tiers := [[5.0, 0.7, -1.9], [3.8, 0.6, -1.2], [2.6, 0.6, -0.6]]
 			for tr in tiers:
 				var disc := MeshInstance3D.new()
 				var dm := CylinderMesh.new()
@@ -735,7 +736,7 @@ func _populate(b) -> void:
 				pil.mesh = pm3
 				pil.material_override = Destructible.make_material(Color("#b8924e"), 0.1)
 				shrine.add_child(pil)
-				pil.position = Vector3(cos(pang) * 4.2, 2.4, sin(pang) * 4.2)
+				pil.position = Vector3(cos(pang) * 4.2, 0.5, sin(pang) * 4.2)
 				var cap := MeshInstance3D.new()
 				var cm3 := SphereMesh.new()
 				cm3.radius = 0.4
@@ -743,7 +744,7 @@ func _populate(b) -> void:
 				cap.mesh = cm3
 				cap.material_override = Destructible.make_material(Color("#ff8c1a"), 2.2)
 				shrine.add_child(cap)
-				cap.position = Vector3(cos(pang) * 4.2, 4.8, sin(pang) * 4.2)
+				cap.position = Vector3(cos(pang) * 4.2, 2.9, sin(pang) * 4.2)
 			# the floating golden pi, visible from orbit
 			var pig := Label3D.new()
 			pig.text = "π"
@@ -754,13 +755,13 @@ func _populate(b) -> void:
 			pig.outline_size = 36
 			pig.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			shrine.add_child(pig)
-			pig.position = Vector3(0, 8.5, 0)
+			pig.position = Vector3(0, 6.5, 0)
 			var slight := OmniLight3D.new()
 			slight.light_color = Color("#ffb04a")
 			slight.light_energy = 2.5
 			slight.omni_range = 26.0
 			shrine.add_child(slight)
-			slight.position = Vector3(0, 5.0, 0)
+			slight.position = Vector3(0, 3.0, 0)
 			_spawn_res_nodes(b, 12, "raw_irid", 3)
 			_build_mine(b, MINE_DIRS["Pi"], "raw_irid", 5, Color("#2a8f6a"))
 		"sand":

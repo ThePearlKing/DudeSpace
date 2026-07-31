@@ -13,6 +13,7 @@ var _ring: Node3D
 var _active: bool = false   # worms sleep until someone touches the ground
 var _tease_w = null         # the one worm that sometimes surfaces anyway
 var _tease_until: float = 0.0
+var _retreat_t: float = 0.0 # worms diving home before they vanish
 
 func build(radius: float) -> void:
 	_radius = radius
@@ -180,6 +181,20 @@ func _process(delta: float) -> void:
 	# dormant until someone TOUCHES the ground; back to sleep only when
 	# the trespasser is super far away from the planet
 	var pdist: float = to_local(p.global_position).length() if p else 1e9
+	# retreat: every worm plunges into the planet, THEN goes to sleep
+	if _retreat_t > 0.0:
+		_retreat_t -= delta
+		var sink := 1.0 - (3.0 - _retreat_t) / 3.0 * 0.55   # shrink toward the core
+		for w in _worms:
+			w["th"] = fmod(float(w["th"]) + float(w["spd"]) * 2.0 * delta, TAU)
+			var segs2: Array = w["segs"]
+			for k in segs2.size():
+				var th2: float = float(w["th"]) - float(k) * 0.045
+				segs2[k].position = _worm_pos(w, th2) * sink
+		if _retreat_t <= 0.0:
+			_set_worms_visible(false)
+		return
+
 	if not _active:
 		if p and Game.mode == Game.Mode.ON_FOOT and not Game.dead and pdist < _radius + 4.0:
 			_active = true
@@ -212,7 +227,7 @@ func _process(delta: float) -> void:
 			return
 	elif pdist > _radius * 4.0:
 		_active = false
-		_set_worms_visible(false)
+		_retreat_t = 3.0   # dive first. vanish underground, not mid-air.
 		return
 	var can_hurt := p != null and Game.mode == Game.Mode.ON_FOOT and not Game.dead
 	for w in _worms:
