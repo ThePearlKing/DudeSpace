@@ -183,8 +183,16 @@ func apply_progress() -> void:
 	Inventory.ak47_recipe = bool(_progress.get("ak47_recipe", false))
 	Inventory.artifact_taken = bool(_progress.get("artifact_taken", false))
 	Inventory.hotbar = parse_slots(_progress.get("hotbar", []), 5)
-	Inventory.backpack_store = parse_slots(_progress.get("backpack", []),
-		maxi(20, int(_progress.get("pack_size", 20))))
+	# migration: an old 40-slot upgraded backpack splits 20/20 into prism
+	var rawbp = _progress.get("backpack", [])
+	Inventory.backpack_store = parse_slots(rawbp, 20)
+	Inventory.prism_store = parse_slots(_progress.get("prism_pack", []), 40)
+	if rawbp is Array and rawbp.size() > 20:
+		var extra := parse_slots(rawbp.slice(20), 20)
+		for i in extra.size():
+			if str(extra[i]["id"]) != "":
+				Inventory.prism_store[i] = extra[i]
+	Inventory.universe_store = parse_slots(_progress.get("universe_pack", []), 20)
 	Inventory.selected = int(_progress.get("selected", 0))
 	Game.score = int(_progress.get("score", 0))
 	Game.wrath = float(_progress.get("wrath", 0.0))
@@ -259,7 +267,8 @@ func save_progress() -> void:
 		"artifact_taken": Inventory.artifact_taken,
 		"hotbar": Inventory.hotbar,
 		"backpack": Inventory.backpack_store,
-		"pack_size": Inventory.backpack_store.size(),
+		"prism_pack": Inventory.prism_store,
+		"universe_pack": Inventory.universe_store,
 		"selected": Inventory.selected,
 		"score": Game.score,
 		"wrath": Game.wrath,

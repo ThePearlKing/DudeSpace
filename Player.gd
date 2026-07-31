@@ -719,7 +719,9 @@ func _use_selected() -> void:
 	if id == "":
 		return
 	if id == "locator":
-		_locate_next()
+		var lui = get_tree().get_first_node_in_group("locator_ui")
+		if lui and lui.has_method("open"):
+			lui.open()
 		return
 	# the wiring tools
 	if id == "wiretool":
@@ -839,10 +841,10 @@ func _use_selected() -> void:
 				Sfx.play("learn")
 			else:
 				Sfx.play("denied")
-		"backpack":
+		"backpack", "backpack2", "ubackpack":
 			var ui := get_tree().get_first_node_in_group("storage_ui")
 			if ui and ui.has_method("open_backpack"):
-				ui.open_backpack()
+				ui.open_backpack(id)
 		"permapple":
 			# two clicks to die: warn first, eat on confirm within 3s
 			if Game.playtime - _apple_warn_t < 3.0:
@@ -1045,13 +1047,13 @@ func _launch_orbit(n: Node3D) -> void:
 	Sfx.play("warp", -8.0)
 	_shake = 0.2
 
-## The locator: cycle categories, ping the nearest one as a 45s green
-## HUD waypoint.
-func _locate_next() -> void:
-	Game.locator_mode = (Game.locator_mode + 1) % 6
+## The locator: single-instance targets ping alone, mine entrance pings the
+## nearest one on this planet, swarm targets (invaders, rifts) ping ALL of
+## them at once. 45s green HUD waypoints.
+func locate(mode: int) -> void:
+	Game.locator_mode = mode
 	var label := ""
-	var target := Vector3.ZERO
-	var found := false
+	var targets: Array = []
 	match Game.locator_mode:
 		0:
 			label = "ALIEN SHIP"
@@ -1060,27 +1062,19 @@ func _locate_next() -> void:
 				var d2: float = global_position.distance_squared_to(n.global_position)
 				if d2 < best:
 					best = d2
-					target = n.global_position
-					found = true
+					targets = [n.global_position]
 		1:
 			label = "SPACE INVADERS"
-			var best2 := 1e18
 			for n in get_tree().get_nodes_in_group("invader"):
-				var d3: float = global_position.distance_squared_to(n.global_position)
-				if d3 < best2:
-					best2 = d3
-					target = n.global_position
-					found = true
+				targets.append(n.global_position)
 		2:
 			label = "SHADOW TEMPLE"
-			target = Zones.SHADOW_POS
-			found = true
+			targets = [Zones.SHADOW_POS]
 		3:
 			label = "UFO"
 			var u = get_tree().get_first_node_in_group("ufo")
 			if u:
-				target = u.global_position
-				found = true
+				targets = [u.global_position]
 		5:
 			label = "MINE ENTRANCE"
 			var cs2 := get_tree().current_scene
@@ -1090,33 +1084,35 @@ func _locate_next() -> void:
 					var d5: float = global_position.distance_squared_to(mpos)
 					if d5 < best4:
 						best4 = d5
-						target = mpos
-						found = true
+						targets = [mpos]
+		6:
+			label = "CONNECT 4 ARENA"
+			var c4 = get_tree().get_first_node_in_group("connect4")
+			if c4:
+				targets = [c4.global_position]
 		4:
 			label = "TIME RIFT"
 			var cs := get_tree().current_scene
 			var rifts = cs.get("_rifts") if cs else null
 			if rifts is Array:
-				var best3 := 1e18
 				for r in rifts:
-					var d4: float = global_position.distance_squared_to(r)
-					if d4 < best3:
-						best3 = d4
-						target = r
-						found = true
+					targets.append(r)
 	var hud = get_tree().get_first_node_in_group("hud")
-	if not found:
+	if targets.is_empty():
 		Game.locator_until = -1.0
 		Sfx.play("denied", -16.0)
 		if hud:
 			hud.flash("LOCATOR: no %s found" % label)
 		return
-	Game.locator_target = target
+	Game.locator_targets = targets
 	Game.locator_label = label
 	Game.locator_until = Game.playtime + 45.0
 	Sfx.play("click", -10.0)
 	if hud:
-		hud.flash("LOCATOR: " + label)
+		if targets.size() > 1:
+			hud.flash("LOCATOR: %s x%d" % [label, targets.size()])
+		else:
+			hud.flash("LOCATOR: " + label)
 
 func _interact() -> void:
 	# holding the ORBIT WAND: F sends YOU around the planet

@@ -29,9 +29,10 @@ var MINE_DIRS := {
 	"Verdant": Vector3(0.7, 0.2, 0.7).normalized(),
 	"Crystalia": Vector3(-0.6, 0.5, -0.6).normalized(),
 }
-var _snap_t: float = 60.0
+var _snap_t: float = 0.0   # first snapshot IMMEDIATELY, then one per minute
 var _rifts: Array = []                 # rift positions
 var _rift_cd: float = 0.0
+var _rift_prev: Vector3 = Vector3.ZERO
 const C4_POS := Vector3(9000, 6000, -9000)
 var _c4: Connect4
 var _c4_zone: bool = false
@@ -63,6 +64,7 @@ func _ready() -> void:
 	_spawn_rifts()
 	_spawn_starship()
 	_c4 = Connect4.new()
+	_c4.add_to_group("connect4")
 	add_child(_c4)
 	_c4.global_position = C4_POS
 
@@ -77,6 +79,7 @@ func _ready() -> void:
 	add_child(CodeUI.new())
 	add_child(PiQuizUI.new())
 	add_child(TeleportUI.new())
+	add_child(LocatorUI.new())
 	add_child(PauseMenu.new())
 	add_child(StatsOverlay.new())
 	_rocket_hud = RocketHUD.new()
@@ -87,6 +90,8 @@ func _ready() -> void:
 	Save.apply_progress()   # restore this slot's run (no-op on a fresh slot)
 	if OS.get_environment("CTD_TEST") == "1":
 		_self_test()
+	if OS.get_environment("CTD_TEST") == "2":
+		_rift_test()
 	if _player:
 		_player.restore_jet()   # jetpack comes back ON if you left it on
 	if Game.door_open:
@@ -166,6 +171,16 @@ func _self_test() -> void:
 	var w2 := collect_world()
 	print("SELFTEST recollect=", w2.size(), " (expected ", w.size() * 2, " after respawn beside originals)")
 
+func _rift_test() -> void:
+	await get_tree().create_timer(0.5).timeout
+	Save.snaps.clear()
+	Save.snaps.append(_make_snapshot(Vector3(123, 456, 789)))
+	Save.snaps[0]["t"] = -999.0   # definitely "5 minutes ago"
+	_player.global_position = _rifts[0]
+	print("RIFTTEST placed at ", _rifts[0])
+	await get_tree().create_timer(1.0).timeout
+	print("RIFTTEST player now at ", _player.global_position, "  (want ~123,456,789)")
+
 func _process(delta: float) -> void:
 	_regen_crates(delta)
 	_regen_ore(delta)
@@ -225,13 +240,21 @@ func _process(delta: float) -> void:
 			if _hud:
 				_hud.flash("a saucer slid into the system. it's %s." % Game.weekday_name())
 
-	# --- rifts: warped patches of space; fly through -> 5 min into the past ---
+	# --- rifts: warped patches of space; fly through -> 5 min into the past.
+	# SWEPT check: even a 10x-timewarp rocket crossing the bubble between
+	# two frames still counts. No tunneling through time holes. ---
 	_rift_cd = maxf(0.0, _rift_cd - delta)
 	if _rift_cd <= 0.0 and not Game.dead:
 		for r in _rifts:
-			if pos.distance_to(r) < 10.0:
+			var seg := pos - _rift_prev
+			var t2 := 0.0
+			if seg.length_squared() > 0.0001:
+				t2 = clampf((r - _rift_prev).dot(seg) / seg.length_squared(), 0.0, 1.0)
+			var closest := _rift_prev + seg * t2
+			if closest.distance_to(r) < 28.0:
 				_enter_rift()
 				break
+	_rift_prev = pos
 
 	# sphere-of-influence change notice (KSP-style)
 	var soi := Universe.nearest(pos).name
@@ -1475,39 +1498,33 @@ func _spawn_rifts() -> void:
 		Vector3(1500, 2400, -1800), Vector3(-2800, -2200, 3400),
 		Vector3(5200, 3800, -5600), Vector3(-6500, 1500, -7000),
 	]
+	# INVISIBLE space-warp: a big bubble that bends whatever is behind it.
+	# No rim, no glow. You spot it by the stars smearing. Good luck.
+	var wsh := Shader.new()
+	wsh.code = """
+shader_type spatial;
+render_mode unshaded, cull_back;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+void fragment() {
+	vec3 nv = normalize(NORMAL);
+	float edge = 1.0 - abs(dot(nv, normalize(-VERTEX)));
+	vec2 off = nv.xy * 0.10 * (0.35 + edge) + vec2(sin(TIME * 0.7 + VERTEX.y * 0.2), cos(TIME * 0.5 + VERTEX.x * 0.2)) * 0.012;
+	ALBEDO = texture(screen_tex, clamp(SCREEN_UV + off, vec2(0.001), vec2(0.999))).rgb;
+}
+"""
 	for r in _rifts:
-		# a refraction bubble that VISIBLY warps the stars behind it...
 		var mi := MeshInstance3D.new()
 		var sm := SphereMesh.new()
-		sm.radius = 9.0
-		sm.height = 18.0
+		sm.radius = 28.0
+		sm.height = 56.0
+		sm.radial_segments = 48
+		sm.rings = 32
 		mi.mesh = sm
-		var mat := StandardMaterial3D.new()
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(1, 1, 1, 0.06)
-		mat.refraction_enabled = true
-		mat.refraction_scale = 0.12
-		mat.roughness = 0.0
-		mi.material_override = mat
+		var wmat := ShaderMaterial.new()
+		wmat.shader = wsh
+		mi.material_override = wmat
 		add_child(mi)
 		mi.global_position = r
-		# ...plus a shimmering rim so you can actually SEE the thing
-		var rim := MeshInstance3D.new()
-		var rm := TorusMesh.new()
-		rm.inner_radius = 8.6
-		rm.outer_radius = 9.4
-		rim.mesh = rm
-		var rmat := StandardMaterial3D.new()
-		rmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		rmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		rmat.albedo_color = Color(0.7, 0.4, 1.0, 0.35)
-		rmat.emission_enabled = true
-		rmat.emission = Color("#a060ff")
-		rmat.emission_energy_multiplier = 1.2
-		rim.material_override = rmat
-		rim.rotation_degrees = Vector3(randf_range(0, 180), randf_range(0, 180), 0)
-		add_child(rim)
-		rim.global_position = r
 
 func _make_snapshot(pos: Vector3) -> Dictionary:
 	return {
@@ -1525,6 +1542,9 @@ func _make_snapshot(pos: Vector3) -> Dictionary:
 
 func _enter_rift() -> void:
 	if Save.snaps.is_empty():
+		_rift_cd = 5.0
+		if _hud:
+			_hud.flash("the rift has no past to return you to yet")
 		return
 	_rift_cd = 20.0
 	# 5 minutes back if we have it, else the oldest we know
@@ -1544,8 +1564,8 @@ func _enter_rift() -> void:
 	if hb is Array and hb.size() == 5:
 		Inventory.hotbar = Save.parse_slots(hb, 5)
 	var bp = chosen.get("backpack", [])
-	if bp is Array and bp.size() == 10:
-		Inventory.backpack_store = Save.parse_slots(bp, 10)
+	if bp is Array and not bp.is_empty():
+		Inventory.backpack_store = Save.parse_slots(bp, 20)
 	Save.snaps.clear()   # the past resets; rifting again won't take you far
 	var node := _active_node()
 	if node is Rocket:

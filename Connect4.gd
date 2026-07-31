@@ -6,7 +6,8 @@ extends Node3D
 
 const COLS := 7
 const ROWS := 6
-const REWARD := 5000   # the AI is rigged; beating it should pay like it
+const REWARD := 5000       # the AI is rigged; beating it should pay like it
+const TIE_REWARD := 350   # holding it to a draw still earns something
 
 var grid: Array = []        # grid[c][r] : 0 empty, 1 you, 2 island
 var busy: bool = false
@@ -193,6 +194,11 @@ func _check_end() -> bool:
 		Sfx.play("denied")
 		if hud:
 			hud.flash("the island wins. it always plays red.")
+	else:   # board full, no winner -- a draw
+		Inventory.add_coins(TIE_REWARD)
+		Sfx.play("click")
+		if hud:
+			hud.flash("draw. %d gold." % TIE_REWARD)
 	# board resets after a moment
 	var t := get_tree().create_timer(4.0)
 	t.timeout.connect(func() -> void:

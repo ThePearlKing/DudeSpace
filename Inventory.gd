@@ -137,6 +137,7 @@ var items: Dictionary = {
 	"waypoint":   {"name": "Waypoint",         "color": Color("#ffd166")},
 	"locator":    {"name": "Locator",          "color": Color("#8a9099")},
 	"backpack2":  {"name": "Prism Backpack",   "color": Color("#ff7ce9")},
+	"ubackpack":  {"name": "Universe Backpack","color": Color("#7df9ff")},
 	"iron_helmet": {"name": "Iron Helmet",     "color": Color("#b8bcc8")},
 	"iron_chest": {"name": "Iron Chestplate",  "color": Color("#b8bcc8")},
 	"iron_legs":  {"name": "Iron Leggings",    "color": Color("#b8bcc8")},
@@ -154,7 +155,9 @@ var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier
 	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender"]
 
 var hotbar: Array = []
-var backpack_store: Array = []
+var backpack_store: Array = []   # basic pack: 20
+var prism_store: Array = []      # prism pack: 40, its own bag
+var universe_store: Array = []   # universe pack: 20, ender-style (all universe packs share it)
 var selected: int = 0
 var caged_data: Array = []   # genomes of caged animals (persisted)
 
@@ -175,6 +178,12 @@ func _blank_containers() -> void:
 	backpack_store = []
 	for i in 20:
 		backpack_store.append(empty_slot())
+	prism_store = []
+	for i in 40:
+		prism_store.append(empty_slot())
+	universe_store = []
+	for i in 20:
+		universe_store.append(empty_slot())
 
 func _ready() -> void:
 	catalog = [
@@ -204,7 +213,8 @@ func _ready() -> void:
 		{"id": "ultima_legs","tab": "Armor",   "name": "Ultima Leggings","cost": {"ultima": 11, "prism": 8}, "desc": "LEGS. 18% damage off. Crystal-grown."},
 		{"id": "ultima_boots","tab": "Armor",  "name": "Ultima Boots",   "cost": {"ultima": 6, "prism": 5},  "desc": "FEET. 10% damage off. Crystal-grown."},
 		{"id": "magnet",    "tab": "Gear",     "name": "Coin Magnet",    "cost": {"coins": 55},  "desc": "Flavor. Coins feel closer."},
-		{"id": "backpack2", "tab": "Gear",     "name": "Prism Backpack", "cost": {"prism": 8, "irid": 6, "coins": 400}, "desc": "Right-click: upgrades your backpack to 40 slots. Twice the chest."},
+		{"id": "backpack2", "tab": "Gear",     "name": "Prism Backpack", "cost": {"prism": 8, "irid": 6, "coins": 400}, "desc": "Its OWN 40-slot bag. Right-click to open."},
+		{"id": "ubackpack", "tab": "Gear",     "name": "Universe Backpack", "cost": {"ultima": 8, "prism": 6, "coins": 1000}, "desc": "20 slots that exist OUTSIDE SPACE. Every universe backpack opens the same storage."},
 		{"id": "locator",   "tab": "Gear",     "name": "Locator",        "cost": {"ultima": 4, "irid": 12}, "desc": "Right-click: cycle target (alien ship / invaders / shadow temple / UFO / rifts / mines) + green ping through walls."},
 		{"id": "waypoint",  "tab": "Gear",     "name": "Waypoint ×3",    "cost": {"ultima": 6}, "desc": "Place anywhere (or ON a rocket). F toggles. HUD diamond marks it through planets.", "count": 3},
 		{"id": "warpshard", "tab": "Gear",     "name": "Warp Shard",     "cost": {"coins": 400, "irid": 3}, "desc": "Single use. Right-click: snap back to your spawn point. Crumbles after."},
@@ -432,13 +442,6 @@ func use_item(slot: int) -> bool:
 			give(old, 1)
 		Sfx.play("click")
 		return true
-	if id == "backpack2":
-		if backpack_store.size() >= 40:
-			return false
-		for i in 20:
-			backpack_store.append(empty_slot())
-		Sfx.play("learn")
-		return true
 	if id == "warpshard":
 		var pw = get_tree().get_first_node_in_group("player")
 		if pw and pw.has_method("respawn_at") and Game.mode == Game.Mode.ON_FOOT:
@@ -552,7 +555,6 @@ func owned_unique(id: String) -> bool:
 		return false
 	match id:
 		"jetpack": return has_jetpack
-		"backpack2": return backpack_store.size() >= 40
 		"jetpack2": return jet_max >= 500.0
 		"jetpack3": return jet_max >= 1000.0
 		"ward": return wrath_ward

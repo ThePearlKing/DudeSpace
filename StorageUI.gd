@@ -10,11 +10,11 @@ var _title: Label
 var held: Dictionary = {"id": "", "n": 0}   # the stack ON YOUR CURSOR
 var _cursor: Label
 
-## Wrapper so the backpack (Inventory.backpack_store) opens like a chest.
+## Wrapper so any carried pack opens like a chest.
 class PackRef:
 	var storage: Array
-	func _init() -> void:
-		storage = Inventory.backpack_store
+	func _init(arr: Array = []) -> void:
+		storage = arr if not arr.is_empty() else Inventory.backpack_store
 
 func _ready() -> void:
 	layer = 22
@@ -107,9 +107,17 @@ func open(chest) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 	_refresh()
 
-func open_backpack() -> void:
-	_chest = PackRef.new()
-	_title.text = "BACKPACK"
+func open_backpack(kind: String = "backpack") -> void:
+	match kind:
+		"backpack2":
+			_chest = PackRef.new(Inventory.prism_store)
+			_title.text = "PRISM BACKPACK"
+		"ubackpack":
+			_chest = PackRef.new(Inventory.universe_store)
+			_title.text = "UNIVERSE BACKPACK"
+		_:
+			_chest = PackRef.new(Inventory.backpack_store)
+			_title.text = "BACKPACK"
 	visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 	Sfx.play("click")
@@ -138,7 +146,7 @@ func slot_click(where: String, index: int, btn: int) -> void:
 	var sid := str(slot["id"])
 	var hid := str(held["id"])
 	# no backpacks inside the backpack. the universe would fold.
-	if _chest is PackRef and where == "chest" and hid == "backpack":
+	if _chest is PackRef and where == "chest" and hid in ["backpack", "backpack2", "ubackpack"]:
 		Sfx.play("denied")
 		return
 	if btn == MOUSE_BUTTON_LEFT:
@@ -195,7 +203,7 @@ func slot_scroll(where: String, index: int) -> void:
 	if sid == "" or int(slot["n"]) <= 0:
 		return
 	var dst: Array = Inventory.hotbar if where == "chest" else _chest.storage
-	if _chest is PackRef and where != "chest" and sid == "backpack":
+	if _chest is PackRef and where != "chest" and sid in ["backpack", "backpack2", "ubackpack"]:
 		Sfx.play("denied")
 		return
 	# merge first, then first empty
@@ -230,7 +238,7 @@ func move(where: String, index: int) -> void:
 	if id == "":
 		return
 	# no backpacks inside the backpack. the universe would fold.
-	if id == "backpack" and _chest is PackRef and where != "chest":
+	if id in ["backpack", "backpack2", "ubackpack"] and _chest is PackRef and where != "chest":
 		Sfx.play("denied")
 		return
 	# merge into an existing stack

@@ -14,6 +14,7 @@ const PATTERN := [
 ]
 
 func build() -> void:
+	add_to_group("invader")
 	var step := 1.6
 	var rows := PATTERN.size()
 	var claude := Color("#d97757")   # Claude's warm clay colour

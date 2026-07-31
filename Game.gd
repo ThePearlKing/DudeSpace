@@ -71,8 +71,8 @@ var has_saved_spawn: bool = false   # a save carried its own spawn point
 var trials_done: bool = false       # temple guardians dead -> maze door open
 
 # --- locator gadget: a temporary green ping the HUD points at ---
-var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow temple · 3 ufo · 4 rifts
-var locator_target: Vector3 = Vector3.ZERO
+var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow temple · 3 ufo · 4 rifts · 5 mine · 6 connect 4
+var locator_targets: Array = []     # Vector3 list -- multi-ping modes fill many
 var locator_label: String = ""
 var locator_until: float = -1.0
 var permadead: bool = false

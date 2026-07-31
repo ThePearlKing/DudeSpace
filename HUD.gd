@@ -42,12 +42,14 @@ class _WaypointLayer extends Control:
 			var txt := "%.0f m" % dist if dist < 1000.0 else "%.1f km" % (dist / 1000.0)
 			draw_string(ThemeDB.fallback_font, sp + Vector2(12, 4), txt,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 0.8, 0.8))
-		# --- locator ping: bigger GREEN diamond, times out on its own ---
+		# --- locator pings: bigger GREEN diamonds, time out on their own ---
 		if Game.locator_until > Game.playtime:
-			var lp := Game.locator_target
-			if not cam.is_position_behind(lp):
+			var g := Color("#2bff6a")
+			for lp_v in Game.locator_targets:
+				var lp: Vector3 = lp_v
+				if cam.is_position_behind(lp):
+					continue
 				var sp2 := cam.unproject_position(lp)
-				var g := Color("#2bff6a")
 				var pts2 := PackedVector2Array([sp2 + Vector2(0, -13), sp2 + Vector2(13, 0),
 					sp2 + Vector2(0, 13), sp2 + Vector2(-13, 0)])
 				draw_polyline(PackedVector2Array([pts2[0], pts2[1], pts2[2], pts2[3], pts2[0]]),
