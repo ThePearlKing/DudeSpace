@@ -138,9 +138,12 @@ func _ai_move() -> void:
 				_place(c, 2)
 				Sfx.play("place", -14.0)
 				return
-	var order := [3, 2, 4, 1, 5, 0, 6]
-	order.shuffle()
-	order.sort_custom(func(a, b): return absi(a - 3) < absi(b - 3) if randf() < 0.7 else randf() < 0.5)
+	# centre bias plus noise, scored up front -- a random comparator breaks sort
+	var keys := {}
+	for c2 in COLS:
+		keys[c2] = float(absi(c2 - 3)) + randf() * 2.0
+	var order := range(COLS)
+	order.sort_custom(func(a, b): return keys[a] < keys[b])
 	for c in order:
 		if _next_row(c) >= 0:
 			_place(c, 2)
