@@ -478,7 +478,8 @@ func _hm_cyl(r: float, h: float, pos: Vector3, col: Color, emit: float = 0.4, to
 const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "prisreactor",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
-	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender", "waypoint"]
+	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
+	"nreactor", "waypoint"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -906,7 +907,7 @@ func _use_selected() -> void:
 		place = global_position - global_transform.basis.z * 3.0
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
-		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "capacitor", "efurnace", "eseller", \
+		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender":
 			var n: Node3D
 			match id:
@@ -920,6 +921,7 @@ func _use_selected() -> void:
 				"bioreactor": n = EMachines.Bioreactor.new()
 				"rtg": n = EMachines.RTG.new()
 				"prisreactor": n = EMachines.PrismReactor.new()
+				"nreactor": n = EMachines.NuclearReactor.new()
 				"capacitor": n = EMachines.Capacitor.new()
 				"efurnace": n = EMachines.EFurnace.new()
 				"eseller": n = EMachines.ESeller.new()

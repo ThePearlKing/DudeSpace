@@ -236,6 +236,8 @@ func apply_progress() -> void:
 	else:
 		Game.has_saved_spawn = false
 	Game.tutorial_done = bool(_progress.get("tut_done", false))
+	Game.god_cycles = int(_progress.get("god_cycles", 0))
+	Game.god_standby_until = float(_progress.get("god_standby_until", -1.0))
 	var hc = _progress.get("host_cfg", null)
 	if hc is Dictionary:
 		for k in Game.host_cfg.keys():
@@ -325,6 +327,8 @@ func save_progress() -> void:
 		"spawn": [Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z],
 		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
 		"tut_done": Game.tutorial_done,
+		"god_cycles": Game.god_cycles,
+		"god_standby_until": Game.god_standby_until,
 		"host_cfg": Game.host_cfg,
 		"guest_data": _progress.get("guest_data", {}),
 		"has_rcs": Inventory.has_rcs,

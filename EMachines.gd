@@ -711,6 +711,180 @@ class ELight extends Machine:
 		return "energy: %.0f / %.0f EU\ndrinks %.1f EU/s while lit" % [buf, buf_cap, DRAIN]
 
 
+## NUCLEAR REACTOR: real fission, playably simplified. Uranium fuel rods
+## react unless the CONTROL RODS are lowered into the core -- rods out =
+## more reaction = more heat = more power. Passive cooling only carries
+## ~60% output; run hotter and the core temperature CLIMBS. At 1000 deg
+## it melts down: fire, a dead crater of your own machines, and you,
+## if you're anywhere near it. Real reactors: also like this, roughly.
+class NuclearReactor extends Machine:
+	const MAX_EU_S := 16.0        # full-reaction output: the best in the game
+	const HEAT_RATE := 14.0       # degrees/s at full reaction (of 100)
+	const COOL_RATE := 8.0        # passive cooling degrees/s
+	const FUEL_SECS := 60.0       # one uranium = a minute of full burn
+	var rods: float = 1.0         # 1.0 = fully inserted = shutdown (safe default)
+	var temp: float = 0.0         # 0..100 internal, shown as 0..1000 deg
+	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
+	var _rod_meshes: Array = []
+	var _glow: MeshInstance3D
+	var _gauge: MeshInstance3D
+	var _geiger_t: float = 0.0
+
+	func _init() -> void:
+		title = "NUCLEAR REACTOR"
+		box_color = Color("#8a8d90")   # containment concrete
+		box_size = Vector3(2.0, 2.4, 2.0)
+		refund_id = "nreactor"
+		shows_out = false
+		buf_cap = 800.0
+
+	func _ready() -> void:
+		super._ready()
+		dress_industrial(Color("#5a5d60"))
+		# containment dome
+		var dome := SphereMesh.new()
+		dome.radius = 1.05
+		dome.height = 1.4
+		dome.is_hemisphere = true
+		part(dome, Vector3(0, box_size.y, 0), Color("#9a9da0"), 0.05)
+		# Cherenkov window: the blue glow of an open pool core
+		var win := BoxMesh.new()
+		win.size = Vector3(1.2, 0.5, 0.06)
+		_glow = part(win, Vector3(0, 1.0, box_size.z * 0.5 + 0.03), Color("#2a9fff"), 0.3)
+		# control rod actuators: four rods that VISIBLY sink into the dome
+		for sx in [-0.45, 0.45]:
+			for sz in [-0.45, 0.45]:
+				var rod := CylinderMesh.new()
+				rod.top_radius = 0.07
+				rod.bottom_radius = 0.07
+				rod.height = 1.1
+				_rod_meshes.append(part(rod, Vector3(sx, box_size.y + 0.9, sz),
+					Color("#2e3238"), 0.15))
+		# temperature strip up the side + hazard stripes + vent stack
+		var strip := BoxMesh.new()
+		strip.size = Vector3(0.2, 1.8, 0.06)
+		_gauge = part(strip, Vector3(-0.7, 1.2, box_size.z * 0.5 + 0.03), Color("#2bff5a"), 1.0)
+		for i in 4:
+			var stp := BoxMesh.new()
+			stp.size = Vector3(0.24, 0.24, 0.03)
+			part(stp, Vector3(0.72, 0.3 + float(i) * 0.3, box_size.z * 0.5 + 0.02),
+				Color("#ffd166") if i % 2 == 0 else Color("#1c1c24"), 0.4, Vector3(0, 0, 45))
+		var stack := CylinderMesh.new()
+		stack.top_radius = 0.14
+		stack.bottom_radius = 0.2
+		stack.height = 1.4
+		part(stack, Vector3(0.75, box_size.y + 0.7, -0.6), Color("#c8cbce"), 0.05)
+
+	func work(delta: float) -> void:
+		# feed: pull the next uranium rod from the hopper when spent
+		if _fuel <= 0.0 and str(in_slot["id"]) == "uranium" and int(in_slot["n"]) > 0:
+			in_slot["n"] = int(in_slot["n"]) - 1
+			if int(in_slot["n"]) <= 0:
+				in_slot = {"id": "", "n": 0}
+			_fuel = FUEL_SECS
+		# the reaction: what the rods don't absorb, burns
+		var reaction := clampf(1.0 - rods, 0.0, 1.0) if _fuel > 0.0 else 0.0
+		_fuel = maxf(0.0, _fuel - reaction * delta)
+		buf = minf(buf_cap, buf + MAX_EU_S * reaction * delta)
+		# thermodynamics: heat in vs. cooling out. the margin is the game.
+		temp = clampf(temp + (reaction * HEAT_RATE - COOL_RATE) * delta, 0.0, 100.0)
+		# looks: rods sink with insertion, the pool glows with reaction,
+		# the gauge walks green -> red
+		for r in _rod_meshes:
+			r.position.y = lerpf(r.position.y, box_size.y + 0.25 + (1.0 - rods) * 0.75,
+				delta * 5.0)
+		if _glow and _glow.material_override:
+			_glow.material_override.emission_energy_multiplier = 0.2 + reaction * 3.2 \
+				+ (temp / 100.0) * 2.0
+		if _gauge and _gauge.material_override:
+			_gauge.material_override.emission = Color("#2bff5a").lerp(Color("#ff2b1a"),
+				temp / 100.0)
+		# hot core clicks at you. that clicking is a WORD, and the word is RUN
+		if temp > 70.0:
+			_geiger_t -= delta
+			if _geiger_t <= 0.0:
+				_geiger_t = lerpf(0.9, 0.12, (temp - 70.0) / 30.0)
+				Sfx.play("click", -14.0)
+		if temp >= 100.0:
+			_meltdown()
+
+	func _meltdown() -> void:
+		var here := global_position
+		Sfx.play("explode", 2.0)
+		Game.anger(30.0)   # splitting atoms was ALREADY pushing it
+		# fire: one giant burst + a lingering plume
+		for burst in [[220, 26.0, 1.0], [80, 10.0, 2.6]]:
+			var parts := GPUParticles3D.new()
+			parts.amount = burst[0]
+			parts.one_shot = true
+			parts.explosiveness = 0.9
+			parts.lifetime = burst[2]
+			var pm := ParticleProcessMaterial.new()
+			pm.direction = Vector3.UP
+			pm.spread = 80.0
+			pm.initial_velocity_min = burst[1] * 0.4
+			pm.initial_velocity_max = burst[1]
+			pm.gravity = Vector3.ZERO
+			pm.scale_min = 0.3
+			pm.scale_max = 1.4
+			pm.color = Color("#ff6a1a")
+			parts.process_material = pm
+			var mesh := SphereMesh.new()
+			mesh.radius = 0.6
+			mesh.height = 1.2
+			mesh.radial_segments = 6
+			mesh.rings = 3
+			mesh.material = Destructible.make_material(Color("#ff8c2a"), 4.0)
+			parts.draw_pass_1 = mesh
+			get_parent().add_child(parts)
+			parts.global_position = here
+			parts.emitting = true
+		# everything mechanical within 18m dies. no refunds. it's slag.
+		for grp in ["machine", "chest", "autominer", "rocket", "spawn"]:
+			for n in get_tree().get_nodes_in_group(grp):
+				if n == self or not (n is Node3D) or not is_instance_valid(n):
+					continue
+				if n.global_position.distance_to(here) < 18.0:
+					Destructible.spawn_debris(get_parent(), n.global_position,
+						Vector3(1.2, 1.2, 1.2), Color("#3a3a3a"), Vector3.UP)
+					Net.broadcast_remove(n.global_position)
+					n.queue_free()
+		# and you, if you kept standing there reading the gauge
+		var p = get_tree().get_first_node_in_group("player")
+		if p and is_instance_valid(p):
+			var d: float = p.global_position.distance_to(here)
+			if d < 22.0:
+				Game.hurt(220.0 * (1.0 - d / 22.0) + 20.0)
+		Net.broadcast_remove(here)
+		Destructible.spawn_debris(get_parent(), here, Vector3(2.4, 2.4, 2.4),
+			Color("#8a8d90"), Vector3.UP)
+		queue_free()
+
+	func accepts(id: String) -> bool:
+		return id == "uranium"
+
+	func actions() -> Array:
+		return [
+			["Rods OUT +10%  (more power, more heat)", func() -> void:
+				rods = clampf(rods - 0.1, 0.0, 1.0)
+				Sfx.play("click", -12.0)],
+			["Rods IN -10%", func() -> void:
+				rods = clampf(rods + 0.1, 0.0, 1.0)
+				Sfx.play("click", -12.0)],
+			["SCRAM (full shutdown, NOW)", func() -> void:
+				rods = 1.0
+				Sfx.play("denied", -6.0)],
+		]
+
+	func info_text() -> String:
+		var reaction := clampf(1.0 - rods, 0.0, 1.0) if _fuel > 0.0 else 0.0
+		return "energy: %.0f / %.0f EU   (+%.1f EU/s)\ncore: %.0f°C %s\ncontrol rods: %.0f%% inserted\nfuel: %s%s\ncooling carries ~60%% power. beyond that, the core climbs." % [
+			buf, buf_cap, MAX_EU_S * reaction,
+			temp * 10.0, "⚠ MELTDOWN IMMINENT" if temp > 80.0 else ("⚠ overheating" if temp > 55.0 else ""),
+			rods * 100.0,
+			("rod burning, %ds left" % int(_fuel)) if _fuel > 0.0 else "EMPTY",
+			"  · hopper: " + Inventory.slot_text(in_slot) if str(in_slot["id"]) != "" else ""]
+
 ## LIGHT BOX: a small indicator cube. Wire it to a computer output (or
 ## anything) and it glows while fed -- a status lamp, not a floodlight.
 class LightBox extends Machine:

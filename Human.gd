@@ -41,9 +41,11 @@ func build(color: Color, shader_kind: String, face_tex: Texture2D = null) -> voi
 		mat.render_priority = 2   # the face wins over any weird shader skin
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		face.material_override = mat
-		face.position = Vector3(0, 2.3, -0.281)   # front face (-Z)
+		# child of the HEAD, so wherever the head goes -- walk bob, poses,
+		# a one-way trip into a wormhole -- the face rides along
+		face.position = Vector3(0, 0, -0.281)   # front of the head (-Z)
 		face.rotation_degrees = Vector3(0, 180, 0)
-		add_child(face)
+		_head_m.add_child(face)
 
 func _part(size: Vector3, pos: Vector3, mat: Material) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()

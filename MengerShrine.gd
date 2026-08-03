@@ -54,7 +54,7 @@ func _ready() -> void:
 	add_child(col)
 
 	var lbl := Label3D.new()
-	lbl.text = "[F] enchant weapon"
+	lbl.text = "[F] enchant weapon / armor"
 	lbl.font_size = 30
 	lbl.modulate = Color("#c9b8ff")
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -74,16 +74,20 @@ func _process(delta: float) -> void:
 func use(_player) -> void:
 	var hud = get_tree().get_first_node_in_group("hud")
 	var id := Inventory.slot_id(Inventory.selected)
-	if not Inventory.weapons.has(id) or id == "fists":
+	var is_weapon := Inventory.weapons.has(id) and id != "fists"
+	var is_armor := Inventory.armors.has(id)
+	if not is_weapon and not is_armor:
 		Sfx.play("denied")
 		if hud:
-			hud.flash("hold a weapon")
+			hud.flash("hold a weapon or armor piece")
 		return
+	var nm: String = str(Inventory.weapons[id]["name"]) if is_weapon \
+		else str(Inventory.armors[id]["name"])
 	var lvl := int(Inventory.enchant.get(id, 0))
 	if lvl >= MAX_LEVEL:
 		Sfx.play("denied")
 		if hud:
-			hud.flash("%s is at max enchant" % Inventory.weapons[id]["name"])
+			hud.flash("%s is at max enchant" % nm)
 		return
 	var cost := 5 * (lvl + 1)
 	if Inventory.res_count("prism") < cost:
@@ -94,6 +98,11 @@ func use(_player) -> void:
 	Inventory.remove_res("prism", cost)
 	Inventory.enchant[id] = lvl + 1
 	Inventory.changed.emit()
+	# fractal power is not free: the gods HATE the menger
+	Game.anger(12.0)
 	Sfx.play("learn")
 	if hud:
-		hud.flash("%s +%d  (damage x%.2f)" % [Inventory.weapons[id]["name"], lvl + 1, 1.0 + 0.25 * float(lvl + 1)])
+		if is_weapon:
+			hud.flash("%s +%d  (damage x%.2f)" % [nm, lvl + 1, 1.0 + 0.25 * float(lvl + 1)])
+		else:
+			hud.flash("%s +%d  (armor x%.2f)" % [nm, lvl + 1, 1.0 + 0.15 * float(lvl + 1)])

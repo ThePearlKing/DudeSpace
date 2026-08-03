@@ -118,6 +118,8 @@ var spawn_up: Vector3 = Vector3.UP
 var has_saved_spawn: bool = false   # a save carried its own spawn point
 var tutorial_done: bool = false     # interactive tutorial finished/skipped
 var tutorial_session: bool = false  # throwaway tutorial world (set by Title, never saved)
+var god_standby_until: float = -1.0 # after a death the god broods instead of acting
+var god_cycles: int = 0             # every brood it wakes STRONGER and pettier
 # What the shop will sell right now. ["*"] = everything (normal play);
 # [] = nothing; otherwise an allowlist of ids. The tutorial drives this so
 # a new player can't blow their coins on the wrong thing mid-lesson.
@@ -216,7 +218,8 @@ func anger(amount: float) -> void:
 
 var wrath_event: bool = false   # the noodle god is currently descending
 
-## The descent ended: caught=true -> the pythagorean transformation.
+## The descent ended: caught=true -> the pythagorean transformation,
+## with full geometric ceremony first.
 func wrath_event_over(caught: bool) -> void:
 	wrath_event = false
 	if not caught:
@@ -225,7 +228,18 @@ func wrath_event_over(caught: bool) -> void:
 		permadeath()
 		changed.emit()
 		return
+	var cs := get_tree().current_scene
+	if cs:
+		cs.add_child(PythagorasCinematic.new())
+	else:
+		complete_transform()
+
+## The proof is complete: the usual end screen takes it from here.
+func complete_transform() -> void:
 	dead = true
+	god_standby_until = playtime + 180.0   # satisfied, for a while
+	god_cycles += 1
+	wrath = WRATH_MAX * 0.5                # the lesson bought you half a pardon
 	if not keep_inv:
 		Inventory.lose_half()
 	transformed.emit()
@@ -239,15 +253,19 @@ func hurt(d: float, vaporize: bool = false) -> void:
 	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
 	health = maxf(0.0, health - d)
 	_since_hit = 0.0
-	if playtime - _hurt_sfx_t > 0.3:   # throttle for per-frame burns
+	if playtime - _hurt_sfx_t > 0.55:   # throttle for per-frame burns
 		_hurt_sfx_t = playtime
-		Sfx.play("hurt", -10.0)
+		Sfx.play("hurt", -16.0)
 	if health <= 0.0:
 		if hardcore:
 			permadeath()   # hardcore: every death is THE death (charm can save)
 			changed.emit()
 			return
 		dead = true
+		# even the god observes a mourning period. red, silent, watching.
+		# and every time it broods, it wakes a little worse.
+		god_standby_until = playtime + 180.0
+		god_cycles += 1
 		if not keep_inv:
 			Inventory.lose_half()   # drop 50% of carried coins on death
 			_spill_hotbar(vaporize)
@@ -302,7 +320,7 @@ func _process(delta: float) -> void:
 	if inf_fuel:
 		Inventory.fuel = Inventory.fuel_max
 		Inventory.jet_fuel = Inventory.jet_max
-	wrath = maxf(0.0, wrath - 0.4 * delta)      # anger slowly cools
+	# the gods do NOT forgive with time. only tribute (noodles) helps.
 	# a FOLLOWING pet warms the heart: +2% regen
 	var pet_mult := 1.02 if pet_following() else 1.0
 	_since_hit += delta
@@ -322,7 +340,7 @@ func _process(delta: float) -> void:
 		if t > 70.0:
 			_salad_t = -1.0
 	# MAX WRATH: the god COMES for you (a whole event, not an instant death)
-	if wrath >= WRATH_MAX and not wrath_event:
+	if wrath >= WRATH_MAX and not wrath_event and playtime >= god_standby_until:
 		wrath_event = true
 		var cs := get_tree().current_scene
 		if cs and cs.has_method("noodle_wrath_event"):

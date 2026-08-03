@@ -42,13 +42,15 @@ var armors: Dictionary = {
 var equip: Dictionary = {"head": "", "chest": "", "legs": "", "boots": "", "charm": ""}
 
 ## Total damage reduction from worn armor (capped at 60%).
+## Menger-enchanted pieces protect 15% more per level.
 func armor_reduction() -> float:
-	var total := 0
+	var total := 0.0
 	for slot in ["head", "chest", "legs", "boots"]:
 		var id := str(equip.get(slot, ""))
 		if armors.has(id):
-			total += int(armors[id]["def"])
-	return minf(0.6, float(total) / 100.0)
+			total += float(armors[id]["def"]) \
+				* (1.0 + 0.15 * float(enchant.get(id, 0)))
+	return minf(0.6, total / 100.0)
 
 var has_rcs: bool = false
 var has_jetpack: bool = false
@@ -82,6 +84,7 @@ var items: Dictionary = {
 	"semicircle": {"name": "Semicircle",       "color": Color("#ffd166")},
 	"circle":     {"name": "Circle",           "color": Color("#ffe9a0")},
 	"prisreactor": {"name": "Prism Reactor",   "color": Color("#2a1a3a")},
+	"nreactor":   {"name": "Nuclear Reactor",  "color": Color("#8a8d90")},
 	"charm":      {"name": "Anti-Death Charm", "color": Color("#b56cff")},
 	"permapple":  {"name": "Permadeath Apple", "color": Color("#8b0000")},
 	"chest":      {"name": "Chest",            "color": Color("#a9713b")},
@@ -254,6 +257,7 @@ func _ready() -> void:
 		{"id": "rtg",       "tab": "Electric", "name": "Nuclear RTG",    "cost": {"irid": 20, "ultima": 15}, "desc": "+2 EU/s forever off ultima decay."},
 		{"id": "teleporter", "tab": "Electric", "name": "Warp Pad",      "cost": {"ultima": 10, "prism": 15, "ingot": 40, "irid": 25}, "desc": "Fast-travel network. Full 1000 EU charge + 2000 coins per warp. F: pick a destination."},
 		{"id": "prisreactor", "tab": "Electric", "name": "Prism Reactor", "cost": {"prism": 35, "irid": 40, "ultima": 8}, "desc": "+8 EU/s forever. Prism shards only grow in the shader system."},
+		{"id": "nreactor",  "tab": "Electric", "name": "Nuclear Reactor", "cost": {"ingot": 30, "irid": 20, "ultima": 6, "uranium": 10}, "desc": "Fission: up to +16 EU/s. Feed uranium, raise the control rods, mind the core temperature. Cooling only carries ~60% power -- run hotter and it CLIMBS. At 1000°C it takes your base with it."},
 		{"id": "efurnace",  "tab": "Electric", "name": "Electric Furnace","cost": {"ingot": 25, "irid": 12}, "desc": "INSTANT smelt, 4 EU per item. Wire power in, funnel ore in."},
 		{"id": "ecomputer", "tab": "Electric", "name": "Electric Computer","cost": {"ingot": 20, "irid": 10}, "desc": "Programmable power gate: inp1, out1..out8. Lua-ish."},
 		{"id": "scomputer", "tab": "Electric", "name": "Sorter Computer", "cost": {"ingot": 20, "irid": 10}, "desc": "Programmable item router: sort(funnel, port)."},
@@ -499,7 +503,14 @@ func use_item(slot: int) -> bool:
 			jet_max = 1000.0
 			jet_power = 2.0
 		"ward": wrath_ward = true
-		"noodle": Game.wrath = 0.0
+		"noodle":
+			# a brooding god will NOT be bribed -- the noodle stays yours
+			if Game.playtime < Game.god_standby_until:
+				Sfx.play("denied")
+				return false
+			# and each brood it survives, tribute means less to it
+			Game.wrath = maxf(0.0, Game.wrath \
+				- maxf(3.0, 12.0 - 2.0 * float(Game.god_cycles)))
 		"banana":
 			Game.heal(15.0)
 			Sfx.play("eat")

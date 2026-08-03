@@ -583,6 +583,48 @@ void fragment(){
 		cmat2.set_shader_parameter("base", b.color)
 		cor.material_override = cmat2
 		p.add_child(cor)
+		# rim fire: a billboard ring of flame that ALWAYS faces you --
+		# transparent over the disc, so the fire lives only AROUND the
+		# star, licking outward from its edge
+		var fire := MeshInstance3D.new()
+		var fq := QuadMesh.new()
+		fq.size = Vector2(b.radius * 6.0, b.radius * 6.0)
+		fire.mesh = fq
+		var fsh := Shader.new()
+		fsh.code = "shader_type spatial;\nrender_mode unshaded, blend_add, depth_draw_never, cull_disabled;\nuniform vec3 base : source_color;\n" \
+			+ _NOISE_GLSL + """
+void vertex(){
+	// billboard: the quad turns to face every camera, always
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(
+		INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+	MODELVIEW_MATRIX = MODELVIEW_MATRIX * mat4(
+		vec4(length(MODEL_MATRIX[0].xyz), 0.0, 0.0, 0.0),
+		vec4(0.0, length(MODEL_MATRIX[1].xyz), 0.0, 0.0),
+		vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
+}
+void fragment(){
+	vec2 pp = UV * 2.0 - 1.0;
+	float r = length(pp);
+	// seamless angular noise: sample on a circle so there's no wrap line
+	vec3 np = vec3(pp.x / max(r, 0.001) * 2.0, pp.y / max(r, 0.001) * 2.0, r * 3.0 - TIME * 0.9);
+	float lick = fbm(np) + fbm(np * 2.3 + 7.0) * 0.5;
+	// flames: root at the disc edge (r=0.334), noisy tips reaching out
+	float tip = 0.36 + lick * 0.4;
+	float body = smoothstep(tip, 0.34, r);
+	float hole = smoothstep(0.328, 0.345, r);   // NOTHING over the disc
+	float a = body * hole;
+	vec3 hot = mix(vec3(1.0, 0.95, 0.7), base, 0.35);
+	vec3 cool = mix(vec3(1.0, 0.35, 0.05), base, 0.3);
+	ALBEDO = vec3(0.0);
+	EMISSION = mix(hot, cool, smoothstep(0.34, 0.75, r)) * a * 2.6;
+	ALPHA = clamp(a, 0.0, 1.0);
+}
+"""
+		var fmat2 := ShaderMaterial.new()
+		fmat2.shader = fsh
+		fmat2.set_shader_parameter("base", b.color)
+		fire.material_override = fmat2
+		p.add_child(fire)
 	# Saturn + Uranus wear their rings (Uranus' famously sideways)
 	if b.name in ["Saturn", "Uranus"]:
 		var ring := MeshInstance3D.new()
@@ -1067,7 +1109,6 @@ func _populate(b) -> void:
 			_register_crates(b, 25, 5)
 		"home":
 			_register_crates(b, 60, 2)     # cheap: enough for a rocket + basics
-			_place_on_surface(b, NoodleGod.new(), _surface_dir(), func(n): n.build())
 			_spawn_mine_clues(b)
 		"circuit":
 			_register_crates(b, 40, 9)
@@ -2479,6 +2520,7 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"elight": return EMachines.ELight.new()
 		"switch": return EMachines.Switch.new()
 		"lightbox": return EMachines.LightBox.new()
+		"nreactor": return EMachines.NuclearReactor.new()
 		"rocket": return Rocket.new()
 		"rocket2":
 			var r2 := Rocket.new()
@@ -2553,15 +2595,18 @@ func _temple_teleport(bdy: Node3D) -> void:
 
 ## Trial button inside the hall: NOW the pyramids come. Never on top of you.
 ## Wrath maxed: spawn the descending noodle god above the player.
+## Max wrath: no chasing monster anymore. JUDGMENT comes from the sky --
+## the watcher's own tendril takes you. Appease below 40 before it
+## closes and it lets go.
 func noodle_wrath_event() -> void:
 	var p := get_tree().get_first_node_in_group("player")
 	if p == null:
 		Game.wrath_event_over(true)
 		return
-	var g := NoodleWrath.new()
-	add_child(g)
-	var up: Vector3 = (p.global_position - Universe.nearest(p.global_position).center).normalized()
-	g.global_position = p.global_position + up * 900.0
+	var j := NoodleWatcher.JudgmentFx.new()
+	j.target = p
+	add_child(j)
+	j.global_position = p.global_position
 	Sfx.play_at("rumble", p.global_position, 8.0)
 
 ## Every mine entrance in the universe (for the locator).

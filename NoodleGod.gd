@@ -1,87 +1,131 @@
 class_name NoodleGod
 extends Node3D
-## A colossal megalophobia structure: a towering monolith crowned by a
-## writhing "noodle". Loitering near it without destroying enrages the
-## destruction gods (Game.wrath). Built in local space (local +Y = up).
+## Home's connection to the thing in the sky: a nest of colossal golden
+## tendrils that FADE INTO EXISTENCE only at full wrath -- the god
+## reaching down through its roots. Get close and they grab you and
+## fling you clean around the planet. Built in local space (+Y = up).
 
 const INFLUENCE := 70.0
-const REVEAL_AT := 0.6   # gods stay invisible until wrath passes 60%
+const REACH := 55.0       # grabbing range once manifested
+const REVEAL_AT := 0.95   # invisible below 95% wrath
 
-var _noodle: Array[Node3D] = []
-var _mats: Array[StandardMaterial3D] = []
-var _base_emit: Array[float] = []
-var _label: Label3D
+var _tendrils: Array = []   # [{root, mat: ShaderMaterial}]
+var _t: float = 0.0
+var _grab_cd: float = 4.0
+var _grabbing: float = 0.0
+var _grab_from: Vector3 = Vector3.ZERO
+
+## One smooth, tapered, GPU-bent tendril tube. Curvature and writhe are
+## all in the vertex shader -- a single connected surface, no bead chains.
+## Colours are the god's own: golden flesh, hot orange pulse crawling
+## along its length.
+const TENDRIL_SHADER := """
+shader_type spatial;
+render_mode cull_disabled;
+uniform float height = 60.0;
+uniform float phase = 0.0;
+uniform float wave_amt = 6.0;
+uniform float wave_speed = 1.5;
+uniform float alpha = 1.0;
+uniform float glow = 0.8;
+uniform vec3 base_col : source_color = vec3(1.0, 0.81, 0.25);
+uniform vec3 glow_col : source_color = vec3(1.0, 0.55, 0.1);
+varying float vk;
+void vertex(){
+	float k = clamp((VERTEX.y + height * 0.5) / height, 0.0, 1.0);
+	vk = k;
+	// two incommensurate sine curves = organic, never-repeating bend
+	vec2 bend = vec2(
+		sin(TIME * wave_speed + phase + k * 3.1) + sin(TIME * wave_speed * 0.53 + phase * 2.0 + k * 5.7) * 0.5,
+		cos(TIME * wave_speed * 0.82 + phase + k * 2.6) + cos(TIME * wave_speed * 0.31 + k * 4.9) * 0.5);
+	VERTEX.xz += bend * wave_amt * k * k;
+}
+void fragment(){
+	ALBEDO = base_col;
+	// smooth, even glow -- one soft slow breath, NO banding (bands read
+	// as suction cups. it is a noodle, not an octopus.)
+	float breath = 0.85 + 0.15 * sin(TIME * 1.4 + phase);
+	EMISSION = glow_col * glow * breath;
+	ALPHA = alpha;
+	ROUGHNESS = 0.6;
+}
+"""
+
+static func make_tendril(length: float, base_r: float, phase: float) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.bottom_radius = base_r
+	cm.top_radius = base_r * 0.15
+	cm.height = length
+	cm.rings = 48          # enough spine to bend smoothly
+	cm.radial_segments = 10
+	mi.mesh = cm
+	mi.position = Vector3(0, length * 0.5, 0)   # base sits at parent origin
+	var sh := Shader.new()
+	sh.code = TENDRIL_SHADER
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("height", length)
+	m.set_shader_parameter("phase", phase)
+	mi.material_override = m
+	return mi
 
 func build() -> void:
-	# monolith
-	var mono := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(14, 90, 14)
-	mono.mesh = bm
-	mono.position = Vector3(0, 45, 0)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#0b0b12")
-	mat.metallic = 0.6
-	mat.roughness = 0.3
-	mat.emission_enabled = true
-	mat.emission = Color("#6a0f6a")
-	mat.emission_energy_multiplier = 0.5
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mono.material_override = mat
-	add_child(mono)
-	_mats.append(mat)
-	_base_emit.append(0.5)
-
-	# the noodle: stacked spheres towering higher
-	for i in 26:
-		var s := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = 5.0
-		sm.height = 10.0
-		s.mesh = sm
-		var m := StandardMaterial3D.new()
-		m.albedo_color = Color("#ffcf40")
-		m.emission_enabled = true
-		m.emission = Color("#ff8c1a")
-		m.emission_energy_multiplier = 0.8
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		s.material_override = m
-		s.position = Vector3(0, 92 + float(i) * 6.0, 0)
-		add_child(s)
-		_noodle.append(s)
-		_mats.append(m)
-		_base_emit.append(0.8)
-
-	# no label. you'll know it when you see it. (director's orders)
-
-var _t: float = 0.0
+	for i in 6:
+		var ang := TAU * float(i) / 6.0 + randf_range(-0.3, 0.3)
+		var root := Node3D.new()
+		root.position = Vector3(cos(ang) * randf_range(6.0, 16.0), 0,
+			sin(ang) * randf_range(6.0, 16.0))
+		# lean outward, like it burst through at an angle
+		root.rotation_degrees = Vector3(randf_range(-18, 18), rad_to_deg(ang),
+			randf_range(-18, 18))
+		add_child(root)
+		var tendril := make_tendril(randf_range(55.0, 85.0), randf_range(4.5, 7.0),
+			randf() * TAU)
+		root.add_child(tendril)
+		_tendrils.append({"root": root, "mat": tendril.material_override})
 
 func _process(delta: float) -> void:
-	# Reveal with anger: fully invisible below 60% wrath, fading in above.
+	_t += delta
 	var w := Game.wrath / Game.WRATH_MAX
+	# manifest ONLY at full fury: below the threshold there is nothing
+	# here at all. above it, they fade up out of the crust.
 	var vis := clampf((w - REVEAL_AT) / (1.0 - REVEAL_AT), 0.0, 1.0)
-	visible = vis > 0.0
+	visible = vis > 0.01
+	for e in _tendrils:
+		var m: ShaderMaterial = e["mat"]
+		m.set_shader_parameter("alpha", vis)
+		m.set_shader_parameter("glow", (0.5 + w * 2.0) * vis)
+		m.set_shader_parameter("wave_amt", 6.0 + w * 14.0)
+		m.set_shader_parameter("wave_speed", 1.0 + w * 4.0)
 	if not visible:
 		return
-	for i in _mats.size():
-		var m := _mats[i]
-		m.albedo_color.a = vis
-		m.emission_energy_multiplier = _base_emit[i] * vis
 
-	# writhe
-	_t += delta
-	for i in _noodle.size():
-		var n := _noodle[i]
-		n.position.x = sin(_t * 1.3 + float(i) * 0.5) * (2.0 + float(i) * 0.5)
-		n.position.z = cos(_t * 1.1 + float(i) * 0.4) * (2.0 + float(i) * 0.5)
-
-	# anger the gods if something living lingers close
 	var p := get_tree().get_first_node_in_group("player")
-	var near := false
-	if p and Game.mode == Game.Mode.ON_FOOT and is_instance_valid(p):
-		near = global_position.distance_to(p.global_position) < INFLUENCE
-	var r := get_tree().get_first_node_in_group("rocket")
-	if r and Game.mode == Game.Mode.IN_ROCKET and is_instance_valid(r):
-		near = near or global_position.distance_to(r.global_position) < INFLUENCE
-	if near:
+	if p == null or not is_instance_valid(p):
+		return
+
+	# --- the grab: wander into reach and a tendril takes you around the world ---
+	if _grabbing > 0.0:
+		_grabbing -= delta
+		# reel you in toward the nest's heart...
+		p.global_position = p.global_position.lerp(_grab_from, minf(1.0, delta * 8.0))
+		if "velocity" in p:
+			p.velocity = Vector3.ZERO
+		if "_shake" in p:
+			p._shake = 0.5
+		if _grabbing <= 0.0 and p.has_method("_launch_orbit"):
+			# ...and HURL. same physics as the orbit wand: a full lap.
+			p._launch_orbit(p)
+			Sfx.play("warp", -4.0)
+	elif Game.mode == Game.Mode.ON_FOOT and not Game.dead:
+		_grab_cd -= delta
+		if _grab_cd <= 0.0 and global_position.distance_to(p.global_position) < REACH:
+			_grab_cd = 9.0
+			_grabbing = 0.6
+			_grab_from = global_position + global_transform.basis.y * 14.0
+			Sfx.play("hurt", -20.0)
+
+	# lingering among the roots without tribute is noticed
+	if global_position.distance_to(p.global_position) < INFLUENCE:
 		Game.report_mega()
