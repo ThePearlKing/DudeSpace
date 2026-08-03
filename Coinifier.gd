@@ -8,7 +8,7 @@ const PRICES := {
 	"ingot": 8, "irid": 20, "ultima": 100, "prism": 60, "circle": 95,
 	"cooked_meat": 5, "meat": 2, "banana": 2, "shroom": 3, "salad": 15, "coal": 1,
 }
-const SECS_PER_ITEM := 1.0
+const SECS_PER_ITEM := 0.5
 
 var _t: float = 0.0
 
@@ -36,7 +36,7 @@ func accepts(id: String) -> bool:
 	return PRICES.has(id)
 
 func info_text() -> String:
-	return "in: %s\nsells 1 item / %.0fs\ningot 8 · irid 20 · ultima 100" % [
+	return "in: %s\nsells 1 item / %.1fs\ningot 8 · irid 20 · ultima 100" % [
 		Inventory.slot_text(in_slot), SECS_PER_ITEM]
 
 func actions() -> Array:

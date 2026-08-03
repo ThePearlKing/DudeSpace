@@ -33,7 +33,7 @@ func apply_scale(k: float) -> void:
 	BOUNDARY = 70000.0 * k
 
 func _ready() -> void:
-	_def("Sol",      Vector3(0, 7000, 0),        380.0, 25.0, "sun",     Color("#ffdd55"))
+	_def("Yorox",    Vector3(0, 7000, 0),        380.0, 25.0, "sun",     Color("#ffdd55"))
 	_def("Home",     Vector3(0, 0, 0),           46.0,  5.0,  "home",    Color("#3a1d6e"))
 	_def("Circuitia",Vector3(0, 0, 4200),        95.0,  9.0,  "circuit", Color("#0e3b2e"))
 	_def("Logica",   Vector3(3600, 0, -2200),    72.0,  8.0,  "logic",   Color("#141820"))
