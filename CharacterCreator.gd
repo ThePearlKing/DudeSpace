@@ -19,6 +19,7 @@ var _pad: _Pad
 var _shaders := ["none", "pixel", "wth", "wireframe", "contrast"]
 var _mode_opt: OptionButton
 var _scale_opt: OptionButton
+var _bscale_cb: CheckBox
 var _name_edit: LineEdit
 var _cpick: ColorPickerButton
 var _shader_opt: OptionButton
@@ -133,6 +134,16 @@ func _ready() -> void:
 	_scale_opt.add_item("4x (absurd. good luck)")
 	_scale_opt.add_item("10x (NOT RECOMMENDED. way too big)")
 	wrow.add_child(_scale_opt)
+
+	# big worlds get sparse -- opt into loot density that keeps up
+	_bscale_cb = CheckBox.new()
+	_bscale_cb.text = "Loot density scales with world size"
+	_bscale_cb.disabled = true   # meaningless at 1x
+	col.add_child(_bscale_cb)
+	_scale_opt.item_selected.connect(func(i: int) -> void:
+		_bscale_cb.disabled = i == 0
+		if i == 0:
+			_bscale_cb.button_pressed = false)
 
 	var dl := Label.new()
 	dl.text = "Draw your FACE:"
@@ -323,6 +334,7 @@ func _on_start() -> void:
 		"color": _color.to_html(false), "shader": _shader,
 		"hardcore": _mode_opt.selected == 1,
 		"wscale": scales[_scale_opt.selected],
+		"bscale": _bscale_cb != null and _bscale_cb.button_pressed,
 	}
 	Save.new_slot(Save.current_slot, data, _name_edit.text if _name_edit else "")
 	started.emit()

@@ -1135,7 +1135,17 @@ func _apple_prompt(slot: int) -> void:
 				get_tree().current_scene.add_child(AppleCinematic.new())
 		elif not Game.dead:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	eat.pressed.connect(func() -> void: closer.call(true))
+	# two yeses to die: the first press only asks harder
+	var armed := [false]
+	eat.pressed.connect(func() -> void:
+		if armed[0]:
+			closer.call(true)
+		else:
+			armed[0] = true
+			q.text = "Are you sure?"
+			eat.text = "Yes"
+			eat.modulate = Color("#ff4040")
+			Sfx.play("denied", -12.0))
 	no.pressed.connect(func() -> void: closer.call(false))
 
 var _wire_src: Machine = null
@@ -1378,7 +1388,10 @@ func _interact() -> void:
 	if hit:
 		var n: Node = hit.collider
 		while n:
-			if n.has_meta("net_pilot"):
+			if n.has_meta("net_pilot") and Net.active \
+					and Net.player_names.has(int(n.get_meta("net_pilot"))):
+				# only a LIVE pilot's rocket counts -- stale displays never
+				# swallow your F press
 				var hudp = get_tree().get_first_node_in_group("hud")
 				if n.get_meta("net_mk2", false):
 					riding_peer = int(n.get_meta("net_pilot"))

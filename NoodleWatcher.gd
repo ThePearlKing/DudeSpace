@@ -236,10 +236,22 @@ func _process(delta: float) -> void:
 			get_tree().current_scene.add_child(grab)
 			grab.global_position = p.global_position
 
+
+## Attack fx are built along +Y; on a sphere, +Y must mean YOUR up.
+static func orient_to_gravity(n: Node3D) -> void:
+	var b = Universe.nearest(n.global_position)
+	var up: Vector3 = (n.global_position - b.center).normalized()
+	var x := up.cross(Vector3.RIGHT)
+	if x.length() < 0.05:
+		x = up.cross(Vector3.FORWARD)
+	x = x.normalized()
+	n.global_transform.basis = Basis(x, up, x.cross(up).normalized() * -1.0).orthonormalized()
+
 ## MAX WRATH: the terminal grab. One vast tendril descends over ~8 slow
 ## seconds -- your appeasement window. Get wrath under 40 (noodles, fast)
 ## and it withdraws. Fail, and it takes you: the Pythagorean sentence.
 class JudgmentFx extends Node3D:
+	var _oriented := false
 	var target: Node = null
 	var _life := 0.0
 	var _tip: MeshInstance3D
@@ -251,6 +263,9 @@ class JudgmentFx extends Node3D:
 		_tip.material_override.set_shader_parameter("glow", 2.4)
 		add_child(_tip)
 	func _process(delta: float) -> void:
+		if not _oriented:
+			_oriented = true
+			NoodleWatcher.orient_to_gravity(self)
 		_life += delta
 		# mercy check, the whole way down
 		if Game.wrath < 40.0:
@@ -271,6 +286,7 @@ class JudgmentFx extends Node3D:
 ## A tendril tip that closes around you, hoists you into the sky, and
 ## hurls you across the landscape like something it's done judging.
 class _GrabFx extends Node3D:
+	var _oriented := false
 	var target: Node = null
 	var _life := 0.0
 	var _tip: MeshInstance3D
@@ -282,6 +298,9 @@ class _GrabFx extends Node3D:
 		add_child(_tip)
 		Sfx.play("warp", -14.0)
 	func _process(delta: float) -> void:
+		if not _oriented:
+			_oriented = true
+			NoodleWatcher.orient_to_gravity(self)
 		_life += delta
 		# descend (0-0.8), clutch + hoist (0.8-2.0), HURL (2.0)
 		if _life < 0.8:
@@ -294,7 +313,7 @@ class _GrabFx extends Node3D:
 				# hoisted: you dangle from the tip, rising
 				var lift := (_life - 0.8) / 1.2
 				target.global_position = global_position \
-					+ Vector3(0, 2.0 + lift * 34.0, 0)
+					+ global_transform.basis.y * (2.0 + lift * 34.0)
 				if "velocity" in target:
 					target.velocity = Vector3.ZERO
 				if "_shake" in target:
@@ -304,8 +323,9 @@ class _GrabFx extends Node3D:
 				_held = false
 				# discarded: a flat, contemptuous hurl across the world
 				if "velocity" in target:
-					target.velocity = Vector3(randf_range(-1, 1), 0.35,
-						randf_range(-1, 1)).normalized() * 34.0
+					var b := global_transform.basis
+					target.velocity = (b.x * randf_range(-1, 1) + b.y * 0.35 \
+						+ b.z * randf_range(-1, 1)).normalized() * 34.0
 				Game.hurt(clampf(Game.health - 5.0, 0.0,
 						8.0 + 2.0 * float(Game.god_cycles)))
 				Sfx.play("explode", -10.0)
@@ -314,6 +334,7 @@ class _GrabFx extends Node3D:
 
 ## A god-sized noodle arm whipping down out of the sky onto your head.
 class _SmackFx extends Node3D:
+	var _oriented := false
 	var target: Node = null
 	var _life := 0.0
 	var _segs: Array = []
@@ -337,6 +358,9 @@ class _SmackFx extends Node3D:
 			add_child(s)
 			_segs.append(s)
 	func _process(delta: float) -> void:
+		if not _oriented:
+			_oriented = true
+			NoodleWatcher.orient_to_gravity(self)
 		_life += delta
 		# wind up (0-0.5), SNAP down (0.5-0.75), linger, gone
 		var drop := 0.0
@@ -354,8 +378,9 @@ class _SmackFx extends Node3D:
 				Game.hurt(clampf(Game.health - 5.0, 0.0,
 						10.0 + 2.0 * float(Game.god_cycles)))   # stings, never slays
 				if target is CharacterBody3D:
-					target.velocity += Vector3(randf_range(-1, 1), 0.4,
-						randf_range(-1, 1)).normalized() * 14.0
+					var b2 := global_transform.basis
+					target.velocity += (b2.x * randf_range(-1, 1) + b2.y * 0.4 \
+						+ b2.z * randf_range(-1, 1)).normalized() * 14.0
 				if "_shake" in target:
 					target._shake = 0.6
 		if _life > 1.6:

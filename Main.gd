@@ -30,6 +30,11 @@ var MINE_DIRS := {
 	"Crystalia": Vector3(-0.6, 0.5, -0.6).normalized(),
 	"Tutoria": Tutorial.ORE_DIR.normalized(),   # the tutorial's teaching mine
 }
+var _dens: float = 1.0   # spawn-density multiplier (bscale worlds)
+
+func _n(base: int) -> int:
+	return maxi(1, int(round(float(base) * _dens)))
+
 var _snap_t: float = 0.0   # first snapshot IMMEDIATELY, then one per minute
 var _arc_t: float = 3.0    # next Sanus lava arc
 var _rifts: Array = []                 # rift positions
@@ -57,6 +62,9 @@ func _ready() -> void:
 	Game.hardcore = bool(Save.character.get("hardcore", false))
 	if Game.tutorial_session:
 		Universe.enter_tutorial_universe()
+	# opt-in loot/object density that keeps up with giant worlds
+	if bool(Save.character.get("bscale", false)):
+		_dens = Universe.world_scale
 	_setup_environment()
 	_setup_light()
 	for b in Universe.bodies:
@@ -82,10 +90,18 @@ func _ready() -> void:
 	add_child(InventoryUI.new())
 	add_child(CalendarUI.new())
 	add_child(ChatUI.new())
+	add_child(HumanFaceEditor.new())   # F9: dev face editor
 	Net.pos_update.connect(_on_net_pos)
 	Net.peer_left.connect(_on_net_left)
 	Net.peer_identity.connect(_on_net_identity)
 	Net.peer_punch.connect(_on_net_punch)
+	# session over = every avatar (and its hitboxes) leaves with it
+	Net.session_changed.connect(func() -> void:
+		if not Net.active:
+			for id in _remote_avatars.keys():
+				if is_instance_valid(_remote_avatars[id]["root"]):
+					_remote_avatars[id]["root"].queue_free()
+			_remote_avatars.clear())
 	add_child(StorageUI.new())
 	add_child(MachineUI.new())
 	add_child(MapUI.new())
@@ -109,6 +125,8 @@ func _ready() -> void:
 		_rift_test()
 	if OS.get_environment("CTD_TEST") == "3":
 		_map_pick_test()
+	if OS.get_environment("CTD_TEST") == "4":
+		_board_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -146,6 +164,22 @@ func _ready() -> void:
 			rk.global_position = sp
 			rk.hyperdrive = Save.was_hyper()
 			rk.board(_player)
+
+## Headless: park a rocket in front of the player's face and press F.
+func _board_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var cam: Camera3D = p.camera()
+	var rk := Rocket.new()
+	add_child(rk)
+	rk.set_meta("placed_id", "rocket")
+	rk.global_position = cam.global_position - cam.global_transform.basis.z * 5.0
+	await get_tree().create_timer(0.5).timeout
+	print("BOARDTEST mode before: ", Game.mode, " board_lock: ", Game.board_lock,
+		" playtime: ", Game.playtime)
+	p._interact()
+	await get_tree().create_timer(0.5).timeout
+	print("BOARDTEST mode after: ", Game.mode, " (1 = IN_ROCKET)")
 
 ## Headless: drive the map picker with a synthetic right-click.
 func _map_pick_test() -> void:
@@ -625,6 +659,48 @@ void fragment(){
 		fmat2.set_shader_parameter("base", b.color)
 		fire.material_override = fmat2
 		p.add_child(fire)
+		# the GLARE: a huge soft halo + four diffraction spikes, always
+		# facing you. THIS is what makes it read as a star from anywhere
+		# in the system instead of a glowing ball
+		var halo := MeshInstance3D.new()
+		var hq := QuadMesh.new()
+		hq.size = Vector2(b.radius * 16.0, b.radius * 16.0)
+		halo.mesh = hq
+		var hsh := Shader.new()
+		hsh.code = """shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+uniform vec3 base : source_color;
+void vertex(){
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(
+		INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+	MODELVIEW_MATRIX = MODELVIEW_MATRIX * mat4(
+		vec4(length(MODEL_MATRIX[0].xyz), 0.0, 0.0, 0.0),
+		vec4(0.0, length(MODEL_MATRIX[1].xyz), 0.0, 0.0),
+		vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
+}
+void fragment(){
+	vec2 pp = UV * 2.0 - 1.0;
+	float r = length(pp);
+	// soft blinding core glow, wide falloff
+	float glow = pow(clamp(1.0 - r, 0.0, 1.0), 3.5) * 2.2
+		+ pow(clamp(1.0 - r, 0.0, 1.0), 9.0) * 3.0;
+	// four glare spikes, slowly breathing
+	float sp = 0.0;
+	float breathe = 0.85 + 0.15 * sin(TIME * 0.7);
+	sp += pow(max(0.0, 1.0 - abs(pp.y) * 26.0), 2.0) * max(0.0, 1.0 - abs(pp.x)) * breathe;
+	sp += pow(max(0.0, 1.0 - abs(pp.x) * 26.0), 2.0) * max(0.0, 1.0 - abs(pp.y)) * breathe;
+	vec3 col = mix(vec3(1.0), base, clamp(r * 1.6, 0.0, 0.85));
+	float a = clamp(glow + sp * 0.9, 0.0, 1.0);
+	ALBEDO = vec3(0.0);
+	EMISSION = col * a * 2.2;
+	ALPHA = a;
+}
+"""
+		var hmat := ShaderMaterial.new()
+		hmat.shader = hsh
+		hmat.set_shader_parameter("base", b.color)
+		halo.material_override = hmat
+		p.add_child(halo)
 	# Saturn + Uranus wear their rings (Uranus' famously sideways)
 	if b.name in ["Saturn", "Uranus"]:
 		var ring := MeshInstance3D.new()
@@ -934,10 +1010,15 @@ void fragment(){
 	float f1 = fbm(n * 4.0 + vec3(TIME * 0.10, TIME * 0.07, 0.0));
 	float f2 = fbm(n * 9.0 - vec3(0.0, TIME * 0.16, TIME * 0.09));
 	float cells = f1 * 0.6 + f2 * 0.4;
-	vec3 hot = mix(base, vec3(1.0), 0.75);
-	vec3 cool = base * 0.55;
-	ALBEDO = mix(cool, hot, smoothstep(0.35, 0.75, cells));
-	EMISSION = mix(base * 1.5, vec3(1.2), pow(cells, 2.0)) * 2.4;
+	// limb darkening, like a real photosphere: the centre of the disc
+	// BLOWS OUT white-hot, the edge cools toward the star's colour
+	float facing = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+	vec3 hot = mix(base, vec3(1.0), 0.85);
+	vec3 cool = base * 0.7;
+	vec3 surf = mix(cool, hot, smoothstep(0.3, 0.75, cells));
+	surf = mix(surf, vec3(1.0), pow(facing, 2.0) * 0.7);
+	ALBEDO = surf;
+	EMISSION = surf * (3.0 + pow(facing, 2.0) * 5.0 + cells * 1.5);
 }
 """
 			var smm := ShaderMaterial.new()
@@ -1219,48 +1300,48 @@ func _populate(b) -> void:
 			var woods: Array = []
 			for i in 3:
 				woods.append(_surface_dir())
-			for i in 40:
+			for i in _n(40):
 				var td: Vector3
-				if i < 28:
+				if i < _n(28):
 					var w: Vector3 = woods[i % woods.size()]
 					td = (w + Vector3(randf_range(-0.12, 0.12), randf_range(-0.12, 0.12),
 						randf_range(-0.12, 0.12))).normalized()
 				else:
 					td = _surface_dir()
 				_earth_tree(b, td)
-			for i in 12:
+			for i in _n(12):
 				var hum := EarthHuman.new()
 				hum.setup(b)
 				add_child(hum)
 				var hd := _surface_dir()
 				hum.global_transform = Transform3D(_basis_from_up(hd),
 					b.center + hd * (b.radius + 1.2))
-			for i in 8:
+			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
-			for i in 5:
+			for i in _n(5):
 				_earth_lake(b, _surface_dir())
 			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
 		"luna":
 			# barren. gray. historic. no loot -- the Moon has nothing to sell
-			for i in 16:
+			for i in _n(16):
 				_crater(b, _surface_dir(), randf_range(1.5, 4.5), Color("#a8a8ac"))
 			_moon_flag(b)
 		"mercury":
 			# scorched crater field: baked boulders to smash, coal in the dark ones
-			for i in 12:
+			for i in _n(12):
 				_crater(b, _surface_dir(), randf_range(1.0, 3.0), Color("#8a7d70"))
 			_spawn_rocks(b, 14, Color("#7d7168"))
 			_spawn_res_nodes(b, 10, "coal", 2)
 		"venus":
 			# the pressure-cooker: glowing fissures, sulfur crusting everything
-			for i in 7:
+			for i in _n(7):
 				_venus_vent(b, _surface_dir())
 			_add_shell(b, Color(0.9, 0.75, 0.4, 0.35), 1.09, false)
 			_spawn_res_nodes(b, 12, "sulfur", 3)
 			_spawn_enemies(b, 4, 2)   # even the locals are hostile. it's venus.
 		"mars":
 			# rust, ruins of exploration, and iridium under the dust
-			for i in 8:
+			for i in _n(8):
 				_crater(b, _surface_dir(), randf_range(1.2, 3.5), Color("#a5502f"))
 			_spawn_res_nodes(b, 10, "raw_irid", 2)
 			_mars_rover(b)
@@ -1274,9 +1355,9 @@ func _populate(b) -> void:
 			_spawn_rocks(b, 10, Color("#2a0c06"))   # cooled slag boulders
 		"volcanic":
 			# Extroma: geologically furious, economically generous
-			for i in 9:
+			for i in _n(9):
 				_volcano(b, _surface_dir())
-			for i in 8:
+			for i in _n(8):
 				_boiling_spring(b, _surface_dir())
 			_spawn_res_nodes(b, 8, "coal", 3)
 			_spawn_res_nodes(b, 6, "raw_irid", 2)
@@ -1285,16 +1366,16 @@ func _populate(b) -> void:
 		"varnisol":
 			# Varnisol: the gentle one. Pine woods, a big lake, wildlife.
 			var grove := _surface_dir()
-			for i in 34:
+			for i in _n(34):
 				var pd := (grove + Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2),
-					randf_range(-0.2, 0.2))).normalized() if i < 24 else _surface_dir()
+					randf_range(-0.2, 0.2))).normalized() if i < _n(24) else _surface_dir()
 				_pine(b, pd)
 			_earth_lake(b, (grove + Vector3(0.3, 0.0, 0.25)).normalized())
-			for i in 3:
+			for i in _n(3):
 				_earth_lake(b, _surface_dir())
-			for i in 6:
+			for i in _n(6):
 				_earth_mountain(b, _surface_dir())
-			for i in 8:
+			for i in _n(8):
 				var an := Animal.new()
 				an.setup(b)
 				add_child(an)
@@ -1609,7 +1690,9 @@ func _mars_rover(b) -> void:
 func _earth_mountain(b, dir: Vector3) -> void:
 	var root := Node3D.new()
 	add_child(root)
-	var h := randf_range(6.0, 12.0)
+	# mountains belong to their planet: bigger world, bigger ranges
+	var sf: float = maxf(1.0, b.radius / 62.0)
+	var h := randf_range(6.0, 12.0) * sf
 	var cone := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.0
@@ -1636,7 +1719,9 @@ func _earth_mountain(b, dir: Vector3) -> void:
 func _earth_lake(b, dir: Vector3) -> void:
 	var root := Node3D.new()
 	add_child(root)
-	var r := randf_range(4.0, 8.0)
+	# lakes scale with their world too
+	var sf: float = maxf(1.0, b.radius / 62.0)
+	var r := randf_range(4.0, 8.0) * sf
 	var rim := MeshInstance3D.new()
 	var rm := CylinderMesh.new()
 	rm.top_radius = r * 1.15
@@ -1724,6 +1809,7 @@ const RES_LOOK := {
 
 func _spawn_res_nodes(b, count: int, res: String, per: int,
 		col_override: Color = Color.BLACK, emit_override: float = -1.0) -> void:
+	count = _n(count)
 	var look: Dictionary = RES_LOOK.get(res, {"col": Color("#2a8f6a"), "emit": 1.0})
 	if col_override != Color.BLACK:
 		look = {"col": col_override, "emit": emit_override if emit_override >= 0.0 else 1.0}
@@ -1739,7 +1825,7 @@ func _spawn_res_nodes(b, count: int, res: String, per: int,
 
 ## Plain breakable boulders: no ore, a little pocket change, pure geology.
 func _spawn_rocks(b, count: int, col: Color) -> void:
-	for i in count:
+	for i in _n(count):
 		var nd := Destructible.new()
 		nd.rock = true
 		var s := randf_range(1.0, 2.4)
@@ -1749,7 +1835,7 @@ func _spawn_rocks(b, count: int, col: Color) -> void:
 		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
 
 func _spawn_enemies(b, count: int, level: int) -> void:
-	for i in count:
+	for i in _n(count):
 		var e := Enemy.new()
 		e.setup(level, b)
 		add_child(e)
@@ -1761,7 +1847,7 @@ func _spawn_flora(b) -> void:
 	var forests: Array = []
 	for i in 4:
 		forests.append(_surface_dir())
-	for i in 130:
+	for i in _n(130):
 		var pl := Plant.new()
 		add_child(pl)
 		var d: Vector3
@@ -1863,6 +1949,7 @@ func _euclid_landmarks(b) -> void:
 	shrine.global_transform = Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 10.0)
 
 func _register_crates(b, count: int, value: int) -> void:
+	count = _n(count)
 	var grp := "brk_" + str(b.name)
 	_crate_beds.append({"body": b, "value": value, "group": grp, "target": count})
 	_scatter_crates(b, count, value, grp)
