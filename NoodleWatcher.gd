@@ -289,7 +289,7 @@ class _GrabFx extends Node3D:
 		elif target and is_instance_valid(target):
 			if not _held:
 				_held = true
-				Sfx.play("hurt", -20.0)
+				Sfx.play("hurt", -10.0)
 			if _life < 2.0:
 				# hoisted: you dangle from the tip, rising
 				var lift := (_life - 0.8) / 1.2

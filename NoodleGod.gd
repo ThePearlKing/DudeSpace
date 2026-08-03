@@ -124,7 +124,7 @@ func _process(delta: float) -> void:
 			_grab_cd = 9.0
 			_grabbing = 0.6
 			_grab_from = global_position + global_transform.basis.y * 14.0
-			Sfx.play("hurt", -20.0)
+			Sfx.play("hurt", -8.0)
 
 	# lingering among the roots without tribute is noticed
 	if global_position.distance_to(p.global_position) < INFLUENCE:
