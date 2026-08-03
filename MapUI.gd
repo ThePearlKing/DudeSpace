@@ -9,19 +9,52 @@ var pan: Vector2 = Vector2.ZERO     # world-space XZ offset from YOU
 var _dragging: bool = false
 var _last_scale: float = 0.001
 
+var select_cb: Callable = Callable()   # set = click-a-planet picker mode
+var _press_pos: Vector2 = Vector2.ZERO
+
 func _ready() -> void:
 	layer = 15
 	visible = false
 	add_to_group("closable_ui")
+	add_to_group("map_ui")
 	_view = _MapView.new()
 	_view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_view.owner_ui = self
 	add_child(_view)
 
+## Teleport browser hands us a callback; the next planet clicked wins.
+func open_select(cb: Callable) -> void:
+	select_cb = cb
+	visible = true
+	pan = Vector2.ZERO
+	_dragging = false
+	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Sfx.play("click", -14.0)
+
+## Which body sits under this screen point? (same transform as _draw)
+func body_at(screen: Vector2) -> Variant:
+	var vp := get_viewport().get_visible_rect().size
+	var c := vp * 0.5
+	var p = get_tree().get_first_node_in_group("player")
+	var me: Vector3 = p.global_position if p else Vector3.ZERO
+	var origin := Vector3(me.x + pan.x, 0, me.z + pan.y)
+	# nearest CENTRE wins -- so a small planet sitting inside a big one's
+	# disc is still clickable by aiming at its dot
+	var best = null
+	var best_d := 1e9
+	for b in Universe.bodies:
+		var sp: Vector2 = c + Vector2(b.center.x - origin.x, b.center.z - origin.z) * _last_scale
+		var d := sp.distance_to(screen)
+		if d <= maxf(14.0, b.radius * _last_scale + 6.0) and d < best_d:
+			best = b
+			best_d = d
+	return best
+
 func close_ui() -> void:
 	visible = false
 	_dragging = false
+	select_cb = Callable()
 	if not Game.dead:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -53,6 +86,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		pan.x -= event.relative.x / _last_scale
 		pan.y -= event.relative.y / _last_scale
 
+## Picker right-click rides _input, ahead of ANY control that might eat
+## the event -- _unhandled_input provably never received it.
+func _input(event: InputEvent) -> void:
+	if not visible or not select_cb.is_valid():
+		return
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_RIGHT:
+		var b = body_at(event.position)
+		if b != null:
+			var cb := select_cb
+			close_ui()
+			cb.call(b)
+			get_viewport().set_input_as_handled()
+
 func _process(_delta: float) -> void:
 	if visible:
 		_view.queue_redraw()
@@ -64,7 +111,12 @@ class _MapView extends Control:
 		var font := ThemeDB.fallback_font
 		var vp := get_viewport_rect().size
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0.02, 0.9))
-		draw_string(font, Vector2(30, 40), "MAP  ·  wheel zoom  ·  drag pan  ·  M close", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+		draw_string(font, Vector2(30, 40),
+			"MAP  ·  RIGHT-CLICK A PLANET TO WARP  ·  wheel zoom  ·  drag pan" \
+			if owner_ui.select_cb.is_valid() \
+			else "MAP  ·  wheel zoom  ·  drag pan  ·  M close",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 20,
+			Color("#7dff9a") if owner_ui.select_cb.is_valid() else Color.WHITE)
 
 		var me := _active_pos()
 		var c := vp * 0.5

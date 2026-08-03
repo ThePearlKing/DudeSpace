@@ -28,8 +28,10 @@ var MINE_DIRS := {
 	"Pi": Vector3(-0.3, -0.8, 0.5).normalized(),
 	"Verdant": Vector3(0.7, 0.2, 0.7).normalized(),
 	"Crystalia": Vector3(-0.6, 0.5, -0.6).normalized(),
+	"Tutoria": Tutorial.ORE_DIR.normalized(),   # the tutorial's teaching mine
 }
 var _snap_t: float = 0.0   # first snapshot IMMEDIATELY, then one per minute
+var _arc_t: float = 3.0    # next Sanus lava arc
 var _rifts: Array = []                 # rift positions
 var _rift_cd: float = 0.0
 var _rift_prev: Vector3 = Vector3.ZERO
@@ -53,24 +55,37 @@ func _ready() -> void:
 	# per-slot run settings: world scale + hardcore
 	Universe.apply_scale(float(Save.character.get("wscale", 1.0)))
 	Game.hardcore = bool(Save.character.get("hardcore", false))
+	if Game.tutorial_session:
+		Universe.enter_tutorial_universe()
 	_setup_environment()
 	_setup_light()
 	for b in Universe.bodies:
 		_build_body(b)
-	_spawn_invaders()
+	if not Game.tutorial_session:
+		_spawn_invaders()
 	_spawn_player_and_rocket()
 
-	Zones.build_shadow_temple(self, Universe.make_flat_body(Zones.SHADOW_POS))
-	_spawn_rifts()
-	_spawn_starship()
-	_c4 = Connect4.new()
-	_c4.add_to_group("connect4")
-	add_child(_c4)
-	_c4.global_position = C4_POS
+	if not Game.tutorial_session:
+		Zones.build_shadow_temple(self, Universe.make_flat_body(Zones.SHADOW_POS))
+		_spawn_rifts()
+		_spawn_starship()
+		_c4 = Connect4.new()
+		_c4.add_to_group("connect4")
+		add_child(_c4)
+		_c4.global_position = C4_POS
+
+	if not Game.tutorial_session:
+		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
 
 	_hud = HUD.new()
 	add_child(_hud)
 	add_child(InventoryUI.new())
+	add_child(CalendarUI.new())
+	add_child(ChatUI.new())
+	Net.pos_update.connect(_on_net_pos)
+	Net.peer_left.connect(_on_net_left)
+	Net.peer_identity.connect(_on_net_identity)
+	Net.peer_punch.connect(_on_net_punch)
 	add_child(StorageUI.new())
 	add_child(MachineUI.new())
 	add_child(MapUI.new())
@@ -92,6 +107,18 @@ func _ready() -> void:
 		_self_test()
 	if OS.get_environment("CTD_TEST") == "2":
 		_rift_test()
+	if OS.get_environment("CTD_TEST") == "3":
+		_map_pick_test()
+	# the interactive tutorial lives ONLY in the dedicated tutorial world
+	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
+			and OS.get_environment("CTD_NET") == "":
+		add_child(Tutorial.new())
+	# headless LAN test rig: CTD_NET=host opens this world to LAN (ephemeral)
+	if OS.get_environment("CTD_NET") == "host":
+		Save.ephemeral = true   # never touch real slots from a test run
+		var cfg := Game.host_cfg.duplicate()
+		cfg["port"] = 25999   # off the real port so tests never collide
+		print("NETTEST host: ", Net.host(cfg))
 	if _player:
 		_player.restore_jet()   # jetpack comes back ON if you left it on
 	if Game.door_open:
@@ -112,10 +139,38 @@ func _ready() -> void:
 		_player.global_position = sp
 		if Save.was_in_rocket():
 			var rk := Rocket.new()
+			rk.mk2 = Save.was_mk2()   # a 2.0 comes back AS a 2.0
+			# without this meta the rocket would never save again once parked
+			rk.set_meta("placed_id", "rocket2" if rk.mk2 else "rocket")
 			add_child(rk)
 			rk.global_position = sp
 			rk.hyperdrive = Save.was_hyper()
 			rk.board(_player)
+
+## Headless: drive the map picker with a synthetic right-click.
+func _map_pick_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var m = get_tree().get_first_node_in_group("map_ui")
+	print("MAPTEST map found: ", m != null)
+	m.open_select(func(b) -> void: print("MAPTEST picked: ", b.name))
+	m._last_scale = 0.01   # headless never draws; fake the draw transform
+	await get_tree().create_timer(0.5).timeout
+	var home = Universe.body_named("Home")
+	var p = get_tree().get_first_node_in_group("player")
+	var vpsz := get_viewport().get_visible_rect().size
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_RIGHT
+	ev.pressed = true
+	ev.position = vpsz * 0.5 + Vector2(home.center.x - p.global_position.x,
+		home.center.z - p.global_position.z) * 0.01
+	Input.parse_input_event(ev)
+	await get_tree().create_timer(0.5).timeout
+	print("MAPTEST after parse_input_event, cb still set: ", m.select_cb.is_valid())
+	if m.select_cb.is_valid():
+		# delivery vs logic: feed the handler directly
+		m._unhandled_input(ev)
+		print("MAPTEST after direct call, cb still set: ", m.select_cb.is_valid())
+		print("MAPTEST body_at says: ", m.body_at(ev.position))
 
 ## Headless regression test: build a small base, save-cycle it, count.
 func _self_test() -> void:
@@ -184,15 +239,18 @@ func _rift_test() -> void:
 func _process(delta: float) -> void:
 	_regen_crates(delta)
 	_regen_ore(delta)
+	_animate_avatars(delta)
 	var pos := _active_pos()
 	_save_t -= delta
 	if _save_t <= 0.0:
 		_save_t = 5.0
 		var hyper := false
+		var mk2 := false
 		if Game.mode == Game.Mode.IN_ROCKET:
 			for r in get_tree().get_nodes_in_group("rocket"):
 				if r is Rocket and r.piloted:
 					hyper = r.hyperdrive
+					mk2 = r.mk2
 					break
 		var petn = get_tree().get_first_node_in_group("pet")
 		if petn != null and is_instance_valid(petn):
@@ -201,7 +259,7 @@ func _process(delta: float) -> void:
 			Save.set_pet(false)
 		if _world_load_ok:
 			Save.set_world(collect_world())
-		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper)
+		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2)
 		Save.save_progress()
 
 	# --- time-rift snapshots: one per minute, keep the last 6 ---
@@ -312,6 +370,32 @@ func _process(delta: float) -> void:
 					_burn_t = 2.0
 					if _hud:
 						_hud.flash("BURNING")
+	# --- gas giants: clouds all the way down. no message needed --
+	# the sky ate you, you were there. Rockets don't survive it either.
+	for b in Universe.bodies:
+		if b.kind != "gas":
+			continue
+		var gd: float = pos.distance_to(b.center)
+		if not Game.dead:
+			if gd < b.radius * 0.75:
+				Game.hurt(100000.0, true)
+			elif gd < b.radius:
+				Game.hurt(22.0 * delta)
+		for r in get_tree().get_nodes_in_group("rocket"):
+			if r is Rocket and is_instance_valid(r) \
+					and r.global_position.distance_to(b.center) < b.radius * 0.75:
+				Destructible.spawn_debris(self, r.global_position,
+					Vector3(1.6, 3.0, 1.6), Color("#d8d8e0"), Vector3.UP)
+				Net.broadcast_remove(r.global_position)
+				r.queue_free()
+	# --- Sanus spits lava at visitors. The loot is priced accordingly. ---
+	if not Game.dead:
+		var sb = Universe.body_named("Sanus")
+		if sb and pos.distance_to(sb.center) < sb.radius + 90.0:
+			_arc_t -= delta
+			if _arc_t <= 0.0:
+				_arc_t = randf_range(0.4, 1.4)   # constant, erratic, everywhere
+				_spawn_lava_arc(sb, pos)
 	_burn_t = maxf(0.0, _burn_t - delta)
 
 	# which fold-maze room are you standing in? (number on screen)
@@ -363,13 +447,15 @@ func _notification(what: int) -> void:
 		if petc != null and is_instance_valid(petc):
 			Save.set_pet(true, petc.genome, petc.staying)
 		var hyper := false
+		var mk2 := false
 		if Game.mode == Game.Mode.IN_ROCKET:
 			for r in get_tree().get_nodes_in_group("rocket"):
 				if r is Rocket and r.piloted:
 					hyper = r.hyperdrive
+					mk2 = r.mk2
 		if _world_load_ok:
 			Save.set_world(collect_world())
-		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET, hyper)
+		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET, hyper, mk2)
 		Save.save_progress()
 
 func _active_node() -> Node:
@@ -450,7 +536,9 @@ func _build_body(b) -> void:
 		var cs := SphereShape3D.new()
 		cs.radius = b.radius
 		col.shape = cs
-	p.add_child(col)
+	if b.kind != "gas":
+		p.add_child(col)   # gas giants have NO surface. you fall in.
+	p.set_meta("body_name", b.name)   # the apple cinematic needs to find these
 	add_child(p)
 	p.global_position = b.center
 
@@ -464,8 +552,58 @@ func _build_body(b) -> void:
 		var ol := OmniLight3D.new()
 		ol.light_energy = 4.0
 		ol.omni_range = 4000.0
-		ol.light_color = Color("#ffcc55")
+		ol.light_color = b.color.lerp(Color.WHITE, 0.25)   # blue stars glow blue
 		p.add_child(ol)
+		# corona: a licking rim of flame around the disc, always moving
+		var cor := MeshInstance3D.new()
+		var corm := SphereMesh.new()
+		corm.radius = b.radius * 1.38
+		corm.height = b.radius * 2.76
+		corm.radial_segments = 48
+		corm.rings = 24
+		cor.mesh = corm
+		var csh2 := Shader.new()
+		csh2.code = "shader_type spatial;\nrender_mode unshaded, blend_add, cull_back;\nvarying vec3 vn;\nuniform vec3 base : source_color;\n" \
+			+ _NOISE_GLSL + """
+void vertex(){
+	vn = NORMAL;
+	VERTEX += NORMAL * (fbm(NORMAL * 3.0 + vec3(TIME * 0.3)) - 0.35) * length(VERTEX) * 0.22;
+}
+void fragment(){
+	vec3 n = normalize(vn);
+	float rim = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.3);
+	float lick = fbm(n * 6.0 + vec3(0.0, TIME * 0.5, TIME * 0.3));
+	ALBEDO = vec3(0.0);
+	EMISSION = base * rim * (0.8 + lick * 2.6) * 2.6;
+	ALPHA = clamp(rim * (0.45 + lick * 1.0), 0.0, 1.0);
+}
+"""
+		var cmat2 := ShaderMaterial.new()
+		cmat2.shader = csh2
+		cmat2.set_shader_parameter("base", b.color)
+		cor.material_override = cmat2
+		p.add_child(cor)
+	# Saturn + Uranus wear their rings (Uranus' famously sideways)
+	if b.name in ["Saturn", "Uranus"]:
+		var ring := MeshInstance3D.new()
+		var rm := TorusMesh.new()
+		rm.inner_radius = b.radius * 1.35
+		rm.outer_radius = b.radius * 2.1
+		ring.mesh = rm
+		ring.scale = Vector3(1, 0.04, 1)   # squashed torus = flat ring disc
+		var rmat := StandardMaterial3D.new()
+		rmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		rmat.albedo_color = Color(0.9, 0.85, 0.7, 0.35) if b.name == "Saturn" \
+			else Color(0.7, 0.9, 0.9, 0.25)
+		rmat.emission_enabled = true
+		rmat.emission = rmat.albedo_color
+		rmat.emission_energy_multiplier = 0.4
+		ring.material_override = rmat
+		if b.name == "Uranus":
+			ring.rotation_degrees = Vector3(0, 0, 82)   # rolls on its side
+		else:
+			ring.rotation_degrees = Vector3(12, 0, 0)
+		p.add_child(ring)
 
 	_populate(b)
 
@@ -611,17 +749,225 @@ func _accretion(b) -> void:
 	add_child(halo)
 	halo.global_position = b.center
 
+## Shared GLSL noise header for planet-surface shaders.
+const _NOISE_GLSL := """
+float h31(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
+float vnoise(vec3 p){
+	vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	float a = h31(i), b = h31(i + vec3(1,0,0)), c = h31(i + vec3(0,1,0)), d = h31(i + vec3(1,1,0));
+	float e = h31(i + vec3(0,0,1)), f2 = h31(i + vec3(1,0,1)), g = h31(i + vec3(0,1,1)), k = h31(i + vec3(1,1,1));
+	return mix(mix(mix(a, b, f.x), mix(c, d, f.x), f.y),
+		mix(mix(e, f2, f.x), mix(g, k, f.x), f.y), f.z);
+}
+float fbm(vec3 p){
+	float v = 0.0; float amp = 0.5;
+	for (int i = 0; i < 4; i++){ v += amp * vnoise(p); p *= 2.13; amp *= 0.5; }
+	return v;
+}
+"""
+
+## Earth from orbit: oceans, continents, shallows, polar ice.
+func _earth_material() -> Material:
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;\nvarying vec3 vn;\n" + _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float land = fbm(n * 3.1);
+	float caps = smoothstep(0.76, 0.86, abs(n.y));
+	vec3 ocean = vec3(0.06, 0.22, 0.5);
+	vec3 shallow = vec3(0.1, 0.42, 0.6);
+	vec3 grass = vec3(0.18, 0.46, 0.18);
+	vec3 rock = vec3(0.42, 0.38, 0.28);
+	vec3 col;
+	if (land > 0.52) { col = mix(grass, rock, smoothstep(0.52, 0.72, land)); }
+	else { col = mix(ocean, shallow, smoothstep(0.38, 0.52, land)); }
+	col = mix(col, vec3(0.93, 0.95, 1.0), caps);
+	ALBEDO = col;
+	ROUGHNESS = land > 0.52 ? 0.9 : 0.25;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	return m
+
+## Rocky worlds: base colour with mottled noise + optional polar caps.
+func _rocky_material(color: Color, cap: float = 0.0) -> Material:
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;\nvarying vec3 vn;\nuniform vec3 base : source_color;\nuniform float capamt;\n" \
+		+ _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float m1 = fbm(n * 7.0);
+	float m2 = fbm(n * 21.0);
+	vec3 col = base * (0.72 + 0.42 * m1 + 0.16 * m2);
+	if (capamt > 0.0) {
+		col = mix(col, vec3(0.95), smoothstep(0.86 - capamt * 0.1, 0.92, abs(n.y)));
+	}
+	ALBEDO = col;
+	ROUGHNESS = 0.95;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("base", color)
+	m.set_shader_parameter("capamt", cap)
+	return m
+
 func _planet_material(kind: String, color: Color) -> Material:
 	match kind:
 		"pixel", "wth", "wob", "contrast":
 			return ShaderLib.make(kind, color)
+		"earth":
+			return _earth_material()
+		"luna", "mercury":
+			return _rocky_material(color)
+		"mars":
+			return _rocky_material(color, 1.0)
+		"venus":
+			# Venus from orbit is nothing but cloud: slow cream-and-sulfur
+			# swirls, fully opaque, faintly glowing with trapped heat
+			var vsh := Shader.new()
+			vsh.code = "shader_type spatial;\nvarying vec3 vn;\n" + _NOISE_GLSL + """
+void fragment(){
+	vec3 n = normalize(vn);
+	float sw = fbm(n * 4.0 + vec3(fbm(n * 2.0 + TIME * 0.008)) * 1.4);
+	float band = sin(n.y * 9.0 + sw * 4.0) * 0.5 + 0.5;
+	vec3 cream = vec3(0.93, 0.85, 0.62);
+	vec3 sulfur = vec3(0.78, 0.62, 0.3);
+	ALBEDO = mix(sulfur, cream, band * 0.7 + sw * 0.3);
+	EMISSION = vec3(0.25, 0.15, 0.02) * (0.3 + sw * 0.4);
+	ROUGHNESS = 0.6;
+}
+void vertex(){ vn = NORMAL; }
+"""
+			var vm := ShaderMaterial.new()
+			vm.shader = vsh
+			return vm
+		"gas":
+			# swirling latitude bands + one big slow storm eye. all clouds,
+			# no ground -- the look warns you before the physics does
+			var sh := Shader.new()
+			sh.code = """shader_type spatial;
+render_mode shadows_disabled;
+uniform vec3 base : source_color;
+float band(vec3 n, float t) {
+	float lat = n.y;
+	float w = sin(lat * 14.0 + sin(lat * 5.0 + t * 0.05) * 1.5
+		+ sin(n.x * 3.0 + t * 0.1) * 0.4);
+	return w * 0.5 + 0.5;
+}
+void fragment() {
+	vec3 n = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	float b1 = band(n, TIME);
+	vec3 dark = base * 0.55;
+	vec3 light = mix(base, vec3(1.0), 0.35);
+	vec3 col = mix(dark, light, b1);
+	// the storm: an oval eye drifting slowly around the equator
+	vec2 eye = vec2(cos(TIME * 0.02), sin(TIME * 0.02));
+	float d = length(vec2(dot(n.xz, eye), (n.y + 0.25) * 2.2));
+	col = mix(base * vec3(1.25, 0.75, 0.65), col, smoothstep(0.12, 0.3, d));
+	ALBEDO = col;
+	ROUGHNESS = 0.9;
+}
+"""
+			var m := ShaderMaterial.new()
+			m.shader = sh
+			m.set_shader_parameter("base", color)
+			return m
 		"wireframe":
 			# dark base; real polygon edges added as an overlay in _build_body
 			return _unshaded(Color("#020308"), 1.0)
 		"blind":
 			return _unshaded(Color.WHITE, 4.0)
 		"sun":
-			return _unshaded(Color("#ffcc33"), 4.0)
+			# a star SURFACE: churning fire cells, hot rising plumes
+			var ssh := Shader.new()
+			ssh.code = "shader_type spatial;\nrender_mode unshaded;\nvarying vec3 vn;\nuniform vec3 base : source_color;\n" \
+				+ _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float f1 = fbm(n * 4.0 + vec3(TIME * 0.10, TIME * 0.07, 0.0));
+	float f2 = fbm(n * 9.0 - vec3(0.0, TIME * 0.16, TIME * 0.09));
+	float cells = f1 * 0.6 + f2 * 0.4;
+	vec3 hot = mix(base, vec3(1.0), 0.75);
+	vec3 cool = base * 0.55;
+	ALBEDO = mix(cool, hot, smoothstep(0.35, 0.75, cells));
+	EMISSION = mix(base * 1.5, vec3(1.2), pow(cells, 2.0)) * 2.4;
+}
+"""
+			var smm := ShaderMaterial.new()
+			smm.shader = ssh
+			smm.set_shader_parameter("base", color)
+			return smm
+		"lava":
+			# Sanus: charred crust laced with glowing lava veins
+			var lsh := Shader.new()
+			lsh.code = "shader_type spatial;\nvarying vec3 vn;\n" + _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float rock = fbm(n * 6.0);
+	float vein = abs(fbm(n * 9.0 + 3.7) - 0.5);
+	float glow = 1.0 - smoothstep(0.02, 0.09, vein);
+	vec3 crust = mix(vec3(0.12, 0.04, 0.03), vec3(0.3, 0.1, 0.06), rock);
+	ALBEDO = mix(crust, vec3(1.0, 0.35, 0.05), glow * 0.8);
+	EMISSION = vec3(1.0, 0.3, 0.02) * glow * (1.6 + sin(TIME * 2.0 + rock * 12.0) * 0.5);
+	ROUGHNESS = 0.9;
+}
+"""
+			var lmm := ShaderMaterial.new()
+			lmm.shader = lsh
+			return lmm
+		"volcanic":
+			# Extroma: Io's ugly cousin -- sulfur blotches, scorch rings,
+			# orange cracks bleeding heat between them
+			var xsh := Shader.new()
+			xsh.code = "shader_type spatial;\nvarying vec3 vn;\n" + _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float blotch = fbm(n * 5.0);
+	float spots = fbm(n * 12.0 + 7.0);
+	float crack = abs(fbm(n * 8.0 + 19.0) - 0.5);
+	float glow = 1.0 - smoothstep(0.015, 0.06, crack);
+	vec3 sulfur = vec3(0.85, 0.72, 0.25);
+	vec3 olive = vec3(0.55, 0.5, 0.2);
+	vec3 scorch = vec3(0.25, 0.16, 0.1);
+	vec3 col = mix(olive, sulfur, blotch);
+	col = mix(col, scorch, smoothstep(0.6, 0.75, spots));
+	ALBEDO = mix(col, vec3(1.0, 0.4, 0.05), glow * 0.6);
+	EMISSION = vec3(1.0, 0.3, 0.02) * glow * 0.9;
+	ROUGHNESS = 0.95;
+}
+"""
+			var xmm := ShaderMaterial.new()
+			xmm.shader = xsh
+			return xmm
+		"varnisol":
+			# grassland + darker forest patches + dirt scars + snow poles
+			var gsh := Shader.new()
+			gsh.code = "shader_type spatial;\nvarying vec3 vn;\n" + _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float g = fbm(n * 4.0);
+	float f = fbm(n * 8.0 + 11.0);
+	vec3 grass = vec3(0.24, 0.52, 0.2);
+	vec3 forest = vec3(0.1, 0.3, 0.12);
+	vec3 dirt = vec3(0.42, 0.34, 0.22);
+	vec3 col = mix(grass, forest, smoothstep(0.5, 0.62, f));
+	col = mix(col, dirt, smoothstep(0.62, 0.75, g));
+	col = mix(col, vec3(0.93, 0.95, 1.0), smoothstep(0.8, 0.88, abs(n.y)));
+	ALBEDO = col;
+	ROUGHNESS = 0.95;
+}
+"""
+			var gmm := ShaderMaterial.new()
+			gmm.shader = gsh
+			return gmm
 		"blackhole":
 			var bm := StandardMaterial3D.new()
 			bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -708,6 +1054,17 @@ func _populate(b) -> void:
 	# Coin value per crate rises far from Home, so late-game gear forces
 	# you out to the dangerous planets. (value, target crate count)
 	match b.kind:
+		"tutorial":
+			# crates = startup capital, exactly like a real fresh planet
+			_register_crates(b, 35, 10)
+			# a REAL mine, same as every mined planet: shaft, chamber,
+			# respawning veins, exit gate. NOTHING is pre-built -- the
+			# tutorial teaches earning and buying every machine yourself.
+			_build_mine(b, MINE_DIRS["Tutoria"], "raw_ingot", 2, Color("#a24bff"), 20)
+		"tutorial_moon":
+			_register_crates(b, 20, 4)
+		"tutorial_rocket":
+			_register_crates(b, 25, 5)
 		"home":
 			_register_crates(b, 60, 2)     # cheap: enough for a rocket + basics
 			_place_on_surface(b, NoodleGod.new(), _surface_dir(), func(n): n.build())
@@ -813,6 +1170,95 @@ func _populate(b) -> void:
 			_spawn_enemies(b, 6, 5)   # shooters + flyers guard the shards
 		"blind":
 			_register_crates(b, 12, 30)
+		"earth":
+			# the most famous planet in the universe, populated by its
+			# dumbest species. trees, lakescape greens, wandering Humans.
+			# earth trees only -- no alien Verdant flora here. brown bark,
+			# green canopy, planted in loose woods
+			var woods: Array = []
+			for i in 3:
+				woods.append(_surface_dir())
+			for i in 40:
+				var td: Vector3
+				if i < 28:
+					var w: Vector3 = woods[i % woods.size()]
+					td = (w + Vector3(randf_range(-0.12, 0.12), randf_range(-0.12, 0.12),
+						randf_range(-0.12, 0.12))).normalized()
+				else:
+					td = _surface_dir()
+				_earth_tree(b, td)
+			for i in 12:
+				var hum := EarthHuman.new()
+				hum.setup(b)
+				add_child(hum)
+				var hd := _surface_dir()
+				hum.global_transform = Transform3D(_basis_from_up(hd),
+					b.center + hd * (b.radius + 1.2))
+			for i in 8:
+				_earth_mountain(b, _surface_dir())
+			for i in 5:
+				_earth_lake(b, _surface_dir())
+			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
+		"luna":
+			# barren. gray. historic. no loot -- the Moon has nothing to sell
+			for i in 16:
+				_crater(b, _surface_dir(), randf_range(1.5, 4.5), Color("#a8a8ac"))
+			_moon_flag(b)
+		"mercury":
+			# scorched crater field: baked boulders to smash, coal in the dark ones
+			for i in 12:
+				_crater(b, _surface_dir(), randf_range(1.0, 3.0), Color("#8a7d70"))
+			_spawn_rocks(b, 14, Color("#7d7168"))
+			_spawn_res_nodes(b, 10, "coal", 2)
+		"venus":
+			# the pressure-cooker: glowing fissures, sulfur crusting everything
+			for i in 7:
+				_venus_vent(b, _surface_dir())
+			_add_shell(b, Color(0.9, 0.75, 0.4, 0.35), 1.09, false)
+			_spawn_res_nodes(b, 12, "sulfur", 3)
+			_spawn_enemies(b, 4, 2)   # even the locals are hostile. it's venus.
+		"mars":
+			# rust, ruins of exploration, and iridium under the dust
+			for i in 8:
+				_crater(b, _surface_dir(), randf_range(1.2, 3.5), Color("#a5502f"))
+			_spawn_res_nodes(b, 10, "raw_irid", 2)
+			_mars_rover(b)
+		"gas":
+			pass   # no surface, no loot. just clouds all the way down.
+		"lava":
+			# Sanus: the wealth is IN the ground, guarded by the sky.
+			# deposits here are half-melted -- glowing slag you crack open
+			_spawn_res_nodes(b, 10, "ultima", 2, Color("#ff5a1a"), 2.2)
+			_spawn_res_nodes(b, 8, "raw_irid", 3, Color("#b8300a"), 1.4)
+			_spawn_rocks(b, 10, Color("#2a0c06"))   # cooled slag boulders
+		"volcanic":
+			# Extroma: geologically furious, economically generous
+			for i in 9:
+				_volcano(b, _surface_dir())
+			for i in 8:
+				_boiling_spring(b, _surface_dir())
+			_spawn_res_nodes(b, 8, "coal", 3)
+			_spawn_res_nodes(b, 6, "raw_irid", 2)
+			_spawn_res_nodes(b, 7, "uranium", 2)   # the volcanic gut glows green
+			_spawn_res_nodes(b, 10, "sulfur", 3)   # sulfur crusts the springs
+		"varnisol":
+			# Varnisol: the gentle one. Pine woods, a big lake, wildlife.
+			var grove := _surface_dir()
+			for i in 34:
+				var pd := (grove + Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2),
+					randf_range(-0.2, 0.2))).normalized() if i < 24 else _surface_dir()
+				_pine(b, pd)
+			_earth_lake(b, (grove + Vector3(0.3, 0.0, 0.25)).normalized())
+			for i in 3:
+				_earth_lake(b, _surface_dir())
+			for i in 6:
+				_earth_mountain(b, _surface_dir())
+			for i in 8:
+				var an := Animal.new()
+				an.setup(b)
+				add_child(an)
+				var ad := _surface_dir()
+				an.global_position = b.center + ad * (b.radius + 1.5)
 		"crystal":
 			# ultima crystals: guarded, far, worth the trip
 			for i in 22:
@@ -825,19 +1271,441 @@ func _populate(b) -> void:
 				cr.global_transform = Transform3D(_basis_from_up(cd), b.center + cd * (b.radius + h * 0.5))
 			_register_crates(b, 12, 30)
 			_spawn_enemies(b, 10, 6)   # heavily guarded
-			_build_mine(b, MINE_DIRS["Crystalia"], "ultima", 2, Color("#7df9ff"))
+			# nerfed: was 2 ultima x 26 veins -- it printed ultima
+			_build_mine(b, MINE_DIRS["Crystalia"], "ultima", 1, Color("#7df9ff"), 14)
 		_:
 			pass
 
+## Earth trees: proper trunk + leafy blobs. Not Verdant's alien flora --
+## the boring, beautiful, regular kind.
+func _earth_tree(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(3.0, 5.5)
+	var trunk := MeshInstance3D.new()
+	var tm := CylinderMesh.new()
+	tm.top_radius = 0.18
+	tm.bottom_radius = 0.3
+	tm.height = h
+	trunk.mesh = tm
+	trunk.position = Vector3(0, h * 0.5, 0)
+	trunk.material_override = Destructible.make_material(Color("#6b4a2a"), 0.05)
+	root.add_child(trunk)
+	for i in 3:
+		var leaf := MeshInstance3D.new()
+		var lm := SphereMesh.new()
+		var r := randf_range(1.0, 1.8)
+		lm.radius = r
+		lm.height = r * 1.7
+		leaf.mesh = lm
+		leaf.position = Vector3(randf_range(-0.7, 0.7), h - 0.4 + randf_range(0.0, 1.0),
+			randf_range(-0.7, 0.7))
+		leaf.material_override = Destructible.make_material(
+			Color("#2f7d32").lerp(Color("#5aa53f"), randf()), 0.08)
+		root.add_child(leaf)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+# ------------------------------------ Tris system surface features
+
+## Small volcano: jagged cone with a glowing throat and a smoke wisp.
+func _volcano(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(4.0, 8.0)
+	var cone := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = h * 0.22
+	cm.bottom_radius = h * 0.6
+	cm.height = h
+	cm.radial_segments = 8
+	cone.mesh = cm
+	cone.position = Vector3(0, h * 0.5 - 0.3, 0)
+	cone.material_override = Destructible.make_material(Color("#7a6428"), 0.05)
+	root.add_child(cone)
+	var throat := MeshInstance3D.new()
+	var tm := CylinderMesh.new()
+	tm.top_radius = h * 0.18
+	tm.bottom_radius = h * 0.1
+	tm.height = 0.3
+	throat.mesh = tm
+	throat.position = Vector3(0, h - 0.25, 0)
+	throat.material_override = Destructible.make_material(Color("#ff5a1a"), 2.5)
+	root.add_child(throat)
+	var smoke := MeshInstance3D.new()
+	var sm5 := SphereMesh.new()
+	sm5.radius = h * 0.2
+	sm5.height = h * 0.4
+	smoke.mesh = sm5
+	smoke.position = Vector3(h * 0.06, h + 0.6, 0)
+	var smat := StandardMaterial3D.new()
+	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smat.albedo_color = Color(0.3, 0.28, 0.26, 0.45)
+	smoke.material_override = smat
+	root.add_child(smoke)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Boiling spring: milky turquoise pool, mineral rim, rising bubbles.
+func _boiling_spring(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var r := randf_range(1.6, 3.2)
+	var rim := MeshInstance3D.new()
+	var rm := CylinderMesh.new()
+	rm.top_radius = r * 1.2
+	rm.bottom_radius = r * 1.25
+	rm.height = 0.22
+	rim.mesh = rm
+	rim.material_override = Destructible.make_material(Color("#d8c890"), 0.1)
+	root.add_child(rim)
+	var pool := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = r
+	pm.bottom_radius = r
+	pm.height = 0.14
+	pool.mesh = pm
+	pool.position = Vector3(0, 0.08, 0)
+	pool.material_override = Destructible.make_material(Color("#5ad8c8"), 1.2)
+	root.add_child(pool)
+	for i in 5:
+		var bub := MeshInstance3D.new()
+		var bm2 := SphereMesh.new()
+		bm2.radius = randf_range(0.08, 0.18)
+		bm2.height = bm2.radius * 2.0
+		bub.mesh = bm2
+		bub.position = Vector3(randf_range(-r * 0.6, r * 0.6),
+			randf_range(0.2, 0.7), randf_range(-r * 0.6, r * 0.6))
+		bub.material_override = Destructible.make_material(Color("#bff2ea"), 0.8)
+		root.add_child(bub)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Pine: straight trunk, three stacked dark-green cones. Varnisol's tree.
+func _pine(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(4.0, 7.0)
+	var trunk := MeshInstance3D.new()
+	var tm2 := CylinderMesh.new()
+	tm2.top_radius = 0.12
+	tm2.bottom_radius = 0.2
+	tm2.height = h * 0.4
+	trunk.mesh = tm2
+	trunk.position = Vector3(0, h * 0.2, 0)
+	trunk.material_override = Destructible.make_material(Color("#5e4020"), 0.05)
+	root.add_child(trunk)
+	for i in 3:
+		var tier := MeshInstance3D.new()
+		var cm2 := CylinderMesh.new()
+		cm2.top_radius = 0.0
+		cm2.bottom_radius = h * (0.3 - float(i) * 0.07)
+		cm2.height = h * 0.34
+		tier.mesh = cm2
+		tier.position = Vector3(0, h * 0.35 + float(i) * h * 0.22, 0)
+		tier.material_override = Destructible.make_material(
+			Color("#1d4a26").lerp(Color("#2f6b34"), randf()), 0.06)
+		root.add_child(tier)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Sanus lava arc: a burst of molten blobs near the player. Fx cleans
+## itself up; standing near the strike hurts A LOT.
+class _ArcFx extends Node3D:
+	var life := 1.2
+	func _process(delta: float) -> void:
+		life -= delta
+		if life <= 0.0:
+			queue_free()
+
+## Fire erupts from a random surface point near the player: a fast,
+## unpredictable particle jet arcing back down under gravity.
+func _spawn_lava_arc(b, player_pos: Vector3) -> void:
+	var up: Vector3 = (player_pos - b.center).normalized()
+	var tang := up.cross(Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)))
+	if tang.length() < 0.01:
+		tang = up.cross(Vector3.RIGHT)
+	tang = tang.normalized()
+	# anywhere around you, not at you -- unpredictable like the worms
+	var strike: Vector3 = b.center + (up + tang * randf_range(0.0, 0.5)).normalized() * b.radius
+	var fx := _ArcFx.new()
+	fx.life = 2.4
+	add_child(fx)
+	fx.global_position = strike
+	var parts := GPUParticles3D.new()
+	parts.amount = 140
+	parts.one_shot = true
+	parts.explosiveness = 0.9
+	parts.lifetime = 1.4
+	var pm2 := ParticleProcessMaterial.new()
+	pm2.direction = Vector3(randf_range(-0.5, 0.5), 1.0, randf_range(-0.5, 0.5))
+	pm2.spread = 22.0
+	pm2.initial_velocity_min = 26.0
+	pm2.initial_velocity_max = 58.0
+	pm2.gravity = -up * 24.0   # arcs bend back to the ground
+	pm2.scale_min = 0.12
+	pm2.scale_max = 0.4
+	pm2.color = Color("#ff5a1a")
+	parts.process_material = pm2
+	var pmesh := SphereMesh.new()
+	pmesh.radius = 0.5
+	pmesh.height = 1.0
+	pmesh.radial_segments = 6
+	pmesh.rings = 3
+	pmesh.material = Destructible.make_material(Color("#ff7a2a"), 4.0)
+	parts.draw_pass_1 = pmesh
+	fx.add_child(parts)
+	parts.emitting = true
+	Sfx.play("explode", -14.0)
+	var p = get_tree().get_first_node_in_group("player")
+	if p and p.global_position.distance_to(strike) < 8.0:
+		Game.hurt(35.0)   # the flying molten rock is its own announcement
+
+# ------------------------------------------- Sol system surface features
+
+## Crater: a flattened rim ring + darker floor disc, dug into the shading.
+func _crater(b, dir: Vector3, size: float, col: Color) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var rim := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = size * 0.7
+	tm.outer_radius = size
+	rim.mesh = tm
+	rim.scale = Vector3(1, 0.35, 1)
+	rim.material_override = Destructible.make_material(col.lightened(0.15), 0.05)
+	root.add_child(rim)
+	var floor_m := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = size * 0.72
+	cm.bottom_radius = size * 0.72
+	cm.height = 0.1
+	floor_m.mesh = cm
+	floor_m.position = Vector3(0, -0.05, 0)
+	floor_m.material_override = Destructible.make_material(col.darkened(0.35), 0.02)
+	root.add_child(floor_m)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## The flag. You know the one. Planted by somebody, sometime.
+func _moon_flag(b) -> void:
+	var dir := Vector3(0.3, 0.9, 0.2).normalized()
+	var root := Node3D.new()
+	add_child(root)
+	var pole := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.04
+	pm.bottom_radius = 0.04
+	pm.height = 2.4
+	pole.mesh = pm
+	pole.position = Vector3(0, 1.2, 0)
+	pole.material_override = Destructible.make_material(Color("#c8c8d0"), 0.3)
+	root.add_child(pole)
+	var cloth := MeshInstance3D.new()
+	var flm := BoxMesh.new()
+	flm.size = Vector3(1.1, 0.7, 0.04)
+	cloth.mesh = flm
+	cloth.position = Vector3(0.57, 2.0, 0)
+	cloth.material_override = Destructible.make_material(Color("#d94a3a"), 0.5)
+	root.add_child(cloth)
+	# footprints leading away from it, going nowhere
+	for i in 6:
+		var fp := MeshInstance3D.new()
+		var fpm := BoxMesh.new()
+		fpm.size = Vector3(0.14, 0.02, 0.3)
+		fp.mesh = fpm
+		fp.position = Vector3(0.6 + float(i) * 0.5, 0.01, 0.4 + sin(float(i) * 1.2) * 0.3)
+		fp.material_override = Destructible.make_material(Color("#8a8a90"), 0.02)
+		root.add_child(fp)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## An abandoned rover, still faithfully parked. F reads its status.
+func _mars_rover(b) -> void:
+	var dir := Vector3(-0.5, 0.6, 0.4).normalized()
+	var root := Node3D.new()
+	add_child(root)
+	var bodym := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(1.2, 0.4, 0.9)
+	bodym.mesh = bm
+	bodym.position = Vector3(0, 0.55, 0)
+	bodym.material_override = Destructible.make_material(Color("#d8d8e0"), 0.3)
+	root.add_child(bodym)
+	for sx in [-0.55, 0.55]:
+		for szp in [-0.35, 0.0, 0.35]:
+			var wheel := MeshInstance3D.new()
+			var wm := CylinderMesh.new()
+			wm.top_radius = 0.18
+			wm.bottom_radius = 0.18
+			wm.height = 0.12
+			wheel.mesh = wm
+			wheel.rotation_degrees = Vector3(0, 0, 90)
+			wheel.position = Vector3(sx, 0.18, szp)
+			wheel.material_override = Destructible.make_material(Color("#2a2a30"), 0.1)
+			root.add_child(wheel)
+	var mast := MeshInstance3D.new()
+	var mm := CylinderMesh.new()
+	mm.top_radius = 0.03
+	mm.bottom_radius = 0.03
+	mm.height = 0.7
+	mast.mesh = mm
+	mast.position = Vector3(0.35, 1.1, 0)
+	mast.material_override = Destructible.make_material(Color("#8a8a94"), 0.2)
+	root.add_child(mast)
+	var cam := MeshInstance3D.new()
+	var cmm := BoxMesh.new()
+	cmm.size = Vector3(0.22, 0.12, 0.1)
+	cam.mesh = cmm
+	cam.position = Vector3(0.35, 1.5, 0)
+	cam.material_override = Destructible.make_material(Color("#3a3a44"), 0.3)
+	root.add_child(cam)
+	var panel := MeshInstance3D.new()
+	var pnm := BoxMesh.new()
+	pnm.size = Vector3(0.9, 0.03, 0.5)
+	panel.mesh = pnm
+	panel.position = Vector3(-0.2, 0.8, 0)
+	panel.rotation_degrees = Vector3(0, 0, 8)
+	panel.material_override = Destructible.make_material(Color("#1a3a6e"), 0.6)
+	root.add_child(panel)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Snow-capped mountain: stone cone with a white tip.
+func _earth_mountain(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(6.0, 12.0)
+	var cone := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = h * 0.55
+	cm.height = h
+	cm.radial_segments = 7   # jagged, not perfect
+	cone.mesh = cm
+	cone.position = Vector3(0, h * 0.5 - 0.4, 0)
+	cone.material_override = Destructible.make_material(Color("#5a564e"), 0.05)
+	root.add_child(cone)
+	var snow := MeshInstance3D.new()
+	var sm2 := CylinderMesh.new()
+	sm2.top_radius = 0.0
+	sm2.bottom_radius = h * 0.18
+	sm2.height = h * 0.32
+	sm2.radial_segments = 7
+	snow.mesh = sm2
+	snow.position = Vector3(0, h - h * 0.16 - 0.4, 0)
+	snow.material_override = Destructible.make_material(Color("#eef2f6"), 0.2)
+	root.add_child(snow)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## A lake: glassy blue disc with a sandy rim, flush with the ground.
+func _earth_lake(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var r := randf_range(4.0, 8.0)
+	var rim := MeshInstance3D.new()
+	var rm := CylinderMesh.new()
+	rm.top_radius = r * 1.15
+	rm.bottom_radius = r * 1.15
+	rm.height = 0.08
+	rim.mesh = rm
+	rim.material_override = Destructible.make_material(Color("#c8b078"), 0.05)
+	root.add_child(rim)
+	var water := MeshInstance3D.new()
+	var wm2 := CylinderMesh.new()
+	wm2.top_radius = r
+	wm2.bottom_radius = r
+	wm2.height = 0.1
+	water.mesh = wm2
+	water.position = Vector3(0, 0.04, 0)
+	var wmat := StandardMaterial3D.new()
+	wmat.albedo_color = Color(0.1, 0.35, 0.6, 0.85)
+	wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wmat.roughness = 0.05
+	wmat.metallic = 0.4
+	water.material_override = wmat
+	root.add_child(water)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Venus fissure: a glowing crack venting the heat below.
+func _venus_vent(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	for i in 4:
+		var seg := MeshInstance3D.new()
+		var sm3 := BoxMesh.new()
+		sm3.size = Vector3(randf_range(0.4, 0.8), 0.15, randf_range(1.6, 3.0))
+		seg.mesh = sm3
+		seg.position = Vector3(randf_range(-0.8, 0.8), 0.02, float(i) * 2.2 - 3.3)
+		seg.rotation_degrees = Vector3(0, randf_range(-25, 25), 0)
+		seg.material_override = Destructible.make_material(Color("#ff6a1a"), 2.2)
+		root.add_child(seg)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Translucent atmosphere shell (venus haze, earth cloud deck).
+func _add_shell(b, col: Color, scale_f: float, cloudy: bool) -> void:
+	var shell := MeshInstance3D.new()
+	var sm4 := SphereMesh.new()
+	sm4.radius = b.radius * scale_f
+	sm4.height = b.radius * scale_f * 2.0
+	sm4.radial_segments = 48
+	sm4.rings = 24
+	shell.mesh = sm4
+	if cloudy:
+		var csh := Shader.new()
+		csh.code = "shader_type spatial;\nrender_mode blend_mix, cull_back, shadows_disabled;\nvarying vec3 vn;\n" \
+			+ _NOISE_GLSL + """
+void vertex(){ vn = NORMAL; }
+void fragment(){
+	vec3 n = normalize(vn);
+	float c = fbm(n * 4.0 + vec3(TIME * 0.006, 0.0, TIME * 0.004));
+	ALBEDO = vec3(1.0);
+	ALPHA = smoothstep(0.52, 0.72, c) * 0.75;
+	ROUGHNESS = 1.0;
+}
+"""
+		var cmat := ShaderMaterial.new()
+		cmat.shader = csh
+		shell.material_override = cmat
+	else:
+		var hmat := StandardMaterial3D.new()
+		hmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		hmat.albedo_color = col
+		hmat.roughness = 1.0
+		shell.material_override = hmat
+	add_child(shell)
+	shell.global_position = b.center
+
 ## Off-world resource nodes (mid-game: raw iridium etc).
-func _spawn_res_nodes(b, count: int, res: String, per: int) -> void:
+## Resource deposits look like WHAT THEY ARE: boulders in the resource's
+## colour -- glowing only when the ore itself glows. No more green towers.
+const RES_LOOK := {
+	"coal":      {"col": Color("#1e1e22"), "emit": 0.1},
+	"raw_ingot": {"col": Color("#a24bff"), "emit": 0.8},
+	"raw_irid":  {"col": Color("#2a8f6a"), "emit": 0.8},
+	"ultima":    {"col": Color("#7df9ff"), "emit": 2.2},
+	"uranium":   {"col": Color("#5aff3a"), "emit": 2.5},
+	"sulfur":    {"col": Color("#e8d44a"), "emit": 0.5},
+}
+
+func _spawn_res_nodes(b, count: int, res: String, per: int,
+		col_override: Color = Color.BLACK, emit_override: float = -1.0) -> void:
+	var look: Dictionary = RES_LOOK.get(res, {"col": Color("#2a8f6a"), "emit": 1.0})
+	if col_override != Color.BLACK:
+		look = {"col": col_override, "emit": emit_override if emit_override >= 0.0 else 1.0}
 	for i in count:
 		var nd := Destructible.new()
-		var s := randf_range(1.2, 2.0)
-		nd.setup(Vector3(s, s * 1.6, s), Color("#2a8f6a"), 2, 4, 2.2, 0.0, res, per)
+		nd.rock = true
+		var s := randf_range(1.2, 2.2)
+		nd.setup(Vector3(s, s * randf_range(0.8, 1.3), s), look["col"], 2, 4,
+			float(look["emit"]), 0.0, res, per)
 		add_child(nd)
 		var d := _surface_dir()
-		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.8))
+		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
+
+## Plain breakable boulders: no ore, a little pocket change, pure geology.
+func _spawn_rocks(b, count: int, col: Color) -> void:
+	for i in count:
+		var nd := Destructible.new()
+		nd.rock = true
+		var s := randf_range(1.0, 2.4)
+		nd.setup(Vector3(s, s * randf_range(0.7, 1.2), s), col, 2, 3, 0.1)
+		add_child(nd)
+		var d := _surface_dir()
+		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
 
 func _spawn_enemies(b, count: int, level: int) -> void:
 	for i in count:
@@ -1035,7 +1903,7 @@ func _spawn_mine_clues(b) -> void:
 
 ## A full mine: open see-through mouth, shaft into the planet, ore
 ## chamber with a furnace, exit gate that drops you BESIDE the hole.
-func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color) -> void:
+func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color, ore_count: int = 26) -> void:
 	var C: Vector3 = b.center
 	var R: float = b.radius
 	var B := _basis_from_up(dir)
@@ -1098,10 +1966,10 @@ func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color) ->
 	var mine := {
 		"body": b, "dir": dir, "B": B, "cham_y": cham_y,
 		"group": "mine_" + str(b.name), "res": res_id, "res_n": res_n,
-		"color": ore_col,
+		"color": ore_col, "count": ore_count,
 	}
 	_mines.append(mine)
-	_spawn_chamber_ore(mine, 26)
+	_spawn_chamber_ore(mine, ore_count)
 	# no free furnace. bring your own machines.
 	# exit drops you BESIDE the mouth, not back down the hole
 	var out := Gate.new().configure({
@@ -1147,9 +2015,10 @@ func _regen_ore(delta: float) -> void:
 		return
 	_ore_t = 4.0
 	for m in _mines:
+		var cap := int(m.get("count", 26))
 		var have := get_tree().get_nodes_in_group(str(m["group"])).size()
-		if have < 26:
-			_spawn_chamber_ore(m, mini(26 - have, 8))
+		if have < cap:
+			_spawn_chamber_ore(m, mini(cap - have, 8))
 
 func _arrow(pos: Vector3, up: Vector3, fwd: Vector3) -> void:
 	var x := up.cross(fwd).normalized()
@@ -1202,7 +2071,8 @@ func _spawn_invaders() -> void:
 		crab.build()
 
 func _spawn_player_and_rocket() -> void:
-	var home := Universe.body_named("Home")
+	var home := Universe.body_named("Tutoria") if Game.tutorial_session \
+		else Universe.body_named("Home")
 	_player = Player.new()
 	add_child(_player)
 	_player.global_position = home.center + Vector3.UP * (home.radius + 2.0)
@@ -1216,6 +2086,235 @@ func _spawn_player_and_rocket() -> void:
 	add_child(atm)
 	var adir := Vector3(-0.15, 1.0, 0.12).normalized()
 	atm.global_transform = Transform3D(_basis_from_up(adir), home.center + adir * home.radius)
+
+# ------------------------------------------------- LAN player avatars
+## peer id -> {root, human, rocket_node, speed, jet, grounded, in_rocket}
+var _remote_avatars: Dictionary = {}
+
+## Build (or rebuild) a peer's avatar from their real character data:
+## body color, shader skin, painted face, worn armor.
+func _make_avatar(id: int) -> void:
+	var keep_tf := Transform3D()
+	var had := false
+	if _remote_avatars.has(id) and is_instance_valid(_remote_avatars[id]["root"]):
+		keep_tf = _remote_avatars[id]["root"].global_transform
+		had = true
+		_remote_avatars[id]["root"].queue_free()
+	_remote_avatars.erase(id)
+	_spawn_avatar(id)
+	if had:
+		_remote_avatars[id]["root"].global_transform = keep_tf
+
+func _spawn_avatar(id: int) -> void:
+	var info: Dictionary = Net.player_infos.get(id, {})
+	var ch: Dictionary = info.get("character", {})
+	var root := Node3D.new()
+	add_child(root)
+	var body := Human.new()
+	root.add_child(body)
+	var face: Texture2D = null
+	var paint: PackedByteArray = info.get("paint", PackedByteArray())
+	if paint.size() > 0:
+		var img := Image.new()
+		if img.load_png_from_buffer(paint) == OK:
+			face = ImageTexture.create_from_image(img)
+	body.build(Color.html(str(ch.get("color", "3aa0ff"))), str(ch.get("shader", "none")), face)
+	var eq = info.get("equip", null)
+	if eq is Dictionary:
+		body.dress(eq)
+	var tag := Label3D.new()
+	tag.text = str(Net.player_names.get(id, "dude"))
+	tag.font_size = 26
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.position = Vector3(0, 2.4, 0)
+	root.add_child(tag)
+	# hitbox so weapons can land on them (friendly fire permitting)
+	var hb := StaticBody3D.new()
+	hb.set_meta("net_peer", id)
+	hb.collision_layer = 2   # raycast-only: you can't stand on a player
+	hb.collision_mask = 0
+	var hbc := CollisionShape3D.new()
+	var hcs := CapsuleShape3D.new()
+	hcs.radius = 0.55
+	hcs.height = 2.0
+	hbc.shape = hcs
+	hbc.position = Vector3(0, 1.0, 0)
+	hb.add_child(hbc)
+	root.add_child(hb)
+	_remote_avatars[id] = {"root": root, "human": body, "rocket_node": null,
+		"speed": 0.0, "jet": false, "grounded": true, "in_rocket": false}
+	if OS.get_environment("CTD_NET") != "":
+		print("NETTEST avatar spawned for peer ", id)
+
+func _on_net_identity(id: int) -> void:
+	_make_avatar(id)
+
+func _on_net_punch(id: int) -> void:
+	if _remote_avatars.has(id):
+		var h = _remote_avatars[id]["human"]
+		if is_instance_valid(h):
+			h.punch()
+
+func _on_net_pos(id: int, pos: Vector3, up: Vector3, fwd: Vector3, state: Dictionary) -> void:
+	if not _remote_avatars.has(id) or not is_instance_valid(_remote_avatars[id]["root"]):
+		_spawn_avatar(id)
+	var e: Dictionary = _remote_avatars[id]
+	var av: Node3D = e["root"]
+	# death screen = gone from the world: burst once, hide until respawn
+	if bool(state.get("dead", false)):
+		if av.visible:
+			Destructible.spawn_debris(self, pos + Vector3(0, 1, 0),
+				Vector3(0.9, 1.8, 0.5), Color("#c04040"), Vector3.UP)
+			Sfx.play("explode", -14.0)
+			av.visible = false
+		return
+	av.visible = true
+	e["jet"] = bool(state.get("jet", false))
+	e["in_rocket"] = bool(state.get("rocket", false))
+	# flying friends show as a rocket, not a floating body
+	_sync_peer_rocket(e, id, bool(state.get("mk2", false)))
+	# player origin = capsule CENTRE; the avatar model's origin is its FEET
+	var foot := pos - up.normalized() * (0.0 if e["in_rocket"] else 1.0)
+	var prev: Vector3 = av.global_position
+	var x := up.cross(fwd)
+	if x.length() > 0.001 and fwd.length() > 0.001:
+		av.global_transform = Transform3D(
+			Basis(x.normalized(), up.normalized(), -fwd.normalized()).orthonormalized(),
+			prev.lerp(foot, 0.5) if prev.distance_to(foot) < 40.0 else foot)
+	else:
+		av.global_position = foot
+	# walking speed from packet spacing (10 Hz), smoothed; grounded guess
+	e["speed"] = lerpf(float(e["speed"]), prev.distance_to(av.global_position) * 10.0, 0.5)
+	var b = Universe.nearest(pos)
+	e["grounded"] = pos.distance_to(b.center) < b.radius + 2.2
+
+## Everyone else's dudes actually LIVE: walk cycles, idle breathing,
+## jetpack flames, tucked legs mid-air. Runs every frame, not per packet.
+func _animate_avatars(delta: float) -> void:
+	for id in _remote_avatars:
+		var e: Dictionary = _remote_avatars[id]
+		var h = e["human"]
+		if not is_instance_valid(h):
+			continue
+		h.visible = not e["in_rocket"]
+		if e["in_rocket"]:
+			continue
+		h.set_jetpack(e["jet"], e["jet"] and not e["grounded"])
+		h.animate(float(e["speed"]), bool(e["grounded"]), delta,
+			e["jet"] and not e["grounded"])
+
+## While a peer flies, their avatar node carries a rocket model.
+func _sync_peer_rocket(e: Dictionary, id: int, mk2: bool) -> void:
+	var want: bool = e["in_rocket"]
+	var node = e["rocket_node"]
+	if want and (node == null or not is_instance_valid(node)):
+		node = _build_peer_rocket(id, mk2)
+		e["root"].add_child(node)
+		e["rocket_node"] = node
+	elif not want and node != null and is_instance_valid(node):
+		node.queue_free()
+		e["rocket_node"] = null
+
+## Lightweight rocket lookalike: hull, cone, fins, engine glow. The body
+## is a raycast-only collider so a friend can press F to hop on (mk2).
+func _build_peer_rocket(id: int, mk2: bool) -> Node3D:
+	var root := Node3D.new()
+	var hull_col := Color("#7df9ff") if mk2 else Color("#d8d8e0")
+	var hull := MeshInstance3D.new()
+	var hm := CylinderMesh.new()
+	hm.top_radius = 0.9
+	hm.bottom_radius = 1.1
+	hm.height = 5.0
+	hull.mesh = hm
+	hull.rotation_degrees = Vector3(-90, 0, 0)   # nose along -Z
+	hull.material_override = Destructible.make_material(hull_col, 0.4)
+	root.add_child(hull)
+	var cone := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = 0.9
+	cm.height = 1.6
+	cone.mesh = cm
+	cone.rotation_degrees = Vector3(-90, 0, 0)
+	cone.position = Vector3(0, 0, -3.3)
+	cone.material_override = Destructible.make_material(Color("#ff5964"), 0.6)
+	root.add_child(cone)
+	for ang in [0.0, 120.0, 240.0]:
+		var fin := MeshInstance3D.new()
+		var fm := BoxMesh.new()
+		fm.size = Vector3(0.12, 1.2, 1.4)
+		fin.mesh = fm
+		var a := deg_to_rad(ang)
+		fin.position = Vector3(cos(a) * 1.1, sin(a) * 1.1, 2.0)
+		fin.rotation_degrees = Vector3(0, 0, ang)
+		fin.material_override = Destructible.make_material(hull_col.darkened(0.3), 0.2)
+		root.add_child(fin)
+	var glow := MeshInstance3D.new()
+	var gm := SphereMesh.new()
+	gm.radius = 0.7
+	gm.height = 1.4
+	glow.mesh = gm
+	glow.position = Vector3(0, 0, 2.8)
+	glow.material_override = Destructible.make_material(Color("#ffb347"), 3.0)
+	root.add_child(glow)
+	var body := StaticBody3D.new()
+	body.set_meta("net_pilot", id)
+	body.set_meta("net_mk2", mk2)
+	body.collision_layer = 2
+	body.collision_mask = 0
+	var bc := CollisionShape3D.new()
+	var cs := CapsuleShape3D.new()
+	cs.radius = 1.3
+	cs.height = 6.5
+	bc.shape = cs
+	bc.rotation_degrees = Vector3(90, 0, 0)
+	body.add_child(bc)
+	root.add_child(body)
+	return root
+
+func _on_net_left(id: int) -> void:
+	if _remote_avatars.has(id):
+		if is_instance_valid(_remote_avatars[id]["root"]):
+			_remote_avatars[id]["root"].queue_free()
+		_remote_avatars.erase(id)
+
+## Another peer placed something: mirror it into this world.
+func net_place(pid: String, pos: Vector3, up: Vector3) -> void:
+	var n := _spawn_world_obj(pid)
+	if n == null:
+		return
+	add_child(n)
+	n.set_meta("placed_id", pid)
+	if n is Rocket:
+		var z := -up
+		var x := up.cross(Vector3(0, 1, 0))
+		if x.length() < 0.01:
+			x = up.cross(Vector3(1, 0, 0))
+		x = x.normalized()
+		n.global_transform = Transform3D(Basis(x, z.cross(x).normalized(), z).orthonormalized(), pos)
+	else:
+		n.global_transform = Transform3D(_basis_from_up(up), pos)
+
+## Another peer removed a placed thing near this position: mirror, silently
+## (no refund here -- the peer who broke it got that).
+func net_remove(pos: Vector3) -> void:
+	for grp in ["machine", "rocket", "waypoint", "spawn"]:
+		for n in get_tree().get_nodes_in_group(grp):
+			if n is Node3D and is_instance_valid(n) \
+					and n.global_position.distance_to(pos) < 1.2:
+				Destructible.spawn_debris(self, n.global_position,
+					Vector3(1.0, 1.0, 1.0), Color("#8890a0"), Vector3.UP)
+				n.queue_free()
+				return
+
+## Another peer smashed a destructible near this position: mirror, without
+## paying out resources twice.
+func net_break(pos: Vector3) -> void:
+	for n in get_tree().get_nodes_in_group("destructible"):
+		if n is Destructible and is_instance_valid(n) \
+				and n.global_position.distance_to(pos) < 1.0:
+			n.net_destroy()
+			return
 
 # -------------------------------------------------- world persistence
 
@@ -1379,7 +2478,12 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"ultracap": return EMachines.UltraCapacitor.new()
 		"elight": return EMachines.ELight.new()
 		"switch": return EMachines.Switch.new()
+		"lightbox": return EMachines.LightBox.new()
 		"rocket": return Rocket.new()
+		"rocket2":
+			var r2 := Rocket.new()
+			r2.mk2 = true
+			return r2
 	return null
 
 # --------------------------------------------------------------- animals

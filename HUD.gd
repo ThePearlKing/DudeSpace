@@ -20,6 +20,27 @@ var _buff_lbl: Label
 class _WaypointLayer extends Control:
 	func _process(_d: float) -> void:
 		queue_redraw()
+
+	## Screen point for a world position. Offscreen or behind-camera
+	## targets clamp to the screen edge instead of vanishing.
+	func _screen_pt(cam: Camera3D, wp: Vector3) -> Vector2:
+		var vp := get_viewport_rect().size
+		var behind := cam.is_position_behind(wp)
+		var sp := cam.unproject_position(wp)
+		if behind:
+			sp = vp - sp   # unproject mirrors behind the camera: flip back
+		var margin := 30.0
+		if not behind and sp.x >= margin and sp.y >= margin \
+				and sp.x <= vp.x - margin and sp.y <= vp.y - margin:
+			return sp
+		var c := vp * 0.5
+		var d := sp - c
+		if d.length() < 0.001:
+			d = Vector2(0, -1)
+		var kx := (c.x - margin) / absf(d.x) if absf(d.x) > 0.001 else 1e9
+		var ky := (c.y - margin) / absf(d.y) if absf(d.y) > 0.001 else 1e9
+		return c + d * minf(kx, ky)
+
 	func _draw() -> void:
 		var cam := get_viewport().get_camera_3d()
 		if cam == null:
@@ -29,9 +50,7 @@ class _WaypointLayer extends Control:
 			if not (w is Waypoint) or not is_instance_valid(w) or not w.enabled:
 				continue
 			var wp: Vector3 = w.global_position + Vector3(0, 0.6, 0)
-			if cam.is_position_behind(wp):
-				continue
-			var sp := cam.unproject_position(wp)
+			var sp := _screen_pt(cam, wp)
 			var c := Color("#ffd166")
 			var pts := PackedVector2Array([sp + Vector2(0, -9), sp + Vector2(9, 0),
 				sp + Vector2(0, 9), sp + Vector2(-9, 0)])
@@ -47,9 +66,7 @@ class _WaypointLayer extends Control:
 			var g := Color("#2bff6a")
 			for lp_v in Game.locator_targets:
 				var lp: Vector3 = lp_v
-				if cam.is_position_behind(lp):
-					continue
-				var sp2 := cam.unproject_position(lp)
+				var sp2 := _screen_pt(cam, lp)
 				var pts2 := PackedVector2Array([sp2 + Vector2(0, -13), sp2 + Vector2(13, 0),
 					sp2 + Vector2(0, 13), sp2 + Vector2(-13, 0)])
 				draw_polyline(PackedVector2Array([pts2[0], pts2[1], pts2[2], pts2[3], pts2[0]]),
@@ -375,14 +392,15 @@ func _process(delta: float) -> void:
 		return
 	_prompt.text = ""
 	if Game.mode == Game.Mode.ON_FOOT:
-		_hint.text = "WASD move   L-click fire   R-click use/place   Space jump/jet   C jet down   V zoom   J jetpack   1-5 hotbar   E shop   M map   F interact   F3 stats   F5 view"
+		_hint.text = "WASD move   L-click fire   R-click use/place   Space jump/jet   C jet down   V zoom   J jetpack   1-5 hotbar   E shop   M map   K calendar   F interact   F3 stats   F5 view"
 	else:
-		_hint.text = "WASD steer   Z/C roll   Space engine   H hyperdrive   arrows RCS   1/2/3/5/0 time warp   L-click smash   F exit   M map"
+		_hint.text = "WASD steer   Space engine   H hyperdrive   arrows RCS   1/2/3/5/0 time warp   L-click smash   F exit   M map"
 
 func _refresh() -> void:
-	_stats.text = "COINS  %d   BANK  %d   ZB  %d\nSCORE  %d      %s%s" % [
+	_stats.text = "COINS  %d   BANK  %d   ZB  %d\nSCORE  %d      %s %s%s" % [
 		Inventory.coins, Inventory.bank_coins, Inventory.zeptobux, Game.score,
-		Game.weekday_name(), "  ·  UFO IN SYSTEM" if Game.is_ufo_day() else ""]
+		Game.date_text(), Game.clock_text(),
+		"  ·  UFO IN SYSTEM" if Game.is_ufo_day() else ""]
 	var hp := Game.health / Game.HEALTH_MAX
 	_health_fill.size.x = 356.0 * hp
 	_health_fill.color = Color(1.0 - hp, hp, 0.2)

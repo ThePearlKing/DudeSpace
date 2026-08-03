@@ -16,7 +16,7 @@ class Body:
 var bodies: Array = []
 var world_scale: float = 1.0
 
-var BOUNDARY := 70000.0   # edge of the universe; cross it and the god throws you back
+var BOUNDARY := 95000.0   # edge of the universe; cross it and the god throws you back
 
 ## Multiply the whole universe: radii, distances, boundary. Gravity
 ## follows automatically (gm = g_surf * r^2 -> heavier worlds, same
@@ -30,10 +30,10 @@ func apply_scale(k: float) -> void:
 		b.center *= f
 		b.radius *= f
 		b.major *= f
-	BOUNDARY = 70000.0 * k
+	BOUNDARY = 95000.0 * k
 
 func _ready() -> void:
-	_def("Yorox",    Vector3(0, 7000, 0),        380.0, 25.0, "sun",     Color("#ffdd55"))
+	_def("Yorox",    Vector3(-6500, 5200, -7000), 380.0, 25.0, "sun",    Color("#ffdd55"))
 	_def("Home",     Vector3(0, 0, 0),           46.0,  5.0,  "home",    Color("#3a1d6e"))
 	_def("Circuitia",Vector3(0, 0, 4200),        95.0,  9.0,  "circuit", Color("#0e3b2e"))
 	_def("Logica",   Vector3(3600, 0, -2200),    72.0,  8.0,  "logic",   Color("#141820"))
@@ -57,6 +57,42 @@ func _ready() -> void:
 	_def("Crystalia",Vector3(-9000, 4000, -8000),90.0,  9.0,  "crystal",   Color("#40e0d0"))
 	# --- TIN 618: a black hole. Extreme pull, endless fall, time dilation. ---
 	_def("TIN 618",  Vector3(30000, 0, 0),       220.0, 80.0, "blackhole", Color("#000000"))
+	# --- the ACTUAL Sol system. Yes, that one. Far out in -X, long haul. ---
+	var SC := Vector3(-52000, 3000, 14000)   # Sol system centre
+	_def("Sol",      SC,                          420.0, 26.0, "sun",     Color("#fff4d6"))
+	_def("Mercury",  SC + Vector3(950, 60, -180),   24.0, 4.0, "mercury", Color("#9c8f84"))
+	_def("Venus",    SC + Vector3(-1500, -120, 700), 58.0, 8.5, "venus",   Color("#e8c46a"))
+	_def("Earth",    SC + Vector3(2300, 200, 900),   62.0, 9.0, "earth",   Color("#3a7bd5"))
+	_def("The Moon", SC + Vector3(2300, 230, 1040),  17.0, 2.5, "luna",    Color("#c8c8cc"))
+	_def("Mars",     SC + Vector3(-3100, 400, -1400), 34.0, 5.5, "mars",   Color("#c1533a"))
+	_def("Jupiter",  SC + Vector3(5400, -600, 2200), 280.0, 16.0, "gas",   Color("#c99a6b"))
+	_def("Saturn",   SC + Vector3(-7300, 900, 3400), 230.0, 14.0, "gas",   Color("#e3cf9a"))
+	_def("Uranus",   SC + Vector3(9600, 1600, -3800), 155.0, 11.0, "gas",  Color("#9fe3e0"))
+	_def("Neptune",  SC + Vector3(-11800, -1400, -5200), 150.0, 11.0, "gas", Color("#4a6fe3"))
+	# --- the Tris system: a pale-blue giant on the FAR side of everything ---
+	var TC := Vector3(52000, -2500, -15000)
+	_def("Tris",     TC,                             460.0, 27.0, "sun",      Color("#9fd8ff"))
+	_def("Sanus",    TC + Vector3(-1050, 80, 260),    70.0, 9.5,  "lava",     Color("#8a1f10"))
+	_def("Extroma",  TC + Vector3(1900, -240, -700),  85.0, 9.0,  "volcanic", Color("#c8a83a"))
+	_def("Varnisol", TC + Vector3(-3400, 420, 1500), 100.0, 9.0,  "varnisol", Color("#3f8f3a"))
+
+## Tutorial universe: ONLY the tutorial planet + its moon exist. The real
+## body list is stashed and put back when the title screen returns.
+var _full_bodies: Array = []
+
+func enter_tutorial_universe() -> void:
+	if _full_bodies.is_empty():
+		_full_bodies = bodies
+	bodies = []
+	_def("Tutoria",      Vector3(0, 0, 0) * world_scale,   55.0 * world_scale, 7.0, "tutorial",      Color("#3f7fbf"))
+	_def("Tutoria Moon", Vector3(0, 0, 320) * world_scale, 20.0 * world_scale, 4.0, "tutorial_moon", Color("#9fb8c8"))
+	# far enough that only a rocket gets you there -- the flight lesson
+	_def("Rocketia",     Vector3(600, 300, 1500) * world_scale, 40.0 * world_scale, 6.0, "tutorial_rocket", Color("#c96a3f"))
+
+func restore_full_universe() -> void:
+	if not _full_bodies.is_empty():
+		bodies = _full_bodies
+		_full_bodies = []
 
 func _def(n: String, c: Vector3, r: float, g: float, k: String, col: Color) -> void:
 	_def_ret(n, c, r, g, k, col)

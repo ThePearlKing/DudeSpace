@@ -4,6 +4,7 @@ extends Node
 
 var current_slot: int = 0
 var character: Dictionary = {"color": "#3aa0ff", "shader": "none"}
+var ephemeral: bool = false   # tutorial session: never write anything to disk
 var save_name: String = ""
 var _progress: Dictionary = {}
 
@@ -104,6 +105,8 @@ func _write(n: int, d: Dictionary) -> void:
 				bak.close()
 			src.close()
 		_backed[n] = true
+	if ephemeral:
+		return   # tutorial session: nothing ever touches disk
 	var f := FileAccess.open(slot_path(n), FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -127,6 +130,11 @@ func slot_name(n: int) -> String:
 	return str(d.get("name", "SAVE %d" % n))
 
 func loaded_paint() -> Texture2D:
+	# LAN guests keep their face in memory, never on disk
+	if ephemeral and Net.guest_paint.size() > 0:
+		var gimg := Image.new()
+		if gimg.load_png_from_buffer(Net.guest_paint) == OK:
+			return ImageTexture.create_from_image(gimg)
 	var p := paint_path(current_slot)
 	if not FileAccess.file_exists(p):
 		return null
@@ -143,6 +151,57 @@ var _world_set: bool = false
 func set_world(w: Array) -> void:
 	world_objs = w
 	_world_set = true
+
+# ------------------------------------------------ LAN guest data (host side)
+
+## The host's save remembers every guest by name -- their bags, coins and
+## character come back next time they join, Minecraft-server style.
+func guest_blob(pname: String) -> Dictionary:
+	var gd = _progress.get("guest_data", {})
+	return gd.get(pname, {}) if gd is Dictionary else {}
+
+func store_guest_blob(pname: String, blob: Dictionary) -> void:
+	var gd = _progress.get("guest_data", {})
+	if not (gd is Dictionary):
+		gd = {}
+	gd[pname] = blob
+	_progress["guest_data"] = gd
+
+## Everything that makes THIS player themselves (synced to the host).
+func build_player_blob() -> Dictionary:
+	return {
+		"character": character,
+		"coins": Inventory.coins,
+		"equip": Inventory.equip,
+		"hotbar": Inventory.hotbar,
+		"backpack": Inventory.backpack_store,
+		"prism_pack": Inventory.prism_store,
+		"has_jetpack": Inventory.has_jetpack,
+		"jet_fuel": Inventory.jet_fuel,
+		"jet_max": Inventory.jet_max,
+		"jet_power": Inventory.jet_power,
+		"fuel": Inventory.fuel,
+		"fuel_max": Inventory.fuel_max,
+	}
+
+## Guest joining a LAN server: boot into the HOST's world snapshot.
+## Ephemeral -- this machine's disk is never touched.
+func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
+	ephemeral = true
+	current_slot = 99
+	_progress = {
+		"world": snap.get("world", []),
+		"playtime": float(snap.get("playtime", 0.0)),
+		"spawn": snap.get("spawn", null),
+		"spawn_up": snap.get("spawn_up", [0, 1, 0]),
+		"pos": snap.get("spawn", null),   # arrive at the server spawn
+	}
+	for k in blob.keys():
+		if k == "character":
+			continue   # you just dressed for this visit -- local look wins
+		_progress[k] = blob[k]
+	_progress["character"] = character
+	save_name = Net.my_name()
 
 func saved_world() -> Array:
 	var w = _progress.get("world", [])
@@ -176,6 +235,12 @@ func apply_progress() -> void:
 		Game.has_saved_spawn = true
 	else:
 		Game.has_saved_spawn = false
+	Game.tutorial_done = bool(_progress.get("tut_done", false))
+	var hc = _progress.get("host_cfg", null)
+	if hc is Dictionary:
+		for k in Game.host_cfg.keys():
+			if hc.has(k):
+				Game.host_cfg[k] = hc[k]
 	Inventory.has_rcs = bool(_progress.get("has_rcs", false))
 	Inventory.has_jetpack = bool(_progress.get("has_jetpack", false))
 	Inventory.wrath_ward = bool(_progress.get("wrath_ward", false))
@@ -259,6 +324,9 @@ func save_progress() -> void:
 		"equip": Inventory.equip,
 		"spawn": [Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z],
 		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
+		"tut_done": Game.tutorial_done,
+		"host_cfg": Game.host_cfg,
+		"guest_data": _progress.get("guest_data", {}),
 		"has_rcs": Inventory.has_rcs,
 		"has_jetpack": Inventory.has_jetpack,
 		"wrath_ward": Inventory.wrath_ward,
@@ -291,6 +359,7 @@ func save_progress() -> void:
 		"pos": _last_pos,
 		"in_rocket": _last_in_rocket,
 		"in_rocket_hyper": _last_hyper,
+		"in_rocket_mk2": _last_mk2,
 		"pet": _last_pet,
 	}
 	_write(current_slot, _progress)
@@ -298,6 +367,7 @@ func save_progress() -> void:
 var _last_pos: Array = []
 var _last_in_rocket: bool = false
 var _last_hyper: bool = false
+var _last_mk2: bool = false
 var _last_pet: bool = false
 var _pet_genome: int = -1
 var _pet_stay: bool = false
@@ -316,13 +386,18 @@ func pet_stay() -> bool:
 func had_pet() -> bool:
 	return bool(_progress.get("pet", false))
 
-func set_player_pos(p: Vector3, in_rocket: bool = false, hyper: bool = false) -> void:
+func set_player_pos(p: Vector3, in_rocket: bool = false, hyper: bool = false,
+		mk2: bool = false) -> void:
 	_last_pos = [p.x, p.y, p.z]
 	_last_in_rocket = in_rocket
 	_last_hyper = hyper
+	_last_mk2 = mk2
 
 func was_hyper() -> bool:
 	return bool(_progress.get("in_rocket_hyper", false))
+
+func was_mk2() -> bool:
+	return bool(_progress.get("in_rocket_mk2", false))
 
 func delete_slot(n: int) -> void:
 	if slot_exists(n):

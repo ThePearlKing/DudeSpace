@@ -47,15 +47,63 @@ func weekday() -> int:
 func weekday_name() -> String:
 	return WEEKDAYS[weekday()]
 
+const MONTHS := ["January", "February", "March", "April", "May", "June",
+	"July", "August", "September", "October", "November", "December"]
+const MDAYS := [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+static func is_leap_year(y: int) -> bool:
+	return y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)
+
+static func days_in_month(m: int, y: int) -> int:
+	return 29 if m == 1 and is_leap_year(y) else int(MDAYS[m])
+
+static func days_in_year(y: int) -> int:
+	return 366 if is_leap_year(y) else 365
+
+## Day 0 = Monday, January 1, Year 1. Leap years follow the usual rule.
+static func date_of(di: int) -> Dictionary:
+	var y := 1
+	while di >= days_in_year(y):
+		di -= days_in_year(y)
+		y += 1
+	var m := 0
+	while di >= days_in_month(m, y):
+		di -= days_in_month(m, y)
+		m += 1
+	return {"year": y, "month": m, "day": di + 1}
+
+## First day index of a given month (for calendar pages).
+static func month_start_day(m: int, y: int) -> int:
+	var di := 0
+	for yy in range(1, y):
+		di += days_in_year(yy)
+	for mm in m:
+		di += days_in_month(mm, y)
+	return di
+
+func date_text() -> String:
+	var d := date_of(day_index())
+	return "%s, %s %d, Year %d" % [weekday_name(), MONTHS[int(d.month)], int(d.day), int(d.year)]
+
+## 24h clock inside the 10-minute day.
+func clock_text() -> String:
+	var mins := int(fposmod(playtime, DAY_SECS) / DAY_SECS * 24.0 * 60.0)
+	return "%02d:%02d" % [mins / 60, mins % 60]
+
 ## The UFO market comes on Tuesdays, and SOMETIMES Saturdays.
-func is_ufo_day() -> bool:
-	if weekday() == 1:
+## Seeded by day index -- deterministic, so the calendar can predict it.
+func ufo_on_day(di: int) -> bool:
+	var wd := di % 7
+	if wd == 1:
 		return true
-	if weekday() == 5:
+	if wd == 5:
 		var rng := RandomNumberGenerator.new()
-		rng.seed = day_index()
+		rng.seed = di
 		return rng.randf() < 0.5
 	return false
+
+func is_ufo_day() -> bool:
+	return ufo_on_day(day_index())
 
 func pet_following() -> bool:
 	# benefits require the pet actually AT your side: following AND nearby
@@ -68,6 +116,21 @@ func pet_following() -> bool:
 var spawn_pos: Vector3 = Vector3.ZERO
 var spawn_up: Vector3 = Vector3.UP
 var has_saved_spawn: bool = false   # a save carried its own spawn point
+var tutorial_done: bool = false     # interactive tutorial finished/skipped
+var tutorial_session: bool = false  # throwaway tutorial world (set by Title, never saved)
+# What the shop will sell right now. ["*"] = everything (normal play);
+# [] = nothing; otherwise an allowlist of ids. The tutorial drives this so
+# a new player can't blow their coins on the wrong thing mid-lesson.
+var tutorial_allow: Array = ["*"]
+
+func tut_can_buy(id: String) -> bool:
+	return tutorial_allow.has("*") or tutorial_allow.has(id)
+
+# Per-world LAN hosting rules (persisted in the save; host changes stick).
+var host_cfg: Dictionary = {
+	"allow_cheats": false, "allow_chat": true, "friendly_fire": false,
+	"port": 24545,
+}
 var trials_done: bool = false       # temple guardians dead -> maze door open
 
 # --- locator gadget: a temporary green ping the HUD points at ---
@@ -187,20 +250,32 @@ func hurt(d: float, vaporize: bool = false) -> void:
 		dead = true
 		if not keep_inv:
 			Inventory.lose_half()   # drop 50% of carried coins on death
-			# the jetpack is CONSUMABLE: death burns it (and its upgrades)
-			Inventory.has_jetpack = false
-			Inventory.jet_fuel = 0.0
-			Inventory.jet_max = 100.0
-			Inventory.jet_power = 1.0
-			Inventory.jet_on = false
 			_spill_hotbar(vaporize)
 		killed.emit()
 	changed.emit()
 
-## Death spills the hotbar where you fell -- fly back and reclaim it.
-## Suns (and black holes, via permadeath) vaporize it instead.
+## Death spills the hotbar -- and the jetpack off your back -- where you
+## fell. Fly (well, walk) back and reclaim them. Suns, gas giants and
+## black holes vaporize the lot instead.
 func _spill_hotbar(vaporize: bool) -> void:
 	var p := get_tree().get_first_node_in_group("player")
+	if Inventory.has_jetpack:
+		if not vaporize and p and p.is_inside_tree():
+			var jid := "jetpack"
+			if Inventory.jet_max >= 1000.0:
+				jid = "jetpack3"
+			elif Inventory.jet_max >= 500.0:
+				jid = "jetpack2"
+			var jd := ItemDrop.new()
+			jd.setup(jid, 1)
+			p.get_parent().add_child(jd)
+			jd.global_position = p.global_position \
+				+ Vector3(randf_range(-1.5, 1.5), 0.5, randf_range(-1.5, 1.5))
+		Inventory.has_jetpack = false
+		Inventory.jet_fuel = 0.0
+		Inventory.jet_max = 100.0
+		Inventory.jet_power = 1.0
+		Inventory.jet_on = false
 	for i in Inventory.hotbar.size():
 		var sid := str(Inventory.hotbar[i].get("id", ""))
 		if sid == "" or sid == "fists":
@@ -270,6 +345,7 @@ func register_break(size: Vector3, coins: int) -> void:
 func reset() -> void:
 	mode = Mode.ON_FOOT
 	score = 0
+	tutorial_done = false
 	wrath = 0.0
 	health = HEALTH_MAX
 	dead = false

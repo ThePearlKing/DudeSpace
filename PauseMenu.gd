@@ -36,6 +36,7 @@ func _ready() -> void:
 	col.add_child(title)
 
 	col.add_child(_btn("Resume", _toggle))
+	col.add_child(_btn("Open to LAN", _open_lan))
 	col.add_child(_btn("Options", _open_options))
 	col.add_child(_btn("Cheats", _open_cheats))
 	col.add_child(_btn("Edit Character (look)", _open_editor))
@@ -51,6 +52,111 @@ func _ready() -> void:
 		_options.visible = false
 		_panel.visible = true)
 	add_child(_options)
+
+var _lan_panel: PanelContainer
+var _lan_status: Label
+var _lan_btn: Button
+
+## Minecraft-style: open THIS world to the LAN. Rules persist in the save.
+func _open_lan() -> void:
+	if _lan_panel:
+		_panel.visible = false
+		_refresh_lan()
+		_lan_panel.visible = true
+		return
+	_lan_panel = PanelContainer.new()
+	_lan_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_lan_panel.position = Vector2(-220, -220)
+	add_child(_lan_panel)
+	var pad := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		pad.add_theme_constant_override(side, 22)
+	_lan_panel.add_child(pad)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	pad.add_child(col)
+
+	var title := Label.new()
+	title.text = "OPEN TO LAN"
+	title.add_theme_font_size_override("font_size", 24)
+	col.add_child(title)
+
+	var rules := [
+		["allow_cheats", "Guests may use cheats"],
+		["allow_chat", "Guests may chat"],
+		["friendly_fire", "Friendly fire"],
+	]
+	for r in rules:
+		var key: String = r[0]
+		var cb := CheckBox.new()
+		cb.text = r[1]
+		cb.button_pressed = bool(Game.host_cfg.get(key, false))
+		cb.toggled.connect(func(on: bool) -> void:
+			Game.host_cfg[key] = on
+			if Net.is_host:
+				Net.host_settings[key] = on
+				Net.push_settings())   # rule changes reach guests live
+		col.add_child(cb)
+
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 8)
+	col.add_child(prow)
+	var plbl := Label.new()
+	plbl.text = "Port"
+	prow.add_child(plbl)
+	var pedit := LineEdit.new()
+	pedit.text = str(int(Game.host_cfg.get("port", 24545)))
+	pedit.custom_minimum_size = Vector2(120, 36)
+	pedit.text_changed.connect(func(t: String) -> void:
+		if t.is_valid_int():
+			Game.host_cfg["port"] = clampi(int(t), 1024, 65535))
+	prow.add_child(pedit)
+
+	_lan_status = Label.new()
+	_lan_status.add_theme_font_size_override("font_size", 13)
+	_lan_status.modulate = Color(1, 1, 1, 0.7)
+	_lan_status.custom_minimum_size = Vector2(380, 0)
+	_lan_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_lan_status)
+
+	_lan_btn = Button.new()
+	_lan_btn.custom_minimum_size = Vector2(0, 44)
+	_lan_btn.pressed.connect(_toggle_hosting)
+	col.add_child(_lan_btn)
+
+	var back := Button.new()
+	back.text = "Back"
+	back.custom_minimum_size = Vector2(0, 40)
+	back.pressed.connect(func() -> void:
+		_lan_panel.visible = false
+		_panel.visible = true)
+	col.add_child(back)
+
+	_panel.visible = false
+	_refresh_lan()
+
+func _toggle_hosting() -> void:
+	if Net.is_host:
+		Net.leave()
+	else:
+		var err := Net.host(Game.host_cfg)
+		if err != "" and _lan_status:
+			_lan_status.text = err
+	_refresh_lan()
+
+func _refresh_lan() -> void:
+	if _lan_btn == null:
+		return
+	_lan_btn.text = "Stop hosting" if Net.is_host else "Start hosting"
+	if Net.is_host:
+		var ips: Array = []
+		for a in IP.get_local_addresses():
+			if str(a).count(".") == 3 and not str(a).begins_with("127."):
+				ips.append(str(a))
+		_lan_status.text = "LIVE -- players on your network will see this world in their LAN list.\nYour addresses: %s · port %d · %d connected" \
+			% [", ".join(ips) if not ips.is_empty() else "?", int(Game.host_cfg.get("port", 24545)), Net.player_names.size()]
+	else:
+		_lan_status.text = "Rules are saved with this world and enforced for guests while hosting."
 
 func _btn(text: String, cb: Callable) -> Button:
 	var b := Button.new()
@@ -155,6 +261,9 @@ func _open_poses() -> void:
 var _cheats: PanelContainer
 
 func _open_cheats() -> void:
+	if not Net.cheats_allowed():
+		Sfx.play("denied")   # host said no guest cheats
+		return
 	if _cheats:
 		_panel.visible = false
 		_cheats.visible = true
@@ -182,73 +291,51 @@ func _open_cheats() -> void:
 	warn.add_theme_font_size_override("font_size", 13)
 	warn.modulate = Color("#ff5a5a")
 	col.add_child(warn)
-	col.add_child(_btn("∞ Coins (+999,999)", func() -> void:
-		Game.cheated = true
-		Inventory.add_coins(999999)
-		Sfx.play("coin")))
-	col.add_child(_btn("+99 ingot/irid/ultima", func() -> void:
-		Game.cheated = true
-		Inventory.add_res("ingot", 99)
-		Inventory.add_res("irid", 99)
-		Inventory.add_res("ultima", 99)
-		Sfx.play("coin")))
-	col.add_child(_btn("Refill health + fuel", func() -> void:
-		Game.cheated = true
-		Game.health = Game.HEALTH_MAX
-		Inventory.fuel = Inventory.fuel_max
-		Inventory.jet_fuel = Inventory.jet_max
-		Inventory.changed.emit()
-		Game.changed.emit()))
-	col.add_child(_btn("Unlock everything", func() -> void:
-		Game.cheated = true
-		Inventory.ak47_recipe = true
-		Game.door_open = true
-		Game.mind_core = true
-		Inventory.has_jetpack = true
-		Inventory.engine_mk2 = true
-		Inventory.give("hyperdrive", 1)
-		Sfx.play("learn")
-		Inventory.changed.emit()))
-	col.add_child(_btn("Calm the gods", func() -> void:
-		Game.cheated = true
-		Game.wrath = 0.0
-		Game.changed.emit()))
-	col.add_child(_btn("Toggle GODMODE", func() -> void:
+	col.add_child(_btn("Godmode", func() -> void:
 		Game.cheated = true
 		Game.godmode = not Game.godmode
 		Sfx.play("learn" if Game.godmode else "click")))
-	col.add_child(_btn("Toggle INFINITE FUEL", func() -> void:
-		Game.cheated = true
-		Game.inf_fuel = not Game.inf_fuel
-		Sfx.play("learn" if Game.inf_fuel else "click")))
-	col.add_child(_btn("Toggle CREATIVE inventory", func() -> void:
-		Game.cheated = true
-		Game.creative = not Game.creative
-		Sfx.play("learn" if Game.creative else "click")))
-	col.add_child(_btn("Toggle FREE CRAFT", func() -> void:
-		Game.cheated = true
-		Game.free_craft = not Game.free_craft
-		Sfx.play("learn" if Game.free_craft else "click")))
-	col.add_child(_btn("Toggle KEEP INVENTORY", func() -> void:
+	col.add_child(_btn("Keep Inventory", func() -> void:
 		Game.cheated = true
 		Game.keep_inv = not Game.keep_inv
 		Sfx.play("learn" if Game.keep_inv else "click")))
-	col.add_child(_btn("Toggle FREECAM (photo mode)", func() -> void:
-		var pf := get_tree().get_first_node_in_group("player")
-		if pf and pf.has_method("toggle_freecam"):
-			pf.toggle_freecam()
-			Sfx.play("click")))
-	col.add_child(_btn("Toggle NOCLIP (fast fly)", func() -> void:
+	col.add_child(_btn("Creative (free craft + creative tab)", func() -> void:
+		Game.cheated = true
+		Game.creative = not Game.creative
+		Game.free_craft = Game.creative
+		Sfx.play("learn" if Game.creative else "click")))
+	col.add_child(_btn("Infinite Fuel", func() -> void:
+		Game.cheated = true
+		Game.inf_fuel = not Game.inf_fuel
+		Sfx.play("learn" if Game.inf_fuel else "click")))
+	col.add_child(_btn("Noclip (fast fly)", func() -> void:
 		Game.cheated = true
 		var p := get_tree().get_first_node_in_group("player")
 		if p:
 			p.noclip = not p.noclip
 			Sfx.play("warp" if p.noclip else "click")))
-	col.add_child(_btn("Anger the noodle gods", func() -> void:
+	# the gods, on a leash
+	var grow := HBoxContainer.new()
+	grow.add_theme_constant_override("separation", 8)
+	col.add_child(grow)
+	var calm := Button.new()
+	calm.text = "Calm gods"
+	calm.custom_minimum_size = Vector2(146, 44)
+	calm.pressed.connect(func() -> void:
+		Game.cheated = true
+		Game.wrath = 0.0
+		Game.changed.emit()
+		Sfx.play("click"))
+	grow.add_child(calm)
+	var anger := Button.new()
+	anger.text = "Anger gods"
+	anger.custom_minimum_size = Vector2(146, 44)
+	anger.pressed.connect(func() -> void:
 		Game.cheated = true
 		Game.wrath = Game.WRATH_MAX
 		Game.changed.emit()
-		_toggle()))
+		_toggle())
+	grow.add_child(anger)
 	col.add_child(_btn("Summon UFO trader", func() -> void:
 		Game.cheated = true
 		var cs := get_tree().current_scene
@@ -285,6 +372,16 @@ func _open_tp() -> void:
 	title.text = "TELEPORT  (cheat)"
 	title.add_theme_font_size_override("font_size", 22)
 	col.add_child(title)
+	# pick straight off the star map instead of scrolling a list
+	var mapb := Button.new()
+	mapb.text = "🗺 Pick on map"
+	mapb.custom_minimum_size = Vector2(250, 42)
+	mapb.pressed.connect(func() -> void:
+		var m = get_tree().get_first_node_in_group("map_ui")
+		if m and m.has_method("open_select"):
+			_toggle()   # unpause; the map takes over
+			m.open_select(func(body) -> void: _tp_to(body)))
+	col.add_child(mapb)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(280, 380)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

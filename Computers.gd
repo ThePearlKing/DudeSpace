@@ -58,9 +58,40 @@ class EComputer extends Machine:
 			led.material_override = lmat
 			add_child(led)
 			_leds.append(lmat)
+		dress_industrial(Color("#101820"))
+		# a real workstation: keyboard shelf, key rows, cable conduit,
+		# cooling grille + spinning fan disc
+		var shelf := BoxMesh.new()
+		shelf.size = Vector3(0.9, 0.06, 0.4)
+		part(shelf, Vector3(0, 0.9, -box_size.z * 0.5 - 0.2), Color("#1a222c"), 0.1)
+		for r in 3:
+			for c in 8:
+				var key := BoxMesh.new()
+				key.size = Vector3(0.08, 0.03, 0.08)
+				part(key, Vector3(-0.38 + float(c) * 0.105, 0.945,
+					-box_size.z * 0.5 - 0.1 - float(r) * 0.11),
+					Color("#2e3a46") if (r + c) % 2 == 0 else Color("#27323d"), 0.15)
+		var conduit := CylinderMesh.new()
+		conduit.top_radius = 0.07
+		conduit.bottom_radius = 0.07
+		conduit.height = 1.6
+		part(conduit, Vector3(-box_size.x * 0.5 - 0.04, 0.8, 0.2), Color("#0e141a"), 0.05)
+		var grille := BoxMesh.new()
+		grille.size = Vector3(0.5, 0.5, 0.04)
+		part(grille, Vector3(0, 0.45, box_size.z * 0.5 + 0.02), Color("#0e141a"), 0.05)
+		var fan := CylinderMesh.new()
+		fan.top_radius = 0.18
+		fan.bottom_radius = 0.18
+		fan.height = 0.05
+		_fan = part(fan, Vector3(0, 0.45, box_size.z * 0.5 + 0.05), Color("#3a4a5a"), 0.3,
+			Vector3(90, 0, 0))
+
+	var _fan: MeshInstance3D
 
 	func _process(delta: float) -> void:
 		_blink += delta
+		if _fan:
+			_fan.rotation_degrees.y += delta * (90.0 + 500.0 * buf / buf_cap)
 		# screen: alive-green pulse while healthy, angry red on script error
 		if _screen_mat:
 			if last_err != "":
@@ -175,6 +206,26 @@ class SorterComputer extends Machine:
 		_screen_mat2.albedo_color = Color("#140a1a")
 		scr.material_override = _screen_mat2
 		add_child(scr)
+		dress_industrial(Color("#241a30"))
+		# the sorting guts on display: two angled outlet chutes with port
+		# lamps, a shaking sieve tray under the hopper
+		for sd in [-1.0, 1.0]:
+			var chute := CylinderMesh.new()
+			chute.top_radius = 0.16
+			chute.bottom_radius = 0.16
+			chute.height = 0.9
+			part(chute, Vector3(sd * (box_size.x * 0.5 + 0.2), 0.55, 0.2),
+				Color("#4a3a5e"), 0.3, Vector3(0, 0, sd * 38.0))
+			var lamp := SphereMesh.new()
+			lamp.radius = 0.09
+			lamp.height = 0.18
+			part(lamp, Vector3(sd * (box_size.x * 0.5 + 0.34), 0.28, 0.2),
+				Color("#c86bff"), 1.8)
+		var sieve := BoxMesh.new()
+		sieve.size = Vector3(0.9, 0.07, 0.9)
+		_sieve = part(sieve, Vector3(0, box_size.y - 0.1, 0), Color("#2a2034"), 0.2)
+
+	var _sieve: MeshInstance3D
 
 	func port_count(kind: String) -> int:
 		return 8 if kind == "item" else 1
@@ -184,6 +235,9 @@ class SorterComputer extends Machine:
 
 	func _process(delta: float) -> void:
 		_blink2 += delta
+		if _sieve:
+			# the sieve rattles harder the more it's routing
+			_sieve.position.x = sin(_blink2 * 22.0) * (0.015 + 0.03 * minf(1.0, buf / 50.0))
 		if _screen_mat2:
 			if last_err != "":
 				_screen_mat2.emission = Color("#ff2b2b")

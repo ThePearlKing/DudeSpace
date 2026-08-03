@@ -10,26 +10,38 @@ class Generator extends Machine:
 		title = "GENERATOR"
 		box_color = Color("#3a3a4a")
 		refund_id = "generator"
+		shows_out = false   # coal in, EU out, no items back
 		buf_cap = 200.0
 	func _ready() -> void:
 		super._ready()
-		# exhaust stack + hot vent
-		var stack := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.16
-		cm.bottom_radius = 0.22
-		cm.height = 1.0
-		stack.mesh = cm
-		stack.position = Vector3(0.4, box_size.y + 0.5, 0.3)
-		stack.material_override = Destructible.make_material(Color("#22222a"), 0.1)
-		add_child(stack)
-		_vent = MeshInstance3D.new()
+		dress_industrial()
+		# twin exhaust stacks with soot caps
+		for off in [Vector3(0.4, 0, 0.3), Vector3(0.1, 0, 0.3)]:
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.13
+			cm.bottom_radius = 0.19
+			cm.height = 1.0 + off.x
+			part(cm, Vector3(off.x, box_size.y + (1.0 + off.x) * 0.5, off.z), Color("#22222a"), 0.1)
+			var capm := CylinderMesh.new()
+			capm.top_radius = 0.2
+			capm.bottom_radius = 0.2
+			capm.height = 0.07
+			part(capm, Vector3(off.x, box_size.y + 1.04 + off.x, off.z), Color("#121218"), 0.02)
+		# hot vent grille + piston housing + intake pipe
+		_vent = part(_grille(), Vector3(0, 0.6, -box_size.z * 0.5 - 0.04), Color("#ff7a1a"), 0.5)
+		var piston := BoxMesh.new()
+		piston.size = Vector3(0.7, 0.5, 0.5)
+		part(piston, Vector3(-0.35, box_size.y + 0.25, -0.25), Color("#30303c"), 0.1)
+		var pipe := CylinderMesh.new()
+		pipe.top_radius = 0.1
+		pipe.bottom_radius = 0.1
+		pipe.height = 0.9
+		part(pipe, Vector3(box_size.x * 0.5 + 0.02, 0.75, 0), Color("#2a2a34"), 0.1,
+			Vector3(0, 0, 90))
+	static func _grille() -> BoxMesh:
 		var vm := BoxMesh.new()
 		vm.size = Vector3(0.9, 0.5, 0.06)
-		_vent.mesh = vm
-		_vent.position = Vector3(0, 0.6, -box_size.z * 0.5 - 0.04)
-		_vent.material_override = Destructible.make_material(Color("#ff7a1a"), 0.5)
-		add_child(_vent)
+		return vm
 	func work(_d: float) -> void:
 		if _vent and _vent.material_override is StandardMaterial3D:
 			_vent.material_override.emission_energy_multiplier = 0.4 + (buf / buf_cap) * 4.0
@@ -54,8 +66,10 @@ class CoalDrill extends Machine:
 		title = "COAL DRILL"
 		box_color = Color("#2a2a30")
 		refund_id = "coaldrill"
+		shows_in = false
 	func _ready() -> void:
 		super._ready()
+		dress_industrial()
 		_bit = MeshInstance3D.new()
 		var bm := CylinderMesh.new()
 		bm.top_radius = 0.3
@@ -65,6 +79,21 @@ class CoalDrill extends Machine:
 		_bit.position = Vector3(0, -0.35, 0)
 		_bit.material_override = Destructible.make_material(Color("#8a8a96"), 0.6)
 		add_child(_bit)
+		# derrick: four angled struts meeting over the drill axis + motor head
+		for ang in [0.0, 90.0, 180.0, 270.0]:
+			var strut := BoxMesh.new()
+			strut.size = Vector3(0.09, 1.6, 0.09)
+			var a := deg_to_rad(ang)
+			part(strut, Vector3(cos(a) * 0.55, box_size.y + 0.55, sin(a) * 0.55),
+				Color("#3a3a44"), 0.08, Vector3(cos(a) * -24.0, 0, sin(a) * 24.0))
+		var motor := BoxMesh.new()
+		motor.size = Vector3(0.5, 0.4, 0.5)
+		part(motor, Vector3(0, box_size.y + 1.25, 0), Color("#2a2a32"), 0.1)
+		var shaft := CylinderMesh.new()
+		shaft.top_radius = 0.07
+		shaft.bottom_radius = 0.07
+		shaft.height = 1.2
+		part(shaft, Vector3(0, box_size.y + 0.6, 0), Color("#8a8a96"), 0.3)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		if _bit:
@@ -90,6 +119,7 @@ class Bioreactor extends Machine:
 		title = "BIOREACTOR"
 		box_color = Color("#2a5a30")
 		refund_id = "bioreactor"
+		shows_out = false
 		buf_cap = 300.0
 	func _ready() -> void:
 		super._ready()
@@ -108,6 +138,26 @@ class Bioreactor extends Machine:
 		_dome.material_override = mat
 		_dome.position = Vector3(0, box_size.y, 0)
 		add_child(_dome)
+		dress_industrial(Color("#1a3a20"))
+		# nutrient pipes climbing the sides into the dome
+		for sx in [-1.0, 1.0]:
+			var pipe := CylinderMesh.new()
+			pipe.top_radius = 0.09
+			pipe.bottom_radius = 0.09
+			pipe.height = box_size.y + 0.3
+			part(pipe, Vector3(sx * (box_size.x * 0.5 - 0.1), (box_size.y + 0.3) * 0.5,
+				box_size.z * 0.4), Color("#2f7d42"), 0.4)
+			var elbow := SphereMesh.new()
+			elbow.radius = 0.12
+			elbow.height = 0.24
+			part(elbow, Vector3(sx * (box_size.x * 0.5 - 0.1), box_size.y + 0.3,
+				box_size.z * 0.4), Color("#2f7d42"), 0.4)
+		# feed hopper on the front
+		var hop := CylinderMesh.new()
+		hop.top_radius = 0.3
+		hop.bottom_radius = 0.12
+		hop.height = 0.45
+		part(hop, Vector3(0, box_size.y * 0.75, box_size.z * 0.5 + 0.16), Color("#234a2c"), 0.15)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		_puls += delta * (1.0 + buf / buf_cap * 6.0)
@@ -135,6 +185,8 @@ class RTG extends Machine:
 		title = "RTG"
 		box_color = Color("#1a4a4a")
 		refund_id = "rtg"
+		shows_in = false
+		shows_out = false
 		buf_cap = 150.0
 		gen_rate = 2.0
 	func _ready() -> void:
@@ -147,6 +199,21 @@ class RTG extends Machine:
 		_core.material_override = Destructible.make_material(Color("#7df9ff"), 5.0)
 		_core.position = Vector3(0, box_size.y + 0.5, 0)
 		add_child(_core)
+		dress_industrial(Color("#12303a"))
+		# radiator fins fanned around the body -- it sheds heat forever
+		for ang in [0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0]:
+			var fin := BoxMesh.new()
+			fin.size = Vector3(0.05, box_size.y * 0.8, 0.42)
+			var a := deg_to_rad(ang)
+			part(fin, Vector3(cos(a) * (box_size.x * 0.5 + 0.18), box_size.y * 0.5,
+				sin(a) * (box_size.z * 0.5 + 0.18)), Color("#2a5a66"), 0.4,
+				Vector3(0, -ang, 0))
+		# warning collar under the halo
+		var collar := CylinderMesh.new()
+		collar.top_radius = 0.3
+		collar.bottom_radius = 0.34
+		collar.height = 0.24
+		part(collar, Vector3(0, box_size.y + 0.12, 0), Color("#ffd166"), 0.8)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		if _core:
@@ -165,6 +232,8 @@ class PrismReactor extends Machine:
 		title = "PRISM REACTOR"
 		box_color = Color("#2a1a3a")
 		refund_id = "prisreactor"
+		shows_in = false
+		shows_out = false
 		buf_cap = 400.0
 		gen_rate = 8.0
 	func _ready() -> void:
@@ -177,16 +246,25 @@ class PrismReactor extends Machine:
 		_shard.material_override = _smat
 		_shard.position = Vector3(0, box_size.y + 0.75, 0)
 		add_child(_shard)
-		for sx in [-0.55, 0.55]:   # cage bars
-			var bar := MeshInstance3D.new()
+		dress_industrial(Color("#1a1028"))
+		# full cage around the shard + crown ring: contained rainbow
+		for ang in [0.0, 90.0, 180.0, 270.0]:
+			var a := deg_to_rad(ang)
 			var bm := CylinderMesh.new()
 			bm.top_radius = 0.05
 			bm.bottom_radius = 0.05
 			bm.height = 1.6
-			bar.mesh = bm
-			bar.material_override = Destructible.make_material(Color("#444455"), 0.2)
-			bar.position = Vector3(sx, box_size.y + 0.7, 0)
-			add_child(bar)
+			part(bm, Vector3(cos(a) * 0.55, box_size.y + 0.7, sin(a) * 0.55), Color("#444455"), 0.2)
+		var crown := TorusMesh.new()
+		crown.inner_radius = 0.5
+		crown.outer_radius = 0.62
+		part(crown, Vector3(0, box_size.y + 1.5, 0), Color("#444455"), 0.2)
+		# light-bleed vents on the body
+		for sx in [-1.0, 1.0]:
+			var vent := BoxMesh.new()
+			vent.size = Vector3(0.06, 0.7, 0.5)
+			part(vent, Vector3(sx * (box_size.x * 0.5 + 0.01), box_size.y * 0.5, 0),
+				Color("#ff7ce9"), 1.2)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		if _shard:
@@ -207,6 +285,8 @@ class Teleporter extends Machine:
 		box_color = Color("#1a2a4a")
 		box_size = Vector3(2.2, 0.5, 2.2)
 		refund_id = "teleporter"
+		shows_in = false
+		shows_out = false
 		buf_cap = 1000.0
 	func _ready() -> void:
 		super._ready()
@@ -219,6 +299,21 @@ class Teleporter extends Machine:
 		_ring2.material_override = Destructible.make_material(Color("#7cf9ff"), 2.0)
 		_ring2.position = Vector3(0, 1.2, 0)
 		add_child(_ring2)
+		# waystone pylons at the pad corners + inlaid glowing runway ring
+		for ang in [45.0, 135.0, 225.0, 315.0]:
+			var a := deg_to_rad(ang)
+			var py := BoxMesh.new()
+			py.size = Vector3(0.18, 1.1, 0.18)
+			part(py, Vector3(cos(a) * 1.25, 0.55, sin(a) * 1.25), Color("#243a5e"), 0.2)
+			var tip := SphereMesh.new()
+			tip.radius = 0.12
+			tip.height = 0.24
+			part(tip, Vector3(cos(a) * 1.25, 1.16, sin(a) * 1.25), Color("#7cf9ff"), 2.5)
+		var inlay := TorusMesh.new()
+		inlay.inner_radius = 0.85
+		inlay.outer_radius = 0.97
+		var ring := part(inlay, Vector3(0, box_size.y + 0.02, 0), Color("#7cf9ff"), 1.4)
+		ring.scale = Vector3(1, 0.08, 1)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		if _ring2:
@@ -260,6 +355,20 @@ class Extender extends Machine:
 			ring.material_override = Destructible.make_material(Color("#5ad0ff"), 1.2)
 			ring.position = Vector3(0, 1.7 + float(i) * 0.35, 0)
 			add_child(ring)
+		# crossarm + guy-wire anchors: a proper utility pole, not a stick
+		var arm := BoxMesh.new()
+		arm.size = Vector3(1.1, 0.09, 0.09)
+		part(arm, Vector3(0, 2.35, 0), Color("#3a3f46"), 0.15)
+		for sx in [-1.0, 1.0]:
+			var anchor := BoxMesh.new()
+			anchor.size = Vector3(0.14, 0.1, 0.14)
+			part(anchor, Vector3(sx * 0.52, 2.42, 0), Color("#5ad0ff"), 0.9)
+			var stay := CylinderMesh.new()
+			stay.top_radius = 0.02
+			stay.bottom_radius = 0.02
+			stay.height = 1.3
+			part(stay, Vector3(sx * 0.35, 0.6, 0.25), Color("#23262c"), 0.05,
+				Vector3(0, 0, sx * -28.0))
 	func work(_d: float) -> void:
 		# items pass straight through: in -> out, funnels take it from there
 		if str(in_slot["id"]) != "" and int(in_slot["n"]) > 0:
@@ -343,6 +452,8 @@ class Capacitor extends Machine:
 		title = "CAPACITOR"
 		box_color = Color("#44446a")
 		refund_id = "capacitor"
+		shows_in = false
+		shows_out = false
 		buf_cap = 600.0
 	func _ready() -> void:
 		super._ready()
@@ -360,6 +471,8 @@ class UltraCapacitor extends Machine:
 		box_color = Color("#6a5aff")
 		box_size = Vector3(1.8, 2.2, 1.8)
 		refund_id = "ultracap"
+		shows_in = false
+		shows_out = false
 		buf_cap = 6000.0
 	func _ready() -> void:
 		super._ready()
@@ -394,6 +507,7 @@ class EFurnace extends Machine:
 		buf_cap = 200.0
 	func _ready() -> void:
 		super._ready()
+		dress_industrial(Color("#3a1c10"))
 		_mouth = MeshInstance3D.new()
 		var mm := BoxMesh.new()
 		mm.size = Vector3(0.8, 0.6, 0.08)
@@ -401,6 +515,24 @@ class EFurnace extends Machine:
 		_mouth.position = Vector3(0, 0.6, -box_size.z * 0.5 - 0.05)
 		_mouth.material_override = Destructible.make_material(Color("#ff5a1a"), 1.0)
 		add_child(_mouth)
+		# induction coils hug the body -- this thing smelts with ELECTRICITY
+		for i in 3:
+			var coil := TorusMesh.new()
+			coil.inner_radius = box_size.x * 0.62
+			coil.outer_radius = box_size.x * 0.62 + 0.09
+			part(coil, Vector3(0, 0.35 + float(i) * 0.35, 0), Color("#ffb347"), 1.2)
+		# power inlet mast with an insulator stack
+		var mast := CylinderMesh.new()
+		mast.top_radius = 0.06
+		mast.bottom_radius = 0.06
+		mast.height = 0.9
+		part(mast, Vector3(-0.45, box_size.y + 0.45, -0.4), Color("#2a2a32"), 0.1)
+		for i in 3:
+			var ins := CylinderMesh.new()
+			ins.top_radius = 0.12
+			ins.bottom_radius = 0.12
+			ins.height = 0.06
+			part(ins, Vector3(-0.45, box_size.y + 0.55 + float(i) * 0.14, -0.4), Color("#c8c8d2"), 0.3)
 	func _process(d: float) -> void:
 		_spent = 0.0
 		super._process(d)
@@ -453,9 +585,11 @@ class ESeller extends Machine:
 		title = "E-SELLER"
 		box_color = Color("#7a6a10")
 		refund_id = "eseller"
+		shows_out = false   # coins go straight to your wallet
 		buf_cap = 200.0
 	func _ready() -> void:
 		super._ready()
+		dress_industrial(Color("#2a2408"))
 		_coin = MeshInstance3D.new()
 		var cm := CylinderMesh.new()
 		cm.top_radius = 0.4
@@ -463,9 +597,28 @@ class ESeller extends Machine:
 		cm.height = 0.08
 		_coin.mesh = cm
 		_coin.rotation_degrees = Vector3(90, 0, 0)
-		_coin.position = Vector3(0, box_size.y + 0.6, 0)
+		_coin.position = Vector3(0, box_size.y + 0.75, 0)
 		_coin.material_override = Destructible.make_material(Color("#ffd700"), 3.0)
 		add_child(_coin)
+		# neon shop sign holding the coin + intake conveyor + cash chute
+		var pole := CylinderMesh.new()
+		pole.top_radius = 0.05
+		pole.bottom_radius = 0.05
+		pole.height = 0.7
+		part(pole, Vector3(0, box_size.y + 0.35, 0), Color("#2a2a32"), 0.1)
+		var belt := BoxMesh.new()
+		belt.size = Vector3(0.8, 0.1, 0.5)
+		part(belt, Vector3(0, box_size.y * 0.8, box_size.z * 0.5 + 0.24), Color("#1c1c22"), 0.1)
+		for i in 3:
+			var roller := CylinderMesh.new()
+			roller.top_radius = 0.05
+			roller.bottom_radius = 0.05
+			roller.height = 0.76
+			part(roller, Vector3(0, box_size.y * 0.8 + 0.06, box_size.z * 0.5 + 0.1 + float(i) * 0.15),
+				Color("#4a4a55"), 0.2, Vector3(0, 0, 90))
+		var chute := BoxMesh.new()
+		chute.size = Vector3(0.5, 0.16, 0.2)
+		part(chute, Vector3(0, 0.3, box_size.z * 0.5 + 0.1), Color("#3a3010"), 0.3)
 	func _process(delta: float) -> void:
 		super._process(delta)
 		if _coin:
@@ -503,7 +656,9 @@ class ELight extends Machine:
 		box_color = Color("#2a2a34")
 		box_size = Vector3(0.5, 2.2, 0.5)
 		refund_id = "elight"
-		buf_cap = 60.0
+		shows_in = false
+		shows_out = false
+		buf_cap = 2.0   # no battery: lit means the wire is live NOW
 	func _ready() -> void:
 		super._ready()
 		_lamp = MeshInstance3D.new()
@@ -516,21 +671,118 @@ class ELight extends Machine:
 		add_child(_lamp)
 		_omni = OmniLight3D.new()
 		_omni.light_color = Color("#ffe9b8")
-		_omni.omni_range = 26.0
+		_omni.omni_range = 64.0   # a street lamp owns its whole street
 		_omni.light_energy = 0.0
 		_omni.position = Vector3(0, box_size.y + 0.4, 0)
 		add_child(_omni)
+		# lamppost dressing: flared base, neck collar, cage ribs over the bulb
+		var base := CylinderMesh.new()
+		base.top_radius = 0.3
+		base.bottom_radius = 0.45
+		base.height = 0.25
+		part(base, Vector3(0, 0.12, 0), Color("#1c1c24"), 0.1)
+		var collar := CylinderMesh.new()
+		collar.top_radius = 0.18
+		collar.bottom_radius = 0.14
+		collar.height = 0.2
+		part(collar, Vector3(0, box_size.y - 0.05, 0), Color("#1c1c24"), 0.1)
+		for ang in [0.0, 60.0, 120.0]:
+			var rib := TorusMesh.new()
+			rib.inner_radius = 0.46
+			rib.outer_radius = 0.5
+			part(rib, Vector3(0, box_size.y + 0.4, 0), Color("#2a2a34"), 0.15,
+				Vector3(90, ang, 0))
 	func work(delta: float) -> void:
-		var on := buf > 0.1
-		if on:
-			buf = maxf(0.0, buf - DRAIN * delta)
+		# lamps don't store power: wire cut = dark within a blink
+		buf = maxf(0.0, buf - (DRAIN + buf * 6.0) * delta)
+		_set_lit(buf > 0.1, delta)
+	func gated_work(delta: float) -> void:
+		# coil says no: dark, regardless of what the wire says
+		buf = maxf(0.0, buf - (DRAIN + buf * 6.0) * delta)
+		_set_lit(false, delta)
+	func _set_lit(on: bool, delta: float) -> void:
 		if _omni:
 			_omni.light_energy = lerpf(_omni.light_energy, 2.6 if on else 0.0, delta * 6.0)
 		if _lamp and _lamp.material_override is StandardMaterial3D:
-			_lamp.material_override.emission_energy_multiplier = 6.0 if on else 0.15
+			# NEON when lit: bloom-hot, unmistakable from across the base
+			_lamp.material_override.emission_energy_multiplier = 16.0 if on else 0.15
+			_lamp.material_override.albedo_color = Color("#fffbe8") if on else Color("#fff2c8")
 	func info_text() -> String:
 		return "energy: %.0f / %.0f EU\ndrinks %.1f EU/s while lit" % [buf, buf_cap, DRAIN]
 
+
+## LIGHT BOX: a small indicator cube. Wire it to a computer output (or
+## anything) and it glows while fed -- a status lamp, not a floodlight.
+class LightBox extends Machine:
+	const DRAIN := 0.8
+	var _omni: OmniLight3D
+	func _init() -> void:
+		title = "LIGHT BOX"
+		box_color = Color("#3a3a2a")
+		box_size = Vector3(0.6, 0.6, 0.6)
+		refund_id = "lightbox"
+		shows_in = false
+		shows_out = false   # it is a LAMP
+		buf_cap = 2.0   # holds nothing: lit = the wire is live, RIGHT NOW
+	func _ready() -> void:
+		super._ready()
+		_omni = OmniLight3D.new()
+		_omni.light_color = Color("#fff2c8")
+		_omni.omni_range = 7.0    # lights the desk, not the planet
+		_omni.light_energy = 0.0
+		_omni.position = Vector3(0, box_size.y * 0.5, 0)
+		add_child(_omni)
+		# redstone-lamp build: the WHOLE cube is the bulb. A dark lattice
+		# frame wraps it -- corner blocks + edge rails -- so each face
+		# reads as an inset glowing panel.
+		var s := box_size.x * 0.5
+		var frame_col := Color("#241f14")
+		for cx in [-1.0, 1.0]:
+			for cy in [0.0, 1.0]:
+				for cz in [-1.0, 1.0]:
+					var corner := BoxMesh.new()
+					corner.size = Vector3(0.16, 0.16, 0.16)
+					part(corner, Vector3(cx * s, cy * box_size.y, cz * s), frame_col, 0.08)
+		# 12 edge rails, slim, connecting the corners
+		var rail_l := box_size.x - 0.1
+		for cy in [0.0, 1.0]:
+			for cz in [-1.0, 1.0]:
+				var rx := BoxMesh.new()
+				rx.size = Vector3(rail_l, 0.08, 0.08)
+				part(rx, Vector3(0, cy * box_size.y, cz * s), frame_col, 0.08)
+			for cx in [-1.0, 1.0]:
+				var rz := BoxMesh.new()
+				rz.size = Vector3(0.08, 0.08, rail_l)
+				part(rz, Vector3(cx * s, cy * box_size.y, 0), frame_col, 0.08)
+		for cx in [-1.0, 1.0]:
+			for cz in [-1.0, 1.0]:
+				var ry := BoxMesh.new()
+				ry.size = Vector3(0.08, rail_l, 0.08)
+				part(ry, Vector3(cx * s, box_size.y * 0.5, cz * s), frame_col, 0.08)
+		# cable stub out the back, so it reads as WIRED
+		var stub := CylinderMesh.new()
+		stub.top_radius = 0.05
+		stub.bottom_radius = 0.05
+		stub.height = 0.16
+		part(stub, Vector3(0, 0.2, box_size.z * 0.5 + 0.06), Color("#2a2a32"), 0.1,
+			Vector3(90, 0, 0))
+	func work(delta: float) -> void:
+		# no battery in a lamp: cut the wire and it dies within a blink
+		buf = maxf(0.0, buf - (DRAIN + buf * 6.0) * delta)
+		_set_lit(buf > 0.05, delta)
+	func gated_work(delta: float) -> void:
+		buf = maxf(0.0, buf - (DRAIN + buf * 6.0) * delta)
+		_set_lit(false, delta)
+	func _set_lit(on: bool, delta: float) -> void:
+		if _omni:
+			_omni.light_energy = lerpf(_omni.light_energy, 1.4 if on else 0.0, delta * 10.0)
+		if _mat:
+			# the whole cube IS the bulb: neon-hot lit, warm dark glass off
+			_mat.emission = Color("#ffedb8")
+			_mat.emission_energy_multiplier = 14.0 if on else 0.1
+			_mat.albedo_color = Color("#fff6d8") if on else Color("#4a4232")
+	func info_text() -> String:
+		return "energy: %.0f / %.0f EU\nglows while fed -- wire a computer output in" % [buf, buf_cap]
 
 ## Hand-operated power switch: energy flows through ONLY while ON.
 ## F toggles it. The simplest machine and somehow the most satisfying.
@@ -544,6 +796,8 @@ class Switch extends Machine:
 		box_color = Color("#4a4a52")
 		box_size = Vector3(0.8, 1.2, 0.8)
 		refund_id = "switch"
+		shows_in = false
+		shows_out = false
 		buf_cap = 200.0
 
 	func _ready() -> void:
@@ -566,6 +820,21 @@ class Switch extends Machine:
 		_lamp_mat.emission_enabled = true
 		lamp.material_override = _lamp_mat
 		add_child(lamp)
+		# breaker-box dressing: hinge plate, lever pivot, hazard stripes
+		var pivot := CylinderMesh.new()
+		pivot.top_radius = 0.12
+		pivot.bottom_radius = 0.12
+		pivot.height = 0.3
+		part(pivot, Vector3(0, box_size.y, 0), Color("#2a2a32"), 0.15, Vector3(0, 0, 90))
+		var plate := BoxMesh.new()
+		plate.size = Vector3(0.6, 0.35, 0.06)
+		part(plate, Vector3(0, 0.6, -box_size.z * 0.5 - 0.02), Color("#1c1c24"), 0.1)
+		for i in 3:
+			var stripe := BoxMesh.new()
+			stripe.size = Vector3(0.12, 0.35, 0.02)
+			part(stripe, Vector3(-0.2 + float(i) * 0.2, 0.18, -box_size.z * 0.5 - 0.03),
+				Color("#ffd166") if i % 2 == 0 else Color("#1c1c24"), 0.4,
+				Vector3(0, 0, 24))
 		_apply_visual()
 
 	func _apply_visual() -> void:

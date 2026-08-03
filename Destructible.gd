@@ -25,18 +25,34 @@ func setup(size: Vector3, color: Color, hp: int = 1, coins: int = -1, emit: floa
 	_res_id = res_id
 	_res_n = res_n
 
+var rock: bool = false   # lumpy low-poly boulder instead of a box
+
 func _ready() -> void:
 	add_to_group("destructible")
 	_mesh = MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = _size
-	_mesh.mesh = box
+	if rock:
+		var sm := SphereMesh.new()
+		sm.radius = _size.x * 0.62
+		sm.height = _size.y
+		sm.radial_segments = 6
+		sm.rings = 3
+		_mesh.mesh = sm
+		_mesh.rotation_degrees = Vector3(randf_range(0, 30), randf_range(0, 180), randf_range(0, 30))
+	else:
+		var box := BoxMesh.new()
+		box.size = _size
+		_mesh.mesh = box
 	_mesh.material_override = make_material(_color, _emit)
 	add_child(_mesh)
 	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = _size
-	col.shape = shape
+	if rock:
+		var ss := SphereShape3D.new()
+		ss.radius = _size.x * 0.6
+		col.shape = ss
+	else:
+		var shape := BoxShape3D.new()
+		shape.size = _size
+		col.shape = shape
 	add_child(col)
 
 ## Used by LogicDiagram: light the panel while its node outputs 1.
@@ -68,6 +84,7 @@ func destroy(push_dir: Vector3) -> void:
 		return
 	_dead = true
 	remove_from_group("destructible")
+	Net.broadcast_break(global_position)   # other players see it die too
 	spawn_debris(get_parent(), global_position, _size, _color, push_dir)
 	Game.register_break(_size, _coins)
 	if _res_id != "" and _res_n > 0:
@@ -75,6 +92,15 @@ func destroy(push_dir: Vector3) -> void:
 	if _anger > 0.0:
 		Game.anger(_anger)   # Claude is cool; the gods rage when you break him
 	Sfx.play("explode", -12.0)
+	queue_free()
+
+## Mirrored network death: debris only -- rewards went to whoever broke it.
+func net_destroy() -> void:
+	if _dead:
+		return
+	_dead = true
+	remove_from_group("destructible")
+	spawn_debris(get_parent(), global_position, _size, _color, Vector3.UP)
 	queue_free()
 
 func _unflash() -> void:

@@ -13,6 +13,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	super._ready()
+	dress_industrial(Color("#0e1830"))
 	var screen := MeshInstance3D.new()
 	var sm := BoxMesh.new()
 	sm.size = Vector3(1.4, 1.0, 0.1)
@@ -20,6 +21,23 @@ func _ready() -> void:
 	screen.position = Vector3(0, 2.0, -0.65)
 	screen.material_override = Destructible.make_material(Color("#39ff14"), 4.0)
 	add_child(screen)
+	# bank furniture: keypad, card slot (glowing), cash tray, armored hood
+	for r in 3:
+		for c in 3:
+			var key := BoxMesh.new()
+			key.size = Vector3(0.14, 0.05, 0.14)
+			part(key, Vector3(-0.3 + float(c) * 0.3, 1.25 - float(r) * 0.2, -0.62),
+				Color("#39ff14") if r == 1 and c == 1 else Color("#25304a"), 0.4 if r == 1 and c == 1 else 0.15,
+				Vector3(-20, 0, 0))
+	var slot := BoxMesh.new()
+	slot.size = Vector3(0.5, 0.05, 0.04)
+	part(slot, Vector3(0.4, 1.5, -0.63), Color("#39ff14"), 1.5)
+	var tray := BoxMesh.new()
+	tray.size = Vector3(0.8, 0.12, 0.25)
+	part(tray, Vector3(0, 0.6, -0.7), Color("#0a1020"), 0.1)
+	var hood := BoxMesh.new()
+	hood.size = Vector3(1.6, 0.16, 0.9)
+	part(hood, Vector3(0, 2.65, -0.35), Color("#0a1020"), 0.1, Vector3(-12, 0, 0))
 
 func info_text() -> String:
 	return "WALLET  %d coins · %d ZB\nBANK    %d coins  (= %d ZB)\n(bank = safe from death · 10 coins = 1 ZB)" % [

@@ -23,6 +23,24 @@ func _ready() -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	col.add_child(title)
 
+	# multiplayer display name -- shown in chat, over your head, TAB list
+	var urow := HBoxContainer.new()
+	urow.add_theme_constant_override("separation", 12)
+	col.add_child(urow)
+	var ulabel := Label.new()
+	ulabel.text = "Username"
+	ulabel.custom_minimum_size = Vector2(200, 0)
+	urow.add_child(ulabel)
+	var uedit := LineEdit.new()
+	uedit.text = Settings.username
+	uedit.placeholder_text = "Dude"
+	uedit.max_length = 24
+	uedit.custom_minimum_size = Vector2(240, 38)
+	uedit.text_changed.connect(func(t: String) -> void:
+		Settings.username = t.strip_edges()
+		Settings.save_cfg())
+	urow.add_child(uedit)
+
 	var srow := HBoxContainer.new()
 	srow.add_theme_constant_override("separation", 12)
 	col.add_child(srow)
@@ -67,13 +85,82 @@ func _ready() -> void:
 	tut.pressed.connect(_open_tutorial)
 	col.add_child(tut)
 
+	var ctl := Button.new()
+	ctl.text = "Controls"
+	ctl.custom_minimum_size = Vector2(0, 42)
+	ctl.pressed.connect(_open_controls)
+	col.add_child(ctl)
+
 	var back := Button.new()
 	back.text = "Back"
 	back.custom_minimum_size = Vector2(0, 42)
-	back.pressed.connect(func(): closed.emit())
+	back.pressed.connect(func():
+		Settings.save_cfg()
+		closed.emit())
 	col.add_child(back)
 
 var _tut_panel: PanelContainer
+var _ctl_panel: PanelContainer
+
+## Every keybind in the game, one place.
+func _open_controls() -> void:
+	if _ctl_panel:
+		_ctl_panel.visible = true
+		return
+	_ctl_panel = PanelContainer.new()
+	_ctl_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_ctl_panel.position = Vector2(-330, -300)
+	_glow(_ctl_panel)
+	get_parent().add_child(_ctl_panel)
+	var pad := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		pad.add_theme_constant_override(side, 20)
+	_ctl_panel.add_child(pad)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	pad.add_child(col)
+	var title := Label.new()
+	title.text = "CONTROLS"
+	title.add_theme_font_size_override("font_size", 24)
+	col.add_child(title)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(640, 460)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	col.add_child(scroll)
+	var txt := Label.new()
+	txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	txt.custom_minimum_size = Vector2(620, 0)
+	txt.add_theme_font_size_override("font_size", 15)
+	txt.text = """ON FOOT
+WASD -- move · mouse -- look · Space -- jump (hold: jetpack thrust)
+Left click -- attack / mine · Right click -- use / place selected item
+F -- interact (machines, gates, board rocket) · E -- inventory + shop
+1-5 / scroll -- hotbar select · Q -- drop selected item · J -- jetpack on/off · C -- jetpack descend
+V -- zoom · G -- cycle pose · R -- respawn (when dead)
+M -- map · K -- calendar · T -- chat · TAB (hold) -- player list (LAN)
+F3 -- stats overlay · F5 -- first/third person · Esc -- pause menu
+
+IN ROCKET
+Space -- burn engine · WASD -- tilt nose (camera-relative)
+1-9 -- time warp 1-9x · 0 -- 10x (coasting only; burning cancels warp)
+H -- hyperdrive (if fitted) · arrow keys + Shift/Ctrl -- RCS (if fitted)
+F -- exit rocket · M -- map · L-click -- smash
+
+INVENTORY / CHESTS
+Click -- pick up / put down stack · Right click -- half / place one
+Scroll over slot -- stream items across · drag armor onto slot to wear
+Right-click armor in hand -- wear it
+Click OUTSIDE the panel -- drop held stack on the floor
+🗑 DELETE slot -- click with a held stack to destroy it
+
+MAP
+Wheel -- zoom · left-drag -- pan"""
+	scroll.add_child(txt)
+	var cls := Button.new()
+	cls.text = "Close"
+	cls.custom_minimum_size = Vector2(0, 40)
+	cls.pressed.connect(func() -> void: _ctl_panel.visible = false)
+	col.add_child(cls)
 
 func _open_tutorial() -> void:
 	if _tut_panel:

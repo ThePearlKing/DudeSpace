@@ -5,18 +5,52 @@ extends Machine
 ## ingots in and let it drip coins.
 
 const PRICES := {
-	"ingot": 8, "irid": 20, "ultima": 100, "prism": 60, "circle": 95,
+	"ingot": 8, "irid": 20, "ultima": 100, "prism": 60, "circle": 95, "uranium": 45, "sulfur": 12,
 	"cooked_meat": 5, "meat": 2, "banana": 2, "shroom": 3, "salad": 15, "coal": 1,
 }
 const SECS_PER_ITEM := 0.5
 
 var _t: float = 0.0
+var _coin: MeshInstance3D
+var _spin: float = 0.0
 
 func _init() -> void:
 	title = "SELL STATION"
 	box_color = Color("#8a7a20")
 	refund_id = "coinifier"
 	add_to_group("coinifier")
+	shows_out = false   # coins go straight to your wallet
+
+func _ready() -> void:
+	super._ready()
+	dress_industrial(Color("#2a2410"))
+	# striped kiosk awning over the front
+	for i in 4:
+		var slat := BoxMesh.new()
+		slat.size = Vector3(0.36, 0.05, 0.55)
+		part(slat, Vector3(-0.54 + float(i) * 0.36, box_size.y + 0.16 - float(i % 2) * 0.03,
+			box_size.z * 0.5 + 0.1),
+			Color("#ffe066") if i % 2 == 0 else Color("#3a3020"), 0.3, Vector3(-14, 0, 0))
+	# big golden coin spinning above (the whole sales pitch)
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.34
+	cm.bottom_radius = 0.34
+	cm.height = 0.09
+	_coin = part(cm, Vector3(0, box_size.y + 0.85, 0), Color("#ffd700"), 2.2, Vector3(90, 0, 0))
+	# coin slot + payout tray on the front
+	var slotm := BoxMesh.new()
+	slotm.size = Vector3(0.5, 0.08, 0.06)
+	part(slotm, Vector3(0, 1.0, box_size.z * 0.5 + 0.03), Color("#141410"), 0.02)
+	var tray := BoxMesh.new()
+	tray.size = Vector3(0.7, 0.1, 0.3)
+	part(tray, Vector3(0, 0.35, box_size.z * 0.5 + 0.14), Color("#2a2410"), 0.05)
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	if _coin:
+		# showcase spin: standing coin turning around the machine's up axis
+		_spin += delta * 130.0
+		_coin.rotation_degrees = Vector3(90, _spin, 0)
 
 func work(delta: float) -> void:
 	var id := str(in_slot["id"])

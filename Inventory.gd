@@ -6,7 +6,7 @@ extends Node
 
 signal changed
 
-const STACKABLE := ["raw_ingot", "raw_irid", "ingot", "irid", "ultima", "prism", "semicircle", "circle", "waypoint",
+const STACKABLE := ["raw_ingot", "raw_irid", "ingot", "irid", "ultima", "prism", "uranium", "sulfur", "semicircle", "circle", "waypoint",
 	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire"]
 const STACK_MAX := 999
 
@@ -77,6 +77,8 @@ var items: Dictionary = {
 	"irid":       {"name": "Iridium",          "color": Color("#59ffc4")},
 	"ultima":     {"name": "Ultima Crystal",   "color": Color("#7df9ff")},
 	"prism":      {"name": "Prism Shard",      "color": Color("#ff7ce9")},
+	"uranium":    {"name": "Uranium",          "color": Color("#5aff3a")},
+	"sulfur":     {"name": "Sulfur",           "color": Color("#e8d44a")},
 	"semicircle": {"name": "Semicircle",       "color": Color("#ffd166")},
 	"circle":     {"name": "Circle",           "color": Color("#ffe9a0")},
 	"prisreactor": {"name": "Prism Reactor",   "color": Color("#2a1a3a")},
@@ -84,11 +86,12 @@ var items: Dictionary = {
 	"permapple":  {"name": "Permadeath Apple", "color": Color("#8b0000")},
 	"chest":      {"name": "Chest",            "color": Color("#a9713b")},
 	"furnace":    {"name": "Furnace",          "color": Color("#ff7a1a")},
-	"coinifier":  {"name": "Coinifier",        "color": Color("#ffe066")},
+	"coinifier":  {"name": "Sell Station",     "color": Color("#ffe066")},
 	"autominer":  {"name": "Auto-Miner",       "color": Color("#8fe8ff")},
 	"backpack":   {"name": "Backpack",         "color": Color("#7d9c4a")},
 	"spawnbeacon":{"name": "Spawn Beacon",     "color": Color("#2bff6a")},
 	"rocket":     {"name": "Rocket",           "color": Color("#ff5964")},
+	"rocket2":    {"name": "Rocket 2.0",       "color": Color("#7df9ff")},
 	"fuel":       {"name": "Rocket Fuel",      "color": Color("#ffd166")},
 	"jetfuel":    {"name": "Jet Fuel",         "color": Color("#ffd166")},
 	"jetpack":    {"name": "Jetpack",          "color": Color("#4cc9f0")},
@@ -114,6 +117,7 @@ var items: Dictionary = {
 	"capacitor":  {"name": "Capacitor",        "color": Color("#44446a")},
 	"ultracap":   {"name": "Ultra Capacitor",  "color": Color("#6a5aff")},
 	"elight":     {"name": "Electric Light",   "color": Color("#fff2c8")},
+	"lightbox":   {"name": "Light Box",        "color": Color("#d8cfa0")},
 	"coil":       {"name": "Control Coil",     "color": Color("#ff9a3c")},
 	"switch":     {"name": "Power Switch",     "color": Color("#4a4a52")},
 	"efurnace":   {"name": "Electric Furnace", "color": Color("#7a3a1a")},
@@ -221,6 +225,7 @@ func _ready() -> void:
 		{"id": "orbitwand", "tab": "Gear",     "name": "Orbit Wand",     "cost": {"coins": 2000, "irid": 15, "ultima": 5, "prism": 12, "circle": 5}, "desc": "Click an animal or enemy: YEET into orbit. F: yeet yourself. An orbit IS a circle."},
 
 		{"id": "rocket",    "tab": "Rocket",   "name": "Rocket",         "cost": {"coins": 150}, "desc": "Right-click to place upright. F to board."},
+		{"id": "rocket2",   "tab": "Rocket",   "name": "Rocket 2.0",     "cost": {"coins": 800, "irid": 15, "ultima": 4}, "desc": "Double tank (200), fuel loads double, burns 40% less. Passenger bubble: a friend can ride."},
 		{"id": "fuel",      "tab": "Rocket",   "name": "Rocket Fuel +50","cost": {"coins": 30},  "desc": "Right-click near your rocket to fill it."},
 		{"id": "tankxl",    "tab": "Rocket",   "name": "Tank XL +50",    "cost": {"coins": 200}, "desc": "Right-click to install. Raises max fuel."},
 		{"id": "engine_mk2","tab": "Rocket",   "name": "Engine Mk2",     "cost": {"coins": 700, "irid": 10}, "desc": "+60% thrust. Iridium: found off-world."},
@@ -240,6 +245,7 @@ func _ready() -> void:
 		{"id": "coaldrill", "tab": "Electric", "name": "Coal Drill",     "cost": {"ingot": 6, "irid": 2}, "desc": "Digs 1 coal / 5s. Funnel it into a generator."},
 		{"id": "bioreactor","tab": "Electric", "name": "Bioreactor",     "cost": {"ingot": 6, "plantfiber": 6}, "desc": "Meat, plants, bananas, even THE APPLE -> energy."},
 		{"id": "capacitor", "tab": "Electric", "name": "Capacitor",      "cost": {"ingot": 4, "irid": 1}, "desc": "Stores 600 EU. One in, one out."},
+		{"id": "lightbox", "tab": "Electric", "name": "Light Box",     "cost": {"coins": 60, "ingot": 4}, "desc": "Small indicator lamp. Glows while fed power -- wire a computer output to it. Lights the desk, not the planet."},
 		{"id": "elight",    "tab": "Electric", "name": "Electric Light", "cost": {"coins": 30, "ingot": 1}, "desc": "Sips 0.5 EU/s, floods the area with light."},
 		{"id": "extender",  "tab": "Electric", "name": "Extender",       "cost": {"ingot": 2}, "desc": "Relay pole: wires AND funnels in/out. Stretches any network."},
 		{"id": "switch",    "tab": "Electric", "name": "Power Switch",   "cost": {"ingot": 2},   "desc": "F toggles it. ON = power flows through. OFF = wall."},
@@ -382,8 +388,27 @@ func clear_slot(i: int) -> void:
 			hotbar[i] = empty_slot()
 		changed.emit()
 
+## Toss any stack onto the floor ahead of the player as a real pickup.
+func drop_stack(id: String, n: int) -> void:
+	if id == "" or id == "fists" or n <= 0:
+		return
+	var cs = get_tree().current_scene
+	var p = get_tree().get_first_node_in_group("player")
+	if cs:
+		var d := ItemDrop.new()
+		d.setup(id, n)
+		cs.add_child(d)
+		var pos: Vector3 = p.global_position if p else Vector3.ZERO
+		if p:
+			pos += -p.global_transform.basis.z * 3.0   # tossed ahead
+		d.global_position = pos
+	Sfx.play("click", -18.0)
+	changed.emit()
+
+## Drop a hotbar slot onto the floor (never deletes).
 func drop_slot(i: int) -> void:
 	if i >= 0 and i < 5:
+		drop_stack(str(hotbar[i]["id"]), int(hotbar[i]["n"]))
 		hotbar[i] = empty_slot()
 		changed.emit()
 

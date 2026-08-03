@@ -11,6 +11,7 @@ var _info: Label
 var _btn_box: VBoxContainer
 var _in_cell: _MSlot
 var _out_cell: _MSlot
+var _arrow: Label
 var _hb_cells: Array = []
 var held: Dictionary = {"id": "", "n": 0}   # stack riding the cursor
 var _cursor: Label
@@ -67,11 +68,11 @@ func _ready() -> void:
 	_in_cell.which = "in"
 	_in_cell.custom_minimum_size = Vector2(150, 64)
 	srow.add_child(_in_cell)
-	var arrow := Label.new()
-	arrow.text = "→"
-	arrow.add_theme_font_size_override("font_size", 30)
-	arrow.modulate = Color(1, 1, 1, 0.6)
-	srow.add_child(arrow)
+	_arrow = Label.new()
+	_arrow.text = "→"
+	_arrow.add_theme_font_size_override("font_size", 30)
+	_arrow.modulate = Color(1, 1, 1, 0.6)
+	srow.add_child(_arrow)
 	_out_cell = _MSlot.new()
 	_out_cell.which = "out"
 	_out_cell.custom_minimum_size = Vector2(150, 64)
@@ -130,7 +131,11 @@ func open_machine(m: Machine) -> void:
 			b.custom_minimum_size = Vector2(0, 40)
 			b.pressed.connect(act[1])
 			_btn_box.add_child(b)
-	_in_cell.get_parent().visible = show_slots
+	# machines only show the slots they actually use
+	_in_cell.get_parent().visible = show_slots and (m.shows_in or m.shows_out)
+	_in_cell.visible = m.shows_in
+	_out_cell.visible = m.shows_out
+	_arrow.visible = m.shows_in and m.shows_out
 	_refresh()
 
 func close_ui() -> void:

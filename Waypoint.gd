@@ -45,6 +45,7 @@ func use() -> void:
 	Sfx.play("click")
 
 func destroy(push_dir: Vector3) -> void:
+	Net.broadcast_remove(global_position)
 	Inventory.give("waypoint", 1)
 	Destructible.spawn_debris(get_parent(), global_position + Vector3(0, 0.5, 0),
 		Vector3(0.5, 0.5, 0.5), Color("#ffd166"), push_dir)

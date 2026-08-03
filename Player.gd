@@ -196,6 +196,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				Inventory.select_slot(event.keycode - KEY_1)
 			KEY_F5:
 				_toggle_view()
+			KEY_Q:
+				Inventory.drop_slot(Inventory.selected)
 			KEY_G:
 				if _body:
 					_body.set_pose((_body.pose + 1) % 6)
@@ -230,6 +232,16 @@ func jetting() -> bool:
 func _physics_process(delta: float) -> void:
 	if Game.mode != Game.Mode.ON_FOOT:
 		return
+	# passenger seat: glued to the pilot's synced rocket, no physics of ours
+	if riding_peer != -1:
+		if not Net.active or not Net.player_pos.has(riding_peer):
+			riding_peer = -1   # pilot gone: back on our own feet
+		else:
+			var seat_up: Vector3 = Net.player_ups.get(riding_peer, Vector3.UP)
+			global_position = global_position.lerp(
+				Net.player_pos[riding_peer] + seat_up * 1.6, minf(1.0, delta * 12.0))
+			velocity = Vector3.ZERO
+			return
 	# C zooms whenever it isn't busy meaning "down" (jetpack/zero-g/fly modes)
 	# V = zoom, always. C keeps meaning "down".
 	_zooming = Input.is_key_pressed(KEY_V) and not _ui_open() and not Game.dead and not freecam
@@ -460,7 +472,47 @@ func _hm_cyl(r: float, h: float, pos: Vector3, col: Color, emit: float = 0.4, to
 	_held.add_child(mi)
 	return mi
 
+## Every placeable machine you hold IS the machine -- the real model,
+## shrunk to hand size, turned so its face points screen-left. No more
+## mystery cubes that look nothing like what you're about to place.
+const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
+	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "prisreactor",
+	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
+	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender", "waypoint"]
+
+func _held_machine(id: String) -> bool:
+	if not HELD_MACHINE_IDS.has(id):
+		return false
+	var cs := get_tree().current_scene
+	if cs == null or not cs.has_method("_spawn_world_obj"):
+		return false
+	var mach: Node3D = cs._spawn_world_obj(id)
+	if mach == null:
+		return false
+	mach.process_mode = Node.PROCESS_MODE_DISABLED   # a model, not a machine
+	_held.add_child(mach)
+	_strip_held(mach)
+	mach.scale = Vector3.ONE * 0.14
+	mach.position = Vector3(0, -0.16, 0)
+	mach.rotation_degrees = Vector3(0, -90, 0)   # face turned to the left
+	return true
+
+## Kill everything about the copy that isn't looks: collision (it would
+## eat your own F-ray), labels, sensor areas.
+func _strip_held(n: Node) -> void:
+	if n is CollisionObject3D:
+		n.collision_layer = 0
+		n.collision_mask = 0
+	if n is Area3D:
+		n.monitoring = false
+	if n is Label3D:
+		n.visible = false
+	for c in n.get_children():
+		_strip_held(c)
+
 func _make_held_model(id: String) -> void:
+	if _held_machine(id):
+		return
 	var col := _held_color(id)
 	var dark := Color("#2a2a30")
 	if Inventory.weapons.has(id):
@@ -565,6 +617,119 @@ func _make_held_model(id: String) -> void:
 			t.mesh = tm
 			t.material_override = Destructible.make_material(Color("#4cc9f0"), 0.8)
 			_held.add_child(t)
+		"wiretool":
+			# lineman's pliers with a wire spool on the hip of the handle
+			_hm_box(Vector3(0.05, 0.05, 0.24), Vector3(-0.035, 0, 0.14), Color("#c03a3a"), 0.2).rotation_degrees = Vector3(0, 6, 0)
+			_hm_box(Vector3(0.05, 0.05, 0.24), Vector3(0.035, 0, 0.14), Color("#c03a3a"), 0.2).rotation_degrees = Vector3(0, -6, 0)
+			_hm_box(Vector3(0.04, 0.06, 0.14), Vector3(-0.02, 0, -0.08), Color("#8a8a94"), 0.3).rotation_degrees = Vector3(0, -8, 0)
+			_hm_box(Vector3(0.04, 0.06, 0.14), Vector3(0.02, 0, -0.08), Color("#8a8a94"), 0.3).rotation_degrees = Vector3(0, 8, 0)
+			var spool := _hm_cyl(0.08, 0.1, Vector3(0, -0.1, 0.2), Color("#5ad0ff"), 0.8)
+			spool.rotation_degrees = Vector3(0, 0, 90)
+		"funneltool":
+			# a funnel on a grip: wide cone, spout, orange service handle
+			_hm_cyl(0.16, 0.16, Vector3(0, 0.08, -0.1), Color("#ffa040"), 0.5, 0.05)
+			_hm_cyl(0.035, 0.16, Vector3(0, -0.07, -0.1), Color("#c87830"), 0.4)
+			_hm_box(Vector3(0.06, 0.07, 0.2), Vector3(0, -0.02, 0.12), Color("#2a2a30"), 0.2)
+		"charm":
+			var gem := _hm_box(Vector3(0.12, 0.16, 0.1), Vector3(0, -0.02, 0), Color("#b56cff"), 2.5)
+			gem.rotation_degrees = Vector3(45, 0, 45)
+			var loop := MeshInstance3D.new()
+			var lm2 := TorusMesh.new()
+			lm2.inner_radius = 0.05
+			lm2.outer_radius = 0.08
+			loop.mesh = lm2
+			loop.position = Vector3(0, 0.14, 0)
+			loop.material_override = Destructible.make_material(Color("#ffd166"), 0.6)
+			_held.add_child(loop)
+		"warpshard":
+			var sh := MeshInstance3D.new()
+			var pm := PrismMesh.new()
+			pm.size = Vector3(0.14, 0.34, 0.1)
+			sh.mesh = pm
+			sh.rotation_degrees = Vector3(0, 0, 12)
+			sh.material_override = Destructible.make_material(Color("#7cf9ff"), 2.5)
+			_held.add_child(sh)
+		"cage", "caged_animal":
+			_hm_box(Vector3(0.34, 0.04, 0.34), Vector3(0, -0.16, 0), dark, 0.2)
+			_hm_box(Vector3(0.34, 0.04, 0.34), Vector3(0, 0.16, 0), dark, 0.2)
+			for bx in [-0.15, -0.05, 0.05, 0.15]:
+				_hm_cyl(0.012, 0.32, Vector3(bx, 0, -0.15), Color("#b0b0b8"), 0.3)
+				_hm_cyl(0.012, 0.32, Vector3(bx, 0, 0.15), Color("#b0b0b8"), 0.3)
+			if id == "caged_animal":
+				_hm_box(Vector3(0.16, 0.12, 0.16), Vector3(0, -0.08, 0), Color("#7d9c4a"), 0.4)
+		"catfood":
+			_hm_cyl(0.11, 0.16, Vector3(0, 0, 0), Color("#e8956a"), 0.4)
+			_hm_box(Vector3(0.16, 0.02, 0.1), Vector3(0, 0.09, 0), Color("#c8c8d0"), 0.5)
+		"noodle":
+			_hm_cyl(0.15, 0.12, Vector3(0, -0.04, 0), Color("#e8e0d0"), 0.3, 0.11)
+			for nx in [-0.06, 0.0, 0.06]:
+				_hm_cyl(0.015, 0.16, Vector3(nx, 0.08, 0), Color("#ffcf40"), 0.8).rotation_degrees = Vector3(0, 0, nx * 120.0)
+		"ward":
+			_hm_cyl(0.05, 0.4, Vector3(0, 0, 0), Color("#5a3020"), 0.2)
+			_hm_box(Vector3(0.2, 0.08, 0.06), Vector3(0, 0.14, 0), Color("#ff6aa0"), 1.2)
+			_hm_box(Vector3(0.14, 0.08, 0.06), Vector3(0, 0.0, 0), Color("#ff6aa0"), 0.9)
+		"permapple":
+			var ap := MeshInstance3D.new()
+			var am2 := SphereMesh.new()
+			am2.radius = 0.14
+			am2.height = 0.26
+			ap.mesh = am2
+			ap.material_override = Destructible.make_material(Color("#8b0000"), 1.2)
+			_held.add_child(ap)
+			_hm_cyl(0.015, 0.08, Vector3(0, 0.16, 0), Color("#4a3020"), 0.2)
+		"banana":
+			for i2 in 3:
+				var seg := _hm_box(Vector3(0.07, 0.07, 0.14), Vector3(0, -0.02 + float(i2) * 0.035, -0.1 + float(i2) * 0.11), Color("#ffe135"), 0.5)
+				seg.rotation_degrees = Vector3(-24.0 + float(i2) * 24.0, 0, 0)
+		"shroom":
+			_hm_cyl(0.05, 0.14, Vector3(0, -0.06, 0), Color("#e8e0d0"), 0.3)
+			var cap2 := MeshInstance3D.new()
+			var cm2 := SphereMesh.new()
+			cm2.radius = 0.13
+			cm2.height = 0.14
+			cm2.is_hemisphere = true
+			cap2.mesh = cm2
+			cap2.position = Vector3(0, 0.01, 0)
+			cap2.material_override = Destructible.make_material(Color("#d13a3a"), 0.6)
+			_held.add_child(cap2)
+		"meat", "cooked_meat":
+			var mc := Color("#c05050") if id == "meat" else Color("#8a4a2a")
+			_hm_box(Vector3(0.14, 0.12, 0.2), Vector3(0, 0, -0.04), mc, 0.3)
+			_hm_cyl(0.025, 0.16, Vector3(0, 0, 0.14), Color("#e8e0d0"), 0.3).rotation_degrees = Vector3(90, 0, 0)
+		"salad":
+			_hm_cyl(0.15, 0.1, Vector3(0, -0.05, 0), Color("#3a5a2a"), 0.3, 0.12)
+			for sx2 in [-0.06, 0.0, 0.06]:
+				_hm_box(Vector3(0.07, 0.05, 0.07), Vector3(sx2, 0.03, sx2 * 0.5), Color("#7ddc5a"), 0.6)
+		"backpack", "backpack2", "ubackpack":
+			var bc2 := Color("#7d9c4a") if id == "backpack" else (Color("#ff7ce9") if id == "backpack2" else Color("#c86bff"))
+			_hm_box(Vector3(0.26, 0.32, 0.14), Vector3(0, 0, 0), bc2, 0.4)
+			_hm_box(Vector3(0.18, 0.12, 0.06), Vector3(0, 0.04, -0.1), bc2.darkened(0.3), 0.3)
+			for sx3 in [-0.09, 0.09]:
+				_hm_box(Vector3(0.04, 0.3, 0.02), Vector3(sx3, 0, 0.09), Color("#3a3a30"), 0.2)
+		"hyperdrive":
+			var hd := MeshInstance3D.new()
+			var hm2 := TorusMesh.new()
+			hm2.inner_radius = 0.09
+			hm2.outer_radius = 0.16
+			hd.mesh = hm2
+			hd.material_override = Destructible.make_material(Color("#c86bff"), 2.0)
+			_held.add_child(hd)
+			_hm_cyl(0.05, 0.2, Vector3(0, 0, 0), Color("#3a2a4a"), 0.8).rotation_degrees = Vector3(90, 0, 0)
+		"engine_mk2":
+			_hm_cyl(0.14, 0.2, Vector3(0, 0.06, 0), Color("#ff8c42"), 0.5, 0.08)
+			_hm_cyl(0.16, 0.12, Vector3(0, -0.1, 0), Color("#2a2a30"), 0.9, 0.2)
+		"carkeys":
+			_hm_cyl(0.06, 0.02, Vector3(0, 0.08, 0), Color("#4dff9a"), 0.8)
+			_hm_box(Vector3(0.035, 0.18, 0.015), Vector3(0, -0.05, 0), Color("#c8c8d0"), 0.5)
+			_hm_box(Vector3(0.06, 0.02, 0.015), Vector3(0.02, -0.13, 0), Color("#c8c8d0"), 0.5)
+		"rcs":
+			_hm_box(Vector3(0.18, 0.18, 0.18), Vector3.ZERO, Color("#8fe8ff"), 0.5)
+			for rd in [Vector3(0.12, 0, 0), Vector3(-0.12, 0, 0), Vector3(0, 0.12, 0), Vector3(0, -0.12, 0)]:
+				_hm_cyl(0.03, 0.07, rd, Color("#2a2a30"), 0.6, 0.05).rotation_degrees = \
+					Vector3(0, 0, 90) if absf(rd.x) > 0.0 else Vector3.ZERO
+		"plantfiber":
+			for fx2 in [-0.04, 0.0, 0.04]:
+				_hm_cyl(0.012, 0.3, Vector3(fx2, 0, fx2), Color("#4caf50"), 0.5).rotation_degrees = Vector3(0, 0, fx2 * 200.0)
 		_:
 			if Inventory.placeables.has(id):
 				# mini machine: coloured body, dark base, glow dot
@@ -656,6 +821,8 @@ func _fire() -> void:
 		# the knife HARVESTS flora instead of smashing it
 		if Inventory.slot_id(Inventory.selected) == "knife" and c.has_method("harvest"):
 			c.harvest()
+		elif c.has_meta("net_peer"):
+			Net.hit_player(int(c.get_meta("net_peer")), float(w["dmg"]))
 		elif c.has_method("take_damage"):
 			c.take_damage(float(w["dmg"]), dir)
 		elif c.has_method("destroy"):
@@ -666,6 +833,7 @@ func _fire() -> void:
 	_punch = 1.0
 	if _body and _body.visible:
 		_body.punch()   # third-person jab too
+	Net.punch()   # and everyone else sees the swing
 
 func _tracer(a: Vector3, b: Vector3, color: Color) -> void:
 	var mat := StandardMaterial3D.new()
@@ -739,7 +907,7 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "capacitor", "efurnace", "eseller", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender":
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender":
 			var n: Node3D
 			match id:
 				"chest": n = Chest.new()
@@ -760,14 +928,15 @@ func _use_selected() -> void:
 				"scomputer": n = Computers.SorterComputer.new()
 				"ultracap": n = EMachines.UltraCapacitor.new()
 				"elight": n = EMachines.ELight.new()
+				"lightbox": n = EMachines.LightBox.new()
 				"switch": n = EMachines.Switch.new()
 				"teleporter": n = EMachines.Teleporter.new()
 				"extender": n = EMachines.Extender.new()
 			get_parent().add_child(n)
 			n.set_meta("placed_id", id)
 			n.global_transform = Transform3D(_basis_from_up(up), place)
-			if n is SpawnBeacon:
-				n.activate_spawn()
+			Net.broadcast_place(id, n.global_position, up)
+			# spawn beacons place DORMANT -- press F to claim one
 			Inventory.clear_slot(slot)
 			Sfx.play("place")
 		"waypoint":
@@ -794,12 +963,14 @@ func _use_selected() -> void:
 				get_parent().add_child(wnode)
 				wnode.set_meta("placed_id", "waypoint")
 				wnode.global_transform = Transform3D(_basis_from_up(up), place)
+			Net.broadcast_place("waypoint", wnode.global_position, up)
 			Inventory.remove_res("waypoint", 1)
 			Sfx.play("place")
-		"rocket":
+		"rocket", "rocket2":
 			var rk := Rocket.new()
+			rk.mk2 = id == "rocket2"
 			get_parent().add_child(rk)
-			rk.set_meta("placed_id", "rocket")
+			rk.set_meta("placed_id", id)
 			# deep space: park it floating right in front of you
 			var nb2 = Universe.nearest(global_position)
 			if Game.zone == "" and global_position.distance_to(nb2.center) > nb2.radius + 40.0:
@@ -811,12 +982,17 @@ func _use_selected() -> void:
 			if Inventory.hyper_rockets > 0:   # this hull still has its drive
 				Inventory.hyper_rockets -= 1
 				rk.hyperdrive = true
+			# rockets serialize their NOSE as "up", same as the world save
+			Net.broadcast_place(id, rk.global_position, -rk.global_transform.basis.z)
 			Inventory.clear_slot(slot)
 			Sfx.play("place")
 		"fuel":
 			var r := _nearest_in("rocket", 8.0)
 			if r:
-				Inventory.fuel = minf(Inventory.fuel_max, Inventory.fuel + 50.0)
+				# Rocket 2.0: double-size tank AND canisters load double
+				var fmult: float = 2.0 if (r is Rocket and r.mk2) else 1.0
+				Inventory.fuel = minf(Inventory.fuel_max * fmult,
+					Inventory.fuel + 50.0 * fmult)
 				Inventory.clear_slot(slot)
 				Sfx.play("smelt")
 				Inventory.changed.emit()
@@ -844,16 +1020,7 @@ func _use_selected() -> void:
 			if ui and ui.has_method("open_backpack"):
 				ui.open_backpack(id)
 		"permapple":
-			# two clicks to die: warn first, eat on confirm within 3s
-			if Game.playtime - _apple_warn_t < 3.0:
-				Inventory.clear_slot(slot)
-				Game.permadeath()
-			else:
-				_apple_warn_t = Game.playtime
-				Sfx.play("denied")
-				var hud := get_tree().get_first_node_in_group("hud")
-				if hud:
-					hud.flash("THIS ENDS YOUR SAVE. right-click again within 3s if you mean it.")
+			_apple_prompt(slot)
 		"cage":
 			var an := _nearest_in("animal", 6.0)
 			if an and an is Animal:
@@ -894,6 +1061,80 @@ func _use_selected() -> void:
 				Sfx.play("denied")
 		_:
 			Inventory.use_item(slot)
+
+## The apple deserves ceremony: game pauses, mouse frees, and the run
+## ends only on an explicit, deliberate click.
+func _apple_prompt(slot: int) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().current_scene.add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0.05, 0, 0, 0.7)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var panel := Panel.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(460, 200)
+	panel.size = Vector2(460, 200)
+	panel.position = Vector2(-230, -100)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("#1a0808")
+	sb.border_color = Color("#8b0000")
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(10)
+	panel.add_theme_stylebox_override("panel", sb)
+	layer.add_child(panel)
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	col.add_theme_constant_override("separation", 14)
+	var pad := MarginContainer.new()
+	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		pad.add_theme_constant_override(side, 22)
+	panel.add_child(pad)
+	pad.add_child(col)
+	var q := Label.new()
+	q.text = "Eat the apple?"
+	q.add_theme_font_size_override("font_size", 26)
+	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(q)
+	var warn := Label.new()
+	warn.text = "(Warning: this will end your run)"
+	warn.add_theme_font_size_override("font_size", 14)
+	warn.modulate = Color("#ff5a5a")
+	warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(warn)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(row)
+	var eat := Button.new()
+	eat.text = "Eat it"
+	eat.custom_minimum_size = Vector2(160, 46)
+	eat.modulate = Color("#ff8080")
+	row.add_child(eat)
+	var no := Button.new()
+	no.text = "No"
+	no.custom_minimum_size = Vector2(160, 46)
+	row.add_child(no)
+
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	var closer := func(eaten: bool) -> void:
+		layer.queue_free()
+		get_tree().paused = false
+		if eaten:
+			Inventory.clear_slot(slot)
+			if str(Inventory.equip.get("charm", "")) == "charm":
+				Game.permadeath()   # the charm eats the death quietly
+			else:
+				# no charm, no mercy: roll the sendoff
+				get_tree().current_scene.add_child(AppleCinematic.new())
+		elif not Game.dead:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	eat.pressed.connect(func() -> void: closer.call(true))
+	no.pressed.connect(func() -> void: closer.call(false))
 
 var _wire_src: Machine = null
 var _wire_port: int = 1
@@ -970,7 +1211,7 @@ func _machine_under_crosshair() -> Node3D:
 	if hit:
 		var n: Node = hit.collider
 		while n:
-			if n is Machine or n is Chest:
+			if n is Machine or n is Chest or n is Machine.CoilNode:
 				return n
 			n = n.get_parent()
 	return null
@@ -1112,7 +1353,16 @@ func locate(mode: int) -> void:
 		else:
 			hud.flash("LOCATOR: " + label)
 
+var riding_peer: int = -1   # sitting in a friend's Rocket 2.0 bubble
+
 func _interact() -> void:
+	# riding shotgun: F hops off
+	if riding_peer != -1:
+		riding_peer = -1
+		var hud0 = get_tree().get_first_node_in_group("hud")
+		if hud0:
+			hud0.flash("hopped off")
+		return
 	# holding the ORBIT WAND: F sends YOU around the planet
 	if Inventory.slot_id(Inventory.selected) == "orbitwand":
 		_launch_orbit(self)
@@ -1126,6 +1376,17 @@ func _interact() -> void:
 	if hit:
 		var n: Node = hit.collider
 		while n:
+			if n.has_meta("net_pilot"):
+				var hudp = get_tree().get_first_node_in_group("hud")
+				if n.get_meta("net_mk2", false):
+					riding_peer = int(n.get_meta("net_pilot"))
+					if hudp:
+						hudp.flash("riding with %s -- F to hop off" \
+							% str(Net.player_names.get(riding_peer, "them")))
+					Sfx.play("click")
+				elif hudp:
+					hudp.flash("no passenger seat -- only a Rocket 2.0 carries two")
+				return
 			if n is Gate or n is MengerShrine:
 				n.use(self)
 				return

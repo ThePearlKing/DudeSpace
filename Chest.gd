@@ -24,6 +24,23 @@ func _ready() -> void:
 	lid.position = Vector3(0, 1.05, 0)
 	lid.material_override = Destructible.make_material(Color("#7d5228"), 0.15)
 	add_child(lid)
+	# iron banding + hasp + golden padlock. every face sits PROUD of the
+	# wood by a few cm -- coplanar surfaces z-fight
+	var band_col := Color("#2c2c34")
+	for bz in [-0.32, 0.32]:
+		var band := BoxMesh.new()
+		band.size = Vector3(1.48, 1.17, 0.12)
+		part(band, Vector3(0, 0.605, bz), band_col, 0.15)   # tops out at 1.19 > lid 1.15
+	var hasp := BoxMesh.new()
+	hasp.size = Vector3(0.18, 0.34, 0.06)
+	part(hasp, Vector3(0, 0.95, -0.57), band_col, 0.2)
+	var lock := BoxMesh.new()
+	lock.size = Vector3(0.2, 0.22, 0.08)
+	part(lock, Vector3(0, 0.76, -0.58), Color("#ffd166"), 0.8)
+	var shackle := TorusMesh.new()
+	shackle.inner_radius = 0.06
+	shackle.outer_radius = 0.1
+	part(shackle, Vector3(0, 0.9, -0.58), Color("#c8a030"), 0.5, Vector3(0, 90, 0))
 
 func accepts(_id: String) -> bool:
 	return true   # a chest takes anything

@@ -65,6 +65,15 @@ static func _resource_mesh(rid: String) -> Mesh:
 			var m := PrismMesh.new()
 			m.size = Vector3(0.34, 0.6, 0.24)
 			return m
+		"uranium":     # jagged hot pebble -- you can tell it's bad for you
+			var m := SphereMesh.new()
+			m.radius = 0.26; m.height = 0.44
+			m.radial_segments = 5; m.rings = 2
+			return m
+		"sulfur":      # crumbly yellow crystal wedge
+			var m := PrismMesh.new()
+			m.size = Vector3(0.4, 0.34, 0.3)
+			return m
 		"semicircle":  # half a dome
 			var m := SphereMesh.new()
 			m.radius = 0.32; m.height = 0.32
@@ -83,6 +92,18 @@ func _process(delta: float) -> void:
 	_t += delta
 	_mesh.rotate_y(delta * 2.0)
 	_mesh.position.y = 0.5 + sin(_t * 2.5) * 0.1
+	# the black hole eats loose items too -- dropped loot drifts in and is gone
+	var bh = Universe.body_named("TIN 618")
+	if bh:
+		var bd: float = global_position.distance_to(bh.center)
+		if bd < bh.radius * 1.2:
+			queue_free()
+			return
+		elif bd < bh.radius * 6.0:
+			global_position += (bh.center - global_position).normalized() \
+				* delta * (bh.radius * 6.0 - bd) * 0.05
+	if _t < 1.2:
+		return   # grace: a just-dropped item isn't instantly re-grabbed
 	var p := get_tree().get_first_node_in_group("player")
 	if p and Game.mode == Game.Mode.ON_FOOT and not Game.dead \
 			and global_position.distance_to(p.global_position) < 3.0:

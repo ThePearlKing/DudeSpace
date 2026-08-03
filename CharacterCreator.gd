@@ -6,7 +6,10 @@ extends CanvasLayer
 signal started
 signal back
 
-var edit_mode: bool = false   # true = restyling an EXISTING dude from the pause menu
+var edit_mode: bool = false    # true = restyling an EXISTING dude from the pause menu
+var guest_mode: bool = false   # true = dressing up before joining a LAN server
+
+const SKINS_DIR := "user://skins"
 
 var _pivot: Node3D
 var _human: Human
@@ -17,6 +20,10 @@ var _shaders := ["none", "pixel", "wth", "wireframe", "contrast"]
 var _mode_opt: OptionButton
 var _scale_opt: OptionButton
 var _name_edit: LineEdit
+var _cpick: ColorPickerButton
+var _shader_opt: OptionButton
+var _skin_name: LineEdit
+var _skin_opt: OptionButton
 
 func _ready() -> void:
 	layer = 25
@@ -68,7 +75,8 @@ func _ready() -> void:
 	row.add_child(col)
 
 	var title := Label.new()
-	title.text = "EDIT YOUR DUDE" if edit_mode else "CREATE YOUR DUDE"
+	title.text = "DRESS FOR THE SERVER" if guest_mode \
+		else ("EDIT YOUR DUDE" if edit_mode else "CREATE YOUR DUDE")
 	title.add_theme_font_size_override("font_size", 26)
 	col.add_child(title)
 
@@ -77,25 +85,27 @@ func _ready() -> void:
 	_name_edit.custom_minimum_size = Vector2(0, 40)
 	col.add_child(_name_edit)
 
-	var cpick := ColorPickerButton.new()
-	cpick.custom_minimum_size = Vector2(0, 40)
-	cpick.color = _color
-	cpick.text = "Base Colour"
-	cpick.color_changed.connect(func(c):
+	_cpick = ColorPickerButton.new()
+	_cpick.custom_minimum_size = Vector2(0, 40)
+	_cpick.color = _color
+	_cpick.text = "Base Colour"
+	_cpick.color_changed.connect(func(c):
 		_color = c
 		_rebuild())
-	col.add_child(cpick)
+	col.add_child(_cpick)
+	var cpick := _cpick
 
 	var shl := Label.new()
 	shl.text = "Weird Shader Skin"
 	col.add_child(shl)
-	var opt := OptionButton.new()
+	_shader_opt = OptionButton.new()
 	for s in _shaders:
-		opt.add_item(s)
-	opt.item_selected.connect(func(i):
+		_shader_opt.add_item(s)
+	_shader_opt.item_selected.connect(func(i):
 		_shader = _shaders[i]
 		_rebuild())
-	col.add_child(opt)
+	col.add_child(_shader_opt)
+	var opt := _shader_opt
 
 	# run settings
 	var mrow := HBoxContainer.new()
@@ -131,6 +141,32 @@ func _ready() -> void:
 	_pad.custom_minimum_size = Vector2(220, 220)
 	_pad.painted.connect(_rebuild)
 	col.add_child(_pad)
+
+	# --- skin library: save the whole look locally, reuse it anywhere ---
+	var srow := HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 8)
+	col.add_child(srow)
+	_skin_name = LineEdit.new()
+	_skin_name.placeholder_text = "skin name"
+	_skin_name.custom_minimum_size = Vector2(180, 36)
+	srow.add_child(_skin_name)
+	var sbtn := Button.new()
+	sbtn.text = "Save Skin"
+	sbtn.custom_minimum_size = Vector2(120, 36)
+	sbtn.pressed.connect(_save_skin)
+	srow.add_child(sbtn)
+	var lrow := HBoxContainer.new()
+	lrow.add_theme_constant_override("separation", 8)
+	col.add_child(lrow)
+	_skin_opt = OptionButton.new()
+	_skin_opt.custom_minimum_size = Vector2(180, 36)
+	lrow.add_child(_skin_opt)
+	var lbtn := Button.new()
+	lbtn.text = "Load"
+	lbtn.custom_minimum_size = Vector2(120, 36)
+	lbtn.pressed.connect(_load_selected_skin)
+	lrow.add_child(lbtn)
+	_refresh_skins()
 
 	# colour palette + eraser
 	var pal := HBoxContainer.new()
@@ -188,6 +224,19 @@ func _ready() -> void:
 		if si >= 0:
 			opt.select(si)
 		_pad.load_png(Save.paint_path(Save.current_slot))
+	elif guest_mode:
+		# joining a server: look only -- no run settings, no save name.
+		# start from the current look so you're not redrawing every visit
+		_name_edit.visible = false
+		mrow.visible = false
+		wrow.visible = false
+		_color = Color.html(str(Save.character.get("color", "3aa0ff")))
+		_shader = str(Save.character.get("shader", "none"))
+		cpick.color = _color
+		var sig := _shaders.find(_shader)
+		if sig >= 0:
+			opt.select(sig)
+		_pad.load_png(Save.paint_path(Save.current_slot))
 
 	_rebuild()
 
@@ -205,7 +254,62 @@ func _rebuild() -> void:
 	_pivot.add_child(_human)
 	_human.build(_color, _shader, _pad.texture() if _pad else null)
 
+# --------------------------------------------------------- skin library
+
+func _refresh_skins() -> void:
+	if _skin_opt == null:
+		return
+	_skin_opt.clear()
+	DirAccess.make_dir_recursive_absolute(SKINS_DIR)
+	var d := DirAccess.open(SKINS_DIR)
+	if d == null:
+		return
+	for f in d.get_files():
+		if f.ends_with(".json"):
+			_skin_opt.add_item(f.trim_suffix(".json"))
+
+func _save_skin() -> void:
+	var nm := _skin_name.text.strip_edges().validate_filename()
+	if nm == "":
+		return
+	DirAccess.make_dir_recursive_absolute(SKINS_DIR)
+	var f := FileAccess.open("%s/%s.json" % [SKINS_DIR, nm], FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"color": _color.to_html(false), "shader": _shader}))
+		f.close()
+	if _pad:
+		_pad.save_png("%s/%s.png" % [SKINS_DIR, nm])
+	Sfx.play("learn", -12.0)
+	_refresh_skins()
+
+func _load_selected_skin() -> void:
+	if _skin_opt == null or _skin_opt.selected < 0:
+		return
+	var nm := _skin_opt.get_item_text(_skin_opt.selected)
+	var raw := FileAccess.get_file_as_string("%s/%s.json" % [SKINS_DIR, nm])
+	var parsed = JSON.parse_string(raw)
+	if parsed is Dictionary:
+		_color = Color.html(str(parsed.get("color", "3aa0ff")))
+		_shader = str(parsed.get("shader", "none"))
+		if _cpick:
+			_cpick.color = _color
+		var si := _shaders.find(_shader)
+		if si >= 0 and _shader_opt:
+			_shader_opt.select(si)
+	if _pad:
+		_pad.load_png("%s/%s.png" % [SKINS_DIR, nm])
+	_skin_name.text = nm
+	Sfx.play("click", -12.0)
+	_rebuild()
+
 func _on_start() -> void:
+	if guest_mode:
+		# server visit: the look lives in memory, never on this disk
+		Save.character = {"color": _color.to_html(false), "shader": _shader}
+		Net.guest_paint = _pad.png_bytes() if _pad else PackedByteArray()
+		Sfx.play("learn")
+		started.emit()
+		return
 	if _pad:
 		_pad.save_png(Save.paint_path(Save.current_slot))
 	if edit_mode:
@@ -250,6 +354,9 @@ class _Pad extends Control:
 
 	func save_png(path: String) -> void:
 		_img.save_png(path)
+
+	func png_bytes() -> PackedByteArray:
+		return _img.save_png_to_buffer()
 
 	func clear() -> void:
 		_img.fill(Color(0, 0, 0, 0))

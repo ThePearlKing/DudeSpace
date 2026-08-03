@@ -14,6 +14,8 @@ var _tab_btns: Array = []
 var _creative_btn: Button
 var _equip_slots: Array = []
 var _eq_lbl: Label
+var held: Dictionary = {"id": "", "n": 0}   # stack riding the cursor
+var _held_cursor: Label
 
 func _rebuild_grid() -> void:
 	for c in _grid.get_children():
@@ -43,6 +45,12 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# click OUTSIDE the panel while holding a stack -> toss it on the floor
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and str(held["id"]) != "":
+			Inventory.drop_stack(str(held["id"]), int(held["n"]))
+			held = Inventory.empty_slot()
+			Inventory.changed.emit())
 	add_child(dim)
 
 	var panel := Panel.new()
@@ -136,7 +144,7 @@ func _ready() -> void:
 
 	# --- hotbar row (right-click a slot to drop it) ---
 	var hb_lbl := Label.new()
-	hb_lbl.text = "HOTBAR   (click = select · right-click = drop)"
+	hb_lbl.text = "HOTBAR   (click = pick up / place · right-click = half / one · click outside = drop · 🗑 = delete · Q in-game drops)"
 	hb_lbl.add_theme_font_size_override("font_size", 14)
 	col.add_child(hb_lbl)
 	var hb := HBoxContainer.new()
@@ -149,6 +157,16 @@ func _ready() -> void:
 		hb.add_child(slot)
 		_slot_panels.append(slot)
 		_slot_lbls.append(slot.label)
+	# trash: click with a held stack to DELETE it forever
+	var trash := _TrashSlot.new()
+	trash.custom_minimum_size = Vector2(120, 60)
+	hb.add_child(trash)
+
+	_held_cursor = Label.new()
+	_held_cursor.add_theme_font_size_override("font_size", 14)
+	_held_cursor.z_index = 100
+	_held_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_held_cursor)
 
 	Inventory.changed.connect(_refresh)
 	_refresh()
@@ -218,6 +236,9 @@ func _icon_color(id: String) -> Color:
 	return Color("#8890a0")
 
 func try_buy(id: String) -> void:
+	if not Game.tut_can_buy(id):
+		Sfx.play("denied", -14.0)   # tutorial: not this one, not yet
+		return
 	if _tab == "Creative" and Game.creative:
 		# free: stackables come in tens
 		Inventory.give(id, 10 if Inventory.STACKABLE.has(id) else 1)
@@ -245,6 +266,9 @@ func _refresh() -> void:
 		var owned := Inventory.owned_unique(c["id"])
 		var afford := Inventory.can_buy(c["id"])
 		c["panel"].add_theme_stylebox_override("panel", _cell_style(owned, afford))
+		# tutorial lockdown: everything but the current lesson's item grays out
+		c["panel"].modulate = Color(1, 1, 1) if Game.tut_can_buy(c["id"]) \
+			else Color(0.45, 0.45, 0.45, 0.5)
 		if owned:
 			c["cost"].text = "OWNED · " + Inventory.cost_text(c["id"])
 			c["cost"].modulate = Color("#88ff88")
@@ -255,6 +279,21 @@ func _refresh() -> void:
 			c["cost"].text = Inventory.cost_text(c["id"])
 			# red when you can't afford it
 			c["cost"].modulate = Color("#ffe066") if afford else Color("#ff5a5a")
+	# tutorial lockdown: the tab holding the lesson's item glows green
+	var lock := not Game.tutorial_allow.has("*")
+	var hot_tabs := {}
+	if lock:
+		for it in Inventory.catalog:
+			if Game.tut_can_buy(str(it.id)):
+				hot_tabs[str(it.get("tab", "Gear"))] = true
+	var tabnames: Array = Inventory.tabs + ["Creative"]
+	for i in mini(_tab_btns.size(), tabnames.size()):
+		if not lock:
+			_tab_btns[i].modulate = Color(1, 1, 1)
+		elif hot_tabs.has(str(tabnames[i])):
+			_tab_btns[i].modulate = Color("#7dff9a")
+		else:
+			_tab_btns[i].modulate = Color(0.5, 0.5, 0.5)
 	for i in _slot_panels.size():
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
 		_slot_panels[i].add_theme_stylebox_override("panel", _hot_style(i == Inventory.selected))
@@ -302,13 +341,78 @@ func _toggle() -> void:
 	if visible:
 		Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 		_refresh()
-	elif not Game.dead:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		_flush_held()
+		if not Game.dead:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func close_ui() -> void:
+	_flush_held()
 	visible = false
 	if not Game.dead:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+## Anything still on the cursor goes back into your bags on close.
+func _flush_held() -> void:
+	if str(held["id"]) != "":
+		Inventory.give(str(held["id"]), int(held["n"]))
+		held = Inventory.empty_slot()
+
+## Same click scheme as chests/backpacks: left = pick up / put down /
+## swap a stack, right = pick up half / place exactly one.
+func hot_click(i: int, btn: int) -> void:
+	var slot: Dictionary = Inventory.hotbar[i]
+	var sid := str(slot["id"])
+	var hid := str(held["id"])
+	if btn == MOUSE_BUTTON_LEFT:
+		if hid == "":
+			if sid == "":
+				return
+			held = {"id": sid, "n": int(slot["n"])}
+			Inventory.hotbar[i] = Inventory.empty_slot()
+		elif sid == "":
+			Inventory.hotbar[i] = {"id": hid, "n": int(held["n"])}
+			held = Inventory.empty_slot()
+		elif sid == hid and Inventory.STACKABLE.has(hid):
+			var room: int = Inventory.STACK_MAX - int(slot["n"])
+			var put: int = mini(room, int(held["n"]))
+			slot["n"] = int(slot["n"]) + put
+			held["n"] = int(held["n"]) - put
+			if int(held["n"]) <= 0:
+				held = Inventory.empty_slot()
+		else:
+			Inventory.hotbar[i] = {"id": hid, "n": int(held["n"])}
+			held = {"id": sid, "n": int(slot["n"])}
+	elif btn == MOUSE_BUTTON_RIGHT:
+		if hid == "":
+			if sid == "":
+				return
+			var take := ceili(int(slot["n"]) / 2.0)
+			held = {"id": sid, "n": take}
+			slot["n"] = int(slot["n"]) - take
+			if int(slot["n"]) <= 0:
+				Inventory.hotbar[i] = Inventory.empty_slot()
+		else:
+			if sid == "":
+				Inventory.hotbar[i] = {"id": hid, "n": 1}
+				held["n"] = int(held["n"]) - 1
+			elif sid == hid and Inventory.STACKABLE.has(hid) and int(slot["n"]) < Inventory.STACK_MAX:
+				slot["n"] = int(slot["n"]) + 1
+				held["n"] = int(held["n"]) - 1
+			else:
+				return
+			if int(held["n"]) <= 0:
+				held = Inventory.empty_slot()
+	Sfx.play("click", -18.0)
+	Inventory.changed.emit()
+
+func _process(_d: float) -> void:
+	if not visible or _held_cursor == null:
+		return
+	_held_cursor.visible = str(held["id"]) != ""
+	if _held_cursor.visible:
+		_held_cursor.text = Inventory.slot_text(held)
+		_held_cursor.position = get_viewport().get_mouse_position() + Vector2(14, -8)
 
 # --------------------------------------------------------- inner widgets
 
@@ -412,9 +516,13 @@ class _ItemCell extends Panel:
 	var id: String = ""
 
 	func _ready() -> void:
-		# hover glow + click flash
-		mouse_entered.connect(func() -> void: modulate = Color(1.25, 1.25, 1.25))
-		mouse_exited.connect(func() -> void: modulate = Color(1, 1, 1))
+		# hover glow + click flash (locked tutorial items stay gray)
+		mouse_entered.connect(func() -> void:
+			if Game.tut_can_buy(id):
+				modulate = Color(1.25, 1.25, 1.25))
+		mouse_exited.connect(func() -> void:
+			if Game.tut_can_buy(id):
+				modulate = Color(1, 1, 1))
 
 	func _flash_click() -> void:
 		modulate = Color(1.7, 1.7, 1.4)
@@ -445,31 +553,44 @@ class _ItemCell extends Panel:
 			n = n.get_parent()
 		return null
 
+## Click with a held stack: gone forever. Deliberate, clearly marked.
+class _TrashSlot extends Panel:
+	func _ready() -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color("#2e1414")
+		sb.border_color = Color("#a04040")
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(6)
+		add_theme_stylebox_override("panel", sb)
+		var l := Label.new()
+		l.text = "🗑 DELETE"
+		l.set_anchors_preset(Control.PRESET_FULL_RECT)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.add_theme_font_size_override("font_size", 13)
+		l.modulate = Color("#ff8080")
+		add_child(l)
+		mouse_entered.connect(func() -> void: modulate = Color(1.4, 1.1, 1.1))
+		mouse_exited.connect(func() -> void: modulate = Color(1, 1, 1))
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT:
+			var ui: InventoryUI = null
+			var n: Node = self
+			while n:
+				if n is InventoryUI:
+					ui = n
+					break
+				n = n.get_parent()
+			if ui and str(ui.held["id"]) != "":
+				ui.held = Inventory.empty_slot()
+				Sfx.play("explode", -20.0)
+				Inventory.changed.emit()
+
 class _HotSlot extends Panel:
 	var index: int = 0
 	var label: Label
-
-	## drag a hotbar item onto another slot to swap them
-	func _get_drag_data(_pos: Vector2) -> Variant:
-		if Inventory.slot_id(index) == "":
-			return null
-		var prev := Label.new()
-		prev.text = Inventory.slot_text(Inventory.hotbar[index])
-		set_drag_preview(prev)
-		return {"kind": "hswap", "i": index}
-
-	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
-		return data is Dictionary and data.get("kind") == "hswap"
-
-	func _drop_data(_pos: Vector2, data: Variant) -> void:
-		var a: int = int(data["i"])
-		if a == index:
-			return
-		var t: Dictionary = Inventory.hotbar[a]
-		Inventory.hotbar[a] = Inventory.hotbar[index]
-		Inventory.hotbar[index] = t
-		Sfx.play("click", -14.0)
-		Inventory.changed.emit()
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void: modulate = Color(1.25, 1.25, 1.25))
@@ -491,10 +612,7 @@ class _HotSlot extends Panel:
 			modulate = Color(1.6, 1.6, 1.3)
 			var tw := create_tween()
 			tw.tween_property(self, "modulate", Color(1.25, 1.25, 1.25), 0.18)
-			if event.button_index == MOUSE_BUTTON_LEFT:
-				ui.select_slot(index)
-			elif event.button_index == MOUSE_BUTTON_RIGHT:
-				ui.drop_slot(index)
+			ui.hot_click(index, event.button_index)
 
 	func _find_ui() -> InventoryUI:
 		var n: Node = self

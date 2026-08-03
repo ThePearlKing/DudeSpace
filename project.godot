@@ -23,6 +23,7 @@ Sfx="*res://Sfx.gd"
 Inventory="*res://Inventory.gd"
 Game="*res://Game.gd"
 Save="*res://Save.gd"
+Net="*res://Net.gd"
 
 [display]
 

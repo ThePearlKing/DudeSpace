@@ -8,6 +8,8 @@ var title: String = "MACHINE"
 var box_color: Color = Color("#666677")
 var box_size: Vector3 = Vector3(1.4, 1.4, 1.4)
 var refund_id: String = ""        # what breaking it gives back
+var shows_in: bool = true         # UI: machine takes items in
+var shows_out: bool = true        # UI: machine gives items out
 
 var buf: float = 0.0              # stored energy (EU)
 var buf_cap: float = 0.0          # 0 = not on the power net
@@ -75,6 +77,34 @@ func _ready() -> void:
 	lbl.position = Vector3(0, box_size.y + 0.9, 0)
 	add_child(lbl)
 
+## Bolt a decorated mesh part onto the machine (visual only).
+func part(mesh: Mesh, pos: Vector3, col: Color, emit: float = 0.25,
+		rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.position = pos
+	mi.rotation_degrees = rot
+	mi.material_override = Destructible.make_material(col, emit)
+	add_child(mi)
+	return mi
+
+## Shared industrial dressing: dark corner posts, foot plates, and a top
+## trim -- makes machines read as BUILT hardware instead of painted boxes.
+func dress_industrial(frame_col: Color = Color("#1c1c24")) -> void:
+	var hx := box_size.x * 0.5
+	var hz := box_size.z * 0.5
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var post := BoxMesh.new()
+			post.size = Vector3(0.12, box_size.y + 0.04, 0.12)
+			part(post, Vector3(sx * hx, box_size.y * 0.5, sz * hz), frame_col, 0.05)
+			var foot := BoxMesh.new()
+			foot.size = Vector3(0.3, 0.1, 0.3)
+			part(foot, Vector3(sx * hx, 0.05, sz * hz), frame_col, 0.05)
+	var trim := BoxMesh.new()
+	trim.size = Vector3(box_size.x + 0.08, 0.1, box_size.z + 0.08)
+	part(trim, Vector3(0, box_size.y - 0.02, 0), frame_col, 0.05)
+
 func _process(delta: float) -> void:
 	if _hits > 0:
 		_hit_reset_t -= delta
@@ -94,15 +124,20 @@ func _process(delta: float) -> void:
 		if gen_rate > 0.0 and buf_cap > 0.0:
 			buf = minf(buf_cap, buf + gen_rate * delta)
 		work(delta)
-	# --- push energy along wires (a coil is just another receiver) ---
-	for w in wires_out:
-		if not is_instance_valid(w) or buf <= 0.0:
-			continue
-		if "buf_cap" in w and w.buf_cap > 0.0 and buf > 0.0:
-			var t: float = minf(minf(WIRE_RATE * delta, buf), w.buf_cap - w.buf)
-			if t > 0.0:
-				buf -= t
-				w.buf += t
+	else:
+		gated_work(delta)   # lamps still need to visibly DIE, etc.
+	# --- push energy along wires (a coil is just another receiver).
+	# a GATED machine passes nothing: coil + extender = a power valve,
+	# and power valves are how you build logic ---
+	if not gated:
+		for w in wires_out:
+			if not is_instance_valid(w) or buf <= 0.0:
+				continue
+			if "buf_cap" in w and w.buf_cap > 0.0 and buf > 0.0:
+				var t: float = minf(minf(WIRE_RATE * delta, buf), w.buf_cap - w.buf)
+				if t > 0.0:
+					buf -= t
+					w.buf += t
 	# --- push items along funnels (1 item / 0.7s per funnel) ---
 	_funnel_t -= delta
 	if _funnel_t <= 0.0 and not gated:
@@ -133,6 +168,10 @@ func accept_item(id: String) -> bool:
 # ------------------------------------------------------------- virtuals
 
 func work(_delta: float) -> void:
+	pass
+
+## Runs INSTEAD of work() while the control coil holds no charge.
+func gated_work(_delta: float) -> void:
 	pass
 
 func accepts(_id: String) -> bool:
@@ -302,7 +341,9 @@ class CoilNode extends StaticBody3D:
 		add_child(cc)
 
 	func _process(delta: float) -> void:
-		buf = maxf(0.0, buf - 0.5 * delta)
+		# a coil is a SIGNAL, not a battery: cut its feed and it dies in
+		# well under a second. that snappiness is what makes logic possible
+		buf = maxf(0.0, buf - (4.0 + buf * 5.0) * delta)
 		if _mat2:
 			_mat2.emission_energy_multiplier = 0.2 + (buf / buf_cap) * 4.0
 
@@ -316,7 +357,10 @@ class CoilNode extends StaticBody3D:
 	func set_role_glow(r: int) -> void:
 		_role2 = r
 		if _mat2:
+			# green + BRIGHT when it's a valid target, not just a hue shift
 			_mat2.emission = Color("#2bff5a") if r == 2 else Color("#ff9a3c")
+			if r > 0:
+				_mat2.emission_energy_multiplier = 3.0
 	func can_role(kind: String, as_input: bool) -> bool:
 		return kind == "power" and as_input
 
@@ -501,6 +545,7 @@ func destroy(push_dir: Vector3) -> void:
 	_on_destroyed(push_dir)
 
 func _on_destroyed(push_dir: Vector3) -> void:
+	Net.broadcast_remove(global_position)   # mirror the demolition
 	if has_coil:
 		Inventory.give_at("coil", 1, global_position)
 	# take our outgoing cables with us

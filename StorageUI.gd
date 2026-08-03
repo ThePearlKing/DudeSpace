@@ -25,6 +25,12 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# click OUTSIDE the panel while holding a stack -> toss it on the floor
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and str(held["id"]) != "":
+			Inventory.drop_stack(str(held["id"]), int(held["n"]))
+			held = Inventory.empty_slot()
+			Inventory.changed.emit())
 	add_child(dim)
 
 	var panel := Panel.new()
@@ -64,7 +70,7 @@ func _ready() -> void:
 		_chest_cells.append(c)
 
 	var t2 := Label.new()
-	t2.text = "HOTBAR   (click an item to move it)"
+	t2.text = "HOTBAR   (click = move · click outside = drop · 🗑 = delete)"
 	t2.add_theme_font_size_override("font_size", 16)
 	col.add_child(t2)
 	var hot := HBoxContainer.new()
@@ -77,6 +83,29 @@ func _ready() -> void:
 		c.custom_minimum_size = Vector2(130, 54)
 		hot.add_child(c)
 		_hot_cells.append(c)
+	var trash := Panel.new()
+	trash.custom_minimum_size = Vector2(130, 54)
+	var tsb := StyleBoxFlat.new()
+	tsb.bg_color = Color("#2e1414")
+	tsb.border_color = Color("#a04040")
+	tsb.set_border_width_all(2)
+	tsb.set_corner_radius_all(6)
+	trash.add_theme_stylebox_override("panel", tsb)
+	var tl := Label.new()
+	tl.text = "🗑 DELETE"
+	tl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tl.add_theme_font_size_override("font_size", 13)
+	tl.modulate = Color("#ff8080")
+	trash.add_child(tl)
+	trash.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed \
+				and ev.button_index == MOUSE_BUTTON_LEFT and str(held["id"]) != "":
+			held = Inventory.empty_slot()
+			Sfx.play("explode", -20.0)
+			Inventory.changed.emit())
+	hot.add_child(trash)
 
 	var close := Label.new()
 	close.text = "F / E / Esc to close"

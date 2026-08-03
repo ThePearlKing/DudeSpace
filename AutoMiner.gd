@@ -17,6 +17,7 @@ func _init() -> void:
 	title = "AUTO-MINER"
 	box_color = Color("#3a5a6a")
 	refund_id = "autominer"
+	shows_in = false   # it digs, it does not eat
 	buf_cap = 400.0
 	add_to_group("autominer")
 
@@ -31,6 +32,25 @@ func _ready() -> void:
 	_drill.position = Vector3(0, box_size.y + 0.5, 0)
 	_drill.material_override = Destructible.make_material(Color("#8fe8ff"), 1.5)
 	add_child(_drill)
+	dress_industrial(Color("#12222a"))
+	# rig hardware: A-frame gantry over the drill, hydraulic rams, ore bin
+	for sx in [-1.0, 1.0]:
+		var leg := BoxMesh.new()
+		leg.size = Vector3(0.1, 1.7, 0.1)
+		part(leg, Vector3(sx * 0.55, box_size.y + 0.6, 0), Color("#26363e"), 0.1,
+			Vector3(0, 0, sx * -18.0))
+		var ram := CylinderMesh.new()
+		ram.top_radius = 0.06
+		ram.bottom_radius = 0.09
+		ram.height = 0.8
+		part(ram, Vector3(sx * (box_size.x * 0.5 - 0.1), box_size.y * 0.6,
+			box_size.z * 0.4), Color("#8fe8ff"), 0.5, Vector3(0, 0, sx * 12.0))
+	var beam := BoxMesh.new()
+	beam.size = Vector3(1.3, 0.12, 0.12)
+	part(beam, Vector3(0, box_size.y + 1.4, 0), Color("#26363e"), 0.1)
+	var bin := BoxMesh.new()
+	bin.size = Vector3(0.7, 0.4, 0.5)
+	part(bin, Vector3(0, 0.3, box_size.z * 0.5 + 0.28), Color("#1a2a32"), 0.15)
 
 func work(delta: float) -> void:
 	var near := _ore_nearby()

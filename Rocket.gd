@@ -18,6 +18,7 @@ var piloted: bool = false
 var landed: bool = false
 var arcade: bool = false      # alien starship mode: unrealistic + angers gods
 var hyperdrive: bool = false  # installed on THIS ship (right-click the item nearby)
+var mk2: bool = false         # Rocket 2.0: double tank, sips fuel, seats a friend
 
 var _player: Player
 var _cam: Camera3D
@@ -78,7 +79,8 @@ func dismantle(push_dir: Vector3) -> void:
 	if _hull_hp > 0:
 		Sfx.play("hurt", -8.0)
 		return
-	Inventory.give("rocket", 1)
+	Net.broadcast_remove(global_position)
+	Inventory.give("rocket2" if mk2 else "rocket", 1)
 	if hyperdrive:
 		Inventory.hyper_rockets += 1   # the drive stays IN the rocket's bones
 	# a waypoint riding the hull comes back too
@@ -100,17 +102,38 @@ func _build_body() -> void:
 	hc.rotation_degrees = Vector3(-90, 0, 0)
 	hull.add_child(hc)
 	add_child(hull)
-	_add_mesh(_capsule(1.0, 5.0, Color("#d8d8e0"), 0.2), Vector3.ZERO, Vector3(-90, 0, 0))
-	_add_mesh(_cone(1.0, 2.0, Color("#ff5964"), 0.3), Vector3(0, 0, -3.4), Vector3(-90, 0, 0))
+	var hull_col := Color("#eef6ff") if mk2 else Color("#d8d8e0")
+	var fin_col := Color("#7df9ff") if mk2 else Color("#4cc9f0")
+	_add_mesh(_capsule(1.0, 5.6 if mk2 else 5.0, hull_col, 0.25), Vector3.ZERO, Vector3(-90, 0, 0))
+	_add_mesh(_cone(1.0, 2.0, Color("#ff5964"), 0.3), Vector3(0, 0, -3.7 if mk2 else -3.4), Vector3(-90, 0, 0))
 	for a in [0.0, 120.0, 240.0]:
 		var fin := BoxMesh.new()
 		fin.size = Vector3(0.2, 1.4, 1.6)
 		var mi := MeshInstance3D.new()
 		mi.mesh = fin
-		mi.material_override = Destructible.make_material(Color("#4cc9f0"), 0.3)
+		mi.material_override = Destructible.make_material(fin_col, 0.3)
 		mi.position = Vector3(0, 0, 2.0).rotated(Vector3.FORWARD, deg_to_rad(a))
 		mi.position += Vector3(sin(deg_to_rad(a)), cos(deg_to_rad(a)), 0) * 1.0
 		add_child(mi)
+	if mk2:
+		# the 2.0 wears its upgrades: twin drop tanks + a passenger bubble
+		for sx in [-1.0, 1.0]:
+			_add_mesh(_capsule(0.42, 2.6, Color("#9fb8c8"), 0.2),
+				Vector3(sx * 1.35, -0.2, 0.8), Vector3(-90, 0, 0))
+		var bubble := MeshInstance3D.new()
+		var bm := SphereMesh.new()
+		bm.radius = 0.55
+		bm.height = 1.1
+		bubble.mesh = bm
+		bubble.position = Vector3(0, 0.95, -0.6)
+		var glass := StandardMaterial3D.new()
+		glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		glass.albedo_color = Color(0.5, 0.95, 1.0, 0.35)
+		glass.emission_enabled = true
+		glass.emission = Color("#7df9ff")
+		glass.emission_energy_multiplier = 0.4
+		bubble.material_override = glass
+		add_child(bubble)
 	# engine glow
 	_add_mesh(_capsule(0.4, 0.6, Color("#ffd166"), 4.0), Vector3(0, 0, 2.6), Vector3(-90, 0, 0))
 
@@ -140,6 +163,8 @@ func _add_mesh(m: Mesh, pos: Vector3, rot_deg: Vector3) -> void:
 # ------------------------------------------------------------- boarding
 
 func board(p: Player) -> void:
+	# lifting off: the parked mirror on other machines comes with us
+	Net.broadcast_remove(global_position)
 	_player = p
 	piloted = true
 	_f_held = true   # swallow the same F press that boarded us
@@ -163,6 +188,9 @@ func _try_exit() -> void:
 	Sfx.alien_engine(false)
 	if _traj:
 		_traj.visible = false
+	# parked again: everyone gets it back exactly where it landed
+	Net.broadcast_place("rocket2" if mk2 else "rocket", global_position,
+		-global_transform.basis.z)
 	Game.mode = Game.Mode.ON_FOOT
 	if is_instance_valid(_player):
 		# hop out BESIDE the hull (clear of its collider), works in space too
@@ -215,7 +243,7 @@ func _physics_process(delta: float) -> void:
 		_f_held = false
 
 	# --- attitude: CAMERA-relative, so it always does what it looks like.
-	# W = nose up on screen. S = down. A = left. D = right. Z/C roll.
+	# W = nose up on screen. S = down. A = left. D = right.
 	var rot_rate := ROT_FAST
 	if not ui:
 		var r := rot_rate * delta
@@ -228,8 +256,6 @@ func _physics_process(delta: float) -> void:
 			global_transform.basis = Basis(cb.y, r) * global_transform.basis
 		if Input.is_key_pressed(KEY_D):
 			global_transform.basis = Basis(cb.y, -r) * global_transform.basis
-		if Input.is_key_pressed(KEY_Z): rotate_object_local(Vector3.FORWARD, r)   # roll
-		if Input.is_key_pressed(KEY_C): rotate_object_local(Vector3.FORWARD, -r)
 		global_transform.basis = global_transform.basis.orthonormalized()
 	# free-orbit camera driven by the mouse, independent of ship attitude
 	if not ui:
@@ -256,15 +282,16 @@ func _physics_process(delta: float) -> void:
 
 	# --- main engine: Space (Mk2 upgrade = +60% thrust) ---
 	var thrust := MAIN_THRUST * (1.6 if Inventory.engine_mk2 else 1.0)
+	var burn_eff := 0.6 if mk2 else 1.0   # 2.0 sips where the 1.0 gulps
 	if not ui and Input.is_key_pressed(KEY_SPACE) and Inventory.fuel > 0.0:
 		vel += fwd * thrust * delta
-		Inventory.fuel = maxf(0.0, Inventory.fuel - MAIN_BURN * delta)
+		Inventory.fuel = maxf(0.0, Inventory.fuel - MAIN_BURN * burn_eff * delta)
 		_engine_on = true
 
 	# --- hyperdrive: hold H, screams toward the nose. Ship-mounted. ---
 	if hyperdrive and not ui and Input.is_key_pressed(KEY_H) and Inventory.fuel > 0.5:
 		vel = vel.lerp(fwd * 900.0, delta * 1.2)
-		Inventory.fuel = maxf(0.0, Inventory.fuel - 10.0 * delta)
+		Inventory.fuel = maxf(0.0, Inventory.fuel - 10.0 * burn_eff * delta)
 		_engine_on = true
 
 	# --- RCS translation (standard): arrows + Shift/Ctrl fore/aft ---
@@ -278,7 +305,7 @@ func _physics_process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_CTRL): t -= fwd
 		if t != Vector3.ZERO:
 			vel += t.normalized() * RCS_THRUST * delta
-			Inventory.fuel = maxf(0.0, Inventory.fuel - RCS_BURN * delta)
+			Inventory.fuel = maxf(0.0, Inventory.fuel - RCS_BURN * burn_eff * delta)
 
 	# --- gravity + integrate (semi-implicit Euler) ---
 	if not arcade:
