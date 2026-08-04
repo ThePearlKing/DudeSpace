@@ -1417,14 +1417,39 @@ static func alien_exchange(in_room: bool = false) -> Array:
 	var inserts := 0
 	var ti2 := 0
 	while ti2 < out.size() - 1 and inserts < 2:
-		if randi() % 6 == 0:
-			var spoke := int(out[ti2][0])
+		var spoke := int(out[ti2][0])
+		# purple's tangents are irresistible: twice as likely to draw fire
+		var roll := 3 if spoke == 2 else 6
+		if randi() % roll == 0:
 			var reactor := randi() % 4
 			for attempt3 in 3:
 				if reactor != spoke:
 					break
 				reactor = randi() % 4
 			var rline := ""
+			if spoke == 2:
+				# responding to PURPLE is its own genre
+				match reactor:
+					0:
+						rline = _ax_fresh(["we are NOT doing 'what if' hour again.",
+							"save it for the overnight slot.",
+							"and that's the sound of a segment ending."])
+					1:
+						rline = _ax_fresh(["you feel something every 4.2 minutes. i have the figures.",
+							"i charted your tangents. they orbit.",
+							"that is not a data point. it never is."])
+					_:
+						rline = _ax_fresh(["no.",
+							"the break is in two minutes. hold it in.",
+							"i miss the silence. it was straightforward."])
+				out.insert(ti2 + 1, [reactor, rline])
+				inserts += 1
+				if randi() % 5 < 2:
+					out.insert(ti2 + 2, [2, _ax_fresh(["you'll all think about it later.",
+						"the sofa understands me.", "noted. feeling it anyway."])])
+				ti2 += 2
+				ti2 += 1
+				continue
 			match reactor:
 				0:
 					rline = _ax_fresh(["that's one interpretation.",
