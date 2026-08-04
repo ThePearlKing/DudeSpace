@@ -159,6 +159,17 @@ static func _parse(t: String) -> Array:
 		elif two == "oa":   # boat
 			vf = [[450.0, 750.0, 0.1]]
 			adv = 2
+		elif two == "ie":
+			# die, pie, flies: EYE at the end of a word (s allowed).
+			# believe, piece: EE in the middle.
+			var after := t.substr(i + 2, 1) if i + 2 < t.length() else ""
+			var after2 := t.substr(i + 3, 1) if i + 3 < t.length() else ""
+			var tail := (not _is_letter(after)) 				or (after == "s" and not _is_letter(after2))
+			if tail:
+				vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
+			else:
+				vf = [[270.0, 2400.0, 0.1]]
+			adv = 2
 		elif two == "th":
 			out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
 			adv = 2
