@@ -161,6 +161,7 @@ func _ready() -> void:
 		var cfg := Game.host_cfg.duplicate()
 		cfg["port"] = 25999   # off the real port so tests never collide
 		print("NETTEST host: ", Net.host(cfg))
+	Game.earth_pop_target = get_tree().get_nodes_in_group("earth_human").size()
 	randomize()   # world built: gameplay dice go back to being dice
 	if _player:
 		_player.restore_jet()   # jetpack comes back ON if you left it on
@@ -438,6 +439,32 @@ func _sitshirt_test() -> void:
 	get_viewport().get_texture().get_image().save_png(OS.get_environment("CTD_SHOT"))
 	print("SITSHIRT saved  act=", hum._act)
 
+## Births, immigration, whatever it is: keep the planet peopled.
+func _repopulate() -> void:
+	if Game.earth_body == null or Game.earth_cities.is_empty() \
+			or _player == null or Game.earth_pop_target <= 0:
+		return
+	var b = Game.earth_body
+	if _player.global_position.distance_to(b.center) > float(b.radius) + 250.0:
+		return   # nobody's watching: the sim is paused, so is the stork
+	var n := 0
+	for h in get_tree().get_nodes_in_group("earth_human"):
+		if h is EarthHuman and not h._dead:
+			n += 1
+	if n >= Game.earth_pop_target:
+		return
+	var ci := randi() % Game.earth_cities.size()
+	var city: Dictionary = Game.earth_cities[ci]
+	var cd: Vector3 = (city["dir"] + Vector3(randf_range(-0.15, 0.15),
+		randf_range(-0.15, 0.15), randf_range(-0.15, 0.15))).normalized()
+	var hm := EarthHuman.new()
+	hm.saved = {"age": randf_range(0.0, 800.0)}   # young. new in town.
+	hm.setup(b)
+	hm.home_city = ci
+	add_child(hm)
+	hm.global_transform = Transform3D(_basis_from_up(cd),
+		b.center + cd * (float(b.radius) + 1.2))
+
 ## Headless: exercise the reactor control-room interlocks.
 func _reactor_test() -> void:
 	await get_tree().create_timer(2.0).timeout
@@ -689,7 +716,13 @@ func _self_test() -> void:
 	restore_world()
 	await get_tree().process_frame
 	var w2 := collect_world()
-	print("SELFTEST recollect=", w2.size(), " (expected ", w.size() * 2, " after respawn beside originals)")
+	var census := 0
+	for e3 in w:
+		if e3 is Dictionary and str(e3.get("id", "")) == "human":
+			census += 1
+	# machines respawn BESIDE originals (doubling); the human census
+	# REPLACES the population (same size). expectation splits the two.
+	print("SELFTEST recollect=", w2.size(), " (expected ", (w.size() - census) * 2 + census, ")")
 
 func _rift_test() -> void:
 	await get_tree().create_timer(0.5).timeout
@@ -701,10 +734,18 @@ func _rift_test() -> void:
 	await get_tree().create_timer(1.0).timeout
 	print("RIFTTEST player now at ", _player.global_position, "  (want ~123,456,789)")
 
+var _pop_t: float = 30.0
+
 func _process(delta: float) -> void:
 	_regen_crates(delta)
 	_regen_ore(delta)
 	_animate_avatars(delta)
+	# demographics: when the census dips, someone new steps off the rail
+	# into a city. only while a player is around to live in
+	_pop_t -= delta
+	if _pop_t <= 0.0:
+		_pop_t = randf_range(20.0, 40.0)
+		_repopulate()
 	var pos := _active_pos()
 	_save_t -= delta
 	if _save_t <= 0.0:
@@ -3071,6 +3112,13 @@ func collect_world() -> Array:
 		if n is Rocket:
 			e["hyper"] = n.hyperdrive
 		out.append(e)
+	# the census: every living human rides the world save -- same souls
+	# on rejoin, same grudges, same shirts
+	for h in get_tree().get_nodes_in_group("earth_human"):
+		if h is EarthHuman and is_instance_valid(h) and not h._dead:
+			out.append({"id": "human",
+				"pos": [h.global_position.x, h.global_position.y, h.global_position.z],
+				"data": h.capture()})
 	return out
 
 var _world_load_ok := false   # only a CLEAN restore may overwrite the save
@@ -3081,7 +3129,27 @@ func restore_world() -> void:
 	_unrestored = []
 	var entries := Save.saved_world()
 	var made: Array = []
+	# a saved census replaces the freshly generated population wholesale
+	var has_census := false
+	for e0 in entries:
+		if e0 is Dictionary and str(e0.get("id", "")) == "human":
+			has_census = true
+			break
+	if has_census:
+		for h0 in get_tree().get_nodes_in_group("earth_human"):
+			h0.queue_free()
 	for e in entries:
+		if str(e.get("id", "")) == "human":
+			var hm := EarthHuman.new()
+			hm.saved = e.get("data", {})
+			var hp4 = e.get("pos", [0, 0, 0])
+			var hpos := Vector3(float(hp4[0]), float(hp4[1]), float(hp4[2]))
+			hm.setup(Universe.nearest(hpos))
+			add_child(hm)
+			var hup := (hpos - Universe.nearest(hpos).center).normalized()
+			hm.global_transform = Transform3D(_basis_from_up(hup), hpos)
+			made.append(hm)
+			continue
 		var n := _spawn_world_obj(str(e.get("id", "")))
 		made.append(n)
 		if n == null:

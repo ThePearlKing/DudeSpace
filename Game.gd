@@ -252,6 +252,7 @@ var _hurt_sfx_t: float = 0.0
 ## read by every human deciding where home is.
 var earth_cities: Array = []
 var earth_body = null
+var earth_pop_target: int = 0   # census at worldgen: repopulation aims here
 
 func hurt(d: float, vaporize: bool = false) -> void:
 	if dead or godmode:

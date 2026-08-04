@@ -1070,6 +1070,7 @@ func _use_selected() -> void:
 			elif hu and hu is EarthHuman:
 				# humans fit in cages too. same guy comes back out --
 				# name, face, shirt, grudges, everything
+				hu._release_seat()
 				Inventory.caged_data.append({"human": hu.capture()})
 				hu.queue_free()
 				Inventory.clear_slot(slot)

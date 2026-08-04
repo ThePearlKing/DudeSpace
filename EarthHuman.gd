@@ -519,6 +519,9 @@ var _gossip_cd: float = 0.0     # cooldown on bad-mouthing the blue dude
 var _los_t: float = 0.0         # sight-check throttle while hunting
 var _lost_t: float = 0.0        # how long the prey has been out of sight
 
+var age: float = 0.0            # seconds LIVED (only ticks near the player)
+var lifespan: float = 1e9       # rolled at birth. nobody checks the number.
+
 var chipped: bool = false       # neuralink chip in the head. unaware.
 var minded: bool = false        # actively driven from a terminal
 var mind_dir: Vector3 = Vector3.ZERO   # the chip's strafe/walk input
@@ -556,7 +559,6 @@ static func _v3(a) -> Vector3:
 ## looks (already in `saved`) plus the live state -- name, personality,
 ## health, and every grudge in the ledger.
 func capture() -> Dictionary:
-	_release_seat()   # the seat stays; the sitter is inventory now
 	saved["name"] = human_name
 	saved["id"] = human_id
 	saved["pers"] = _pers.duplicate()
@@ -565,6 +567,8 @@ func capture() -> Dictionary:
 	saved["home_city"] = home_city
 	saved["moved"] = _moved
 	saved["chip"] = chipped
+	saved["age"] = age
+	saved["life"] = lifespan
 	return saved.duplicate()
 
 func _ready() -> void:
@@ -586,6 +590,9 @@ func _ready() -> void:
 	human_name = str(_rv("name", NAMES[randi() % NAMES.size()]))
 	human_id = int(_rv("id", randi()))
 	hp = float(_rv("hp", 30.0))
+	age = float(_rv("age", randf_range(0.0, 5000.0)))
+	# a LONG life, measured in rendered seconds: many, many sessions
+	lifespan = float(_rv("life", randf_range(30000.0, 70000.0)))
 	# grudges survive the cage. JSON turns int keys into strings; turn
 	# them back or every old enemy becomes a stranger
 	home_city = int(saved.get("home_city", -1))
@@ -1593,6 +1600,12 @@ func _physics_process(delta: float) -> void:
 		_bg.visible = near
 		_tag.visible = near
 	if not _active:
+		return
+	# mortality, the slow kind: humans age only while reality renders
+	# them. eventually one of these frames is the last one.
+	age += delta
+	if age > lifespan and not _dead:
+		_die(_up())   # of old age, mid-errand. the meat is unaffected.
 		return
 	var up := _up()
 
