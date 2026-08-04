@@ -591,18 +591,23 @@ func _build_windows() -> void:
 	var otex := _vp_out.get_texture()
 	var itex := _vp_in.get_texture()
 	if kind == "box":
-		# no wall windows -- but a big SKYLIGHT on top, looking straight
-		# down into the cube like a display case
+		# the SKYLIGHT IS the ceiling: glass roof outside showing the
+		# cube's contents, glass ceiling inside showing the sky
 		_cam_out.global_position = c + Vector3(0, sz.y * 0.5 - 0.7, 0.01)
 		_cam_out.look_at(c + Vector3(0, -sz.y * 0.5, 0), Vector3.FORWARD)
 		var tu := Node3D.new()
 		add_child(tu)
 		tu.position = Vector3(0, 3.05, 0)
 		tu.rotation_degrees.x = -90.0
-		_win_frame(tu, otex, Vector2(2.2, 2.2))
+		_win_frame(tu, otex, Vector2(w - 0.5, w - 0.5))
+		var cu := Node3D.new()
+		_iroot.add_child(cu)
+		cu.global_position = c + Vector3(0, sz.y * 0.5 - 0.62, 0)
+		cu.rotation_degrees.x = 90.0
+		_win_frame(cu, itex, Vector2(sz.x - 1.6, sz.z - 1.6))
 		return
-	# ONE window per floor, on the +X wall, inside AND outside in the
-	# same place -- floor 2's outside glass belongs to floor 2's room
+	# windows per floor on the FRONT and BACK faces (never the sides),
+	# inside and outside in matching places, properly sized
 	var floors := 1
 	match kind:
 		"two_story": floors = 2
@@ -610,17 +615,22 @@ func _build_windows() -> void:
 	var ifloors := floors if kind != "tower" else int(sz.y / 5.0)
 	for f in floors:
 		var wy := 1.7 + float(f) * (3.0 if kind != "two_story" else 2.9)
-		_win_unit(self, Vector3(w * 0.5 - 0.02, wy, 0), -90.0, otex,
-			Vector2(0.9, 0.9))
+		# front: beside the door on floor 0, centered above
+		var fx := 1.4 if f == 0 else 0.0
+		_win_unit(self, Vector3(fx, wy, -w * 0.5 + 0.02), 0.0, otex,
+			Vector2(1.4, 1.2))
+		_win_unit(self, Vector3(0, wy, w * 0.5 - 0.02), 180.0, otex,
+			Vector2(1.4, 1.2))
 	for f2 in ifloors:
 		var fy2 := c.y - sz.y * 0.5 + 1.6 + float(f2) * 5.0
 		if kind == "two_story":
 			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f2) * (sz.y * 0.5)
-		var iu := Node3D.new()
-		_iroot.add_child(iu)
-		iu.global_position = Vector3(c.x + sz.x * 0.5 - 0.62, fy2, c.z)
-		iu.rotation_degrees.y = 90.0
-		_win_frame(iu, itex, Vector2(2.6, 1.9))
+		for zside in [-1.0, 1.0]:
+			var iu := Node3D.new()
+			_iroot.add_child(iu)
+			iu.global_position = Vector3(c.x, fy2, c.z + zside * (sz.z * 0.5 - 0.62))
+			iu.rotation_degrees.y = 0.0 if zside > 0.0 else 180.0
+			_win_frame(iu, itex, Vector2(3.2, 2.2))
 
 ## One window UNIT: recessed cavity, frame, sill -- a window with
 ## actual depth, whose glass happens to be a live screen.
@@ -728,13 +738,18 @@ func _physics_process(delta: float) -> void:
 		_vp_in.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
 			else SubViewport.UPDATE_DISABLED
 		if inside and _cam_in:
-			# windows live on the +X wall, so the view is what stands
-			# off the house's +X side -- matching wall, matching view
-			var wx: Vector3 = global_transform.basis.x
 			var wy: Vector3 = global_transform.basis.y
-			var cpos: Vector3 = global_position + wx * 3.4 + wy * 1.8
-			_cam_in.global_position = cpos
-			_cam_in.look_at(cpos + wx, wy)
+			if kind == "box":
+				# the ceiling is glass: the view is UP
+				var cpos0: Vector3 = global_position + wy * 4.0
+				_cam_in.global_position = cpos0
+				_cam_in.look_at(cpos0 + wy, -global_transform.basis.z)
+			else:
+				# windows face front/back: the view is the front yard
+				var wz: Vector3 = -global_transform.basis.z
+				var cpos: Vector3 = global_position + wz * 3.6 + wy * 1.8
+				_cam_in.global_position = cpos
+				_cam_in.look_at(cpos + wz, wy)
 	if _haz_t <= 0.0:
 		_haz_t = 2.0
 		_scan_hazards()
