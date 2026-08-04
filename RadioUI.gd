@@ -150,6 +150,9 @@ func _draw_map() -> void:
 	var w = get_tree().get_first_node_in_group("noodle_watcher")
 	if w != null and w is Node3D:
 		var np := _to_px(w.global_position)
+		# the god parks WAY out past the planets now: pin its marker to
+		# the map edge instead of drawing it in the void off-screen
+		np = np.clamp(Vector2(10, 10), _map.size - Vector2(10, 10))
 		_map.draw_circle(np, 5.0, Color("#ffcf40"))
 		_map.draw_arc(np, 9.0, 0, TAU, 20, Color("#e8b830"), 1.5)
 		_map.draw_string(ThemeDB.fallback_font, np + Vector2(8, 4), "noodle god",

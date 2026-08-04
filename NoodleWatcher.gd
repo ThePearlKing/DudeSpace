@@ -8,7 +8,9 @@ extends Node3D
 ## lethal only if you let wrath max out -- then its JUDGMENT tendril
 ## descends (JudgmentFx below) and the geometry lesson begins.
 
-const DIST := 12000.0
+const DIST := 48000.0   # a proper cosmic distance
+const SCALE := 6.0      # and a proper cosmic size: farther AND bigger,
+						# so parallax says "that thing is enormous"
 
 var _dir: Vector3 = Vector3(0.4, 0.55, -0.73).normalized()
 var _scramble_t: float = 6.0
@@ -25,6 +27,7 @@ var _whisper_t: float = 9.0
 
 func _ready() -> void:
 	add_to_group("noodle_watcher")
+	scale = Vector3.ONE * SCALE
 	# the eye
 	var eye := MeshInstance3D.new()
 	var em := SphereMesh.new()
