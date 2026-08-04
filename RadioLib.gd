@@ -246,6 +246,82 @@ const RICK_BITS := ["this station will never let you down. contractually.",
 static func rick_line() -> String:
 	return RICK_BITS[randi() % RICK_BITS.size()]
 
+static var _rick_wav: AudioStreamWAV = null
+
+## RICK FM's flagship: the hook, sung by a perfectly autotuned synthetic
+## man over a committed little band. Bass on eighths, pad chords, hats,
+## backbeat snare -- and a voice pitched EXACTLY to the melody, zero
+## wobble allowed. That's the autotune promise.
+static func rick_song() -> AudioStreamWAV:
+	if _rick_wav:
+		return _rick_wav
+	var beat := 60.0 / 113.0
+	var total := int(8.0 * 4.0 * beat * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# --- the band ---
+	var roots: Array = [131.0, 147.0, 165.0, 147.0]   # C D Em D
+	var third: Array = [1.26, 1.26, 1.19, 1.26]       # maj maj MIN maj
+	for bar in 8:
+		var r: float = roots[bar % 4]
+		var t3: float = third[bar % 4]
+		var b0 := int(float(bar) * 4.0 * beat * SR)
+		for e8 in 8:
+			var st := b0 + int(float(e8) * 0.5 * beat * SR)
+			var dur := int(0.4 * beat * SR)
+			for i in mini(dur, total - st):
+				var env := minf(1.0, float(i) / (SR * 0.005)) * (1.0 - float(i) / float(dur))
+				buf[st + i] += (0.28 if fmod(r * 0.5 * float(i) / SR, 1.0) < 0.5 else -0.28) * env * 0.5
+		var bl := int(4.0 * beat * SR)
+		for i in mini(bl, total - b0):
+			var t2 := float(i) / SR
+			var env2 := minf(1.0, float(i) / (SR * 0.03)) * minf(1.0, float(bl - i) / (SR * 0.06))
+			buf[b0 + i] += (sin(TAU * r * 2.0 * t2) + sin(TAU * r * 2.0 * t3 * t2) \
+				+ sin(TAU * r * 3.0 * t2)) * 0.05 * env2
+		for q in 4:
+			var hs := b0 + int((float(q) + 0.5) * beat * SR)
+			for i in mini(int(0.03 * SR), total - hs):
+				buf[hs + i] += (randf() * 2.0 - 1.0) * 0.11 * (1.0 - float(i) / (0.03 * SR))
+			if q % 2 == 1:
+				var sn := b0 + int(float(q) * beat * SR)
+				for i in mini(int(0.09 * SR), total - sn):
+					buf[sn + i] += (randf() * 2.0 - 1.0) * 0.19 * (1.0 - float(i) / (0.09 * SR))
+	# --- the voice: [syllable, pitch Hz, start beat, length beats] ---
+	var up_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
+		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
+		["giv", 494.0, 1.0, 0.75], ["yoo", 494.0, 1.75, 0.5], ["up", 440.0, 2.25, 1.2]]
+	var down_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
+		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
+		["let", 440.0, 1.0, 0.75], ["yoo", 440.0, 1.75, 0.5], ["doun", 392.0, 2.25, 1.2]]
+	for rep in [0.0, 4.0]:
+		for ph in [[rep, up_line], [rep + 2.0, down_line]]:
+			var bar_off: float = float(ph[0])
+			for syl in ph[1]:
+				var word: String = str(syl[0])
+				var hz: float = float(syl[1])
+				var sb: float = float(syl[2])
+				var lb: float = float(syl[3])
+				var wav0: AudioStreamWAV = HumanVoice.render(word,
+					{"base": hz, "var": 0.02, "wave": "sine", "rate": 1.5, "artic": 1.3})
+				var d0 := wav0.data
+				var n0 := d0.size() / 2
+				var start := int((bar_off * 4.0 + sb) * beat * SR)
+				var cap := mini(n0, int(lb * beat * SR * 1.15))
+				for i in mini(cap, total - start):
+					var fade := minf(1.0, float(cap - i) / (SR * 0.02))
+					buf[start + i] += d0.decode_s16(i * 2) / 32768.0 * 0.95 * fade
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	_rick_wav = AudioStreamWAV.new()
+	_rick_wav.format = AudioStreamWAV.FORMAT_16_BITS
+	_rick_wav.mix_rate = SR
+	_rick_wav.data = bytes
+	_rick_wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	_rick_wav.loop_end = total
+	return _rick_wav
+
 static func noodle_line() -> String:
 	return NOODLE_BITS[randi() % NOODLE_BITS.size()]
 
