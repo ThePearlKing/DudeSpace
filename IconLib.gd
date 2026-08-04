@@ -16,6 +16,26 @@ static func _host(tree: SceneTree) -> Node:
 		root.add_child(h)
 	return h
 
+## The one true model pipeline: real world object > the player's own
+## hand model > curated minis > resource silhouette. Never a bare cube.
+static func build_model_world(id: String, tree: SceneTree) -> Node3D:
+	var holder := Node3D.new()
+	var cs = tree.current_scene
+	if cs != null and cs.has_method("_spawn_world_obj"):
+		var real = cs._spawn_world_obj(id)
+		if real != null:
+			real.process_mode = Node.PROCESS_MODE_DISABLED
+			holder.add_child(real)
+			var ext := 1.4
+			if "box_size" in real:
+				ext = maxf(real.box_size.x, maxf(real.box_size.y, real.box_size.z))
+			var sc := 0.62 / maxf(0.6, ext)
+			real.scale = Vector3(sc, sc, sc)
+			real.position = Vector3(0, -0.25, 0)
+			return holder
+	holder.add_child(build_model(id, tree))
+	return holder
+
 static func tex(id: String, tree: SceneTree) -> Texture2D:
 	if _pool.has(id) and is_instance_valid(_pool[id]):
 		return _pool[id].get_texture()
@@ -35,28 +55,45 @@ static func tex(id: String, tree: SceneTree) -> Texture2D:
 	vp.add_child(sun)
 	var holder := Node3D.new()
 	vp.add_child(holder)
-	# the REAL in-game model when one exists (chest looks like the
-	# chest, sell station like the sell station); minis otherwise
-	var real: Node3D = null
-	var cs = tree.current_scene
-	if cs != null and cs.has_method("_spawn_world_obj"):
-		real = cs._spawn_world_obj(id)
-	if real != null:
-		real.process_mode = Node.PROCESS_MODE_DISABLED
-		holder.add_child(real)
-		var ext := 1.4
-		if "box_size" in real:
-			ext = maxf(real.box_size.x, maxf(real.box_size.y, real.box_size.z))
-		var sc := 0.62 / maxf(0.6, ext)
-		real.scale = Vector3(sc, sc, sc)
-		real.position = Vector3(0, -0.25, 0)
-	else:
-		holder.add_child(build_model(id))
+	holder.add_child(build_model_world(id, tree))
 	# the spin: unhurried, like a furniture showroom
 	var tw := holder.create_tween().set_loops()
 	tw.tween_property(holder, "rotation:y", TAU, 9.0).from(0.0)
 	_pool[id] = vp
 	return vp.get_texture()
+
+## The player's own hand model, if it amounts to anything.
+static func _hand_model(id: String, tree: SceneTree) -> Node3D:
+	var pl = tree.get_first_node_in_group("player")
+	if pl == null or not pl.has_method("model_for"):
+		return null
+	var m: Node3D = pl.model_for(id)
+	if m.get_child_count() == 0:
+		m.queue_free()
+		return null
+	return m
+
+static func _bx(x: float, y: float, z: float) -> BoxMesh:
+	var b := BoxMesh.new()
+	b.size = Vector3(x, y, z)
+	return b
+
+static func _cage_bars(r: Node3D, c: Color) -> void:
+	for ang in [0, 45, 90, 135]:
+		var bar := CylinderMesh.new()
+		bar.top_radius = 0.03
+		bar.bottom_radius = 0.03
+		bar.height = 0.55
+		_p(r, bar, Vector3(cos(deg_to_rad(ang)) * 0.22, 0,
+			sin(deg_to_rad(ang)) * 0.22), c, 0.3)
+		_p(r, bar.duplicate(), Vector3(-cos(deg_to_rad(ang)) * 0.22, 0,
+			-sin(deg_to_rad(ang)) * 0.22), c, 0.3)
+	var top := CylinderMesh.new()
+	top.top_radius = 0.26
+	top.bottom_radius = 0.26
+	top.height = 0.05
+	_p(r, top, Vector3(0, 0.28, 0), c, 0.3)
+	_p(r, top.duplicate(), Vector3(0, -0.28, 0), c, 0.3)
 
 static func _color_of(id: String) -> Color:
 	if Inventory.items.has(id):
@@ -79,7 +116,7 @@ static func _p(root: Node3D, mesh: Mesh, pos: Vector3, col: Color,
 ## EVERY item gets a real little model -- family by family, with the
 ## resource silhouettes reused where they exist and a detailed
 ## fallback (never a bare cube) for the rest.
-static func build_model(id: String) -> Node3D:
+static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 	var r := Node3D.new()
 	var c := _color_of(id)
 	var box := BoxMesh.new()
@@ -166,22 +203,32 @@ static func build_model(id: String) -> Node3D:
 			led.radius = 0.07
 			led.height = 0.14
 			_p(r, led, Vector3(0, 0.09, 0), c, 2.0)
-		"cage", "caged_animal", "caged_human":
-			for ang in [0, 45, 90, 135]:
-				var bar := CylinderMesh.new()
-				bar.top_radius = 0.03
-				bar.bottom_radius = 0.03
-				bar.height = 0.55
-				_p(r, bar, Vector3(cos(deg_to_rad(ang)) * 0.22, 0,
-					sin(deg_to_rad(ang)) * 0.22), c, 0.3)
-				_p(r, bar, Vector3(-cos(deg_to_rad(ang)) * 0.22, 0,
-					-sin(deg_to_rad(ang)) * 0.22), c, 0.3)
-			var top := CylinderMesh.new()
-			top.top_radius = 0.26
-			top.bottom_radius = 0.26
-			top.height = 0.05
-			_p(r, top, Vector3(0, 0.28, 0), c, 0.3)
-			_p(r, top.duplicate(), Vector3(0, -0.28, 0), c, 0.3)
+		"caged_human":
+			_cage_bars(r, c)
+			# the occupant: the NEXT human out of storage, in miniature
+			var hdata := {}
+			for i in range(Inventory.caged_data.size() - 1, -1, -1):
+				var e0 = Inventory.caged_data[i]
+				if e0 is Dictionary and e0.has("human"):
+					hdata = e0["human"]
+					break
+			var skin := Color(str(hdata.get("skin", "b58a6a")))
+			var shirt := Color(str(hdata.get("shirt_col", "5a7aa0")))
+			_p(r, _bx(0.14, 0.14, 0.14), Vector3(0, 0.16, 0), skin, 0.15)
+			_p(r, _bx(0.18, 0.22, 0.1), Vector3(0, -0.04, 0), shirt, 0.15)
+			for lx2 in [-0.05, 0.05]:
+				_p(r, _bx(0.07, 0.18, 0.07), Vector3(lx2, -0.22, 0),
+					Color("#2b3a5e"), 0.1)
+		"caged_animal":
+			_cage_bars(r, c)
+			# a small unidentified mammal. it's fine. probably tamed.
+			_p(r, _bx(0.26, 0.16, 0.16), Vector3(0, -0.1, 0), Color("#9a8a6a"), 0.15)
+			_p(r, _bx(0.12, 0.12, 0.1), Vector3(0.16, 0.0, 0), Color("#9a8a6a"), 0.15)
+			for lx3 in [-0.08, 0.08]:
+				_p(r, _bx(0.05, 0.1, 0.05), Vector3(lx3, -0.22, 0),
+					Color("#7a6a50"), 0.1)
+		"cage":
+			_cage_bars(r, c)
 		"bench":
 			var seat := BoxMesh.new()
 			seat.size = Vector3(0.6, 0.05, 0.2)
@@ -253,6 +300,10 @@ static func build_model(id: String) -> Node3D:
 					sh2.radius = 0.11
 					sh2.height = 0.22
 					_p(r, sh2, Vector3(sx, 0.2, 0), c)
+			elif tree != null and _hand_model(id, tree) != null:
+				var hm := _hand_model(id, tree)
+				hm.scale = Vector3(1.4, 1.4, 1.4)
+				r.add_child(hm)
 			elif ItemDrop._resource_mesh(id) is BoxMesh:
 				# machine/misc fallback: chassis + face panel + little
 				# stack, so NOTHING is ever a bare spinning cube

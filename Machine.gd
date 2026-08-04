@@ -69,13 +69,14 @@ func _ready() -> void:
 	col.shape = cs
 	col.position = Vector3(0, box_size.y * 0.5, 0)
 	add_child(col)
-	var lbl := Label3D.new()
-	lbl.text = title + "  [F]"
-	lbl.font_size = 26
-	lbl.modulate = Color(1, 1, 1, 0.75)
-	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	lbl.position = Vector3(0, box_size.y + 0.9, 0)
-	add_child(lbl)
+	if title != "":
+		var lbl := Label3D.new()
+		lbl.text = title + "  [F]"
+		lbl.font_size = 26
+		lbl.modulate = Color(1, 1, 1, 0.75)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.position = Vector3(0, box_size.y + 0.9, 0)
+		add_child(lbl)
 
 ## Bolt a decorated mesh part onto the machine (visual only).
 func part(mesh: Mesh, pos: Vector3, col: Color, emit: float = 0.25,

@@ -21,6 +21,16 @@ func _ready() -> void:
 	_mesh.material_override = Destructible.make_material(col, 1.2)
 	_mesh.position = Vector3(0, 0.5, 0)
 	add_child(_mesh)
+	# generic cube? the item HAS a real look -- wear it on the ground too
+	if _mesh.mesh is BoxMesh:
+		var mdl := IconLib.build_model_world(id, get_tree())
+		if mdl.get_child_count() > 0:
+			_mesh.mesh = null
+			mdl.scale = Vector3(0.85, 0.85, 0.85)
+			mdl.position = Vector3(0, 0.1, 0)
+			_mesh.add_child(mdl)
+		else:
+			mdl.queue_free()
 	var lbl := Label3D.new()
 	lbl.text = (Inventory.hotbar_name(id) + (" ×%d" % count if count > 1 else ""))
 	lbl.font_size = 20

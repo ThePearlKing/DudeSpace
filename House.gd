@@ -28,7 +28,7 @@ class Port extends Machine:
 	var home_label := ""
 
 	func _init() -> void:
-		title = "HOUSE PORT"
+		title = ""   # sockets don't introduce themselves
 		box_color = Color("#c8cbd0")
 		box_size = Vector3(0.52, 0.52, 0.24)
 		buf_cap = 200.0
@@ -91,12 +91,7 @@ var _in_ports: Array = []       # interior port machines
 var _out_ports: Array = []      # exterior port machines
 var _win_out_mesh: MeshInstance3D    # exterior window pane
 var _win_in_mesh: MeshInstance3D     # interior window pane
-var _vp_out: SubViewport        # renders interior (for the outside pane)
-var _vp_in: SubViewport         # renders outside, FRONT view (front panes)
-var _vp_in2: SubViewport        # renders outside, BACK view (back pane)
-var _cam_out: Camera3D
-var _cam_in: Camera3D
-var _cam_in2: Camera3D
+var _views: Array = []          # every window viewport (paused when unseen)
 var _haz_t := 0.0
 var _rad := false
 var _smoke := false
@@ -665,92 +660,94 @@ func _build_windows() -> void:
 		w = 4.0
 	if kind == "box":
 		w = 3.4
-	# shared screens: ONE camera looks at the interior (for every
-	# outside pane), one looks out from the wall (for every inside pane)
-	_vp_out = SubViewport.new()
-	_vp_out.size = Vector2i(256, 192)
-	_vp_out.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_vp_out)
-	_vp_out.world_3d = get_viewport().world_3d
-	_cam_out = Camera3D.new()
-	_vp_out.add_child(_cam_out)
-	_cam_out.fov = 65.0
-	_cam_out.global_position = c + Vector3(0, -sz.y * 0.5 + 1.7, sz.z * 0.5 - 1.2)
-	_cam_out.look_at(c + Vector3(0, -sz.y * 0.5 + 1.4, 0), Vector3.UP)
-	_vp_in = SubViewport.new()
-	_vp_in.size = Vector2i(384, 288)
-	_vp_in.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_vp_in)
-	_vp_in.world_3d = get_viewport().world_3d
-	_cam_in = Camera3D.new()
-	_vp_in.add_child(_cam_in)
-	_cam_in.fov = 70.0
-	_vp_in2 = SubViewport.new()
-	_vp_in2.size = Vector2i(384, 288)
-	_vp_in2.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_vp_in2)
-	_vp_in2.world_3d = get_viewport().world_3d
-	_cam_in2 = Camera3D.new()
-	_vp_in2.add_child(_cam_in2)
-	_cam_in2.fov = 70.0
-	var otex := _vp_out.get_texture()
-	var itex := _vp_in.get_texture()
-	var itex2 := _vp_in2.get_texture()
 	if kind == "box":
-		# the SKYLIGHT IS the ceiling: glass roof outside showing the
-		# cube's contents, glass ceiling inside showing the sky
-		_cam_out.global_position = c + Vector3(0, sz.y * 0.5 - 0.7, 0.01)
-		_cam_out.look_at(c + Vector3(0, -sz.y * 0.5, 0), Vector3.FORWARD)
-		var tu := Node3D.new()
-		add_child(tu)
-		tu.position = Vector3(0, 3.05, 0)
-		tu.rotation_degrees.x = -90.0
-		_win_frame(tu, otex, Vector2(w - 0.5, w - 0.5), false)
-		var cu := Node3D.new()
-		_iroot.add_child(cu)
-		cu.global_position = c + Vector3(0, sz.y * 0.5 - 0.62, 0)
-		cu.rotation_degrees.x = 90.0
-		_win_frame(cu, itex, Vector2(sz.x - 1.6, sz.z - 1.6), false)
+		# the skylight pair: roof glass <-> ceiling glass, one camera
+		# at each end, looking through like the hole was real
+		_win_pair(Vector3(0, 3.05, 0), Vector3(0, -90, 0),
+			Vector3(c.x, c.y + sz.y * 0.5 - 0.62, c.z), Vector3(0, 90, 0),
+			global_transform.basis.y,            # outward = up
+			Vector3.DOWN,                        # into the room = down
+			Vector2(w - 0.5, w - 0.5), Vector2(sz.x - 1.6, sz.z - 1.6), false)
 		return
-	# windows per floor on the FRONT and BACK faces (never the sides),
-	# inside and outside in matching places, properly sized
 	var floors := 1
 	match kind:
 		"two_story": floors = 2
 		"tower": floors = 3
-	var ifloors := floors if kind != "tower" else int(sz.y / 5.0)
-	for f in floors:
+	var ifloors := floors if kind != "tower" else mini(int(sz.y / 5.0), floors)
+	for f in mini(floors, ifloors):
 		var wy := 1.7 + float(f) * (3.0 if kind != "two_story" else 2.9)
-		# front: TWO small windows flanking the door line, every floor
-		for fxs in [-1.0, 1.0]:
-			_win_unit(self, Vector3(fxs * w * 0.28, wy, -w * 0.5 + 0.02),
-				0.0, otex, Vector2(1.1, 1.0))
-		_win_unit(self, Vector3(0, wy, w * 0.5 - 0.02), 180.0, otex,
-			Vector2(2.0, 1.5))
-	for f2 in ifloors:
-		var fy2 := c.y - sz.y * 0.5 + 1.6 + float(f2) * 5.0
+		var fy2 := c.y - sz.y * 0.5 + 1.6 + float(f) * 5.0
 		if kind == "two_story":
-			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f2) * (sz.y * 0.5)
-		for zside in [-1.0, 1.0]:
-			# same layout as outside: two front windows flanking the
-			# door line, one wide back window off the exit gate
-			if zside < 0.0:
-				for ixs in [-1.0, 1.0]:
-					var iu2 := Node3D.new()
-					_iroot.add_child(iu2)
-					iu2.global_position = Vector3(c.x + ixs * sz.x * 0.28,
-						fy2 + 0.5, c.z - (sz.z * 0.5 - 0.62))
-					iu2.rotation_degrees.y = 180.0
-					_win_frame(iu2, itex, Vector2(1.8, 1.4))
-			else:
-				# the BACK window gets its OWN camera: a portal, not a
-				# second screen of the front yard
-				var iu := Node3D.new()
-				_iroot.add_child(iu)
-				iu.global_position = Vector3(c.x - sz.x * 0.18, fy2 + 0.5,
-					c.z + (sz.z * 0.5 - 0.62))
-				iu.rotation_degrees.y = 0.0
-				_win_frame(iu, itex2, Vector2(2.8, 1.8))
+			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f) * (sz.y * 0.5)
+		var fwd: Vector3 = -global_transform.basis.z   # house front normal
+		var back: Vector3 = global_transform.basis.z
+		# two small front windows flanking the door, exact twins inside
+		for fxs in [-1.0, 1.0]:
+			_win_pair(Vector3(fxs * w * 0.28, wy, -w * 0.5 + 0.02),
+				Vector3.ZERO,
+				Vector3(c.x + fxs * sz.x * 0.28, fy2 + 0.5, c.z - (sz.z * 0.5 - 0.62)),
+				Vector3(0, 180, 0),
+				fwd, Vector3(0, 0, 1),
+				Vector2(1.1, 1.0), Vector2(1.8, 1.4))
+		# one wide back window
+		_win_pair(Vector3(-w * 0.18, wy, w * 0.5 - 0.02), Vector3(0, 180, 0),
+			Vector3(c.x - sz.x * 0.18, fy2 + 0.5, c.z + (sz.z * 0.5 - 0.62)),
+			Vector3.ZERO,
+			back, Vector3(0, 0, -1),
+			Vector2(2.0, 1.5), Vector2(2.8, 1.8))
+
+func _mk_view(px: Vector2i) -> Array:
+	var vp := SubViewport.new()
+	vp.size = px
+	vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(vp)
+	vp.world_3d = get_viewport().world_3d
+	var cam := Camera3D.new()
+	vp.add_child(cam)
+	cam.fov = 78.0
+	_views.append(vp)
+	return [vp, cam]
+
+## A matched window PAIR, portal-style: the outside pane renders from a
+## camera standing AT the inside window looking into the room; the
+## inside pane renders from a camera AT the outside window looking out.
+## Same spot, same axis, both directions. Like glass. Imagine.
+func _win_pair(ext_local: Vector3, ext_rot_deg: Vector3,
+		int_gpos: Vector3, int_rot_deg: Vector3,
+		out_dir: Vector3, in_dir: Vector3,
+		ext_size: Vector2, int_size: Vector2, cavity := true) -> void:
+	var ev := _mk_view(Vector2i(224, 170))   # feeds the EXTERIOR pane
+	var iv := _mk_view(Vector2i(320, 240))   # feeds the INTERIOR pane
+	# exterior pane's camera: at the interior window, looking into the room
+	var ecam: Camera3D = ev[1]
+	ecam.global_position = int_gpos + in_dir * 0.15
+	ecam.look_at(int_gpos + in_dir * 2.0,
+		Vector3.UP if absf(in_dir.y) < 0.9 else Vector3.FORWARD)
+	# interior pane's camera: at the exterior window, looking outward
+	var egpos := global_transform * ext_local
+	var icam: Camera3D = iv[1]
+	icam.global_position = egpos + out_dir * 0.15
+	icam.look_at(egpos + out_dir * 2.0,
+		global_transform.basis.y if absf(out_dir.dot(global_transform.basis.y)) < 0.9 \
+		else -global_transform.basis.z)
+	# the two units
+	var eu := Node3D.new()
+	add_child(eu)
+	eu.position = ext_local
+	eu.rotation_degrees = ext_rot_deg
+	if ext_rot_deg.y == -90.0 and ext_local.y > 2.0:
+		eu.rotation_degrees = Vector3(-90, 0, 0)   # the skylight lies flat
+	_win_frame_on(eu, ev[0].get_texture(), ext_size, cavity)
+	var iu := Node3D.new()
+	_iroot.add_child(iu)
+	iu.global_position = int_gpos
+	iu.rotation_degrees = int_rot_deg
+	if absf(in_dir.y) > 0.9:
+		iu.rotation_degrees = Vector3(90, 0, 0)    # the ceiling glass too
+	_win_frame_on(iu, iv[0].get_texture(), int_size, cavity)
+
+func _win_frame_on(u: Node3D, tex: Texture2D, wsize: Vector2, cavity := true) -> void:
+	_win_frame(u, tex, wsize, cavity)
 
 ## One window UNIT: recessed cavity, frame, sill -- a window with
 ## actual depth, whose glass happens to be a live screen.
@@ -859,35 +856,11 @@ func _physics_process(delta: float) -> void:
 	if _tag:
 		_tag.visible = p.global_position.distance_to(global_position) < 45.0
 	# window rendering only when someone can see the glass
-	if _vp_out:
-		_vp_out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if nearby \
-			else SubViewport.UPDATE_DISABLED
-	if _vp_in:
-		var live := inside or nearby
-		_vp_in.render_target_update_mode = SubViewport.UPDATE_ALWAYS if live \
-			else SubViewport.UPDATE_DISABLED
-		if _vp_in2:
-			_vp_in2.render_target_update_mode = _vp_in.render_target_update_mode
-		if live and _cam_in2 and kind != "box":
-			# back camera: the view off the +Z face
-			var bz: Vector3 = global_transform.basis.z
-			var by: Vector3 = global_transform.basis.y
-			var bpos: Vector3 = global_position + bz * 3.6 + by * 1.8
-			_cam_in2.global_position = bpos
-			_cam_in2.look_at(bpos + bz, by)
-		if live and _cam_in:
-			var wy: Vector3 = global_transform.basis.y
-			if kind == "box":
-				# the ceiling is glass: the view is UP
-				var cpos0: Vector3 = global_position + wy * 4.0
-				_cam_in.global_position = cpos0
-				_cam_in.look_at(cpos0 + wy, -global_transform.basis.z)
-			else:
-				# windows face front/back: the view is the front yard
-				var wz: Vector3 = -global_transform.basis.z
-				var cpos: Vector3 = global_position + wz * 3.6 + wy * 1.8
-				_cam_in.global_position = cpos
-				_cam_in.look_at(cpos + wz, wy)
+	var live := inside or nearby
+	for v in _views:
+		if is_instance_valid(v):
+			v.render_target_update_mode = SubViewport.UPDATE_ALWAYS if live \
+				else SubViewport.UPDATE_DISABLED
 	if _haz_t <= 0.0:
 		_haz_t = 2.0
 		_scan_hazards()

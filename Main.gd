@@ -1943,10 +1943,10 @@ func _populate(b) -> void:
 			# hamlets: little clusters of unclaimed human houses out in
 			# the country. dudes can't enter; humans move in, furnish
 			# them to taste, and have people over
-			for ti in 2:
-				# hamlets sit in the countryside JUST outside a city:
-				# close enough to visit, far enough to not overlap it
-				var cty2: Dictionary = Game.earth_cities[crng.randi() % Game.earth_cities.size()]
+			for ti in 4:
+				# every city gets a hamlet in its countryside: close
+				# enough to visit, far enough to never overlap
+				var cty2: Dictionary = Game.earth_cities[ti]
 				var cdir: Vector3 = cty2["dir"]
 				var ring_r := crng.randf_range(55.0, 95.0) / float(b.radius)
 				var ring_a := crng.randf() * TAU

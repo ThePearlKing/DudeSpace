@@ -593,6 +593,16 @@ func _update_held() -> void:
 	if _body and is_instance_valid(_body):
 		_body.set_held(_held.duplicate(), Inventory.weapons.has(id))
 
+## Build the SAME model the hand would hold, as a free-standing node.
+## Icons and dropped items borrow it so nothing is ever a mystery cube.
+func model_for(id: String) -> Node3D:
+	var keep := _held
+	var out := Node3D.new()
+	_held = out
+	_make_held_model(id)
+	_held = keep
+	return out
+
 # --- tiny in-hand models -------------------------------------------------
 
 func _hm_box(sz: Vector3, pos: Vector3, col: Color, emit: float = 0.4) -> MeshInstance3D:
@@ -704,6 +714,10 @@ func _make_held_model(id: String) -> void:
 			_hm_cyl(0.11, 0.16, Vector3(0, 0.24, 0), Color("#ff5964"), 0.6, 0.0)
 			for fx in [-0.12, 0.12]:
 				_hm_box(Vector3(0.05, 0.14, 0.02), Vector3(fx, -0.22, 0), Color("#ff5964"), 0.4)
+		"cage", "caged_animal", "caged_human":
+			var cm2 := IconLib.build_model(id, get_tree())
+			cm2.scale = Vector3(0.55, 0.55, 0.55)
+			_held.add_child(cm2)
 		"jetpack", "jetpack2", "jetpack3":
 			for fx in [-0.11, 0.11]:
 				_hm_cyl(0.09, 0.4, Vector3(fx, 0, 0), col, 0.6)
@@ -1196,6 +1210,7 @@ func _use_selected() -> void:
 				# name, face, shirt, grudges, everything
 				hu._release_seat()
 				Inventory.caged_data.append({"human": hu.capture()})
+				IconLib._pool.erase("caged_human")   # the box has a new face
 				hu.queue_free()
 				Inventory.clear_slot(slot)
 				Inventory.give("caged_human", 1)
