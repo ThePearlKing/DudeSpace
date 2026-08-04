@@ -560,20 +560,13 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	var barlen := int(beat * 2.0 * SR)
 	var segs: Array = []   # [start_sample, voice bytes]
 	var pos := 0
-	# the god SINGS it: each line autotuned to a note of a dark minor
-	# line-melody, low register, saw throat
-	var melody: Array = [0, 3, 0, 5, 3, 7, 3, 10, 0, 0, -2, 0, 0]
-	var li := 0
+	# delivered in the god's own MONOTONE. the flow comes from the bars,
+	# not from melody. it would not stoop to melody.
 	for ln in SAUCE_VERSE:
 		if str(ln) == "":
 			pos += barlen   # a rest: the beat carries the bar alone
-			li += 1
 			continue
-		var note := 98.0 * pow(2.0, float(melody[li % melody.size()]) / 12.0)
-		li += 1
-		var w := eldritch(HumanVoice.render(str(ln),
-			{"base": note, "var": 0.0, "wave": "saw", "rate": 0.62,
-			"artic": 1.1, "autotune": true}), false)
+		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
 		segs.append([pos, w.data])
 		var nlen: int = w.data.size() / 2
 		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
