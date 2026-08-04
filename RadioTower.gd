@@ -530,9 +530,10 @@ func _serve(builder: Callable, clock_sync: bool) -> bool:
 		else:
 			var seek := 0.0
 			if _cur_station >= 0 and _cur_station < stations.size() \
-					and str(stations[_cur_station]["type"]) == "noodle" \
-					and Game.playtime - _sauce_seen < 20.0:
-				seek = _sauce_pos   # the drop was a blink: pick up mid-song
+					and str(stations[_cur_station]["type"]) == "noodle":
+				# NEVER restarts: the tape holds its place through any
+				# drop, however long. first-ever listen starts at zero.
+				seek = _sauce_pos
 			_talk.play(seek)
 		return true
 	if not _cooking:
