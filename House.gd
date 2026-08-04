@@ -479,6 +479,8 @@ func _build_interior() -> void:
 						Vector3(0.6, sz.y - 0.6, 0.6), Color("#4a4f58"))
 			_solid(c + Vector3(0, 0.8, -sz.z * 0.5 + 1.2),
 				Vector3(sz.x - 6.0, 0.3, 1.8), Color("#6a6f78"))
+		"box":
+			pass   # a blank canvas. bring your own everything.
 		_:
 			# small house: wood floor, kitchen corner, plants, a hearth
 			_wood_floor(Vector3(c.x, fy + 0.2, c.z), Vector2(sz.x - 1.2, sz.z - 1.2))
@@ -690,12 +692,12 @@ func _build_windows() -> void:
 		add_child(tu)
 		tu.position = Vector3(0, 3.05, 0)
 		tu.rotation_degrees.x = -90.0
-		_win_frame(tu, otex, Vector2(w - 0.5, w - 0.5))
+		_win_frame(tu, otex, Vector2(w - 0.5, w - 0.5), false)
 		var cu := Node3D.new()
 		_iroot.add_child(cu)
 		cu.global_position = c + Vector3(0, sz.y * 0.5 - 0.62, 0)
 		cu.rotation_degrees.x = 90.0
-		_win_frame(cu, itex, Vector2(sz.x - 1.6, sz.z - 1.6))
+		_win_frame(cu, itex, Vector2(sz.x - 1.6, sz.z - 1.6), false)
 		return
 	# windows per floor on the FRONT and BACK faces (never the sides),
 	# inside and outside in matching places, properly sized
@@ -706,10 +708,10 @@ func _build_windows() -> void:
 	var ifloors := floors if kind != "tower" else int(sz.y / 5.0)
 	for f in floors:
 		var wy := 1.7 + float(f) * (3.0 if kind != "two_story" else 2.9)
-		# front: beside the door on floor 0, centered above
-		var fx := w * 0.28 if f == 0 else 0.0
-		_win_unit(self, Vector3(fx, wy, -w * 0.5 + 0.02), 0.0, otex,
-			Vector2(2.0, 1.5))
+		# front: TWO small windows flanking the door line, every floor
+		for fxs in [-1.0, 1.0]:
+			_win_unit(self, Vector3(fxs * w * 0.28, wy, -w * 0.5 + 0.02),
+				0.0, otex, Vector2(1.1, 1.0))
 		_win_unit(self, Vector3(0, wy, w * 0.5 - 0.02), 180.0, otex,
 			Vector2(2.0, 1.5))
 	for f2 in ifloors:
@@ -717,17 +719,23 @@ func _build_windows() -> void:
 		if kind == "two_story":
 			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f2) * (sz.y * 0.5)
 		for zside in [-1.0, 1.0]:
-			# same spots as outside: front window sits beside the door
-			# line, back window shifted off the exit gate
-			var ix := sz.x * 0.28 if (zside < 0.0 and f2 == 0) else -sz.x * 0.18
-			if zside < 0.0 and f2 > 0:
-				ix = 0.0
-			var iu := Node3D.new()
-			_iroot.add_child(iu)
-			iu.global_position = Vector3(c.x + ix, fy2 + 0.5,
-				c.z + zside * (sz.z * 0.5 - 0.62))
-			iu.rotation_degrees.y = 0.0 if zside > 0.0 else 180.0
-			_win_frame(iu, itex, Vector2(2.8, 1.8))
+			# same layout as outside: two front windows flanking the
+			# door line, one wide back window off the exit gate
+			if zside < 0.0:
+				for ixs in [-1.0, 1.0]:
+					var iu2 := Node3D.new()
+					_iroot.add_child(iu2)
+					iu2.global_position = Vector3(c.x + ixs * sz.x * 0.28,
+						fy2 + 0.5, c.z - (sz.z * 0.5 - 0.62))
+					iu2.rotation_degrees.y = 180.0
+					_win_frame(iu2, itex, Vector2(1.8, 1.4))
+			else:
+				var iu := Node3D.new()
+				_iroot.add_child(iu)
+				iu.global_position = Vector3(c.x - sz.x * 0.18, fy2 + 0.5,
+					c.z + (sz.z * 0.5 - 0.62))
+				iu.rotation_degrees.y = 0.0
+				_win_frame(iu, itex, Vector2(2.8, 1.8))
 
 ## One window UNIT: recessed cavity, frame, sill -- a window with
 ## actual depth, whose glass happens to be a live screen.
@@ -739,19 +747,20 @@ func _win_unit(parent: Node3D, pos: Vector3, yaw: float, tex: Texture2D,
 	u.rotation_degrees.y = yaw
 	_win_frame(u, tex, wsize)
 
-func _win_frame(u: Node3D, tex: Texture2D, wsize: Vector2) -> void:
+func _win_frame(u: Node3D, tex: Texture2D, wsize: Vector2, cavity := true) -> void:
 	var frame_c := Color("#4a3c2c") if not (kind in ["tower", "factory", "box"]) \
 		else Color("#2c3038")
 	var fm := Destructible.make_material(frame_c, 0.05)
 	# the recess: a dark cavity sunk INTO the wall (0.10..0.30 deep --
 	# every element gets its own depth plane, nothing coplanar)
-	var cav := MeshInstance3D.new()
-	var cm := BoxMesh.new()
-	cm.size = Vector3(wsize.x, wsize.y, 0.2)
-	cav.mesh = cm
-	cav.position = Vector3(0, 0, 0.2)
-	cav.material_override = Destructible.make_material(Color("#101014"), 0.02)
-	u.add_child(cav)
+	if cavity:
+		var cav := MeshInstance3D.new()
+		var cm := BoxMesh.new()
+		cm.size = Vector3(wsize.x, wsize.y, 0.2)
+		cav.mesh = cm
+		cav.position = Vector3(0, 0, 0.2)
+		cav.material_override = Destructible.make_material(Color("#101014"), 0.02)
+		u.add_child(cav)
 	# frame borders, slightly proud of the wall
 	for spec in [
 		[Vector3(wsize.x + 0.16, 0.08, 0.12), Vector3(0, wsize.y * 0.5 + 0.04, 0)],
