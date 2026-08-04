@@ -734,13 +734,41 @@ class NuclearReactor extends Machine:
 	var mode: int = 0             # 0 SHUTDOWN · 1 STARTUP · 2 RUN (permissives)
 	var breaker: bool = false     # turbine breaker: closed = exporting
 	var trip_t: float = 0.0       # turbine trip lamp timer
+	var _panel: Label3D           # the little front readout
+	var _panel_t: float = 0.0
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
+
+	var _rhits: int = 0
+
+	## Containment takes SIX hits, not three -- and cracking a LIVE core
+	## is not disassembly, it's a decision. Yield scales with power.
+	func destroy(push_dir: Vector3) -> void:
+		if not Net.can_break(str(get_meta("owner", ""))):
+			Sfx.play("denied")
+			return
+		_rhits += 1
+		if _rhits < 6:
+			Sfx.play("hurt", -12.0)
+			if power > 0.05 and _panel != null:
+				_panel.text = "⚠ CORE IS LIVE\nBREAKING = DETONATION\nSCRAM FIRST"
+				_panel_t = 2.5
+			return
+		if power > 0.05:
+			_meltdown(clampf(power, 0.25, 2.0))
+		else:
+			_on_destroyed(push_dir)
 
 	## Reactivity as the instruments see it.
 	func rho_now() -> float:
 		if _fuel <= 0.0:
 			return -1.0
 		return (0.65 - rods) * 0.9 - xenon * 0.5 - (temp / 100.0) * 0.25
+
+	## Burnup fraction of the rod in the core (0 fresh, 1 spent).
+	func rod_burnup() -> float:
+		if _fuel <= 0.0:
+			return 1.0
+		return 1.0 - _fuel / FUEL_SECS
 
 	func out_eu_s() -> float:
 		return MAX_EU_S * 1.4 * power * (float(flow) * 0.5) if breaker else 0.0
@@ -808,10 +836,40 @@ class NuclearReactor extends Machine:
 		dome.height = 1.4
 		dome.is_hemisphere = true
 		part(dome, Vector3(0, box_size.y, 0), Color("#9a9da0"), 0.05)
-		# Cherenkov window: the blue glow of an open pool core
-		var win := BoxMesh.new()
-		win.size = Vector3(1.2, 0.5, 0.06)
-		_glow = part(win, Vector3(0, 1.0, box_size.z * 0.5 + 0.03), Color("#2a9fff"), 0.3)
+		# lead glass: a murky pane you can ALMOST see through, straight
+		# into the pool. behind it, the core -- which glows Cherenkov
+		# blue when the reaction is real
+		var glass := MeshInstance3D.new()
+		var gbm := BoxMesh.new()
+		gbm.size = Vector3(1.5, 1.4, 0.07)
+		glass.mesh = gbm
+		glass.position = Vector3(0, 1.2, box_size.z * 0.5 + 0.04)
+		var gmat := StandardMaterial3D.new()
+		gmat.albedo_color = Color(0.32, 0.38, 0.42, 0.8)
+		gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		gmat.roughness = 0.12
+		gmat.metallic = 0.35
+		glass.material_override = gmat
+		add_child(glass)
+		# the visible core: fuel bundle in the pool, seen through the glass
+		var core := BoxMesh.new()
+		core.size = Vector3(1.2, 1.1, 0.7)
+		_glow = part(core, Vector3(0, 1.15, box_size.z * 0.5 - 0.45), Color("#0a2a4a"), 0.2)
+		for bx in [-0.35, 0.0, 0.35]:
+			var brod := CylinderMesh.new()
+			brod.top_radius = 0.08
+			brod.bottom_radius = 0.08
+			brod.height = 1.0
+			part(brod, Vector3(bx, 1.15, box_size.z * 0.5 - 0.42), Color("#3a3f46"), 0.1)
+		# front status panel: the little numbers that matter
+		_panel = Label3D.new()
+		_panel.font_size = 26
+		_panel.pixel_size = 0.0038
+		_panel.modulate = Color("#7be8ff")
+		_panel.outline_size = 4
+		_panel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_panel.position = Vector3(0, 0.45, box_size.z * 0.5 + 0.05)
+		add_child(_panel)
 		# control rod actuators: four rods that VISIBLY sink into the dome
 		for sx in [-0.45, 0.45]:
 			for sz in [-0.45, 0.45]:
@@ -890,6 +948,13 @@ class NuclearReactor extends Machine:
 		if _gauge and _gauge.material_override:
 			_gauge.material_override.emission = Color("#2bff5a").lerp(Color("#ff2b1a"),
 				temp / 100.0)
+		# front panel: terse, honest, slightly blue
+		_panel_t -= delta
+		if _panel != null and _panel_t <= 0.0:
+			_panel_t = 0.3
+			_panel.text = "PWR %3.0f%%  T %3.0f°C\nP %3.0f bar  Xe %2.0f%%\n%s" % [
+				power * 100.0, temp * 10.0, press, xenon * 100.0,
+				"SCRAM" if _scram else ["SHUTDOWN", "STARTUP", "RUN"][mode]]
 		# hot core clicks at you. that clicking is a WORD, and the word is RUN
 		if temp > 70.0:
 			_geiger_t -= delta
@@ -899,7 +964,7 @@ class NuclearReactor extends Machine:
 		if temp >= 100.0 or press >= 100.0:
 			_meltdown()
 
-	func _meltdown() -> void:
+	func _meltdown(yield_scale: float = 1.0) -> void:
 		var here := global_position
 		Sfx.play("explode", 2.0)
 		Game.anger(30.0)   # splitting atoms was ALREADY pushing it
@@ -935,7 +1000,7 @@ class NuclearReactor extends Machine:
 			for n in get_tree().get_nodes_in_group(grp):
 				if n == self or not (n is Node3D) or not is_instance_valid(n):
 					continue
-				if n.global_position.distance_to(here) < 18.0:
+				if n.global_position.distance_to(here) < 18.0 * yield_scale:
 					Destructible.spawn_debris(get_parent(), n.global_position,
 						Vector3(1.2, 1.2, 1.2), Color("#3a3a3a"), Vector3.UP)
 					Net.broadcast_remove(n.global_position)
@@ -944,8 +1009,9 @@ class NuclearReactor extends Machine:
 		var p = get_tree().get_first_node_in_group("player")
 		if p and is_instance_valid(p):
 			var d: float = p.global_position.distance_to(here)
-			if d < 22.0:
-				Game.hurt(220.0 * (1.0 - d / 22.0) + 20.0)
+			var rr := 22.0 * yield_scale
+			if d < rr:
+				Game.hurt((220.0 * (1.0 - d / rr) + 20.0) * yield_scale)
 		Net.broadcast_remove(here)
 		Destructible.spawn_debris(get_parent(), here, Vector3(2.4, 2.4, 2.4),
 			Color("#8a8d90"), Vector3.UP)

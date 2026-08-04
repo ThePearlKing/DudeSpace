@@ -41,6 +41,9 @@ func _ready() -> void:
 	col.add_child(_btn("Cheats", _open_cheats))
 	col.add_child(_btn("Edit Character (look)", _open_editor))
 	col.add_child(_btn("Pose (photo)", _open_poses))
+	col.add_child(_btn("Screenshots Folder", func() -> void:
+		DirAccess.make_dir_recursive_absolute("user://screenshots")
+		OS.shell_open(ProjectSettings.globalize_path("user://screenshots"))))
 	col.add_child(_btn("Reset Character (to spawn)", _reset_char))
 	col.add_child(_btn("Save & Quit to Title", _quit_title))
 

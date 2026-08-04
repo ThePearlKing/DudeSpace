@@ -63,6 +63,11 @@ func _ready() -> void:
 
 func use(player: Player) -> void:
 	var hud := get_tree().get_first_node_in_group("hud")
+	if action == "house_exit":
+		var h = get_meta("house", null)
+		if h != null and is_instance_valid(h):
+			h.exit_to_door(player)
+		return
 	match action:
 		"recipe":
 			if not Inventory.ak47_recipe:

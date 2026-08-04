@@ -151,6 +151,8 @@ func _ready() -> void:
 		_sitshirt_test()
 	if OS.get_environment("CTD_TEST") == "15":
 		_reactor_test()
+	if OS.get_environment("CTD_TEST") == "16":
+		_house_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -161,7 +163,12 @@ func _ready() -> void:
 		var cfg := Game.host_cfg.duplicate()
 		cfg["port"] = 25999   # off the real port so tests never collide
 		print("NETTEST host: ", Net.host(cfg))
-	Game.earth_pop_target = get_tree().get_nodes_in_group("earth_human").size()
+	# housing raises the carrying capacity: every human home is +1
+	var homes := 0
+	for hn0 in get_tree().get_nodes_in_group("house"):
+		if hn0 is House and hn0.human_home:
+			homes += 1
+	Game.earth_pop_target = get_tree().get_nodes_in_group("earth_human").size() + homes
 	randomize()   # world built: gameplay dice go back to being dice
 	if _player:
 		_player.restore_jet()   # jetpack comes back ON if you left it on
@@ -464,6 +471,65 @@ func _repopulate() -> void:
 	add_child(hm)
 	hm.global_transform = Transform3D(_basis_from_up(cd),
 		b.center + cd * (float(b.radius) + 1.2))
+
+## Headless: place a house, walk in, count the ports, poison the air.
+func _house_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var hs := House.new()
+	hs.kind = "two_story"
+	add_child(hs)
+	hs.set_meta("placed_id", "house")
+	hs.global_transform = Transform3D(_basis_from_up(up),
+		home.center + up * home.radius)
+	await get_tree().create_timer(1.0).timeout
+	print("HOUSETEST ports out/in: ", hs._out_ports.size(), "/", hs._in_ports.size(),
+		"  interior built: ", hs._iroot != null and is_instance_valid(hs._iroot))
+	hs.enter(p)
+	await get_tree().create_timer(0.3).timeout
+	print("HOUSETEST inside: ", p.global_position.distance_to(hs.room_center()) < 30.0,
+		"  zone: ", Game.zone)
+	# a reactor in the living room. what could go wrong.
+	var rx := EMachines.NuclearReactor.new()
+	add_child(rx)
+	rx.global_position = hs.room_center() + Vector3(3, -1.5, 0)
+	var hp0: float = Game.health
+	await get_tree().create_timer(4.5).timeout
+	print("HOUSETEST radioactive: ", hs._rad, "  cancer dmg: ", hp0 - Game.health > 0.0)
+	hs.exit_to_door(p)
+	await get_tree().create_timer(0.2).timeout
+	print("HOUSETEST back outside: ", p.global_position.distance_to(hs.global_position) < 10.0,
+		"  zone cleared: ", Game.zone == "")
+	# a human claims a town house and furnishes it
+	var th := House.new()
+	th.kind = "small"
+	th.human_home = true
+	add_child(th)
+	th.global_transform = Transform3D(_basis_from_up(up),
+		home.center + up * home.radius + Vector3(12, 0, 0))
+	var hu := EarthHuman.new()
+	hu.setup(home)
+	add_child(hu)
+	hu.global_position = th.global_position + Vector3(3, 1, 0)
+	await get_tree().create_timer(1.0).timeout
+	hu.my_house = th
+	th.owner_uid = hu.human_id
+	th.furnish_for(hu._pers)
+	hu._goal_house = th
+	hu._act = "gohouse"
+	hu._act_t = 40.0
+	for i in 40:
+		await get_tree().create_timer(0.25).timeout
+		if hu.flat_house != null:
+			break
+	print("HOUSETEST human moved in: ", hu.flat_house == th)
+	var furn := 0
+	for f in get_tree().get_nodes_in_group("bench"):
+		if f is Furniture and f.global_position.distance_to(th.room_center()) < 20.0:
+			furn += 1
+	print("HOUSETEST furnished pieces: ", furn)
 
 ## Headless: exercise the reactor control-room interlocks.
 func _reactor_test() -> void:
@@ -1364,7 +1430,8 @@ void vertex(){ vn = NORMAL; }
 void fragment(){
 	vec3 n = normalize(vn);
 	float land = fbm(n * 3.1);
-	float caps = smoothstep(0.76, 0.86, abs(n.y));
+	// snowline wobbles with the terrain, not a clean latitude ring
+	float caps = smoothstep(0.7, 0.82, abs(n.y) + fbm(n * 6.0 + 3.0) * 0.09);
 	vec3 ocean = vec3(0.06, 0.22, 0.5);
 	vec3 shallow = vec3(0.1, 0.42, 0.6);
 	vec3 grass = vec3(0.18, 0.46, 0.18);
@@ -1372,9 +1439,19 @@ void fragment(){
 	vec3 col;
 	if (land > 0.52) { col = mix(grass, rock, smoothstep(0.52, 0.72, land)); }
 	else { col = mix(ocean, shallow, smoothstep(0.38, 0.52, land)); }
-	col = mix(col, vec3(0.93, 0.95, 1.0), caps);
+	// SNOW with texture: bright powder over blue-shadowed drifts,
+	// wind-carved bands, dark rock poking through near the snowline
+	vec3 snow = mix(vec3(0.78, 0.83, 0.92), vec3(0.97, 0.98, 1.0), fbm(n * 14.0));
+	snow *= 0.93 + 0.07 * sin(fbm(n * 9.0 + 5.0) * 22.0);
+	float poke = smoothstep(0.55, 0.72, fbm(n * 11.0 + 7.0))
+		* (1.0 - smoothstep(0.85, 0.96, abs(n.y)));
+	vec3 capped = mix(snow, rock * 0.65, poke * 0.55);
+	// frozen sea gets flat ice instead of powder
+	if (land <= 0.52) { capped = mix(vec3(0.75, 0.85, 0.95), capped, 0.4); }
+	col = mix(col, capped, caps);
 	ALBEDO = col;
-	ROUGHNESS = land > 0.52 ? 0.9 : 0.25;
+	float baseR = land > 0.52 ? 0.9 : 0.25;
+	ROUGHNESS = mix(baseR, land > 0.52 ? 0.55 : 0.15, caps);
 }
 """
 	var m := ShaderMaterial.new()
@@ -1797,13 +1874,13 @@ func _populate(b) -> void:
 			Game.earth_body = b
 			Game.earth_cities = []
 			var vibes: Array = [
-				{"vibe": "goofy", "name": "Honkton", "tint": Color("#ffb347"),
+				{"vibe": "goofy", "name": "Springdale", "tint": Color("#ffb347"),
 					"arch": "goofy"},
-				{"vibe": "grumpy", "name": "Grumbleburg", "tint": Color("#50505a"),
+				{"vibe": "grumpy", "name": "Ironvale", "tint": Color("#50505a"),
 					"arch": "concrete"},
-				{"vibe": "dreamy", "name": "Driftwood", "tint": Color("#9ad0ff"),
+				{"vibe": "dreamy", "name": "Eldenport", "tint": Color("#9ad0ff"),
 					"arch": "ancient"},
-				{"vibe": "confident", "name": "Peak City", "tint": Color("#ffd166"),
+				{"vibe": "confident", "name": "New Meridian", "tint": Color("#ffd166"),
 					"arch": "glass"},
 			]
 			for ci in 4:
@@ -1845,10 +1922,40 @@ func _populate(b) -> void:
 					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18))).normalized(), crng, false)
+				# the welcome sign, in the city's own architectural accent
+				_city_sign(b, (centre + Vector3(0.13, 0.02, 0.13)).normalized(),
+					str(vibes[ci]["name"]), str(vibes[ci]["arch"]))
 			# the railway ring: every city linked to the next one over
 			for ci in 4:
 				_rail(b, Game.earth_cities[ci]["dir"],
 					Game.earth_cities[(ci + 1) % 4]["dir"])
+			# hamlets: little clusters of unclaimed human houses out in
+			# the country. dudes can't enter; humans move in, furnish
+			# them to taste, and have people over
+			for ti in 2:
+				var tc := Vector3.ZERO
+				while tc.length() < 0.1:
+					tc = Vector3(crng.randf_range(-1, 1), crng.randf_range(-1, 1),
+						crng.randf_range(-1, 1))
+				tc = tc.normalized()
+				for hi in 3:
+					var hd3 := (tc + Vector3(crng.randf_range(-0.05, 0.05),
+						crng.randf_range(-0.05, 0.05), crng.randf_range(-0.05, 0.05))).normalized()
+					var hh2 := House.new()
+					hh2.kind = "small"
+					hh2.human_home = true
+					add_child(hh2)
+					hh2.global_transform = Transform3D(_basis_from_up(hd3),
+						b.center + hd3 * b.radius)
+					hh2.rotate_object_local(Vector3.UP, crng.randf() * TAU)
+				for hi2 in 2:
+					var hu4 := EarthHuman.new()
+					hu4.setup(b)
+					add_child(hu4)
+					var hud := (tc + Vector3(crng.randf_range(-0.06, 0.06),
+						crng.randf_range(-0.06, 0.06), crng.randf_range(-0.06, 0.06))).normalized()
+					hu4.global_transform = Transform3D(_basis_from_up(hud),
+						b.center + hud * (b.radius + 1.2))
 			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
 			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
@@ -1966,6 +2073,56 @@ func _seat_prop(b, dir: Vector3, rng: RandomNumberGenerator, bench: bool) -> voi
 	add_child(root)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
 
+## WELCOME TO <city>: a roadside sign dressed like its city.
+func _city_sign(b, dir: Vector3, cname: String, arch: String) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var board_col := Color("#3a4048")
+	var post_col := Color("#5a5f66")
+	var text_col := Color.WHITE
+	match arch:
+		"glass":
+			board_col = Color("#101820")
+			text_col = Color("#7bffd0")
+		"ancient":
+			board_col = Color("#c9b47e")
+			post_col = Color("#b0a070")
+			text_col = Color("#4a3a20")
+		"goofy":
+			board_col = Color.from_hsv(randf(), 0.6, 0.9)
+			post_col = Color.from_hsv(randf(), 0.6, 0.8)
+	for px in [-1.1, 1.1]:
+		var post := MeshInstance3D.new()
+		var pm := CylinderMesh.new()
+		pm.top_radius = 0.09
+		pm.bottom_radius = 0.11
+		pm.height = 2.4
+		post.mesh = pm
+		post.position = Vector3(px, 1.2, 0)
+		post.material_override = Destructible.make_material(post_col, 0.05)
+		root.add_child(post)
+	var board := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(3.2, 1.1, 0.14)
+	board.mesh = bm
+	board.position = Vector3(0, 2.2, 0)
+	if arch == "goofy":
+		board.rotation_degrees.z = randf_range(-4.0, 4.0)   # kinda goofy. only kinda.
+	board.material_override = Destructible.make_material(board_col,
+		0.9 if arch == "glass" else 0.1)
+	root.add_child(board)
+	var lbl := Label3D.new()
+	lbl.text = "WELCOME TO\n%s" % cname.to_upper()
+	lbl.font_size = 40
+	lbl.pixel_size = 0.006
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.modulate = text_col
+	lbl.position = Vector3(0, 0, -0.09)
+	lbl.rotation_degrees.y = 180.0
+	board.add_child(lbl)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, randf() * TAU)
+
 ## Peak City: glass curtain-wall skyscrapers. Tall, smug, lit like a
 ## quarterly report that beat expectations.
 func _glass_tower(b, dir: Vector3) -> void:
@@ -2017,78 +2174,75 @@ func _glass_tower(b, dir: Vector3) -> void:
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
 	root.rotate_object_local(Vector3.UP, randf() * TAU)
 
-## Driftwood: ancient architecture. Sandstone cellas ringed by columns,
-## the odd dome, at least one column that gave up centuries ago.
+## Eldenport: ancient architecture that goes UP -- weathered stone
+## tower-houses, tapering story by story, banded and columned, like a
+## city that was already old when the planet got its name.
 func _ancient_building(b, dir: Vector3) -> void:
 	var root := Node3D.new()
 	add_child(root)
 	var stone := Destructible.make_material(Color("#d8c49a"), 0.03)
 	var worn := Destructible.make_material(Color("#c2ab7e"), 0.02)
-	var wr := randf_range(2.2, 3.4)
-	# stepped plinth
-	for st in 2:
-		var base := MeshInstance3D.new()
-		var bm3 := BoxMesh.new()
-		bm3.size = Vector3(wr * 2.0 + 1.2 - float(st) * 0.5, 0.35,
-			wr * 2.0 + 1.2 - float(st) * 0.5)
-		base.mesh = bm3
-		base.position = Vector3(0, 0.18 + float(st) * 0.35, 0)
-		base.material_override = worn
-		root.add_child(base)
-	# inner cella
-	var cella := MeshInstance3D.new()
-	var cbm := BoxMesh.new()
-	var ch := randf_range(2.4, 3.6)
-	cbm.size = Vector3(wr * 1.1, ch, wr * 1.1)
-	cella.mesh = cbm
-	cella.position = Vector3(0, 0.7 + ch * 0.5, 0)
-	cella.material_override = stone
-	root.add_child(cella)
-	# column ring -- one of them is rubble, as is tradition
-	var ncol := 8
-	var fallen := randi() % ncol
-	for i in ncol:
-		var a := TAU * float(i) / float(ncol)
-		var cx := cos(a) * wr
-		var cz := sin(a) * wr
-		if i == fallen:
-			var stub := MeshInstance3D.new()
-			var stm := CylinderMesh.new()
-			stm.top_radius = 0.22
-			stm.bottom_radius = 0.24
-			stm.height = 0.7
-			stub.mesh = stm
-			stub.position = Vector3(cx, 1.05, cz)
-			stub.material_override = worn
-			root.add_child(stub)
-			continue
+	var dark := Destructible.make_material(Color("#a08a5e"), 0.02)
+	var stories := randi_range(3, 6)
+	var w := randf_range(2.6, 3.6)
+	var y := -0.2
+	for st in stories:
+		var sw := w * (1.0 - float(st) * 0.07)
+		var sh := randf_range(2.2, 3.0)
+		var lvl := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(sw, sh, sw)
+		lvl.mesh = bm
+		lvl.position = Vector3(0, y + sh * 0.5, 0)
+		lvl.material_override = stone if st % 2 == 0 else worn
+		root.add_child(lvl)
+		# banded cornice between stories
+		var band := MeshInstance3D.new()
+		var bbm := BoxMesh.new()
+		bbm.size = Vector3(sw + 0.3, 0.22, sw + 0.3)
+		band.mesh = bbm
+		band.position = Vector3(0, y + sh, 0)
+		band.material_override = dark
+		root.add_child(band)
+		# slender window slits
+		for face in 2:
+			var slit := MeshInstance3D.new()
+			var slm := BoxMesh.new()
+			slm.size = Vector3(0.22, sh * 0.5, 0.06)
+			slit.mesh = slm
+			slit.position = Vector3(sw * 0.2 * (1 if face == 0 else -1),
+				y + sh * 0.55, -sw * 0.5 - 0.02)
+			slit.material_override = Destructible.make_material(Color("#4a3a20"), 0.4)
+			root.add_child(slit)
+		y += sh + 0.22
+	# columned porch at the door
+	for cx in [-0.9, 0.9]:
 		var colm := MeshInstance3D.new()
 		var clm := CylinderMesh.new()
-		clm.top_radius = 0.2
-		clm.bottom_radius = 0.24
-		clm.height = ch + 0.6
+		clm.top_radius = 0.16
+		clm.bottom_radius = 0.2
+		clm.height = 2.2
 		colm.mesh = clm
-		colm.position = Vector3(cx, 0.7 + (ch + 0.6) * 0.5, cz)
+		colm.position = Vector3(cx, 1.1, -w * 0.5 - 0.7)
 		colm.material_override = stone
 		root.add_child(colm)
-	# entablature + either a dome or a pediment slab
-	var top := MeshInstance3D.new()
-	var tbm := BoxMesh.new()
-	tbm.size = Vector3(wr * 2.0 + 0.8, 0.4, wr * 2.0 + 0.8)
-	top.mesh = tbm
-	top.position = Vector3(0, 1.3 + ch + 0.35, 0)
-	top.material_override = stone
-	root.add_child(top)
-	if randf() < 0.5:
-		var dome := MeshInstance3D.new()
-		var dm := SphereMesh.new()
-		dm.radius = wr * 0.9
-		dm.height = wr * 0.9
-		dm.is_hemisphere = true
-		dome.mesh = dm
-		dome.position = Vector3(0, 1.5 + ch + 0.5, 0)
-		dome.material_override = worn
-		root.add_child(dome)
+	var lintel := MeshInstance3D.new()
+	var lbm := BoxMesh.new()
+	lbm.size = Vector3(2.4, 0.35, 1.0)
+	lintel.mesh = lbm
+	lintel.position = Vector3(0, 2.35, -w * 0.5 - 0.7)
+	lintel.material_override = worn
+	root.add_child(lintel)
+	# small dome cap
+	var dome := MeshInstance3D.new()
+	var dm := SphereMesh.new()
+	dm.radius = w * 0.4
+	dm.height = w * 0.4
+	dm.is_hemisphere = true
+	dome.mesh = dm
+	dome.position = Vector3(0, y, 0)
+	dome.material_override = worn
+	root.add_child(dome)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
 	root.rotate_object_local(Vector3.UP, randf() * TAU)
 
@@ -2108,11 +2262,11 @@ func _goofy_building(b, dir: Vector3) -> void:
 		var bm4 := BoxMesh.new()
 		bm4.size = Vector3(lw, lh, lw)
 		box.mesh = bm4
-		box.position = Vector3(randf_range(-0.4, 0.4), y + lh * 0.5,
-			randf_range(-0.4, 0.4))
-		box.rotation_degrees.y = randf_range(-14.0, 14.0)
+		box.position = Vector3(randf_range(-0.18, 0.18), y + lh * 0.5,
+			randf_range(-0.18, 0.18))
+		box.rotation_degrees.y = randf_range(-6.0, 6.0)   # kinda goofy. only kinda
 		box.material_override = Destructible.make_material(
-			Color.from_hsv(randf(), randf_range(0.55, 0.85), randf_range(0.7, 0.95)), 0.15)
+			Color.from_hsv(randf(), randf_range(0.3, 0.55), randf_range(0.65, 0.9)), 0.12)
 		root.add_child(box)
 		# porthole window: one glowing circle per level
 		var port := MeshInstance3D.new()
@@ -2127,17 +2281,18 @@ func _goofy_building(b, dir: Vector3) -> void:
 		box.add_child(port)
 		y += lh
 		pw = lw
-	# the party hat
-	var roof := MeshInstance3D.new()
-	var rm := CylinderMesh.new()
-	rm.top_radius = 0.0
-	rm.bottom_radius = pw * 0.75
-	rm.height = randf_range(1.4, 2.4)
-	roof.mesh = rm
-	roof.position = Vector3(0, y + rm.height * 0.5, 0)
-	roof.material_override = Destructible.make_material(
-		Color.from_hsv(randf(), 0.8, 0.95), 0.5)
-	root.add_child(roof)
+	# a hat, most of the time. sometimes restraint wins
+	if randf() < 0.6:
+		var roof := MeshInstance3D.new()
+		var rm := CylinderMesh.new()
+		rm.top_radius = 0.0
+		rm.bottom_radius = pw * 0.7
+		rm.height = randf_range(1.0, 1.8)
+		roof.mesh = rm
+		roof.position = Vector3(0, y + rm.height * 0.5, 0)
+		roof.material_override = Destructible.make_material(
+			Color.from_hsv(randf(), 0.5, 0.85), 0.3)
+		root.add_child(roof)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
 	root.rotate_object_local(Vector3.UP, randf() * TAU)
 
@@ -3243,7 +3398,7 @@ func net_break(pos: Vector3) -> void:
 ## graph (as indices into this same list).
 func collect_world() -> Array:
 	var nodes: Array = []
-	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop", "bench", "nterm"]:
+	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop", "bench", "nterm", "house"]:
 		for n in get_tree().get_nodes_in_group(grp):
 			if is_instance_valid(n) and (n.has_meta("placed_id") or n is ItemDrop) and not nodes.has(n):
 				if n is Rocket and n.piloted:
@@ -3296,6 +3451,13 @@ func collect_world() -> Array:
 				e["script"] = n.script_src
 		if n is Chest:
 			e["storage"] = n.storage
+		if n is House:
+			e["kind"] = n.kind
+			e["hslot"] = n.slot
+			e["hh"] = n.human_home
+			e["howner"] = n.owner_uid
+		if n is Furniture:
+			e["fkind"] = n.kind
 		if n is Rocket:
 			e["hyper"] = n.hyperdrive
 		out.append(e)
@@ -3344,6 +3506,13 @@ func restore_world() -> void:
 			continue
 		if n is ItemDrop:
 			n.setup(str(e.get("drop_id", "coal")), int(e.get("n", 1)))
+		if n is House:
+			n.kind = str(e.get("kind", "small"))
+			n.slot = int(e.get("hslot", -1))
+			n.human_home = bool(e.get("hh", false))
+			n.owner_uid = int(e.get("howner", 0))
+		if n is Furniture:
+			n.kind = str(e.get("fkind", "bench"))
 		add_child(n)
 		n.set_meta("placed_id", e["id"])
 		n.set_meta("owner", str(e.get("owner", "")))
@@ -3432,6 +3601,8 @@ func _spawn_world_obj(id: String) -> Node3D:
 			var bn := Bench.new()
 			return bn
 		"nterm": return NeuralinkTerminal.new()
+		"house": return House.new()
+		"furn": return Furniture.new()
 		"chairseat":
 			var cn := Bench.new()
 			cn.is_bench = false

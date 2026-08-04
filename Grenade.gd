@@ -56,6 +56,8 @@ func _boom() -> void:
 				continue
 			if not Net.can_break(str(n.get_meta("owner", ""))):
 				continue   # host says other people's stuff is off-limits
+			if n is EMachines.NuclearReactor:
+				continue   # containment shrugs off grenades. use a wrench.
 			var dmg := 3 if d <= KILL_R else 1
 			var hits := int(n.get_meta("g_dmg", 0)) + dmg
 			if hits >= 3:

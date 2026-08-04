@@ -528,6 +528,11 @@ var mind_dir: Vector3 = Vector3.ZERO   # the chip's strafe/walk input
 var mind_turn: float = 0.0             # the chip's turn input (rad/s)
 
 var home_city: int = -1         # index into Game.earth_cities. -2 = rural
+var my_house = null             # claimed town house (House)
+var _goal_house = null          # house being walked to right now
+var flat_house = null           # inside a house: flat gravity, cozy
+var _house_t: float = 0.0       # time left indoors
+var _leg: int = -1              # next rail stop on the current journey
 var _moved: bool = false        # already relocated once: settled now
 var _travel_to: int = -1        # riding the rail toward this city
 var _away_t: float = 0.0        # visiting: time left before homesickness
@@ -854,7 +859,8 @@ func _pick_act() -> void:
 			return
 	# city life: home leash and the occasional rail trip. dreamers and
 	# goofballs wander more; everyone comes home eventually.
-	if _home == Game.earth_body and not Game.earth_cities.is_empty():
+	if _home == Game.earth_body and not Game.earth_cities.is_empty() \
+			and flat_house == null:
 		if home_city == -1:
 			home_city = _nearest_city()
 		if home_city >= 0 and _travel_to < 0 and _away_t <= 0.0:
@@ -872,6 +878,34 @@ func _pick_act() -> void:
 			if cur3.angle_to(hd) * float(_home.radius) > 55.0:
 				_travel_to = home_city
 				return
+	# home life: claim an empty town house, visit yours sometimes,
+	# and sometimes bring a friend over to talk about things
+	if flat_house == null and _home == Game.earth_body:
+		if my_house != null and not is_instance_valid(my_house):
+			my_house = null
+		if my_house == null and randf() < 0.2:
+			for hn in get_tree().get_nodes_in_group("house"):
+				if hn is House and hn.human_home and hn.owner_uid == human_id:
+					my_house = hn
+					break
+			if my_house == null:
+				var bhd := 3600.0
+				var cand = null
+				for hn2 in get_tree().get_nodes_in_group("house"):
+					if hn2 is House and hn2.human_home and hn2.owner_uid == 0:
+						var hdd := global_position.distance_squared_to(hn2.global_position)
+						if hdd < bhd:
+							bhd = hdd
+							cand = hn2
+				if cand != null:
+					my_house = cand
+					my_house.owner_uid = human_id
+					my_house.furnish_for(_pers)
+		if my_house != null and randf() < 0.08:
+			_goal_house = my_house
+			_act = "gohouse"
+			_act_t = 40.0
+			return
 	# a good friend somewhere out there? go stand with them. friends
 	# drift apart and find each other again. nobody knows how they know.
 	if randf() < 0.18:
@@ -915,7 +949,7 @@ func _pick_act() -> void:
 	_dir = tang.normalized() if tang.length() > 0.01 else Vector3.ZERO
 
 func _up() -> Vector3:
-	if _home == null:
+	if flat_house != null or _home == null:
 		return Vector3.UP
 	return (global_position - _home.center).normalized()
 
@@ -1325,6 +1359,28 @@ func add_chip_visual() -> void:
 	led.material_override = Destructible.make_material(Color("#7bffb0"), 3.0)
 	_body._head_m.add_child(led)
 
+func _enter_house(h) -> void:
+	_release_seat()
+	_end_convo()
+	_goal_house = null
+	flat_house = h
+	_house_t = randf_range(30.0, 70.0)
+	global_position = h.interior_spawn() + Vector3(randf_range(-1.5, 1.5), 0.2,
+		randf_range(-1.5, 0.5))
+	velocity = Vector3.ZERO
+	_act = "wander"
+	_act_t = randf_range(2.0, 5.0)
+
+func _exit_house() -> void:
+	var h = flat_house
+	flat_house = null
+	_house_t = 0.0
+	if h != null and is_instance_valid(h):
+		global_position = h.global_position \
+			- h.global_transform.basis.z * 2.5 + h.global_transform.basis.y * 1.2
+	velocity = Vector3.ZERO
+	_pick_act()
+
 ## Chip command: swing at whoever's in arm's reach.
 func mind_punch() -> void:
 	for h in get_tree().get_nodes_in_group("earth_human"):
@@ -1340,6 +1396,21 @@ func mind_punch() -> void:
 ## Chip autopilot small talk: the terminal talks FOR them.
 func mind_talk() -> void:
 	_say(_social_line() if randf() < 0.5 else _smalltalk_line())
+
+## Nearest city with NO distance cap: for routing, everywhere is near
+## some station.
+func _nearest_city_any() -> int:
+	if _home == null or Game.earth_cities.is_empty():
+		return 0
+	var cur: Vector3 = (global_position - _home.center).normalized()
+	var best := 0
+	var bd := 99.0
+	for i in Game.earth_cities.size():
+		var a: float = cur.angle_to(Game.earth_cities[i]["dir"])
+		if a < bd:
+			bd = a
+			best = i
+	return best
 
 ## Which city is this, then. -2 means the countryside: no city within
 ## ~80m of surface arc, no leash, no civic duties.
@@ -1365,7 +1436,7 @@ func _maybe_adopt_city() -> void:
 	if idx < 0 or idx == home_city:
 		return
 	var city: Dictionary = Game.earth_cities[idx]
-	if float(_pers.get(str(city["vibe"]), 25.0)) > 60.0 and randf() < 0.5:
+	if float(_pers.get(str(city["vibe"]), 25.0)) > 70.0 and randf() < 0.15:
 		home_city = idx
 		_moved = true
 		_away_t = 0.0
@@ -1592,6 +1663,8 @@ func _physics_process(delta: float) -> void:
 		var pl = get_tree().get_first_node_in_group("player")
 		var d2 := global_position.distance_squared_to(pl.global_position) \
 			if pl != null else INF
+		if pl != null and flat_house != null and is_instance_valid(flat_house):
+			d2 = minf(d2, flat_house.global_position.distance_squared_to(pl.global_position))
 		_active = d2 < 3600.0
 		# labels only exist up close: no nametag dots dotting the
 		# horizon from the far side of the planet
@@ -1646,14 +1719,34 @@ func _physics_process(delta: float) -> void:
 	if _travel_to >= 0:
 		if _travel_to >= Game.earth_cities.size():
 			_travel_to = -1
+			_leg = -1
 		else:
-			var tgt: Vector3 = Game.earth_cities[_travel_to]["dir"]
+			# rail PATHFINDING: the network is a ring. ride it stop by
+			# stop the short way around -- nobody cuts across the fields
+			var nct := Game.earth_cities.size()
+			if _leg < 0:
+				var from := _nearest_city_any()
+				if from == _travel_to:
+					_leg = _travel_to
+				else:
+					var fwd_hops := (_travel_to - from + nct) % nct
+					var back_hops := (from - _travel_to + nct) % nct
+					_leg = (from + (1 if fwd_hops <= back_hops else -1) + nct) % nct
+			var tgt: Vector3 = Game.earth_cities[_leg]["dir"]
 			var cur: Vector3 = (global_position - _home.center).normalized()
 			var ang: float = cur.angle_to(tgt)
 			if ang < 0.02:
-				_travel_to = -1
-				velocity = Vector3.ZERO
-				_maybe_adopt_city()
+				if _leg != _travel_to:
+					# passing through. next stop, please.
+					var nct2 := Game.earth_cities.size()
+					var fh := (_travel_to - _leg + nct2) % nct2
+					var bh := (_leg - _travel_to + nct2) % nct2
+					_leg = (_leg + (1 if fh <= bh else -1) + nct2) % nct2
+				else:
+					_travel_to = -1
+					_leg = -1
+					velocity = Vector3.ZERO
+					_maybe_adopt_city()
 			else:
 				var step: float = clampf((16.0 * delta) / (float(_home.radius) * ang), 0.0, 1.0)
 				var nd: Vector3 = cur.slerp(tgt, step).normalized()
@@ -1673,7 +1766,8 @@ func _physics_process(delta: float) -> void:
 		_away_t -= delta
 		if _away_t <= 0.0 and home_city >= 0:
 			_travel_to = home_city   # every time. no exceptions.
-	var g := Universe.gravity_at(global_position)
+	var g: Vector3 = Vector3.DOWN * 9.0 if flat_house != null \
+		else Universe.gravity_at(global_position)
 
 	# thought bubble fades like the thought itself. the OUTLINE fades in
 	# lockstep -- left opaque it lingers as a black ghost of the words
@@ -1843,6 +1937,24 @@ func _physics_process(delta: float) -> void:
 					elif to_f.length() > 2.2:
 						speed = WALK_SPEED * 1.1
 					# close enough: stand together. chats start on their own
+			"gohouse":
+				if _goal_house == null or not is_instance_valid(_goal_house):
+					_pick_act()
+				else:
+					var to_h: Vector3 = _goal_house.global_position - global_position
+					_dir = (to_h - up * to_h.dot(up)).normalized()
+					if to_h.length() < 2.8:
+						var gh = _goal_house
+						_enter_house(gh)
+						if gh == my_house and randf() < 0.5:
+							var fr3 := _best_friend(80.0)
+							if fr3 != null and fr3.flat_house == null \
+									and fr3._goal_house == null:
+								fr3._goal_house = gh   # you. come see the place.
+								fr3._act = "gohouse"
+								fr3._act_t = 40.0
+					else:
+						speed = WALK_SPEED * 1.1
 			"goseat":
 				if _seat == null or not is_instance_valid(_seat):
 					_pick_act()
@@ -1896,11 +2008,19 @@ func _physics_process(delta: float) -> void:
 	up_direction = up
 	move_and_slide()
 	_grounded = is_on_floor()
+	# indoors: the visit timer. when it's up, home ejects you politely
+	if flat_house != null:
+		if not is_instance_valid(flat_house):
+			flat_house = null
+		else:
+			_house_t -= delta
+			if _house_t <= 0.0:
+				_exit_house()
 	# leash: calm humans belong on the ground; punched/panicking ones get
 	# real air time. only ACTUAL astronauts get snapped back.
-	var alt: float = global_position.distance_to(_home.center) - _home.radius
+	var alt: float = global_position.distance_to(_home.center) - float(_home.radius)
 	var leash := 30.0 if _panic_t > 0.0 else 3.0
-	if alt > leash:
+	if flat_house == null and alt > leash:
 		global_position = _home.center + up * (_home.radius + 1.1)
 		velocity = Vector3.ZERO
 

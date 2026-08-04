@@ -1,0 +1,479 @@
+class_name House
+extends StaticBody3D
+## A house: small on the outside, a whole flat-gravity room on the
+## inside (TARDIS school of architecture, same tech as the temples).
+##
+## The exterior sinks a real foundation into the planet so nothing
+## floats on curvy ground. On the wall: 3 POWER ports and 3 ITEM ports,
+## each its own labeled box with its own hitbox -- wire or funnel into
+## them outside and the twin port inside the house carries it through.
+## A window on the outside shows the interior in miniature (live: the
+## furniture, the humans, the player). A window on the inside shows the
+## actual outside world (planets, creatures, the noodle god, all of it).
+##
+## Kinds: small · two_story · box · basement · factory · tower.
+## Any machine works inside except drills (nothing to drill up there).
+## Reactors and RTGs make the place RADIOACTIVE (cancer is a mechanic).
+## A generator indoors fills the room with smoke. Read a book instead.
+
+const KINDS := ["small", "two_story", "box", "basement", "factory", "tower"]
+const BASE := Vector3(60000, 24000, -60000)   # pocket-interior estate
+const SLOT_SPACING := 800.0
+
+var kind: String = "small"
+var slot: int = -1              # which pocket lot this house owns
+var human_home: bool = false    # town house: humans only, no dudes
+var owner_uid: int = 0          # claiming human's id (human homes)
+
+var _iroot: Node3D              # interior nodes live under here
+var _in_ports: Array = []       # interior port machines
+var _out_ports: Array = []      # exterior port machines
+var _win_out_mesh: MeshInstance3D    # exterior window pane
+var _win_in_mesh: MeshInstance3D     # interior window pane
+var _vp_out: SubViewport        # renders interior (for the outside pane)
+var _vp_in: SubViewport         # renders outside (for the inside pane)
+var _cam_out: Camera3D
+var _cam_in: Camera3D
+var _haz_t := 0.0
+var _rad := false
+var _smoke := false
+var _smoke_node: GPUParticles3D
+var _door_pos := Vector3.ZERO   # local door spot (exterior)
+
+static var _next_slot := 0
+
+func room_center() -> Vector3:
+	return BASE + Vector3(float(slot) * SLOT_SPACING, 0, 0)
+
+func interior_spawn() -> Vector3:
+	return room_center() + Vector3(0, -room_size().y * 0.5 + 1.5, room_size().z * 0.5 - 3.0)
+
+func room_size() -> Vector3:
+	match kind:
+		"two_story":
+			return Vector3(14, 10, 14)
+		"box":
+			return Vector3(8, 4.5, 8)
+		"basement":
+			return Vector3(14, 5.5, 14)
+		"factory":
+			return Vector3(26, 9, 26)
+		"tower":
+			return Vector3(18, 30, 18)
+		_:
+			return Vector3(13, 5.5, 13)
+
+func _ready() -> void:
+	add_to_group("house")
+	if slot < 0:
+		slot = _next_slot
+	_next_slot = maxi(_next_slot, slot + 1)
+	_build_exterior()
+	_build_interior()
+	_build_ports()
+	_build_windows()
+
+# ------------------------------------------------------------- exterior
+
+func _wallmat(c: Color, e := 0.05) -> StandardMaterial3D:
+	return Destructible.make_material(c, e)
+
+func _box(parent: Node3D, size: Vector3, pos: Vector3, c: Color, e := 0.05) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var m := BoxMesh.new()
+	m.size = size
+	mi.mesh = m
+	mi.position = pos
+	mi.material_override = _wallmat(c, e)
+	parent.add_child(mi)
+	return mi
+
+func _build_exterior() -> void:
+	var wall := Color("#c9b8a0")
+	var roofc := Color("#7a4a3a")
+	match kind:
+		"box":
+			wall = Color("#8a8f96")
+		"factory":
+			wall = Color("#7a7f88")
+			roofc = Color("#4a4f58")
+		"tower":
+			wall = Color("#3a4452")
+		"two_story":
+			wall = Color("#d8cbb2")
+	var w := 5.0
+	var h := 3.4
+	match kind:
+		"two_story":
+			h = 6.2
+		"factory":
+			w = 8.0
+			h = 4.5
+		"tower":
+			w = 4.0
+			h = 18.0
+		"box":
+			w = 3.4
+			h = 3.0
+	# FOUNDATION: a deep plug so the house never floats on curvature
+	_box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0), wall.darkened(0.35))
+	# main shell
+	_box(self, Vector3(w, h, w), Vector3(0, h * 0.5, 0), wall)
+	if kind == "tower":
+		# glassy bands up the shaft
+		for f in int(h / 3.0):
+			_box(self, Vector3(w + 0.08, 0.9, w + 0.08),
+				Vector3(0, 1.6 + float(f) * 3.0, 0), Color("#6fb6dd"), 0.6)
+		_box(self, Vector3(w * 0.5, 1.4, w * 0.5), Vector3(0, h + 0.7, 0), wall.darkened(0.2))
+	elif kind == "factory":
+		# sawtooth roof + stack
+		for i in 3:
+			_box(self, Vector3(w, 1.2, w / 3.0),
+				Vector3(0, h + 0.6, -w / 3.0 + float(i) * (w / 3.0)), roofc)
+		var stack := MeshInstance3D.new()
+		var sm := CylinderMesh.new()
+		sm.top_radius = 0.3
+		sm.bottom_radius = 0.42
+		sm.height = 3.0
+		stack.mesh = sm
+		stack.position = Vector3(w * 0.3, h + 1.5, w * 0.3)
+		stack.material_override = _wallmat(Color("#5a5f68"))
+		add_child(stack)
+	elif kind != "box":
+		# pitched roof (two slabs)
+		for sgn in [-1.0, 1.0]:
+			var slab := _box(self, Vector3(w + 0.6, 0.25, w * 0.75),
+				Vector3(0, h + w * 0.22, sgn * w * 0.26), roofc)
+			slab.rotation_degrees.x = -sgn * 32.0
+	# door (dark inset) on -Z face
+	_door_pos = Vector3(0, 1.1, -w * 0.5 - 0.05)
+	_box(self, Vector3(1.2, 2.2, 0.12), _door_pos, Color("#3a2c20"), 0.02)
+	var tag := Label3D.new()
+	tag.text = ("HOUSE  [F]" if not human_home else "someone's home")
+	tag.font_size = 16
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.position = Vector3(0, h + 1.6, 0)
+	tag.modulate = Color(1, 1, 1, 0.75)
+	tag.outline_size = 5
+	add_child(tag)
+	# collider for the shell (also the interact hitbox)
+	var col := CollisionShape3D.new()
+	var cs := BoxShape3D.new()
+	cs.size = Vector3(w, h, w)
+	col.shape = cs
+	col.position = Vector3(0, h * 0.5, 0)
+	add_child(col)
+
+# ------------------------------------------------------------- interior
+
+func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12) -> void:
+	var half := size * 0.5
+	for wspec in [
+		[Vector3(size.x, 1, size.z), Vector3(0, -half.y, 0)],
+		[Vector3(size.x, 1, size.z), Vector3(0, half.y, 0)],
+		[Vector3(1, size.y, size.z), Vector3(-half.x, 0, 0)],
+		[Vector3(1, size.y, size.z), Vector3(half.x, 0, 0)],
+		[Vector3(size.x, size.y, 1), Vector3(0, 0, -half.z)],
+		[Vector3(size.x, size.y, 1), Vector3(0, 0, half.z)],
+	]:
+		var body := StaticBody3D.new()
+		var mi := MeshInstance3D.new()
+		var m := BoxMesh.new()
+		m.size = wspec[0]
+		mi.mesh = m
+		mi.material_override = _wallmat(c, e)
+		body.add_child(mi)
+		var col := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = wspec[0]
+		col.shape = bs
+		body.add_child(col)
+		_iroot.add_child(body)
+		body.global_position = center + wspec[1]
+	var light := OmniLight3D.new()
+	light.light_energy = 1.4
+	light.omni_range = maxf(size.x, size.z) * 1.3
+	_iroot.add_child(light)
+	light.global_position = center + Vector3(0, half.y - 1.0, 0)
+
+func _build_interior() -> void:
+	_iroot = Node3D.new()
+	get_tree().current_scene.add_child.call_deferred(_iroot)
+	await get_tree().process_frame
+	var c := room_center()
+	var sz := room_size()
+	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
+	_iroom(c, sz, warm)
+	var fy := c.y - sz.y * 0.5
+	match kind:
+		"two_story":
+			# half floor slab + stair boxes up the side
+			_solid(c + Vector3(-sz.x * 0.15, 0.0, 0), Vector3(sz.x * 0.7, 0.4, sz.z - 1.0), warm.darkened(0.15))
+			for st in 6:
+				_solid(c + Vector3(sz.x * 0.5 - 1.2, fy - c.y + 0.3 + float(st) * 0.75,
+					sz.z * 0.5 - 2.0 - float(st) * 0.9) + Vector3(0, 0, 0),
+					Vector3(2.0, 0.5, 1.0), warm.darkened(0.25))
+		"basement":
+			# the cellar: a second room straight below, with a laddered hole
+			_iroom(c + Vector3(0, -sz.y - 2.0, 0), Vector3(sz.x - 2.0, sz.y, sz.z - 2.0),
+				Color("#8a8272"), 0.06)
+			for st in 7:
+				_solid(c + Vector3(sz.x * 0.5 - 2.0 - float(st) * 0.8, -sz.y * 0.5 - float(st) * 0.9, -sz.z * 0.5 + 1.6),
+					Vector3(1.0, 0.4, 1.6), Color("#6a6255"))
+		"tower":
+			# floors every 5 units with a stair gap
+			var nf := int(sz.y / 5.0)
+			for f in range(1, nf):
+				_solid(c + Vector3(1.0, -sz.y * 0.5 + float(f) * 5.0, 0),
+					Vector3(sz.x - 4.0, 0.4, sz.z - 1.0), Color("#7a8090"))
+				for st in 5:
+					_solid(c + Vector3(-sz.x * 0.5 + 1.4, -sz.y * 0.5 + float(f - 1) * 5.0 + 0.5 + float(st) * 0.95,
+						-2.0 + float(st) * 1.0), Vector3(2.2, 0.5, 1.0), Color("#5a6070"))
+		"factory":
+			# painted work lines + a gantry beam
+			_solid(c + Vector3(0, -sz.y * 0.5 + 0.06, 0), Vector3(sz.x - 4.0, 0.05, 2.0), Color("#c9a83a"), 0.3)
+			_solid(c + Vector3(0, sz.y * 0.5 - 1.2, 0), Vector3(sz.x - 2.0, 0.5, 0.5), Color("#5a5f68"))
+	# EXIT door pad, back wall
+	var out := Gate.new().configure({
+		"action": "house_exit", "label": "LEAVE HOUSE",
+		"color": Color("#ffe066")})
+	_iroot.add_child(out)
+	out.global_position = c + Vector3(0, fy - c.y + 1.0, sz.z * 0.5 - 1.4)
+	out.set_meta("house", self)
+
+func _solid(gpos: Vector3, size: Vector3, c: Color, e := 0.08) -> void:
+	var body := StaticBody3D.new()
+	var mi := MeshInstance3D.new()
+	var m := BoxMesh.new()
+	m.size = size
+	mi.mesh = m
+	mi.material_override = _wallmat(c, e)
+	body.add_child(mi)
+	var col := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = size
+	col.shape = bs
+	body.add_child(col)
+	_iroot.add_child(body)
+	body.global_position = gpos
+
+# --------------------------------------------------------------- ports
+
+## 3 power + 3 item ports: each an Extender machine OUTSIDE, hard-wired
+## to a twin INSIDE. Wire/funnel to the box on the wall; the house wall
+## stops mattering. Each box has its own body, its own hitbox.
+func _build_ports() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var c := room_center()
+	var sz := room_size()
+	for i in 6:
+		var is_power := i < 3
+		var outp := EMachines.Extender.new()
+		outp.set_meta("house_port", true)
+		get_tree().current_scene.add_child(outp)
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var w := 5.0 if kind != "factory" else 8.0
+		if kind == "tower":
+			w = 4.0
+		if kind == "box":
+			w = 3.4
+		outp.global_transform = global_transform
+		outp.global_position = global_position \
+			+ global_transform.basis.x * (side * (w * 0.5 + 0.45)) \
+			+ global_transform.basis.y * (0.7 + float(i / 2) * 1.1)
+		outp.scale = Vector3(0.45, 0.45, 0.45)
+		_out_ports.append(outp)
+		var inp := EMachines.Extender.new()
+		inp.set_meta("house_port", true)
+		get_tree().current_scene.add_child(inp)
+		inp.global_position = c + Vector3(-sz.x * 0.5 + 1.0 + float(i) * 1.4,
+			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 1.0)
+		inp.scale = Vector3(0.6, 0.6, 0.6)
+		_in_ports.append(inp)
+		# the umbilical: outside twin feeds inside twin
+		if outp.has_method("connect_wire"):
+			if is_power:
+				outp.connect_wire(inp, "power", 0)
+			else:
+				outp.connect_wire(inp, "item", 2)
+
+# ------------------------------------------------------------- windows
+
+func _build_windows() -> void:
+	await get_tree().process_frame
+	var c := room_center()
+	var sz := room_size()
+	var w := 5.0 if kind != "factory" else 8.0
+	if kind == "tower":
+		w = 4.0
+	if kind == "box":
+		w = 3.4
+	# exterior pane: shows the interior, in miniature
+	_vp_out = SubViewport.new()
+	_vp_out.size = Vector2i(256, 192)
+	_vp_out.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_vp_out)
+	_vp_out.world_3d = get_viewport().world_3d
+	_cam_out = Camera3D.new()
+	_vp_out.add_child(_cam_out)
+	_cam_out.fov = 65.0
+	_cam_out.global_position = c + Vector3(0, 0.5, sz.z * 0.5 - 1.0)
+	_cam_out.look_at(c + Vector3(0, -sz.y * 0.25, 0), Vector3.UP)
+	_win_out_mesh = MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(1.6, 1.2)
+	_win_out_mesh.mesh = qm
+	var wm := StandardMaterial3D.new()
+	wm.albedo_texture = _vp_out.get_texture()
+	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_win_out_mesh.material_override = wm
+	_win_out_mesh.position = Vector3(1.6, 1.6, -w * 0.5 - 0.04)
+	_win_out_mesh.rotation_degrees.y = 180.0
+	add_child(_win_out_mesh)
+	# interior pane: shows the actual outside, live
+	_vp_in = SubViewport.new()
+	_vp_in.size = Vector2i(384, 288)
+	_vp_in.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_vp_in)
+	_vp_in.world_3d = get_viewport().world_3d
+	_cam_in = Camera3D.new()
+	_vp_in.add_child(_cam_in)
+	_cam_in.fov = 70.0
+	_win_in_mesh = MeshInstance3D.new()
+	var qm2 := QuadMesh.new()
+	qm2.size = Vector2(3.0, 2.2)
+	_win_in_mesh.mesh = qm2
+	var wm2 := StandardMaterial3D.new()
+	wm2.albedo_texture = _vp_in.get_texture()
+	wm2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_win_in_mesh.material_override = wm2
+	_iroot.add_child(_win_in_mesh)
+	_win_in_mesh.global_position = c + Vector3(sz.x * 0.5 - 0.6, 0.4, 0)
+	_win_in_mesh.rotation_degrees.y = -90.0
+
+# ----------------------------------------------------------- use / tick
+
+func use() -> void:
+	var p = get_tree().get_first_node_in_group("player")
+	if p == null:
+		return
+	if human_home:
+		Sfx.play("denied")   # it's SOMEONE'S. have some decency.
+		return
+	enter(p)
+
+func enter(p: Node3D) -> void:
+	Game.zone = "flat"
+	Game.zone_g = 9.0
+	p.global_position = interior_spawn()
+	p.velocity = Vector3.ZERO
+	Sfx.play("click", -12.0)
+
+func exit_to_door(p: Node3D) -> void:
+	Game.zone = ""
+	p.global_position = global_position + global_transform.basis.y * 1.2 \
+		- global_transform.basis.z * 2.0
+	p.velocity = Vector3.ZERO
+
+func _physics_process(delta: float) -> void:
+	_haz_t -= delta
+	var p = get_tree().get_first_node_in_group("player")
+	if p == null:
+		return
+	var inside: bool = p.global_position.distance_to(room_center()) < room_size().length()
+	var nearby: bool = p.global_position.distance_to(global_position) < 30.0
+	# window rendering only when someone can see the glass
+	if _vp_out:
+		_vp_out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if nearby \
+			else SubViewport.UPDATE_DISABLED
+	if _vp_in:
+		_vp_in.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
+			else SubViewport.UPDATE_DISABLED
+		if inside and _cam_in:
+			# the pane looks out from the exterior wall, wherever the
+			# planet has rotated the house to
+			_cam_in.global_transform = Transform3D(global_transform.basis, \
+				global_position + global_transform.basis.y * 1.8 \
+				- global_transform.basis.z * 3.2)
+	if _haz_t <= 0.0:
+		_haz_t = 2.0
+		_scan_hazards()
+	if inside:
+		if _rad:
+			Game.hurt(1.2)   # cancer, the slow kind
+			if randf() < 0.5:
+				Sfx.play("click", -16.0)   # the geiger disagrees with your choices
+		if _smoke:
+			Game.hurt(0.6)   # generator smoke: lungs disagree too
+
+## What did you PUT in there. Reactors and RTGs irradiate the room;
+## a generator fills it with smoke.
+func _scan_hazards() -> void:
+	_rad = false
+	_smoke = false
+	var c := room_center()
+	var r := room_size().length()
+	for m in get_tree().get_nodes_in_group("machine"):
+		if not (m is Node3D) or not is_instance_valid(m):
+			continue
+		if m.global_position.distance_to(c) > r:
+			continue
+		if m is EMachines.NuclearReactor or m is EMachines.RTG:
+			_rad = true
+		if m is EMachines.Generator:
+			_smoke = true
+	if _smoke and _smoke_node == null:
+		_smoke_node = GPUParticles3D.new()
+		_smoke_node.amount = 40
+		_smoke_node.lifetime = 3.0
+		var pm := ParticleProcessMaterial.new()
+		pm.direction = Vector3.UP
+		pm.spread = 60.0
+		pm.initial_velocity_min = 0.4
+		pm.initial_velocity_max = 1.2
+		pm.gravity = Vector3.ZERO
+		pm.scale_min = 0.4
+		pm.scale_max = 1.2
+		pm.color = Color(0.25, 0.25, 0.28, 0.5)
+		_smoke_node.process_material = pm
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.5
+		mesh.height = 1.0
+		mesh.radial_segments = 6
+		mesh.rings = 3
+		mesh.material = Destructible.make_material(Color(0.2, 0.2, 0.22), 0.0)
+		_smoke_node.draw_pass_1 = mesh
+		_iroot.add_child(_smoke_node)
+		_smoke_node.global_position = c
+	if _smoke_node:
+		_smoke_node.emitting = _smoke
+
+## A claiming human decorates to taste. The furniture is real: their
+## guests will sit on it, and you can watch through the window.
+func furnish_for(pers: Dictionary) -> void:
+	var picks: Array = ["carpet"]
+	if float(pers.get("dreamy", 25.0)) > 50.0:
+		picks.append("bed")
+	if float(pers.get("goofy", 25.0)) > 50.0:
+		picks.append("sofa")
+	if float(pers.get("grumpy", 25.0)) > 50.0:
+		picks.append("chair")
+	picks.append(Furniture.KINDS[randi() % Furniture.KINDS.size()])
+	var c := room_center()
+	var sz := room_size()
+	for i in picks.size():
+		var f := Furniture.new()
+		f.kind = str(picks[i])
+		get_tree().current_scene.add_child(f)
+		f.global_position = c + Vector3(
+			randf_range(-sz.x * 0.3, sz.x * 0.3),
+			-sz.y * 0.5 + 0.55,
+			randf_range(-sz.z * 0.3, sz.z * 0.3))
+
+func _exit_tree() -> void:
+	if _iroot and is_instance_valid(_iroot):
+		_iroot.queue_free()
+	for prt in _out_ports + _in_ports:
+		if is_instance_valid(prt):
+			prt.queue_free()

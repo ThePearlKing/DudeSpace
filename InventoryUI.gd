@@ -190,6 +190,13 @@ func _make_cell(item: Dictionary) -> Control:
 	var icon := ColorRect.new()
 	icon.color = _icon_color(item.id)
 	icon.custom_minimum_size = Vector2(48, 48)
+	# the color chip is the BACKGROUND; the item's real model spins
+	# in front of it like a tiny shopping channel
+	var spin := TextureRect.new()
+	spin.texture = IconLib.tex(str(item.id), get_tree())
+	spin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	spin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.add_child(spin)
 	var iw := CenterContainer.new()
 	iw.add_child(icon)
 	row.add_child(iw)

@@ -24,6 +24,9 @@ var _right: VBoxContainer
 var _face_rect: TextureRect
 var _talk_t := 6.0
 var _hint: Label
+var _orbit := 0.0            # right-drag camera spin around the puppet
+var _rmb := false
+var _vitals: Label
 
 const NEON := Color("#7bffb0")
 const DIM := Color("#9aa3ad")
@@ -134,6 +137,7 @@ func select_target(t) -> void:
 	target = t
 	target.minded = true
 	target.mind_dir = Vector3.ZERO
+	_orbit = 0.0
 	if target is EarthHuman:
 		target._release_seat()
 		target._end_convo()
@@ -199,10 +203,19 @@ func _release_target() -> void:
 		if sc:
 			sc.queue_free()
 
+func _other_ui_open() -> bool:
+	# an inventory / storage / machine screen under us still needs the
+	# mouse -- don't yank it back into capture on top of them
+	for grp in ["storage_ui", "machine_ui"]:
+		var n = get_tree().get_first_node_in_group(grp)
+		if n != null and n is CanvasItem and n.visible:
+			return true
+	return false
+
 func close() -> void:
 	_release_target()
 	queue_free()
-	if not Game.dead:
+	if not Game.dead and not _other_ui_open():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 ## ---------- the human brain panel ----------
@@ -213,6 +226,10 @@ func _build_human_brain() -> void:
 	head.text = "%s — BRAIN" % t.human_name
 	head.add_theme_font_size_override("font_size", 22)
 	_right.add_child(head)
+	_vitals = Label.new()
+	_vitals.add_theme_font_size_override("font_size", 15)
+	_vitals.add_theme_color_override("font_color", NEON)
+	_right.add_child(_vitals)
 	_face_rect = TextureRect.new()
 	_face_rect.custom_minimum_size = Vector2(128, 128)
 	_face_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -367,21 +384,23 @@ func _build_animal_brain() -> void:
 ## ---------- input + drive loop ----------
 
 func _view_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		if not _focus:
-			_focus = true
-		elif target is EarthHuman:
+	# no focus dance: LEFT click on the view punches, RIGHT drag spins
+	# the camera around the puppet. WASD just always works.
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			_rmb = event.pressed
+		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed \
+				and target is EarthHuman:
 			target.mind_punch()
+	elif event is InputEventMouseMotion and _rmb:
+		_orbit += event.relative.x * 0.01
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			if _focus:
-				_focus = false      # free the mouse for the brain panel
-			else:
-				close()
+			close()
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_P and _focus and target is EarthHuman:
+		elif event.keycode == KEY_P and target != null and target is EarthHuman:
 			target.mind_punch()
 			get_viewport().set_input_as_handled()
 
@@ -390,35 +409,33 @@ func _process(delta: float) -> void:
 		if target != null:
 			_show_browse()
 		return
-	# steer while focused: W/S along their facing, A/D STRAFE,
+	# steering is always live: W/S along their facing, A/D STRAFE,
 	# Q/E turns the facing itself
-	if _focus:
-		var fwd: Vector3 = -target.global_transform.basis.z
-		var right: Vector3 = target.global_transform.basis.x
-		var d := Vector3.ZERO
-		if Input.is_key_pressed(KEY_W):
-			d += fwd
-		if Input.is_key_pressed(KEY_S):
-			d -= fwd
-		if Input.is_key_pressed(KEY_A):
-			d -= right
-		if Input.is_key_pressed(KEY_D):
-			d += right
-		target.mind_dir = d.normalized() if d.length() > 0.1 else Vector3.ZERO
-		if target is EarthHuman:
-			target.mind_turn = (2.6 if Input.is_key_pressed(KEY_Q) else 0.0) \
-				- (2.6 if Input.is_key_pressed(KEY_E) else 0.0)
-	else:
-		target.mind_dir = Vector3.ZERO
-		if target is EarthHuman:
-			target.mind_turn = 0.0
+	var fwd: Vector3 = -target.global_transform.basis.z
+	var right: Vector3 = target.global_transform.basis.x
+	var d := Vector3.ZERO
+	if Input.is_key_pressed(KEY_W):
+		d += fwd
+	if Input.is_key_pressed(KEY_S):
+		d -= fwd
+	if Input.is_key_pressed(KEY_A):
+		d -= right
+	if Input.is_key_pressed(KEY_D):
+		d += right
+	target.mind_dir = d.normalized() if d.length() > 0.1 else Vector3.ZERO
+	if target is EarthHuman:
+		target.mind_turn = (2.6 if Input.is_key_pressed(KEY_Q) else 0.0) \
+			- (2.6 if Input.is_key_pressed(KEY_E) else 0.0)
 	if _hint:
-		_hint.text = ("▶ LINKED — WASD move (A/D strafe) · Q/E turn · P/click punch · ESC release") \
-			if _focus else "○ standby — click the view to take the wheel · ESC leaves"
-		_hint.add_theme_color_override("font_color", NEON if _focus else DIM)
-	# third person: hover behind and above the puppet
+		_hint.text = "▶ LINKED — WASD move (A/D strafe) · Q/E turn · click/P punch · right-drag spin · ESC leave"
+		_hint.add_theme_color_override("font_color", NEON)
+	if _vitals and target is EarthHuman:
+		_vitals.text = "VITALS   hp %.0f / 30   ·   age %.0f%% of a life" % [
+			maxf(0.0, target.hp), target.age / maxf(1.0, target.lifespan) * 100.0]
+	# third person: hover behind and above, right-drag orbits
 	var up: Vector3 = target.global_transform.basis.y
-	var back2: Vector3 = target.global_transform.basis.z
+	var back2: Vector3 = target.global_transform.basis.z.rotated(
+		target.global_transform.basis.y, _orbit)
 	_cam.global_position = target.global_position + up * 2.3 + back2 * 4.4
 	_cam.look_at(target.global_position + up * 0.9, up)
 	# the chip talks for them

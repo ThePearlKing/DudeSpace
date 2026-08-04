@@ -181,6 +181,17 @@ func _ui_open() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if Game.mode != Game.Mode.ON_FOOT or Game.dead:
 		return
+	if _ghost != null and event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_confirm_ghost()
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_cancel_ghost()
+		get_viewport().set_input_as_handled()
+		return
+	if _ghost != null and event is InputEventKey and event.pressed 			and event.keycode == KEY_ESCAPE:
+		_cancel_ghost()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
 			and get_window().has_focus():
 		_look += event.relative
@@ -230,6 +241,96 @@ func jetting() -> bool:
 	return _jetting
 
 var seated: Node3D = null   # bench seat marker we're parked on
+var _ghost: Node3D = null   # placement preview hologram
+var _ghost_cat := ""        # "house" | "furn"
+var _ghost_kind := ""
+
+func _start_ghost(cat: String, kind: String) -> void:
+	if cat == "house" and Game.zone != "":
+		Sfx.play("denied")   # a house inside a house is asking for trouble
+		return
+	_ghost_cat = cat
+	_ghost_kind = kind
+	_ghost = MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	if cat == "house":
+		var w := 5.0
+		var hh := 3.4
+		match kind:
+			"two_story": hh = 6.2
+			"factory":
+				w = 8.0
+				hh = 4.5
+			"tower":
+				w = 4.0
+				hh = 18.0
+			"box":
+				w = 3.4
+				hh = 3.0
+		bm.size = Vector3(w, hh, w)
+	else:
+		bm.size = Vector3(1.8, 1.0, 0.8) if kind in ["bench", "sofa"] 			else Vector3(1.2, 0.8, 1.6)
+	_ghost.mesh = bm
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.4, 1.0, 0.6, 0.35)
+	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ghost.material_override = gm
+	get_parent().add_child(_ghost)
+
+func _update_ghost() -> void:
+	if _ghost == null:
+		return
+	var sp := get_world_3d().direct_space_state
+	var f := _camera.global_position
+	var q := PhysicsRayQueryParameters3D.create(f, f - _camera.global_transform.basis.z * 22.0)
+	q.exclude = [get_rid()]
+	var hit := sp.intersect_ray(q)
+	if hit:
+		var up2: Vector3 = (hit.position - Universe.nearest(hit.position).center).normalized()
+		if Game.zone != "":
+			up2 = Vector3.UP
+		_ghost.global_transform = Transform3D(_basis_from_up(up2),
+			hit.position + up2 * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4))
+		_ghost.visible = true
+	else:
+		_ghost.visible = false
+
+func _confirm_ghost() -> void:
+	if _ghost == null or not _ghost.visible:
+		return
+	var tf := _ghost.global_transform
+	var base_pos: Vector3 = tf.origin - tf.basis.y * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4)
+	if _ghost_cat == "house":
+		var hn := House.new()
+		hn.kind = _ghost_kind
+		get_parent().add_child(hn)
+		hn.set_meta("placed_id", "house")
+		hn.set_meta("owner", Net.my_name())
+		hn.global_transform = Transform3D(tf.basis, base_pos)
+		hn.rotate_object_local(Vector3.UP, randf() * TAU)
+		Inventory.remove_res("housekit", 1)
+		Sfx.play("place")
+	else:
+		if Inventory.res_count("plantfiber") < 2:
+			Sfx.play("denied")
+			_cancel_ghost()
+			return
+		Inventory.remove_res("plantfiber", 2)
+		var fn := Furniture.new()
+		fn.kind = _ghost_kind
+		get_parent().add_child(fn)
+		fn.set_meta("placed_id", "furn")
+		fn.set_meta("owner", Net.my_name())
+		fn.global_transform = Transform3D(tf.basis, base_pos)
+		Sfx.play("place")
+	_cancel_ghost()
+
+func _cancel_ghost() -> void:
+	if _ghost and is_instance_valid(_ghost):
+		_ghost.queue_free()
+	_ghost = null
+	_ghost_cat = ""
 
 func sit_on(seat: Node3D) -> void:
 	seated = seat
@@ -241,6 +342,8 @@ func _physics_process(delta: float) -> void:
 		return
 	# parked on a bench: pinned until a movement key. the humans sit on
 	# their side, you sit on yours. equality.
+	if _ghost != null:
+		_update_ghost()
 	if seated != null:
 		if not is_instance_valid(seated):
 			seated = null
@@ -933,6 +1036,9 @@ func _use_selected() -> void:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm":
+			if id in ["coaldrill", "autominer"] and Game.zone != "":
+				Sfx.play("denied")   # nothing to drill in a pocket dimension
+				return
 			var n: Node3D
 			match id:
 				"chest": n = Chest.new()
@@ -1117,6 +1223,25 @@ func _use_selected() -> void:
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
+		"housekit":
+			var hopts: Array = []
+			for k in House.KINDS:
+				hopts.append({"id": k, "label": {"small": "Small House",
+					"two_story": "Two-Story House", "box": "Compact Box",
+					"basement": "House w/ Basement", "factory": "Factory House",
+					"tower": "Skyscraper"}[k]})
+			var pui := PickUI.new().configure("HOUSE TYPE", hopts,
+				func(kind: String) -> void:
+					_start_ghost("house", kind))
+			get_tree().current_scene.add_child(pui)
+		"furnkit":
+			var fopts: Array = []
+			for k2 in Furniture.KINDS:
+				fopts.append({"id": k2, "label": k2.capitalize()})
+			var pui2 := PickUI.new().configure("FURNITURE (2 plantfiber)", fopts,
+				func(kind: String) -> void:
+					_start_ghost("furn", kind))
+			get_tree().current_scene.add_child(pui2)
 		"grenade":
 			var gr := Grenade.new()
 			get_parent().add_child(gr)

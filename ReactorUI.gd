@@ -160,6 +160,12 @@ func _ready() -> void:
 	vrow.add_child(_vent_b)
 	col.add_child(vrow)
 
+	var man := Button.new()
+	man.text = "OPERATOR'S MANUAL"
+	man.custom_minimum_size = Vector2(200, 36)
+	man.pressed.connect(_open_manual)
+	col.add_child(man)
+
 	col.add_child(_section("FUEL"))
 	var lb := Button.new()
 	lb.text = "LOAD URANIUM ROD (from inventory)"
@@ -196,6 +202,21 @@ func _ready() -> void:
 			rx.do_scram())
 	col.add_child(scram)
 
+## The rod, described like the maintenance sheet would.
+func _fuel_line() -> String:
+	if rx._fuel > 0.0:
+		var bu: float = rx.rod_burnup() * 100.0
+		var cond := "fresh"
+		if bu > 85.0:
+			cond = "nearly spent"
+		elif bu > 55.0:
+			cond = "worn"
+		elif bu > 20.0:
+			cond = "in service"
+		return "rod %.0f%% burned (%s) · %ds left" % [bu, cond, int(rx._fuel)]
+	var hopper := int(rx.in_slot["n"]) if str(rx.in_slot["id"]) == "uranium" else 0
+	return "NO ROD IN CORE · hopper: %d" % hopper
+
 func _section(txt: String) -> Label:
 	var l := Label.new()
 	l.text = txt
@@ -219,9 +240,71 @@ func _rods(d: float) -> void:
 	else:
 		Sfx.play("click", -14.0)
 
+func _other_ui_open() -> bool:
+	# an inventory / storage / machine screen under us still needs the
+	# mouse -- don't yank it back into capture on top of them
+	for grp in ["storage_ui", "machine_ui"]:
+		var n = get_tree().get_first_node_in_group(grp)
+		if n != null and n is CanvasItem and n.visible:
+			return true
+	return false
+
+var _manual: Panel = null
+
+## The startup procedure, as taught to every operator who is still alive.
+func _open_manual() -> void:
+	if _manual != null:
+		_manual.queue_free()
+		_manual = null
+		return
+	_manual = Panel.new()
+	_manual.set_anchors_preset(Control.PRESET_CENTER)
+	_manual.custom_minimum_size = Vector2(560, 520)
+	var st2 := StyleBoxFlat.new()
+	st2.bg_color = Color("#26241c")
+	st2.border_color = AMBER
+	st2.set_border_width_all(2)
+	_manual.add_theme_stylebox_override("panel", st2)
+	get_child(0).add_child(_manual)
+	var t2 := Label.new()
+	t2.text = """OPERATOR'S MANUAL — DO NOT LAMINATE
+
+STARTUP (in this order, no improvising):
+ 1. LOAD a uranium rod. an empty core does nothing.
+ 2. COOLANT FLOW to HALF or FULL. no flow, no startup mode.
+ 3. MODE: STARTUP. rods now move, but only down to 45%%.
+ 4. Rods OUT in small steps. watch reactivity (ρ):
+    ρ negative = power falling. ρ positive = power RISING,
+    exponentially. small positive is a startup. big positive
+    is a headline.
+ 5. When POWER > 3%% and CORE is warm, MODE: RUN.
+ 6. Rods OUT slowly toward criticality. the hot core and the
+    xenon both push ρ down -- that's the core stabilizing
+    itself. let it.
+ 7. When steam is real (power x flow), close the BREAKER.
+    too early = turbine trip. that's embarrassing, not fatal.
+
+RULES OF NOT EXPLODING:
+ · CORE temp climbs when power beats cooling. above ~550°C
+   you are spending margin. at 1000°C you are news.
+ · PRESSURE follows temp. the guarded VENT dumps 30 bar and
+   costs coolant. coolant comes back only when the core is calm.
+ · XENON: shut down hot and the poison peaks. pulling hard
+   against xenon, then having it burn off at power, is the
+   classic way to die. pull GENTLY near criticality.
+ · in doubt: SCRAM. rods fall, breaker opens, you live. the
+   xenon will make restart annoying. annoying beats glowing.
+
+(click MANUAL again to close)"""
+	t2.add_theme_font_size_override("font_size", 14)
+	t2.add_theme_color_override("font_color", Color("#e8dcb8"))
+	t2.position = Vector2(18, 14)
+	_manual.add_child(t2)
+	Sfx.play("click", -16.0)
+
 func close() -> void:
 	queue_free()
-	if not Game.dead:
+	if not Game.dead and not _other_ui_open():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _input(event: InputEvent) -> void:
@@ -248,7 +331,7 @@ func _process(delta: float) -> void:
 		rx.coolant, ["OFF", "HALF", "FULL"][rx.flow],
 		"CLOSED (exporting)" if rx.breaker else "OPEN",
 		rx.out_eu_s(), rx.buf, rx.buf_cap,
-		("%ds" % int(rx._fuel)) if rx._fuel > 0.0 else "EMPTY  · hopper: " + str(int(rx.in_slot["n"])) + " rods" if str(rx.in_slot["id"]) == "uranium" else "EMPTY"]
+		_fuel_line()]
 	_lamp("HI TEMP", rx.temp > 55.0, rx.temp > 80.0)
 	_lamp("HI PRESS", rx.press > 65.0, rx.press > 85.0)
 	_lamp("LO COOLANT", rx.coolant < 55.0, rx.coolant < 30.0)
