@@ -1439,6 +1439,23 @@ func cut_doorway(frame: Node3D) -> void:
 			else Vector3(wpos.x, seg[4], wpos.z + seg[1])
 
 ## The little hallway between two cut walls, plus the outside tunnel.
+	# trim (baseboards, crown, seams) never had collision, but a bar
+	# drawn ACROSS the opening still reads as a blocked door -- clear any
+	# decorative mesh crossing the doorway column
+	var f_along: Vector3 = frame.global_transform.basis.x
+	var f_out: Vector3 = -frame.global_transform.basis.z
+	for ch2 in _iroot.get_children():
+		if ch2 is MeshInstance3D and ch2.mesh is BoxMesh \
+				and ch2.get_child_count() == 0:
+			var rel2: Vector3 = ch2.global_position - frame.global_position
+			var perp: float = absf(rel2.dot(f_out))
+			var along: float = absf(rel2.dot(f_along))
+			var bsz2: Vector3 = (ch2.mesh as BoxMesh).size
+			var bhalf: float = maxf(bsz2.x, bsz2.z) * 0.5
+			if perp < 0.8 and along < bhalf + 1.1 \
+					and rel2.y > -0.5 and rel2.y < 3.2:
+				ch2.queue_free()
+
 func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void:
 	var fa_p := Vector3.ZERO
 	var fb_p := Vector3.ZERO
