@@ -2993,12 +2993,6 @@ func _spawn_rocks(b, count: int, col: Color) -> void:
 		var s := randf_range(1.0, 2.4)
 		nd.setup(Vector3(s, s * randf_range(0.7, 1.2), s), col, 2, 3, 0.1)
 		add_child(nd)
-		if res == "ultima":
-			# ultima shards boil with the portal glow
-			(func() -> void:
-				for ch in nd.get_children():
-					if ch is MeshInstance3D:
-						ch.material_override = Surfaces.portal(Color("#7df9ff"))).call_deferred()
 		var d := _surface_dir()
 		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
 
