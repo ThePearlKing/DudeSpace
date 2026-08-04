@@ -297,6 +297,16 @@ STARTUP (in this order, no improvising):
  7. When steam is real (power x flow), close the BREAKER.
     too early = turbine trip. that's embarrassing, not fatal.
 
+FUEL, OR: WHY ρ JUST SLAMMED NEGATIVE
+ · one rod = ~60 seconds of full-power burn. burn slower,
+   it lasts longer.
+ · at FUEL 0%% the core physically cannot react: ρ pins to
+   -1.0 instantly and power dies. that's not a malfunction,
+   that's an empty furnace.
+ · watch the FUEL %% on the readout; the FUEL LOW lamp and
+   the coach line warn you near the end. keep rods in the
+   hopper -- a FUNNEL can restock it automatically.
+
 RULES OF NOT EXPLODING:
  · CORE temp climbs when power beats cooling. above ~550°C
    you are spending margin. at 1000°C you are news.
@@ -340,7 +350,9 @@ func _process(delta: float) -> void:
 	# the coach line: says exactly what the core is waiting for
 	var coach := ""
 	if rx._fuel <= 0.0:
-		coach = "\n>> LOAD URANIUM"
+		coach = "\n>> FUEL SPENT: ρ pinned at -1 until you LOAD URANIUM"
+	elif rx._fuel < 12.0:
+		coach = "\n>> FUEL LOW: ~%.0fs of burn left -- restock the hopper" % rx._fuel
 	elif rx.mode == 1 and rho <= 0.0:
 		coach = "\n>> ρ negative: rods below 65%% before power can rise"
 	elif rx.mode == 1 and rx.power < 0.03:

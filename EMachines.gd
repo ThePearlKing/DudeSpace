@@ -740,6 +740,7 @@ class NuclearReactor extends Machine:
 	var _blades: Array = []       # control blades sinking between rods
 	var _waters: Array = []       # the pool volumes, one per window
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
+	var _lowfuel_warned: bool = false
 
 	var _rhits: int = 0
 
@@ -1003,6 +1004,17 @@ class NuclearReactor extends Machine:
 		xenon = clampf(xenon + (0.045 * power - 0.09 * power * xenon \
 			- 0.012 * xenon) * delta, 0.0, 1.0)
 		_fuel = maxf(0.0, _fuel - power * delta)
+		# audible warning BEFORE the core starves -- rho slamming to -1
+		# with no notice was reading as a random breakdown
+		if _fuel > 0.0 and _fuel < 12.0 and not _lowfuel_warned \
+				and str(in_slot["id"]) == "":
+			_lowfuel_warned = true
+			Sfx.play("denied", -6.0)
+			if _panel != null:
+				_panel.text = "⚠ FUEL LOW\nSTOCK THE HOPPER"
+				_panel_t = 2.0
+		elif _fuel > 30.0 or str(in_slot["id"]) != "":
+			_lowfuel_warned = false
 		# --- thermal-hydraulics: pump + coolant carry heat to the turbine ---
 		var fl := float(flow) * 0.5   # 0 / 0.5 / 1.0
 		var cooling := COOL_RATE * fl * (coolant / 100.0) + 1.5
