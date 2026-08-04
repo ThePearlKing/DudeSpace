@@ -573,16 +573,18 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 	rng.seed = seed_v
 	var base := 392.0
 	var beat := 60.0 / 150.0
-	var bars := 4
 	var barlen := int(4.0 * beat * SR)
-	var total := barlen * bars
+	var total := barlen * 16
 	var buf := PackedFloat32Array()
 	buf.resize(total)
 	var arp: Array = [0, 3, 7, 10, 12, 10, 7, 3]
 	var trans: Array = [0, 0, -2, 3]
 	var s16 := int(beat * SR * 0.25)
-	for bar in bars:
-		var tr := int(trans[bar])
+	# 16 bars: bars 0-7 = the classic loop twice; bars 8-15 = SAME arps
+	# but the bass wakes up and the drums get complicated. then loop.
+	for bar in 16:
+		var part2 := bar >= 8
+		var tr := int(trans[bar % 4])
 		var b0 := bar * barlen
 		# the arp: 16ths, pattern-locked
 		for n in 16:
@@ -594,24 +596,63 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 				var env := minf(1.0, float(i) / (SR * 0.003)) \
 					* (1.0 - float(i) / (s16 * 0.85))
 				buf[ns + i] += (0.16 if fmod(f * t, 1.0) < 0.5 else -0.16) * env
-		# triangle bass: eighths, root-root-fifth-root figure
-		for e8 in 8:
-			var bsemi := tr + (7 if e8 % 4 == 2 else 0)
-			var bf := base * 0.25 * pow(2.0, float(bsemi) / 12.0)
-			var bs := b0 + e8 * s16 * 2
-			for i in mini(int(s16 * 1.7), total - bs):
-				var t2 := float(i) / SR
-				var tri := 2.0 * absf(2.0 * fmod(bf * t2, 1.0) - 1.0) - 1.0
-				var env2 := minf(1.0, float(i) / (SR * 0.004)) \
-					* (1.0 - float(i) / (s16 * 1.7) * 0.6)
-				buf[bs + i] += tri * 0.22 * env2
-		# hats: every 16th, accents on the beat
-		for n2 in 16:
-			var hs := b0 + n2 * s16
-			var amp := 0.07 if n2 % 4 == 0 else 0.035
-			for i in mini(int(0.012 * SR), total - hs):
-				buf[hs + i] += (randf() * 2.0 - 1.0) * amp \
-					* (1.0 - float(i) / (0.012 * SR))
+		if not part2:
+			# triangle bass: eighths, root-root-fifth-root figure
+			for e8 in 8:
+				var bsemi := tr + (7 if e8 % 4 == 2 else 0)
+				var bf := base * 0.25 * pow(2.0, float(bsemi) / 12.0)
+				var bs := b0 + e8 * s16 * 2
+				for i in mini(int(s16 * 1.7), total - bs):
+					var t2 := float(i) / SR
+					var tri := 2.0 * absf(2.0 * fmod(bf * t2, 1.0) - 1.0) - 1.0
+					var env2 := minf(1.0, float(i) / (SR * 0.004)) \
+						* (1.0 - float(i) / (s16 * 1.7) * 0.6)
+					buf[bs + i] += tri * 0.22 * env2
+			# hats: every 16th, accents on the beat
+			for n2 in 16:
+				var hs := b0 + n2 * s16
+				var amp := 0.07 if n2 % 4 == 0 else 0.035
+				for i in mini(int(0.012 * SR), total - hs):
+					buf[hs + i] += (randf() * 2.0 - 1.0) * amp \
+						* (1.0 - float(i) / (0.012 * SR))
+		else:
+			# PART 2 bass: syncopated 16ths walking root/octave/fifth with
+			# chromatic approaches -- the triangle learns to funk
+			var bpat: Array = [0, -1, 12, 0, 7, -1, 12, 5, 0, 12, -1, 7, 0, 10, 12, -1]
+			for n3 in 16:
+				var bp := int(bpat[n3])
+				if bp == -1:
+					continue
+				var bf2 := base * 0.25 * pow(2.0, float(tr + bp) / 12.0)
+				var bs2 := b0 + n3 * s16
+				for i in mini(int(s16 * 0.9), total - bs2):
+					var t3 := float(i) / SR
+					var tri2 := 2.0 * absf(2.0 * fmod(bf2 * t3, 1.0) - 1.0) - 1.0
+					var env3 := minf(1.0, float(i) / (SR * 0.003)) \
+						* (1.0 - float(i) / (s16 * 0.9) * 0.5)
+					buf[bs2 + i] += tri2 * 0.26 * env3
+			# PART 2 drums: syncopated kicks, backbeat snares with a ghost,
+			# 16th hats with velocity, an open hat pushing the turnaround
+			for kn in [0, 3, 6, 10, 14]:
+				var ks := b0 + kn * s16
+				for i in mini(int(0.09 * SR), total - ks):
+					var tk := float(i) / SR
+					buf[ks + i] += sin(TAU * (85.0 - tk * 300.0) * tk) \
+						* exp(-tk * 32.0) * 0.5
+			for sn in [4, 12, 15]:
+				var ss := b0 + sn * s16
+				var samp := 0.3 if sn != 15 else 0.14
+				for i in mini(int(0.08 * SR), total - ss):
+					buf[ss + i] += ((randf() * 2.0 - 1.0) * 0.7 \
+						+ sin(TAU * 190.0 * float(i) / SR) * 0.3) \
+						* exp(-float(i) / (SR * 0.02)) * samp
+			for n4 in 16:
+				var hs2 := b0 + n4 * s16
+				var hamp := 0.08 if n4 % 4 == 0 else (0.05 if n4 % 2 == 0 else 0.028)
+				var hlen := 0.05 if n4 == 7 else 0.012   # the open hat
+				for i in mini(int(hlen * SR), total - hs2):
+					buf[hs2 + i] += (randf() * 2.0 - 1.0) * hamp \
+						* (1.0 - float(i) / (hlen * SR))
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
