@@ -598,8 +598,11 @@ func _house_test() -> void:
 	hu._goal_house = th
 	hu._act = "gohouse"
 	hu._act_t = 40.0
-	for i in 40:
+	for i in 60:
 		await get_tree().create_timer(0.25).timeout
+		if i % 12 == 0:
+			print("HOUSETEST walk: act=", hu._act, " d=%.1f" % \
+				hu.global_position.distance_to(th.door_spot()))
 		if hu.flat_house != null:
 			break
 	print("HOUSETEST human moved in: ", hu.flat_house == th)
