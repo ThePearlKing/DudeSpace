@@ -14,6 +14,12 @@ const PORTAL := 5
 
 static var _cache := {}
 
+## Quit-time hygiene: release cached materials/shader so the renderer
+## doesn't report their RIDs as leaked on the way out.
+static func shutdown() -> void:
+	_cache.clear()
+	_shader = null
+
 const _SH := """
 shader_type spatial;
 uniform vec4 base : source_color;

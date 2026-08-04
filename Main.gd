@@ -1152,6 +1152,14 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	# window closed mid-run: save the exact position on the way out
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		# static caches held render resources past teardown -> the wall
+		# of "leaked at exit" warnings on quit. Drop them first.
+		Surfaces.shutdown()
+		IconLib.shutdown(get_tree())
+		RadioLib._music_cache.clear()
+		RadioLib._static_wav = null
+		RadioLib._eerie_wav = null
+		RadioLib._rick_wav = null
 		var petc = get_tree().get_first_node_in_group("pet")
 		if petc != null and is_instance_valid(petc):
 			Save.set_pet(true, petc.genome, petc.staying)

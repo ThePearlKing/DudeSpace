@@ -65,7 +65,10 @@ func _build_main_menu() -> void:
 		["MULTIPLAYER", _open_multiplayer],
 		["TUTORIAL", _start_tutorial],
 		["OPTIONS", _open_options],
-		["QUIT", func() -> void: get_tree().quit()],
+		["QUIT", func() -> void:
+			Surfaces.shutdown()
+			IconLib.shutdown(get_tree())
+			get_tree().quit()],
 	]
 	for e in entries:
 		var b := Button.new()

@@ -7,6 +7,13 @@ extends RefCounted
 
 static var _pool := {}   # id -> SubViewport
 
+## Quit-time hygiene: free the icon viewports before the renderer dies.
+static func shutdown(tree: SceneTree) -> void:
+	_pool.clear()
+	var h := tree.root.get_node_or_null("IconHost")
+	if h != null:
+		h.free()
+
 static func _host(tree: SceneTree) -> Node:
 	var root := tree.root
 	var h := root.get_node_or_null("IconHost")
