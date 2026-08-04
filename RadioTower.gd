@@ -353,7 +353,7 @@ func work(delta: float) -> void:
 		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 140000.0, 0.0, 1.0)
 		clear = bs * (1.0 - 0.9 * pow(far, 1.3))
 	_last_sig = clear
-	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
+	var hiss_target := linear_to_db(clampf(0.9 - clear * 0.78, 0.06, 1.0)) - 3.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	# HYSTERESIS: the tuned station keeps the receiver unless something
 	# CLEARLY beats it -- a beam grazing two stations must not flap
@@ -377,7 +377,8 @@ func work(delta: float) -> void:
 		return
 	_bad_t = 0.0
 	var st: Dictionary = stations[best]
-	var talk_target := linear_to_db(clampf(clear, 0.05, 1.0))
+	# squared: off-tune signal sinks FAST, so the risen static DROWNS it
+	var talk_target := linear_to_db(clampf(clear * clear, 0.02, 1.0))
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
 	var freq_seed := int(st["freq"] * 10.0)
 	var kind := str(st["kind"])
