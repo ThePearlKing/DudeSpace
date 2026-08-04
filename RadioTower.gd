@@ -87,8 +87,8 @@ func _ready() -> void:
 		AudioServer.set_bus_send(bi, "Master")
 		AudioServer.add_bus_effect(bi, AudioEffectSpectrumAnalyzer.new())
 	_an = AudioServer.get_bus_effect_instance(bi, 0)
-	_spec_img = Image.create(96, 40, false, Image.FORMAT_RGB8)
-	_spec_img.fill(Color(0.01, 0.02, 0.05))
+	_spec_img = Image.create(192, 64, false, Image.FORMAT_RGB8)
+	_spec_img.fill(Color(0.015, 0.01, 0.0))
 	spec_tex = ImageTexture.create_from_image(_spec_img)
 	# little spectrogram SCREENS on the base, fed by that texture
 	for sxs in [-1.0, 1.0]:
@@ -410,17 +410,18 @@ func _process(d: float) -> void:
 	_spec_t -= d
 	if _spec_t <= 0.0 and _an != null and _spec_img != null:
 		_spec_t = 1.0 / 15.0
-		var region := _spec_img.get_region(Rect2i(1, 0, 95, 40))
-		_spec_img.blit_rect(region, Rect2i(0, 0, 95, 40), Vector2i(0, 0))
-		for b in 40:
-			var f0 := 60.0 * pow(8000.0 / 60.0, float(b) / 40.0)
-			var f1 := 60.0 * pow(8000.0 / 60.0, float(b + 1) / 40.0)
+		var region := _spec_img.get_region(Rect2i(1, 0, 191, 64))
+		_spec_img.blit_rect(region, Rect2i(0, 0, 191, 64), Vector2i(0, 0))
+		for b in 64:
+			var f0 := 60.0 * pow(8000.0 / 60.0, float(b) / 64.0)
+			var f1 := 60.0 * pow(8000.0 / 60.0, float(b + 1) / 64.0)
 			var mag: float = _an.get_magnitude_for_frequency_range(f0, f1).length()
 			var db := clampf((linear_to_db(maxf(mag, 0.00001)) + 55.0) / 55.0, 0.0, 1.0)
-			var cc := Color(0.01, 0.02, 0.05).lerp(Color(0.05, 0.75, 1.0), db)
-			if db > 0.65:
-				cc = cc.lerp(Color(1.0, 0.9, 0.3), (db - 0.65) / 0.35)
-			_spec_img.set_pixel(95, 39 - b, cc)
+			# HD heat: near-black -> ember orange -> bright YELLOW
+			var cc := Color(0.015, 0.01, 0.0).lerp(Color(0.85, 0.32, 0.03), minf(db / 0.6, 1.0))
+			if db > 0.6:
+				cc = cc.lerp(Color(1.0, 0.95, 0.35), (db - 0.6) / 0.4)
+			_spec_img.set_pixel(191, 63 - b, cc)
 		spec_tex.update(_spec_img)
 	# a locked dish TRACKS its target as it moves
 	if track_node != null and is_instance_valid(track_node):
