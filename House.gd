@@ -509,7 +509,8 @@ func _build_interior() -> void:
 	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
 	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower", "moonbase"] else Surfaces.PLASTER
 	# the basement supplies its own floor (the one with the HOLE in it)
-	_iroom(c, sz, warm, 0.12, [0] if kind == "basement" else [])
+	_iroom(c, sz, warm, 0.12,
+		[0] if kind == "basement" else ([1] if kind == "moonbase" else []))
 	var fy := c.y - sz.y * 0.5
 	# every home: a visible ceiling light fixture and a wall trim band
 	_deco(c + Vector3(0, sz.y * 0.5 - 0.35, 0), Vector3(1.4, 0.12, 1.4),
@@ -659,22 +660,30 @@ func _build_interior() -> void:
 			for dx2 in [-5.0, 5.0]:
 				_deco(c + Vector3(dx2, sz.y * 0.5 - 1.35, 0),
 					Vector3(0.6, 0.06, 2.2), Color("#fff2c8"), 1.4)
-			# ORANGE dome skylight over the hub: warped, tinted, glowing
+			# the ROOF IS A DOME: the generic ceiling is skipped for the
+			# moonbase; flat panels cover only the wings, and the hub gets
+			# a big dome you can actually SEE from inside (cull off),
+			# showing the sky like the window it is
+			for wx in [-1.0, 1.0]:
+				_solid(c + Vector3(wx * (5.0 + (sz.x * 0.5 - 5.0) * 0.5),
+					sz.y * 0.5, 0), Vector3(sz.x * 0.5 - 5.0, 0.4, sz.z), mgray)
 			var odome := MeshInstance3D.new()
 			var odm := SphereMesh.new()
-			odm.radius = 4.6
-			odm.height = 3.4
+			odm.radius = 5.6
+			odm.height = 4.5
 			odm.is_hemisphere = true
 			var omat2 := StandardMaterial3D.new()
-			omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.5)
+			omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.6)
 			omat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			omat2.emission_enabled = true
 			omat2.emission = Color(1.0, 0.5, 0.12)
-			omat2.emission_energy_multiplier = 1.1
+			omat2.emission_energy_multiplier = 0.8
+			omat2.cull_mode = BaseMaterial3D.CULL_DISABLED
 			odome.mesh = odm
 			odome.material_override = omat2
+			odome.extra_cull_margin = 8.0
 			_iroot.add_child(odome)
-			odome.global_position = c + Vector3(0, sz.y * 0.5 - 0.4, 0)
+			odome.global_position = c + Vector3(0, sz.y * 0.5 - 0.1, 0)
 			_mb_dome_in = odome
 			# wing dressing: bunk west, console east, floor decals
 			_deco(c + Vector3(-9.5, fy - c.y + 0.55, 2.5),
@@ -878,7 +887,7 @@ func _build_ports() -> void:
 		inp.global_position = c + Vector3(
 			(-sz.x * 0.25 if is_power else sz.x * 0.25) \
 				+ float(i % 3 - 1) * 1.2,
-			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 0.85)
+			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 2.85)   # 2m clear of the wall
 		_port_number(inp, i % 3 + 1)
 		_in_ports.append(inp)
 		# the pairing: outside pours into inside. no wires, no visuals,
@@ -912,14 +921,17 @@ func _build_windows() -> void:
 		if _mb_dome_out:
 			var em := StandardMaterial3D.new()
 			em.albedo_texture = ev[0].get_texture()
-			em.albedo_color = Color(1.0, 0.62, 0.25)   # orange through glass
+			em.albedo_color = Color(1.0, 0.62, 0.25, 0.62)   # SEE-THROUGH orange
+			em.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			em.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			_mb_dome_out.material_override = em
 		if _mb_dome_in:
 			var im := StandardMaterial3D.new()
 			im.albedo_texture = iv[0].get_texture()
-			im.albedo_color = Color(1.0, 0.62, 0.25)
+			im.albedo_color = Color(1.0, 0.62, 0.25, 0.85)
+			im.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			im.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			im.cull_mode = BaseMaterial3D.CULL_DISABLED   # visible from BELOW
 			_mb_dome_in.material_override = im
 		return
 	if kind == "box":
