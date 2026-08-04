@@ -2095,7 +2095,8 @@ func _populate(b) -> void:
 					if saxis.length() < 0.001:
 						continue
 					var sdir := cdir.rotated(saxis.normalized(), 0.22)
-					_city_sign(b, sdir, str(vibes[ci]["name"]), str(vibes[ci]["arch"]))
+					_city_sign(b, sdir, str(vibes[ci]["name"]),
+						str(vibes[ci]["arch"]), ndir)
 			# hamlets: little clusters of unclaimed human houses out in
 			# the country. dudes can't enter; humans move in, furnish
 			# them to taste, and have people over
@@ -2316,7 +2317,8 @@ func show_chat_bubble(pname: String, text: String) -> void:
 	tw.tween_callback(lbl.queue_free)
 
 ## WELCOME TO <city>: a roadside sign dressed like its city.
-func _city_sign(b, dir: Vector3, cname: String, arch: String) -> void:
+func _city_sign(b, dir: Vector3, cname: String, arch: String,
+		face_along: Vector3 = Vector3.ZERO) -> void:
 	var root := Node3D.new()
 	add_child(root)
 	var board_col := Color("#3a4048")
@@ -2333,7 +2335,7 @@ func _city_sign(b, dir: Vector3, cname: String, arch: String) -> void:
 		"goofy":
 			board_col = Color.from_hsv(randf(), 0.6, 0.9)
 			post_col = Color.from_hsv(randf(), 0.6, 0.8)
-	for px in [-1.1, 1.1]:
+	for px in [-1.75, 1.75]:
 		var post := MeshInstance3D.new()
 		var pm := CylinderMesh.new()
 		pm.top_radius = 0.09
@@ -2353,17 +2355,30 @@ func _city_sign(b, dir: Vector3, cname: String, arch: String) -> void:
 	board.material_override = Destructible.make_material(board_col,
 		0.9 if arch == "glass" else 0.1)
 	root.add_child(board)
-	var lbl := Label3D.new()
-	lbl.text = "WELCOME TO\n%s" % cname.to_upper()
-	lbl.font_size = 40
-	lbl.pixel_size = 0.006
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.modulate = text_col
-	lbl.position = Vector3(0, 0, -0.09)
-	lbl.rotation_degrees.y = 180.0
-	board.add_child(lbl)
+	# DOUBLE-SIDED: a label on each face, posts moved out past the board
+	# ends so neither side's text hides behind a pole
+	for lz in [-0.09, 0.09]:
+		var lbl := Label3D.new()
+		lbl.text = "WELCOME TO\n%s" % cname.to_upper()
+		lbl.font_size = 40
+		lbl.pixel_size = 0.006
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.modulate = text_col
+		lbl.position = Vector3(0, 0, lz)
+		if lz < 0.0:
+			lbl.rotation_degrees.y = 180.0
+		board.add_child(lbl)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
-	root.rotate_object_local(Vector3.UP, randf() * TAU)
+	if face_along.length() > 0.01:
+		# face SQUARE ACROSS the road (text toward travelers), and step
+		# aside so the sign stands NEXT to the rails, never on them
+		var tang := (face_along - dir * dir.dot(face_along)).normalized()
+		var lb := root.global_transform.basis.inverse() * tang
+		root.rotate_object_local(Vector3.UP, atan2(lb.x, lb.z))
+		var lat := tang.cross(dir).normalized()
+		root.global_position += lat * 3.5
+	else:
+		root.rotate_object_local(Vector3.UP, randf() * TAU)
 
 ## Peak City: glass curtain-wall skyscrapers. Tall, smug, lit like a
 ## quarterly report that beat expectations.
