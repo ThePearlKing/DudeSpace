@@ -155,7 +155,8 @@ func work(delta: float) -> void:
 		_cur_station = -1
 		return
 	buf = maxf(0.0, buf - DRAIN * delta)
-	# find the strongest signal on the current dial + aim
+	# find the strongest signal on the current dial + aim -- every
+	# frame, so dragging the dial/dish changes the sound LIVE
 	var best := -1
 	var bs := 0.0
 	for i in stations.size():
@@ -163,20 +164,23 @@ func work(delta: float) -> void:
 		if sgn > bs:
 			bs = sgn
 			best = i
-	# static bed always runs while powered; ducks under a good signal
+	# static bed always runs while powered; ducks under a good signal.
+	# volumes SLEW toward targets: analog, not stepped.
 	if not _hiss.playing:
 		_hiss.play()
-	_hiss.volume_db = linear_to_db(clampf(0.85 - bs * 0.8, 0.05, 1.0)) - 6.0
+	var hiss_target := linear_to_db(clampf(0.85 - bs * 0.8, 0.05, 1.0)) - 6.0
+	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	if best != _cur_station:
 		_cur_station = best
 		_talk.stop()
-		_sentence_cd = 0.2
+		_sentence_cd = 0.15
 	if best < 0 or bs < 0.05:
 		if _talk.playing:
 			_talk.stop()
 		return
 	var st: Dictionary = stations[best]
-	_talk.volume_db = linear_to_db(clampf(bs, 0.05, 1.0))
+	var talk_target := linear_to_db(clampf(bs, 0.05, 1.0))
+	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
 	match str(st["type"]):
 		"music":
 			if not _talk.playing:
