@@ -1265,6 +1265,35 @@ static func _ax_story(p: String, p2: String, foreign: bool = false) -> Array:
 			out.append([0, "we'll follow %s until it follows back." % thing])
 	return out
 
+# PERSONALITIES: four smart aliens, four registers. Flavor is applied
+# as a light per-host pass over composed lines -- word habits, not
+# different content. 0 = the crisp anchor. 1 = the deadpan veteran.
+# 2 = the sincere wonderer. 3 = the precise analyst.
+const AX_VOICE_PRE := {
+	0: ["moving on:", "for the record:", "in summary:"],
+	1: ["mm.", "again?", "noted."],
+	2: ["oh --", "wait, wait --", "okay but --"],
+	3: ["per my chart,", "point of order:", "actuarially speaking,"]}
+const AX_VOICE_POST := {
+	0: [" -- next item.", " and that's confirmed.", " stay with us."],
+	1: [" as it always was.", " nothing changes.", " i've said my piece."],
+	2: [" ...isn't that something?", " i think about that a lot.",
+		" the universe is so much."],
+	3: [" margin of error: yes.", " i have the figures.",
+		" the data agrees, reluctantly."]}
+
+## The personality pass: ~one line in four picks up its speaker's habit.
+static func _ax_voice(host: int, line: String) -> String:
+	if randi() % 4 != 0:
+		return line
+	if randi() % 2 == 0 and AX_VOICE_PRE.has(host):
+		var pre: Array = AX_VOICE_PRE[host]
+		return str(pre[randi() % pre.size()]) + " " + line
+	if AX_VOICE_POST.has(host):
+		var post: Array = AX_VOICE_POST[host]
+		return line + str(post[randi() % post.size()])
+	return line
+
 # anti-repeat memory: recently used lines and topics stay off the air
 static var _ax_recent: Array = []
 static var _ax_topics: Array = []
@@ -1382,6 +1411,9 @@ static func alien_exchange(in_room: bool = false) -> Array:
 	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
 	if randi() % 12 == 0:
 		out.append([2, _ax_fresh(AP_FOIL)])
+	# the personality pass: every line filtered through its speaker
+	for ti in out.size():
+		out[ti] = [int(out[ti][0]), _ax_voice(int(out[ti][0]), str(out[ti][1]))]
 	return out
 
 ## The whole segment as one broadcast: each voice rendered with its own
