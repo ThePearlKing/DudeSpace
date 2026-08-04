@@ -3461,7 +3461,8 @@ func _spawn_avatar(id: int) -> void:
 		var img := Image.new()
 		if img.load_png_from_buffer(paint) == OK:
 			face = ImageTexture.create_from_image(img)
-	body.build(Color.html(str(ch.get("color", "3aa0ff"))), str(ch.get("shader", "none")), face)
+	body.build(Color.html(str(ch.get("color", "3aa0ff"))), str(ch.get("shader", "none")), face,
+		ch.get("fx", {}) if ch.get("fx", {}) is Dictionary else {})
 	var eq = info.get("equip", null)
 	if eq is Dictionary:
 		body.dress(eq)

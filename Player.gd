@@ -134,7 +134,8 @@ func _build_body() -> void:
 	_body = Human.new()
 	add_child(_body)
 	_body.position = Vector3(0, -1.0, 0)
-	_body.build(_char_color(), _char_shader(), Save.loaded_paint())
+	_body.build(_char_color(), _char_shader(), Save.loaded_paint(),
+		Save.character.get("fx", {}))
 	_body.dress(Inventory.equip)
 	_body.visible = false
 

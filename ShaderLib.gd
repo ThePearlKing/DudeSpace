@@ -32,7 +32,58 @@ static func shader_code(kind: String) -> String:
 static func is_shader(kind: String) -> bool:
 	return kind in ["pixel", "wth", "wob", "wireframe", "contrast"]
 
-static func make(kind: String, color: Color, tex: Texture2D = null) -> Material:
+static var _fx_shader: Shader = null
+
+## The customisable EFFECT skin: the portal/prism family with every dial
+## exposed. Presets are just parameter sets.
+static func effect_material(color: Color, fx: Dictionary) -> ShaderMaterial:
+	if _fx_shader == null:
+		_fx_shader = Shader.new()
+		_fx_shader.code = """
+shader_type spatial;
+varying vec3 vpos;
+uniform vec3 tint = vec3(0.5, 1.0, 1.0);
+uniform float strength = 1.0;
+uniform float speed = 1.0;
+uniform float nscale = 5.0;
+uniform float sharp = 2.0;
+uniform float rainbow = 0.0;
+float hash31(vec3 p) { p = fract(p * 0.3183 + vec3(0.1, 0.2, 0.3)); p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise(vec3 p) { vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	float a = hash31(i), b = hash31(i + vec3(1,0,0)), c = hash31(i + vec3(0,1,0)), d = hash31(i + vec3(1,1,0));
+	float e = hash31(i + vec3(0,0,1)), g = hash31(i + vec3(1,0,1)), h = hash31(i + vec3(0,1,1)), k = hash31(i + vec3(1,1,1));
+	return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(e,g,f.x), mix(h,k,f.x), f.y), f.z); }
+float fbm3(vec3 p) { return vnoise(p) * 0.6 + vnoise(p * 2.3) * 0.4; }
+void vertex() { vpos = VERTEX; }
+void fragment() {
+	float t = TIME * speed;
+	float sw = fbm3(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
+	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
+	vec3 base = tint;
+	if (rainbow > 0.5) {
+		float hue = fract(sw + t * 0.05);
+		base = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+	}
+	ALBEDO = base * 0.2;
+	EMISSION = base * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
+	ROUGHNESS = 0.35;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = _fx_shader
+	var tintc := Color.html(str(fx.get("tint", "#7df9ff")))
+	m.set_shader_parameter("tint", Vector3(tintc.r, tintc.g, tintc.b))
+	var defs := {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
+		"sharp": 2.0, "rainbow": 0.0}
+	for k in defs:
+		m.set_shader_parameter(k, float(fx.get(k, defs[k])))
+	return m
+
+static func make(kind: String, color: Color, tex: Texture2D = null,
+		fx: Dictionary = {}) -> Material:
+	if kind == "effect":
+		return effect_material(color, fx)
 	if is_shader(kind):
 		var sh := Shader.new()
 		sh.code = shader_code(kind)

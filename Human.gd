@@ -13,8 +13,9 @@ var _hand_mount: Node3D
 var _cycle: float = 0.0
 var _armor_nodes: Array = []
 
-func build(color: Color, shader_kind: String, face_tex: Texture2D = null) -> void:
-	var skin := ShaderLib.make(shader_kind, color)
+func build(color: Color, shader_kind: String, face_tex: Texture2D = null,
+		fx: Dictionary = {}) -> void:
+	var skin := ShaderLib.make(shader_kind, color, null, fx)
 
 	_torso = _part(Vector3(0.9, 1.2, 0.45), Vector3(0, 1.4, 0), skin)
 	_head_m = _part(Vector3(0.55, 0.55, 0.55), Vector3(0, 2.3, 0), skin)      # head
@@ -152,13 +153,14 @@ void fragment() {
 	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
 	METALLIC = 0.85;
 	ROUGHNESS = 0.12;
-	// the ultima portal effect verbatim -- same boiling fbm rings, same
-	// motion -- just dialed down and less shiny on top of the rainbow
+	// the portal effect EXACTLY as the gates run it -- identical
+	// coefficients, identical contrast -- multiplied down as a whole.
+	// dimmer overall, same crazy pattern. nothing re-tuned.
 	float t = TIME;
 	float sw = fbm3(vpos * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
 	EMISSION = rainbow * (0.25 + 0.55 * fres)
-		+ rainbow * (0.32 * pow(ring, 2.0) + sw * 0.11);
+		+ rainbow * (0.35 + 1.9 * pow(ring, 2.0) + sw * 0.7) * 0.33;
 }
 """
 	_prism_mat = ShaderMaterial.new()

@@ -16,7 +16,11 @@ var _human: Human
 var _color: Color = Color("#3aa0ff")
 var _shader: String = "none"
 var _pad: _Pad
-var _shaders := ["none", "pixel", "wth", "wireframe", "contrast"]
+var _shaders := ["none", "pixel", "wth", "wireframe", "contrast", "effect"]
+var _fx := {"strength": 1.0, "speed": 1.0, "nscale": 5.0, "sharp": 2.0,
+	"rainbow": 0.0, "tint": "#7df9ff"}
+var _fx_box: VBoxContainer
+var _fx_sliders := {}
 var _mode_opt: OptionButton
 var _scale_opt: OptionButton
 var _bscale_cb: CheckBox
@@ -104,9 +108,77 @@ func _ready() -> void:
 		_shader_opt.add_item(s)
 	_shader_opt.item_selected.connect(func(i):
 		_shader = _shaders[i]
+		if _fx_box != null:
+			_fx_box.visible = _shader == "effect"
 		_rebuild())
 	col.add_child(_shader_opt)
 	var opt := _shader_opt
+
+	# --- EFFECT: the parameterised glow, dials + presets ---
+	_fx_box = VBoxContainer.new()
+	_fx_box.visible = false
+	_fx_box.add_theme_constant_override("separation", 4)
+	col.add_child(_fx_box)
+	var fxl := Label.new()
+	fxl.text = "EFFECT — parameters"
+	_fx_box.add_child(fxl)
+	for spec in [["strength", 0.0, 2.5], ["speed", 0.1, 3.0],
+			["nscale", 1.0, 12.0], ["sharp", 0.5, 4.0]]:
+		var key: String = str(spec[0])
+		var frow := HBoxContainer.new()
+		var fl2 := Label.new()
+		fl2.text = key
+		fl2.custom_minimum_size = Vector2(80, 0)
+		frow.add_child(fl2)
+		var sl := HSlider.new()
+		sl.min_value = float(spec[1])
+		sl.max_value = float(spec[2])
+		sl.step = 0.05
+		sl.value = float(_fx[key])
+		sl.custom_minimum_size = Vector2(220, 22)
+		sl.value_changed.connect(func(v: float) -> void:
+			_fx[key] = v
+			_rebuild())
+		frow.add_child(sl)
+		_fx_sliders[key] = sl
+		_fx_box.add_child(frow)
+	var rb := CheckBox.new()
+	rb.text = "rainbow (prism mode)"
+	rb.toggled.connect(func(v: bool) -> void:
+		_fx["rainbow"] = 1.0 if v else 0.0
+		_rebuild())
+	_fx_sliders["rainbow"] = rb
+	_fx_box.add_child(rb)
+	var tpick := ColorPickerButton.new()
+	tpick.text = "Effect Tint"
+	tpick.custom_minimum_size = Vector2(0, 34)
+	tpick.color = Color.html(str(_fx["tint"]))
+	tpick.color_changed.connect(func(c: Color) -> void:
+		_fx["tint"] = c.to_html(false)
+		_rebuild())
+	_fx_sliders["tint"] = tpick
+	_fx_box.add_child(tpick)
+	var pl2 := Label.new()
+	pl2.text = "EFFECT PRESETS"
+	_fx_box.add_child(pl2)
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 6)
+	_fx_box.add_child(prow)
+	for pr in [["Ultima glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
+				"sharp": 2.0, "rainbow": 0.0, "tint": "#7df9ff"}],
+			["Prism glow", {"strength": 0.4, "speed": 1.0, "nscale": 5.0,
+				"sharp": 2.0, "rainbow": 1.0, "tint": "#ff7ce9"}],
+			["Fluid", {"strength": 0.7, "speed": 0.5, "nscale": 4.0,
+				"sharp": 1.0, "rainbow": 0.0, "tint": "#33ff99"}]]:
+		var pb := Button.new()
+		pb.text = str(pr[0])
+		var preset: Dictionary = pr[1]
+		pb.pressed.connect(func() -> void:
+			for k in preset:
+				_fx[k] = preset[k]
+			_sync_fx_ui()
+			_rebuild())
+		prow.add_child(pb)
 
 	# run settings
 	var mrow := HBoxContainer.new()
@@ -234,6 +306,12 @@ func _ready() -> void:
 		wrow.visible = false
 		_color = Color.html(str(Save.character.get("color", "3aa0ff")))
 		_shader = str(Save.character.get("shader", "none"))
+		var sfx = Save.character.get("fx", {})
+		if sfx is Dictionary:
+			for k in sfx:
+				_fx[k] = sfx[k]
+		_sync_fx_ui()
+		_fx_box.visible = _shader == "effect"
 		cpick.color = _color
 		var si := _shaders.find(_shader)
 		if si >= 0:
@@ -255,6 +333,15 @@ func _ready() -> void:
 
 	_rebuild()
 
+func _sync_fx_ui() -> void:
+	for k in ["strength", "speed", "nscale", "sharp"]:
+		if _fx_sliders.has(k):
+			_fx_sliders[k].set_value_no_signal(float(_fx[k]))
+	if _fx_sliders.has("rainbow"):
+		_fx_sliders["rainbow"].set_pressed_no_signal(float(_fx["rainbow"]) > 0.5)
+	if _fx_sliders.has("tint"):
+		_fx_sliders["tint"].color = Color.html(str(_fx["tint"]))
+
 func _process(delta: float) -> void:
 	if _pivot:
 		_pivot.rotate_y(delta * 0.7)
@@ -267,7 +354,7 @@ func _rebuild() -> void:
 		_human.queue_free()
 	_human = Human.new()
 	_pivot.add_child(_human)
-	_human.build(_color, _shader, _pad.texture() if _pad else null)
+	_human.build(_color, _shader, _pad.texture() if _pad else null, _fx)
 
 # --------------------------------------------------------- skin library
 
@@ -290,7 +377,8 @@ func _save_skin() -> void:
 	DirAccess.make_dir_recursive_absolute(SKINS_DIR)
 	var f := FileAccess.open("%s/%s.json" % [SKINS_DIR, nm], FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"color": _color.to_html(false), "shader": _shader}))
+		f.store_string(JSON.stringify({"color": _color.to_html(false),
+			"shader": _shader, "fx": _fx}))
 		f.close()
 	if _pad:
 		_pad.save_png("%s/%s.png" % [SKINS_DIR, nm])
@@ -306,6 +394,13 @@ func _load_selected_skin() -> void:
 	if parsed is Dictionary:
 		_color = Color.html(str(parsed.get("color", "3aa0ff")))
 		_shader = str(parsed.get("shader", "none"))
+		var pfx = parsed.get("fx", {})
+		if pfx is Dictionary:
+			for k in pfx:
+				_fx[k] = pfx[k]
+		_sync_fx_ui()
+		if _fx_box:
+			_fx_box.visible = _shader == "effect"
 		if _cpick:
 			_cpick.color = _color
 		var si := _shaders.find(_shader)
@@ -320,7 +415,8 @@ func _load_selected_skin() -> void:
 func _on_start() -> void:
 	if guest_mode:
 		# server visit: the look lives in memory, never on this disk
-		Save.character = {"color": _color.to_html(false), "shader": _shader}
+		Save.character = {"color": _color.to_html(false), "shader": _shader,
+			"fx": _fx}
 		Net.guest_paint = _pad.png_bytes() if _pad else PackedByteArray()
 		Sfx.play("learn")
 		started.emit()
@@ -330,12 +426,13 @@ func _on_start() -> void:
 	if edit_mode:
 		Save.character["color"] = _color.to_html(false)
 		Save.character["shader"] = _shader
+		Save.character["fx"] = _fx
 		Sfx.play("learn")
 		started.emit()
 		return
 	var scales := [1.0, 2.0, 4.0, 10.0]
 	var data := {
-		"color": _color.to_html(false), "shader": _shader,
+		"color": _color.to_html(false), "shader": _shader, "fx": _fx,
 		"hardcore": _mode_opt.selected == 1,
 		"wscale": scales[_scale_opt.selected],
 		"bscale": _bscale_cb != null and _bscale_cb.button_pressed,
