@@ -26,6 +26,8 @@ var _human_pick_t := 0.0
 var _human_target: Node3D = null
 var _next_seg_t := 2.0
 var _jitter_t := 0.0
+var _cur_text := ""
+var _bubble_linger := 0.9
 var _tv_bodies: Array = []
 
 class _AlienShell extends StaticBody3D:
@@ -167,8 +169,21 @@ func _build_studio() -> void:
 		a.material_override = mat
 		add_child(a)
 		a.global_position = POS + Vector3(-4.5 + float(i) * 3.0, -0.6, -4.2)
+		# the speech bubble: anchor-colored, fills letter by letter
+		var bub := Label3D.new()
+		bub.font_size = 26
+		bub.pixel_size = 0.006
+		bub.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		bub.modulate = [Color("#33ff99"), Color("#ffcf40"),
+			Color("#b388ff"), Color("#ff6a6a")][i]
+		bub.outline_size = 8
+		bub.outline_modulate = Color(0, 0, 0, 0.85)
+		bub.position = Vector3(0, 1.2, 0)
+		bub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		bub.width = 360.0
+		a.add_child(bub)
 		_aliens.append({"node": a, "mat": mat,
-			"base": a.global_position, "phase": randf() * TAU})
+			"base": a.global_position, "phase": randf() * TAU, "bub": bub})
 		# shootable, but not hurtable: bullets PLINK off and the voice
 		# jitters for a blink. they are above harm. slightly below dignity.
 		var shell := _AlienShell.new()
@@ -300,15 +315,32 @@ func _process(delta: float) -> void:
 					var w = HumanVoice.render(str(turn[1]),
 						RadioLib.ALIEN_HOSTS[int(turn[0])])
 					if w != null:
-						cooked.append([int(turn[0]), w])
+						cooked.append([int(turn[0]), w, str(turn[1])])
 				_deliver.call_deferred(cooked))
 	if not _talk.playing and not _turns.is_empty():
 		var t0: Array = _turns.pop_front()
 		_cur_host = int(t0[0])
 		_talk.stream = t0[1]
+		_cur_text = str(t0[2]) if t0.size() > 2 else ""
 		_talk.play()
 	if not _talk.playing and _turns.is_empty():
 		_cur_host = -1
+	# bubbles: the CURRENT speaker's text builds letter by letter, timed
+	# to the voice; everyone else's bubble is empty
+	for i2 in _aliens.size():
+		var bub: Label3D = _aliens[i2]["bub"]
+		if i2 == _cur_host and _talk.playing and _cur_text != "":
+			var tlen: float = maxf(0.2, _talk.stream.get_length() * 0.88)
+			var n := int(float(_cur_text.length()) \
+				* clampf(_talk.get_playback_position() / tlen, 0.0, 1.0))
+			bub.text = _cur_text.substr(0, n)
+		elif i2 != _cur_host or not _talk.playing:
+			if bub.text != "" and (i2 != _cur_host or not _talk.playing):
+				_bubble_linger -= delta
+				if _bubble_linger <= 0.0 or i2 != _cur_host:
+					bub.text = ""
+			else:
+				_bubble_linger = 0.9
 	# anchors: float, bob, and SWELL with their own voice
 	for i in _aliens.size():
 		var a: Dictionary = _aliens[i]
