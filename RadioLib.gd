@@ -107,6 +107,10 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wavi := _ice_loop()
 		_music_cache[key] = wavi
 		return wavi
+	if kind == "abyss":
+		var wavn := _abyss_loop(seed_v)
+		_music_cache[key] = wavn
+		return wavn
 	if kind == "earth":
 		var wave2 := _earth_loop(seed_v)
 		_music_cache[key] = wave2
@@ -729,6 +733,61 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	wav.loop_end = total
 	return wav
+
+## NEPTUNE: deep-sea documentary ambience. Pressure-drone underneath,
+## two lush chords breathing into each other, WHALE CALLS -- real pitch
+## glides with vibrato, phase-accumulated so they bend smoothly -- and a
+## tiny sonar ping with its own echo. Blue planet, blue sound.
+static func _abyss_loop(seed_v: int) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var total := int(20.0 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# the pressure: sub drone breathing once per loop
+	for i in total:
+		var t := float(i) / SR
+		var lp := float(i) / float(total) * TAU
+		buf[i] += sin(TAU * 49.0 * t) * 0.13 * (0.7 + 0.3 * sin(lp)) \
+			+ (randf() * 2.0 - 1.0) * 0.012
+	# two chords breathing into each other: i(add9) and VI(maj7)
+	var half := total / 2
+	var chords: Array = [[0, 3, 7, 14], [-4, 3, 8, 15]]
+	for ci in 2:
+		var ch: Array = chords[ci]
+		var c0 := ci * half
+		for semi in ch:
+			var f := 98.0 * pow(2.0, float(semi) / 12.0)
+			for i in mini(half + int(SR), total - c0):
+				var t2 := float(i) / SR
+				var env := sin(PI * float(i) / float(half + SR))
+				buf[c0 + i] += (sin(TAU * f * t2) + 0.3 * sin(TAU * f * 2.0 * t2)) \
+					* 0.05 * env * env
+	# WHALES: three calls, each a smooth pitch bend with slow vibrato
+	for wc in 3:
+		var start := int(float(wc) * 6.5 * SR + rng.randf_range(0.0, 1.5) * SR)
+		var dur := int(rng.randf_range(1.6, 2.6) * SR)
+		var f1 := rng.randf_range(180.0, 260.0)
+		var f2 := f1 * rng.randf_range(0.55, 0.8)
+		if rng.randf() < 0.4:
+			f2 = f1 * rng.randf_range(1.3, 1.6)   # some calls rise
+		var phase := 0.0
+		for i in mini(dur, total - start):
+			var k := float(i) / float(dur)
+			var fr := lerpf(f1, f2, k * k)
+			fr *= 1.0 + 0.015 * sin(TAU * 4.0 * float(i) / SR)
+			phase += TAU * fr / SR
+			var env := sin(PI * k)
+			buf[start + i] += (sin(phase) + 0.4 * sin(phase * 2.0)) * 0.16 * env * env
+	# sonar: a tiny ping and its lonelier echo, twice a loop
+	for pn in 2:
+		var ps := int((4.0 + float(pn) * 10.0) * SR)
+		for eo in [[0, 0.09], [int(0.8 * SR), 0.04]]:
+			var pstart: int = ps + int(eo[0])
+			for i in mini(int(0.25 * SR), total - pstart):
+				var t3 := float(i) / SR
+				buf[pstart + i] += sin(TAU * 1180.0 * t3) * float(eo[1]) * exp(-t3 * 14.0)
+	return _encode_loop(buf, total, "")
 
 ## EUCLID, composed instead of rolled: real maqam-style PHRASES over the
 ## double-harmonic scale -- fixed melodic contours with grace-note

@@ -187,6 +187,12 @@ func _build_stations() -> void:
 				st = {"name": b.name.to_upper(), "type": "music"}
 			"Jupiter":
 				st = {"name": "JUPITER", "type": "music"}
+			"Neptune":
+				st = {"name": "NEPTUNE", "type": "music", "kind": "abyss"}
+				st["freq"] = snappedf(rng.randf_range(88.5, 107.5), 0.1)
+				st["body"] = b
+				stations.append(st)
+				continue
 			"TIN 618":
 				# the black hole broadcasts. nobody asked it to.
 				st = {"name": "EVENT HORIZON", "type": "music"}
