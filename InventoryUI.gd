@@ -28,7 +28,7 @@ func _rebuild_grid() -> void:
 		for it in Inventory.catalog:
 			in_catalog[str(it.id)] = true
 		for id in Inventory.weapons.keys() + Inventory.items.keys():
-			if id == "fists" or id == "caged_animal" or in_catalog.has(id):
+			if id == "fists" or id == "caged_animal" or id == "caged_human" or in_catalog.has(id):
 				continue
 			_grid.add_child(_make_cell({"id": id, "name": Inventory.hotbar_name(id), "desc": "creative: free"}))
 	else:

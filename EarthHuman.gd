@@ -324,12 +324,47 @@ const ST_TAKE := ["it's a lot.", "not a fan.", "huge, honestly.",
 	"I stand by that.", "we live in times.", "could go either way.",
 	"it knows what it did.", "I've said too much."]
 
-## Getting insulted, for the non-retaliating: the sounds of absorbing it.
-const REACT_HURT := ["ok. wow. ok.", "I'm telling the sky eye.",
-	"cool. cool cool cool. (not cool)",
-	"my mother warned me about days like this.",
-	"noted. hostile. noted.", "and I was having a DAY, too.",
-	"wow. in front of the rocks and everything."]
+## Getting insulted, for the non-retaliating: the sounds of absorbing
+## it -- in your own voice. The grump files a complaint, the edgy adds
+## it to the pile, the average just stand there and take it averagely.
+const REACTS := {
+	"generic": ["ok. wow. ok.", "I'm telling the sky eye.",
+		"cool. cool cool cool. (not cool)",
+		"my mother warned me about days like this.",
+		"noted. hostile. noted.", "and I was having a DAY, too.",
+		"wow. in front of the rocks and everything."],
+	"silly": ["ha! ...wait.", "honk?? HONK.",
+		"I don't get it. I'll laugh anyway. ha. HA.",
+		"that's the meanest thing I've half-understood.",
+		"my feelings! the little ones!"],
+	"dark": ["whatever. pain is my roommate.",
+		"I've been called worse by the mirror.",
+		"cool. adding it to the pile.",
+		"the abyss takes notes. so do I.",
+		"you can't hurt what's already hollow."],
+	"grump": ["THAT'S IT. that's going in the complaint.",
+		"I've been insulted by BETTER.",
+		"back in MY day insults had CRAFT.",
+		"get off my planet.", "unbelievable. UNBELIEVABLE."],
+	"awkward": ["ok. cool. I'm going to think about this for nine years.",
+		"ha ha. yes. anyway. bye. no wait--",
+		"I had a comeback. it's gone.",
+		"you too. NO. wait.", "I'm going to stand somewhere else now."],
+	"smug": ["bold words from a background character.",
+		"I've decided that didn't happen.",
+		"jealousy is a disease. get well soon.",
+		"noted. dismissed.", "and yet I'm still the best one here."],
+	"dreamy": ["oh. that's... a rain cloud of a thing to say.",
+		"the wind will carry that away. eventually.",
+		"I forgive you. the sky told me to.",
+		"words are just air with opinions.",
+		"that made my aura flicker."],
+	"anxious": ["ok. OK. this is fine. is this fine??",
+		"did everyone hear that? everyone heard that.",
+		"I need to sit down. there's nowhere to sit.",
+		"adding this to the 3am archive.",
+		"my heart rate just filed a complaint."],
+}
 
 ## The card behind the words: rounded corners, billboarded, fades with
 ## the thought. This is what makes a speech bubble a BUBBLE.
@@ -959,7 +994,8 @@ func _speak() -> void:
 		"nice":
 			_say(_nice_line())
 		"react":
-			_say(REACT_HURT[randi() % REACT_HURT.size()])
+			var pool: Array = REACTS[_insult_flavor()]
+			_say(pool[randi() % pool.size()])
 		_:
 			_say(_smalltalk_line())
 	_convo_left -= 1

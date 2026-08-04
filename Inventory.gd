@@ -134,6 +134,7 @@ var items: Dictionary = {
 	"salad":      {"name": "Salad",            "color": Color("#7ddc5a")},
 	"cage":       {"name": "Animal Cage",      "color": Color("#b0b0b8")},
 	"caged_animal":{"name": "Caged Animal",   "color": Color("#7d9c4a")},
+	"caged_human": {"name": "Caged Human",    "color": Color("#c8a078")},
 	"catfood":    {"name": "Cat Food",         "color": Color("#e8956a")},
 	"boots":      {"name": "Grav Boots",       "color": Color("#888899")},
 	"magnet":     {"name": "Coin Magnet",      "color": Color("#ffcc22")},
@@ -285,6 +286,13 @@ func slot_text(slot: Dictionary) -> String:
 func hotbar_name(id: String) -> String:
 	if id == "":
 		return ""
+	if id == "caged_human":
+		# the box says who's in it (the next one out, specifically)
+		for i in range(caged_data.size() - 1, -1, -1):
+			var e: Dictionary = caged_data[i]
+			if e is Dictionary and e.has("human"):
+				return "Caged Human (%s)" % str(e["human"].get("name", "?"))
+		return "Caged Human"
 	if weapons.has(id):
 		return weapons[id]["name"]
 	if items.has(id):

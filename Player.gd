@@ -870,7 +870,7 @@ func _use_selected() -> void:
 	var id: String = Inventory.slot_id(slot)
 	# right-click a PET (crosshair ON it) with anything that isn't
 	# food/cage -> stay / follow
-	if id not in ["catfood", "cage", "caged_animal"]:
+	if id not in ["catfood", "cage", "caged_animal", "caged_human"]:
 		var sp2 := get_world_3d().direct_space_state
 		var fp2 := _camera.global_position
 		var qp2 := PhysicsRayQueryParameters3D.create(fp2, fp2 - _camera.global_transform.basis.z * 7.0)
@@ -1043,31 +1043,46 @@ func _use_selected() -> void:
 				Inventory.caged_data.append({"human": hu.capture()})
 				hu.queue_free()
 				Inventory.clear_slot(slot)
-				Inventory.give("caged_animal", 1)
+				Inventory.give("caged_human", 1)
 				Sfx.play("place")
 			else:
 				Sfx.play("denied")
 		"caged_animal":
 			var body2 := Universe.nearest(global_position)
-			var d2: Dictionary = Inventory.caged_data.pop_back() \
-				if not Inventory.caged_data.is_empty() else {}
-			if d2.has("human"):
-				var outh := EarthHuman.new()
-				outh.saved = d2["human"]
-				outh.setup(body2)
-				get_parent().add_child(outh)
-				outh.global_position = place + up * 1.0
+			# pop the newest ANIMAL box (humans travel under their own item)
+			var d2: Dictionary = {}
+			for ci in range(Inventory.caged_data.size() - 1, -1, -1):
+				if not Inventory.caged_data[ci].has("human"):
+					d2 = Inventory.caged_data[ci]
+					Inventory.caged_data.remove_at(ci)
+					break
+			var out := Animal.new()
+			if not d2.is_empty():
+				out.setup(body2, bool(d2.get("ground", false)), bool(d2.get("bug", false)), int(d2.get("g", -1)))
+				get_parent().add_child(out)
+				if bool(d2.get("tamed", false)):
+					out.tame()
 			else:
-				var out := Animal.new()
-				if not d2.is_empty():
-					out.setup(body2, bool(d2.get("ground", false)), bool(d2.get("bug", false)), int(d2.get("g", -1)))
-					get_parent().add_child(out)
-					if bool(d2.get("tamed", false)):
-						out.tame()
-				else:
-					out.setup(body2)
-					get_parent().add_child(out)
-				out.global_position = place + up * 1.0
+				out.setup(body2)
+				get_parent().add_child(out)
+			out.global_position = place + up * 1.0
+			Inventory.clear_slot(slot)
+			Inventory.give("cage", 1)   # the cage survives
+			Sfx.play("place")
+		"caged_human":
+			var bodyh := Universe.nearest(global_position)
+			var dh: Dictionary = {}
+			for ci in range(Inventory.caged_data.size() - 1, -1, -1):
+				if Inventory.caged_data[ci].has("human"):
+					dh = Inventory.caged_data[ci]
+					Inventory.caged_data.remove_at(ci)
+					break
+			var outh := EarthHuman.new()
+			if dh.has("human"):
+				outh.saved = dh["human"]
+			outh.setup(bodyh)
+			get_parent().add_child(outh)
+			outh.global_position = place + up * 1.0
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
