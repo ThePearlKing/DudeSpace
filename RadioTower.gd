@@ -90,14 +90,44 @@ func _ready() -> void:
 	_spec_img = Image.create(192, 64, false, Image.FORMAT_RGB8)
 	_spec_img.fill(Color(0.015, 0.01, 0.0))
 	spec_tex = ImageTexture.create_from_image(_spec_img)
-	# little spectrogram SCREENS on the base, fed by that texture
+	# little spectrogram SCREENS on the base -- mounted in a real bezel:
+	# recessed dark housing, raised frame edges, a wee standby lamp
 	for sxs in [-1.0, 1.0]:
+		var mount := Node3D.new()
+		mount.position = Vector3(sxs * (box_size.x * 0.5), 0.62, 0)
+		mount.rotation_degrees.y = 90.0 * sxs
+		add_child(mount)
+		var housing := MeshInstance3D.new()
+		var hbm := BoxMesh.new()
+		hbm.size = Vector3(0.74, 0.5, 0.07)
+		housing.mesh = hbm
+		housing.position = Vector3(0, 0, 0.035)
+		housing.material_override = Surfaces.metal(Color("#23262c"))
+		mount.add_child(housing)
+		for edge in [[Vector3(0.76, 0.045, 0.045), Vector3(0, 0.25, 0.06)],
+				[Vector3(0.76, 0.045, 0.045), Vector3(0, -0.25, 0.06)],
+				[Vector3(0.045, 0.5, 0.045), Vector3(0.375, 0, 0.06)],
+				[Vector3(0.045, 0.5, 0.045), Vector3(-0.375, 0, 0.06)]]:
+			var emi := MeshInstance3D.new()
+			var ebm := BoxMesh.new()
+			ebm.size = edge[0]
+			emi.mesh = ebm
+			emi.position = edge[1]
+			emi.material_override = Surfaces.metal(Color("#5a616c"))
+			mount.add_child(emi)
+		var lamp := MeshInstance3D.new()
+		var lbm := SphereMesh.new()
+		lbm.radius = 0.02
+		lbm.height = 0.04
+		lamp.mesh = lbm
+		lamp.position = Vector3(0.32, -0.19, 0.075)
+		lamp.material_override = Destructible.make_material(Color("#3aff6a"), 2.5)
+		mount.add_child(lamp)
 		var scr := MeshInstance3D.new()
 		var qm := QuadMesh.new()
 		qm.size = Vector2(0.62, 0.4)
 		scr.mesh = qm
-		scr.position = Vector3(sxs * (box_size.x * 0.5 + 0.02), 0.62, 0)
-		scr.rotation_degrees.y = 90.0 * sxs
+		scr.position = Vector3(0, 0, 0.074)
 		var sm2 := StandardMaterial3D.new()
 		sm2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		sm2.albedo_texture = spec_tex
@@ -106,7 +136,7 @@ func _ready() -> void:
 		sm2.emission_energy_multiplier = 1.3
 		scr.material_override = sm2
 		scr.extra_cull_margin = 2.0
-		add_child(scr)
+		mount.add_child(scr)
 	_talk = AudioStreamPlayer3D.new()
 	_talk.bus = "RadioFX"
 	# loud beside it, NORMAL across your whole base, quiet only when
