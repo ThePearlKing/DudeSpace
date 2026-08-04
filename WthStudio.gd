@@ -28,6 +28,19 @@ var _next_seg_t := 2.0
 var _jitter_t := 0.0
 var _cur_text := ""
 var _bubble_linger := 0.9
+var _annoy := 0.0          # keeps count of your bullets. decays. slowly.
+var _annoy_cd := 0.0
+var _cooking_callout := false
+
+const ANNOY_WARN := ["dude. we are LIVE.",
+	"stop shooting the hosts, dude.",
+	"the orbs are not targets. the orbs are TALENT."]
+const ANNOY_ANGRY := ["okay. dude. get out of the studio.",
+	"security to the sofa area. it's the dude.",
+	"OUT. the hole is where you came from. use it."]
+const ANNOY_FINAL := ["GET. OUT. the show resumes without witnesses.",
+	"we have voted. unanimously. LEAVE, dude.",
+	"every orb in this room wants you gone. that includes the table."]
 var _tv_bodies: Array = []
 var _table: MeshInstance3D = null
 var _ad_root: Node3D = null
@@ -51,6 +64,27 @@ func orb_hit(idx: int, at: Vector3) -> void:
 	if idx == _cur_host and _talk != null and _talk.playing:
 		_jitter_t = 0.05
 		_talk.pitch_scale = randf_range(0.55, 1.7)
+	# they keep count. shoot enough and the show STOPS to address you.
+	_annoy = minf(_annoy + 1.0, 12.0)
+	if _annoy >= 3.0 and _annoy_cd <= 0.0 and not _cooking_callout:
+		_annoy_cd = 4.0
+		var bank: Array = ANNOY_WARN
+		if _annoy >= 9.0:
+			bank = ANNOY_FINAL
+		elif _annoy >= 6.0:
+			bank = ANNOY_ANGRY
+		var line := str(bank[randi() % bank.size()])
+		var host := clampi(idx, 0, 3)
+		_cooking_callout = true
+		WorkerThreadPool.add_task(func() -> void:
+			var w = HumanVoice.render(line, RadioLib.ALIEN_HOSTS[host])
+			_callout_ready.call_deferred(host, w, line))
+
+func _callout_ready(host: int, w, line: String) -> void:
+	_cooking_callout = false
+	if w != null:
+		_talk.stop()   # the show interrupts ITSELF to tell you off
+		_turns.push_front([host, w, line])
 
 var _ping_wav: AudioStreamWAV = null
 
@@ -408,6 +442,8 @@ func _process(delta: float) -> void:
 		_jitter_t -= delta
 		if _jitter_t <= 0.0 and _talk != null:
 			_talk.pitch_scale = 1.0
+	_annoy = maxf(0.0, _annoy - delta * 0.15)
+	_annoy_cd = maxf(0.0, _annoy_cd - delta)
 	if _beacon_mat != null:
 		_beacon_mat.emission_energy_multiplier = 3.0 if fmod(_t, 1.2) < 0.6 else 0.3
 	if _table != null:
