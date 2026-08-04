@@ -533,6 +533,13 @@ static func rick_song() -> AudioStreamWAV:
 static func noodle_line() -> String:
 	return NOODLE_BITS[randi() % NOODLE_BITS.size()]
 
+## A full transmission: two or three pronouncements strung together.
+static func noodle_sermon() -> String:
+	var out := ""
+	for i in 2 + randi() % 2:
+		out += NOODLE_BITS[randi() % NOODLE_BITS.size()] + " "
+	return out.strip_edges()
+
 static func noodle_profile() -> Dictionary:
 	return {"base": 85.0, "var": 0.25, "wave": "saw", "rate": 0.62, "artic": 1.1}
 
@@ -563,6 +570,21 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 		v *= 0.85 + 0.15 * sin(TAU * 29.0 * t)      # ring-mod tremble
 		v += sin(TAU * 48.0 * t) * 0.045 + sin(TAU * 48.7 * t) * 0.035   # the pot
 		buf[i] = v
+	# the BEAT: a slow ceremonial thump with a dry tick between, laid in
+	# BEFORE the echo pass so it smears through the same feedback
+	var bstep := int(SR * 0.75)
+	var bi := 0
+	while bi * bstep < total:
+		var b0 := bi * bstep
+		if bi % 2 == 0:
+			for i in mini(int(0.16 * SR), total - b0):
+				var tb := float(i) / SR
+				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.5
+		else:
+			var toff := b0 + int(float(bstep) * 0.5)
+			for i in mini(int(0.05 * SR), total - toff):
+				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.1
+		bi += 1
 	# feedback echoes: the words keep arriving after they've stopped
 	for e in [[int(SR * 0.29), 0.3], [int(SR * 0.61), 0.15]]:
 		var off := int(e[0])
