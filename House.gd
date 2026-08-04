@@ -1445,9 +1445,12 @@ func cut_doorway(frame: Node3D) -> void:
 			var bsz: Vector3 = cc2.shape.size
 			if bsz.y < 2.0 or (bsz.x < 2.0 and bsz.z < 2.0):
 				continue
-			var rel: Vector3 = frame.global_position - ch.global_position
-			var plane_d: float = absf(rel.z) if bsz.x > bsz.z else absf(rel.x)
-			if plane_d < bd and absf(rel.y) < bsz.y:
+			# LOCAL space: rotated houses' walls carry rotated bases,
+			# world-axis math found (and rebuilt) the wrong planes
+			var rel_l: Vector3 = ch.global_transform.basis.inverse() \
+				* (frame.global_position - ch.global_position)
+			var plane_d: float = absf(rel_l.z) if bsz.x > bsz.z else absf(rel_l.x)
+			if plane_d < bd and absf(rel_l.y) < bsz.y:
 				bd = plane_d
 				best = ch
 	if best == null:
@@ -1460,34 +1463,35 @@ func cut_doorway(frame: Node3D) -> void:
 		return
 	var wsz: Vector3 = col.shape.size
 	var wpos := best.global_position
+	var wb: Basis = best.global_transform.basis
 	var mat: Material = null
 	for mm in best.get_children():
 		if mm is MeshInstance3D:
 			mat = mm.material_override
 	best.queue_free()
-	# the wall runs along its LONG horizontal axis; the gap is centered
-	# on the frame's position along that axis
+	# everything below happens in the WALL'S OWN frame, then transforms
+	# out -- rotated walls rebuild rotated, gap where the frame stands
+	var frel: Vector3 = wb.inverse() * (frame.global_position - wpos)
 	var along_x := wsz.x > wsz.z
 	var gapw := 2.0
 	var gaph := 2.7
-	var fl: float = (frame.global_position.x - wpos.x) if along_x \
-		else (frame.global_position.z - wpos.z)
+	var fl: float = frel.x if along_x else frel.z
 	var span: float = wsz.x if along_x else wsz.z
 	var lw: float = span * 0.5 + fl - gapw * 0.5
 	var rw: float = span * 0.5 - fl - gapw * 0.5
-	var yb: float = wpos.y - wsz.y * 0.5
+	var hdr_y: float = -wsz.y * 0.5 + gaph + (wsz.y - gaph) * 0.5
 	for seg in [
-		[lw, (-span * 0.5 + lw * 0.5), 0.0, wsz.y, wpos.y],
-		[rw, (span * 0.5 - rw * 0.5), 0.0, wsz.y, wpos.y],
-		[gapw, fl, 0.0, wsz.y - gaph, yb + gaph + (wsz.y - gaph) * 0.5],
+		[lw, (-span * 0.5 + lw * 0.5), wsz.y, 0.0],
+		[rw, (span * 0.5 - rw * 0.5), wsz.y, 0.0],
+		[gapw, fl, wsz.y - gaph, hdr_y],
 	]:
-		if seg[0] < 0.15 or seg[3] < 0.15:
+		if seg[0] < 0.15 or seg[2] < 0.15:
 			continue
 		var b2 := StaticBody3D.new()
 		var mi := MeshInstance3D.new()
 		var m2 := BoxMesh.new()
-		m2.size = Vector3(seg[0], seg[3], wsz.z) if along_x \
-			else Vector3(wsz.x, seg[3], seg[0])
+		m2.size = Vector3(seg[0], seg[2], wsz.z) if along_x \
+			else Vector3(wsz.x, seg[2], seg[0])
 		mi.mesh = m2
 		mi.material_override = mat
 		b2.add_child(mi)
@@ -1497,8 +1501,9 @@ func cut_doorway(frame: Node3D) -> void:
 		c2.shape = bs2
 		b2.add_child(c2)
 		_iroot.add_child(b2)
-		b2.global_position = Vector3(wpos.x + seg[1], seg[4], wpos.z) if along_x \
-			else Vector3(wpos.x, seg[4], wpos.z + seg[1])
+		var lofs := Vector3(float(seg[1]), float(seg[3]), 0.0) if along_x \
+			else Vector3(0.0, float(seg[3]), float(seg[1]))
+		b2.global_transform = Transform3D(wb, wpos + wb * lofs)
 
 ## The little hallway between two cut walls, plus the outside tunnel.
 	# trim (baseboards, crown, seams) never had collision, but a bar
@@ -1641,16 +1646,27 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 			linklbl.modulate = Color(0.6, 1.0, 0.75, 0.9)
 			tube.add_child(linklbl)
 			linklbl.position = Vector3(0, 1.6, 0)
-	# PORTHOLES: little round windows down the hallway. Real rims, real
-	# glass, and the glass SHOWS THE OUTSIDE -- each pane renders from a
-	# camera mounted on the exterior connector's skin, looking out.
-	var up_h := Vector3.UP
-	for pspec in [[-1.0, -0.22], [1.0, 0.22]]:
-		var pside: float = float(pspec[0])
-		var pfrac: float = float(pspec[1])
-		var ppos: Vector3 = mid + dirv * (L * pfrac) + xr * (1.28 * pside) \
-			+ Vector3(0, 0.25, 0)
-		var pbasis := Basis(dirv, xr * pside, dirv.cross(xr * pside)).orthonormalized()
+	# PORTHOLES: one round window per hallway side, dead CENTER, glass
+	# flush in the wall. The pane renders the actual outside from the
+	# matching spot on the exterior connector's skin -- the corridor
+	# window and the exterior window are the same hole in the world.
+	var seg_dir := dirv
+	var ext_lat := Vector3.ZERO
+	var ext_mid := Vector3.ZERO
+	if is_instance_valid(other):
+		var a_o := global_position + global_transform.basis.y * 1.4
+		var b_o: Vector3 = other.global_position + other.global_transform.basis.y * 1.4
+		var sg := (b_o - a_o)
+		if sg.length() > 0.5:
+			ext_mid = (a_o + b_o) * 0.5
+			ext_lat = sg.normalized().cross(global_transform.basis.y)
+			if ext_lat.length() > 0.01:
+				ext_lat = ext_lat.normalized()
+	for pspec in [-1.0, 1.0]:
+		var pside: float = float(pspec)
+		var ppos: Vector3 = mid + xr * (1.28 * pside)
+		var pbasis := Basis(seg_dir, xr * pside,
+			seg_dir.cross(xr * pside)).orthonormalized()
 		var rim := MeshInstance3D.new()
 		var rt := TorusMesh.new()
 		rt.inner_radius = 0.3
@@ -1661,12 +1677,10 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 		rim.global_transform = Transform3D(pbasis, ppos)
 		var pv := _mk_view(Vector2i(180, 180))
 		var pcam: Camera3D = pv[1]
-		if is_instance_valid(other):
-			var ext_mid: Vector3 = (global_position + other.global_position) * 0.5 \
-				+ global_transform.basis.y * 1.4
-			pcam.global_position = ext_mid + global_transform.basis.x * (pside * 0.9)
-			pcam.look_at(pcam.global_position \
-				+ global_transform.basis.x * pside, global_transform.basis.y)
+		if ext_lat != Vector3.ZERO:
+			pcam.global_position = ext_mid + ext_lat * (pside * 0.9)
+			pcam.look_at(pcam.global_position + ext_lat * pside,
+				global_transform.basis.y)
 		var glass2 := MeshInstance3D.new()
 		var gcm := CylinderMesh.new()
 		gcm.top_radius = 0.31
@@ -1679,23 +1693,18 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 		glass2.material_override = gm2
 		_iroot.add_child(glass2)
 		glass2.global_transform = Transform3D(pbasis, ppos)
-		# matching porthole on the exterior tube skin: rim + a soft
-		# portal shimmer, dimmer than the seam
-		if is_instance_valid(other):
+		# the exterior half: same porthole, FLAT on the tube's side wall,
+		# centered, axis pointing straight out
+		if ext_lat != Vector3.ZERO:
+			var opb := Basis(seg_dir, ext_lat * pside,
+				seg_dir.cross(ext_lat * pside)).orthonormalized()
 			var orim := MeshInstance3D.new()
 			orim.mesh = rt
 			orim.material_override = Surfaces.metal(Color("#565c64"))
 			get_tree().current_scene.add_child(orim)
 			orim.add_to_group("house_link_tube")
 			orim.set_meta("link_slots", [slot, other.slot])
-			var ext_mid2: Vector3 = (global_position + other.global_position) * 0.5 \
-				+ global_transform.basis.y * 1.4
-			var opb := Basis(global_transform.basis.z,
-				global_transform.basis.x * pside,
-				global_transform.basis.z.cross(global_transform.basis.x * pside)) \
-				.orthonormalized()
-			orim.global_transform = Transform3D(opb,
-				ext_mid2 + global_transform.basis.x * (pside * 0.72))
+			orim.global_transform = Transform3D(opb, ext_mid + ext_lat * (pside * 0.72))
 			var oglass := MeshInstance3D.new()
 			oglass.mesh = gcm
 			oglass.material_override = Surfaces.portal(Color("#2a4a66"))
