@@ -1212,13 +1212,15 @@ func _check_social() -> void:
 	if _inv_count() < 8:
 		for dp in get_tree().get_nodes_in_group("itemdrop"):
 			if dp is ItemDrop and is_instance_valid(dp) and dp._t > 4.0 \
-					and global_position.distance_squared_to(dp.global_position) < 4.0:
-				if FOOD_HEAL.has(dp.id) or randf() < 0.2:
-					inv[dp.id] = int(inv.get(dp.id, 0)) + 1
-					dp.count -= 1
-					if dp.count <= 0:
-						dp.queue_free()
-					Sfx.play("click", -26.0)
+					and global_position.distance_squared_to(dp.global_position) < 12.25:
+				# ANYTHING within reach gets pocketed in passing -- raw
+				# meat, coal, whatever. Course unchanged: they pocket it
+				# and keep walking to wherever they were going.
+				inv[dp.id] = int(inv.get(dp.id, 0)) + 1
+				dp.count -= 1
+				if dp.count <= 0:
+					dp.queue_free()
+				Sfx.play("click", -26.0)
 				break
 	if _partner != null:
 		return

@@ -15,6 +15,7 @@ extends CanvasLayer
 
 var target = null            # EarthHuman or Animal
 var _focus := false          # mind-control focus: WASD captured
+var _mc_btn: Button = null
 var _vp: SubViewport
 var _cam: Camera3D
 var _root: Panel
@@ -136,16 +137,12 @@ func select_target(t) -> void:
 		_browse.queue_free()
 		_browse = null
 	target = t
-	target.minded = true
+	# OBSERVE first: the mind keeps running its own life (goals update
+	# live) until you flip MIND CONTROL on
+	target.minded = false
 	target.mind_dir = Vector3.ZERO
 	_orbit = 0.0
-	if target is EarthHuman:
-		target._release_seat()
-		target._end_convo()
-		target._hunt_t = 0.0
-		target._target = null
-		target._travel_to = -1
-	_focus = true
+	_focus = false
 
 	_left = VBoxContainer.new()
 	_left.anchor_left = 0.02
@@ -169,6 +166,12 @@ func select_target(t) -> void:
 	_hint = Label.new()
 	_hint.add_theme_font_size_override("font_size", 14)
 	_left.add_child(_hint)
+	_mc_btn = Button.new()
+	_mc_btn.text = "MIND CONTROL: OFF — watching their own will"
+	_style_btn(_mc_btn)
+	_mc_btn.pressed.connect(func() -> void:
+		_set_mind(not (target != null and target.minded)))
+	_left.add_child(_mc_btn)
 	var back := Button.new()
 	back.text = "◂ all minds"
 	_style_btn(back)
@@ -188,6 +191,23 @@ func select_target(t) -> void:
 		_build_human_brain()
 	else:
 		_build_animal_brain()
+
+## Flip between WATCHING (their AI runs, goals live) and DRIVING.
+func _set_mind(on: bool) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	target.minded = on
+	target.mind_dir = Vector3.ZERO
+	if on and target is EarthHuman:
+		target._release_seat()
+		target._end_convo()
+		target._hunt_t = 0.0
+		target._target = null
+		target._travel_to = -1
+	_focus = on
+	if _mc_btn != null:
+		_mc_btn.text = "MIND CONTROL: ON — WASD drives them" if on \
+			else "MIND CONTROL: OFF — watching their own will"
 
 func _release_target() -> void:
 	if target != null and is_instance_valid(target):
@@ -349,7 +369,7 @@ func _face_row(h: EarthHuman, op: float) -> HBoxContainer:
 	var l := Label.new()
 	# exact ledger, both directions: how the target rates them, and
 	# how they rate the target back
-	l.text = "%s   %+.1f  (they: %+.1f)" % [h.human_name, op,
+	l.text = "%s   likes: %+.1f · likes back: %+.1f" % [h.human_name, op,
 		h._op((target as EarthHuman).human_id) if target is EarthHuman else 0.0]
 	row.add_child(l)
 	return row
