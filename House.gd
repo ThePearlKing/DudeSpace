@@ -1284,8 +1284,11 @@ static func house_at(p: Vector3) -> House:
 		if h is House and is_instance_valid(h):
 			var sz: Vector3 = h.room_size()
 			var rel: Vector3 = p - h.room_center()
+			# a "room" includes everything the kind actually builds: the
+			# basement's cellar hangs a full room-height BELOW the bounds
+			var ylo: float = -sz.y * (2.4 if h.kind == "basement" else 1.2)
 			if absf(rel.x) < sz.x * 0.75 and absf(rel.z) < sz.z * 0.75 \
-					and absf(rel.y) < sz.y * 1.2:
+					and rel.y > ylo and rel.y < sz.y * 1.2:
 				return h
 	return null
 
