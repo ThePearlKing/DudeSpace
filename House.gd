@@ -1434,7 +1434,7 @@ func build_link_visuals(other) -> void:
 			tube.material_override = Surfaces.metal(Color("#9aa0a8"))
 			get_tree().current_scene.add_child(tube)
 			tube.global_position = (a_out + b_out) * 0.5
-			var upm := (global_transform.basis.y + other.global_transform.basis.y).normalized()
+			var upm: Vector3 = (global_transform.basis.y + other.global_transform.basis.y).normalized()
 			if absf(seg2.normalized().dot(upm)) > 0.95:
 				upm = global_transform.basis.x
 			tube.look_at(tube.global_position + seg2.normalized(), upm)
