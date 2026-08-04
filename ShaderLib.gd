@@ -18,11 +18,11 @@ static func shader_code(kind: String) -> String:
 		"contrast":
 			return "shader_type spatial;\nvoid fragment(){\n float v=dot(normalize(NORMAL),normalize(VIEW));\n v=clamp((v-0.5)*7.0+0.5,0.0,1.0);\n ALBEDO=mix(vec3(0.02,0.0,0.06),vec3(1.0,0.97,0.85),v);\n EMISSION=vec3(step(0.88,v))*0.8;\n METALLIC=0.0; ROUGHNESS=0.4;\n}"
 		"wth":
-			# ACTUALLY broken: the geometry itself corrupts. Vertices spike
-			# off the mesh, positions snap like a dying PS1, rows of the
-			# surface tear sideways; texture falls back to missing-asset
-			# magenta, frames drop to black, colours invert at random.
-			return "shader_type spatial;\nfloat h(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453);}\nvoid vertex(){\n float t=floor(TIME*7.0);\n float r=h(floor(VERTEX*0.5)+vec3(t));\n if(r>0.93){ VERTEX += NORMAL*(r-0.93)*260.0; }\n VERTEX = floor(VERTEX*0.35)/0.35;\n if(h(vec3(t,1.0,2.0))>0.75){ VERTEX.x += sin(VERTEX.y*0.2+t)*6.0; }\n}\nvoid fragment(){\n float t=TIME;\n float row=floor(UV.y*40.0);\n float g=h(vec3(row,floor(t*9.0),0.0));\n vec3 c=vec3(1.0,0.0,1.0);\n if(g>0.5){ c=vec3(h(vec3(row,floor(t*9.0),1.0)),h(vec3(row,floor(t*9.0),2.0)),h(vec3(row,floor(t*9.0),3.0))); }\n if(fract(t*5.0)<0.04){ c=vec3(0.0); }\n if(fract(t*3.1)<0.03){ c=vec3(1.0)-c; }\n ALBEDO=c; EMISSION=c*0.7;\n}"
+			# STILL broken, but broken in slow motion: spikes GROW and
+			# retract (interpolated between corruption seeds), the row
+			# tear eases in and out, and the blackouts/inversions are
+			# slow faded dips instead of strobe cuts. seizure-safe glitch.
+			return "shader_type spatial;\nfloat h(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453);}\nvoid vertex(){\n float ph=TIME*0.9; float t0=floor(ph); float f=fract(ph); f=f*f*(3.0-2.0*f);\n vec3 cell=floor(VERTEX*0.5);\n float r0=max(h(cell+vec3(t0))-0.9,0.0);\n float r1=max(h(cell+vec3(t0+1.0))-0.9,0.0);\n VERTEX += NORMAL*mix(r0,r1,f)*180.0;\n float ph2=TIME*0.35; float s0=floor(ph2); float f2=fract(ph2); f2=f2*f2*(3.0-2.0*f2);\n float tear=mix(step(0.75,h(vec3(s0,1.0,2.0))), step(0.75,h(vec3(s0+1.0,1.0,2.0))), f2);\n VERTEX.x += sin(VERTEX.y*0.2+TIME*0.6)*6.0*tear;\n}\nvoid fragment(){\n float ph=TIME*1.2; float t0=floor(ph); float f=fract(ph); f=f*f*(3.0-2.0*f);\n float row=floor(UV.y*40.0);\n vec3 c0=vec3(h(vec3(row,t0,1.0)),h(vec3(row,t0,2.0)),h(vec3(row,t0,3.0)));\n vec3 c1=vec3(h(vec3(row,t0+1.0,1.0)),h(vec3(row,t0+1.0,2.0)),h(vec3(row,t0+1.0,3.0)));\n float m0=step(0.5,h(vec3(row,t0,0.0))); float m1=step(0.5,h(vec3(row,t0+1.0,0.0)));\n vec3 mag=vec3(1.0,0.0,1.0);\n vec3 c=mix(mix(mag,c0,m0),mix(mag,c1,m1),f);\n float dark=smoothstep(0.92,1.0,sin(TIME*0.9)*0.5+0.5);\n c*=1.0-0.85*dark;\n float inv=smoothstep(0.94,1.0,sin(TIME*0.57+2.0)*0.5+0.5);\n c=mix(c,vec3(1.0)-c,inv);\n ALBEDO=c; EMISSION=c*0.6;\n}"
 		"wob":
 			return "shader_type spatial;\nvoid fragment(){\n float t=TIME;\n float band=floor(VERTEX.y*4.0+t*6.0);\n float g=fract(sin(band)*43758.5453);\n vec3 c=vec3(fract(VERTEX.x*0.3+t),g,fract(VERTEX.z*0.3-t));\n if(g>0.7){c=vec3(1.0)-c;}\n ALBEDO=c; EMISSION=c*0.6;\n}"
 		"wireframe":

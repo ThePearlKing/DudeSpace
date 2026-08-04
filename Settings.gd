@@ -8,6 +8,7 @@ var mouse_sensitivity: float = 1.0
 var fullscreen: bool = true      # game launches fullscreen (project setting)
 var fov: float = 90.0
 var username: String = ""        # multiplayer display name
+var epilepsy_seen: bool = false  # 'don't show again' on the photosensitivity note
 
 func _ready() -> void:
 	var cf := ConfigFile.new()
@@ -15,6 +16,7 @@ func _ready() -> void:
 		mouse_sensitivity = float(cf.get_value("opts", "sens", mouse_sensitivity))
 		fov = float(cf.get_value("opts", "fov", fov))
 		username = str(cf.get_value("opts", "username", ""))
+		epilepsy_seen = bool(cf.get_value("opts", "epilepsy_seen", false))
 		var fs := bool(cf.get_value("opts", "fullscreen", fullscreen))
 		if fs != fullscreen:
 			apply_fullscreen(fs)
@@ -25,6 +27,7 @@ func save_cfg() -> void:
 	cf.set_value("opts", "fov", fov)
 	cf.set_value("opts", "fullscreen", fullscreen)
 	cf.set_value("opts", "username", username)
+	cf.set_value("opts", "epilepsy_seen", epilepsy_seen)
 	cf.save(CFG_PATH)
 
 func apply_fullscreen(on: bool) -> void:

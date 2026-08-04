@@ -11,11 +11,56 @@ var _orbits: Array = []
 var _crab: ClawdeCrab
 var _invader: Invader
 
+func _show_epilepsy_note() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 50
+	add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.82)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-260, -140)
+	dim.add_child(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	panel.add_child(col)
+	var t := Label.new()
+	t.text = "  PHOTOSENSITIVITY WARNING  "
+	t.add_theme_font_size_override("font_size", 26)
+	t.add_theme_color_override("font_color", Color("#ffd166"))
+	col.add_child(t)
+	var b := Label.new()
+	b.text = "Parts of this game (notably the shader system's planets)\ncontain flashing imagery, rapid color changes, and moving\npatterns that may affect photosensitive players.\nIf you feel dizzy or unwell, stop playing."
+	b.add_theme_font_size_override("font_size", 15)
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.custom_minimum_size = Vector2(500, 0)
+	col.add_child(b)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	col.add_child(row)
+	var ok := Button.new()
+	ok.text = "Continue"
+	ok.custom_minimum_size = Vector2(240, 46)
+	ok.pressed.connect(layer.queue_free)
+	row.add_child(ok)
+	var never := Button.new()
+	never.text = "Don't show again"
+	never.custom_minimum_size = Vector2(240, 46)
+	never.pressed.connect(func() -> void:
+		Settings.epilepsy_seen = true
+		Settings.save_cfg()
+		layer.queue_free())
+	row.add_child(never)
+
 func _ready() -> void:
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	get_window().grab_focus()
 	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	if not Settings.epilepsy_seen:
+		_show_epilepsy_note.call_deferred()
 	# back from a tutorial session: throw its world away
 	Game.tutorial_session = false
 	Game.tutorial_allow = ["*"]
