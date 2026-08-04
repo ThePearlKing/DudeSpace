@@ -519,6 +519,12 @@ var _gossip_cd: float = 0.0     # cooldown on bad-mouthing the blue dude
 var _los_t: float = 0.0         # sight-check throttle while hunting
 var _lost_t: float = 0.0        # how long the prey has been out of sight
 
+const FOOD_HEAL := {"cooked_meat": 10.0, "salad": 8.0, "meat": 6.0,
+	"shroom": 5.0, "banana": 4.0}
+
+var inv: Dictionary = {}        # pockets: id -> count. finders keepers.
+var _eat_cd: float = 0.0
+
 var age: float = 0.0            # seconds LIVED (only ticks near the player)
 var lifespan: float = 1e9       # rolled at birth. nobody checks the number.
 
@@ -574,6 +580,7 @@ func capture() -> Dictionary:
 	saved["chip"] = chipped
 	saved["age"] = age
 	saved["life"] = lifespan
+	saved["inv"] = inv.duplicate()
 	return saved.duplicate()
 
 func _ready() -> void:
@@ -603,6 +610,10 @@ func _ready() -> void:
 	home_city = int(saved.get("home_city", -1))
 	_moved = bool(saved.get("moved", false))
 	chipped = bool(saved.get("chip", false))
+	var rinv = saved.get("inv", {})
+	if rinv is Dictionary:
+		for k2 in rinv:
+			inv[str(k2)] = int(rinv[k2])
 	if chipped:
 		call_deferred("add_chip_visual")
 	var rop: Dictionary = saved.get("op", {})
@@ -1189,6 +1200,20 @@ func _check_social() -> void:
 				_apple = d
 				_end_convo()
 				return
+	# magpie module: loose items within reach get pocketed. food
+	# always; shiny things sometimes. the drop's grace is respected --
+	# scavengers, not pickpockets
+	if _inv_count() < 8:
+		for dp in get_tree().get_nodes_in_group("itemdrop"):
+			if dp is ItemDrop and is_instance_valid(dp) and dp._t > 4.0 \
+					and global_position.distance_squared_to(dp.global_position) < 4.0:
+				if FOOD_HEAL.has(dp.id) or randf() < 0.2:
+					inv[dp.id] = int(inv.get(dp.id, 0)) + 1
+					dp.count -= 1
+					if dp.count <= 0:
+						dp.queue_free()
+					Sfx.play("click", -26.0)
+				break
 	if _partner != null:
 		return
 	# standing with a cross-city friend: sometimes the Conversation
@@ -1599,8 +1624,25 @@ func _die(dir: Vector3 = Vector3.UP) -> void:
 	Destructible.spawn_debris(get_parent(), global_position,
 		Vector3(0.7, 1.6, 0.7), Color("#c05050"), dir)
 	_drop_meat(randi_range(2, 3))
+	_spill_pockets()
 	Sfx.play("hurt", -10.0)
 	queue_free()
+
+func _inv_count() -> int:
+	var n := 0
+	for k in inv:
+		n += int(inv[k])
+	return n
+
+## Death empties the pockets. The next scavenger says thanks.
+func _spill_pockets() -> void:
+	for k in inv:
+		var d := ItemDrop.new()
+		d.setup(str(k), int(inv[k]))
+		get_parent().add_child(d)
+		d.global_position = global_position + Vector3(randf_range(-0.7, 0.7),
+			0.3, randf_range(-0.7, 0.7))
+	inv.clear()
 
 func _drop_meat(n: int) -> void:
 	for i in n:
@@ -1647,6 +1689,7 @@ func _explode() -> void:
 	Sfx.play("explode", -6.0)
 	_witness(-25.0)   # everyone saw where that apple came from
 	_drop_meat(randi_range(3, 5))
+	_spill_pockets()
 	queue_free()
 
 func _burst(col: Color, size: float, amount: int) -> void:
@@ -1820,6 +1863,22 @@ func _physics_process(delta: float) -> void:
 	_act_t -= delta
 	if _act_t <= 0.0 and _panic_t <= 0.0:
 		_pick_act()
+
+	# hurt and holding food? eat it. where the meat came from is not
+	# a question anyone asks out loud.
+	_eat_cd -= delta
+	if hp < 26.0 and _eat_cd <= 0.0 and _panic_t <= 0.0 and _eat_t <= 0.0:
+		for fkey in FOOD_HEAL:
+			if int(inv.get(fkey, 0)) > 0:
+				inv[fkey] = int(inv[fkey]) - 1
+				if int(inv[fkey]) <= 0:
+					inv.erase(fkey)
+				hp = minf(30.0, hp + float(FOOD_HEAL[fkey]))
+				_eat_cd = 7.0
+				Sfx.play("eat", -20.0)
+				if fkey == "meat" and randf() < 0.25:
+					_say("tastes familiar.")
+				break
 
 	# mid-chew: the countdown between bite and consequence
 	if _eat_t > 0.0:
