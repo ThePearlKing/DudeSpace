@@ -145,6 +145,8 @@ func _ready() -> void:
 		_shirt_test()
 	if OS.get_environment("CTD_TEST") == "12":
 		_neuro_test()
+	if OS.get_environment("CTD_TEST") == "13":
+		_nade_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -388,6 +390,40 @@ func _shirt_test() -> void:
 	var img2 := get_viewport().get_texture().get_image()
 	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_back.png"))
 	print("SHIRTTEST saved back shot")
+
+## Headless: one grenade, one point-blank furnace, one furnace at 5m,
+## one bystander. Count the casualties.
+func _nade_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var ground: Vector3 = home.center + up * (home.radius + 0.5)
+	var close := Furnace.new()
+	add_child(close)
+	close.set_meta("placed_id", "furnace")
+	close.global_position = ground + Vector3(1.5, 0, 0)
+	var far := Furnace.new()
+	add_child(far)
+	far.set_meta("placed_id", "furnace")
+	far.global_position = ground + Vector3(5.5, 0, 0)
+	var hum := EarthHuman.new()
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = ground + Vector3(0, 0, 4)
+	await get_tree().create_timer(0.4).timeout
+	var php: float = Game.health
+	var hhp: float = hum.hp
+	var g := Grenade.new()
+	add_child(g)
+	g.global_position = ground + up * 0.5
+	g._boom()
+	await get_tree().create_timer(0.3).timeout
+	print("NADETEST close machine gone: ", not is_instance_valid(close))
+	print("NADETEST far machine dented: ",
+		is_instance_valid(far) and int(far.get_meta("g_dmg", 0)) == 1)
+	print("NADETEST human hurt: ", (not is_instance_valid(hum)) or hum.hp < hhp)
+	print("NADETEST player hurt: ", Game.health < php or php <= 0.0)
 
 ## Headless: chip a human, open the terminal UI, take the wheel, walk
 ## them, punch a bystander, rewrite the soul. The full violation.

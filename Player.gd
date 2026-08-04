@@ -1112,6 +1112,13 @@ func _use_selected() -> void:
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
+		"grenade":
+			var gr := Grenade.new()
+			get_parent().add_child(gr)
+			gr.global_position = _camera.global_position - _camera.global_transform.basis.z * 1.0
+			gr.vel = -_camera.global_transform.basis.z * 18.0 + global_transform.basis.y * 4.0
+			Inventory.remove_res("grenade", 1)
+			Sfx.play("click", -14.0)
 		"nchip":
 			# brain surgery, field edition: nearest head within reach
 			var hu2 := _nearest_in("earth_human", 6.0)
