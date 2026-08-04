@@ -27,6 +27,7 @@ var powered: bool = false
 var _cooking: bool = false
 var _cooked: AudioStreamWAV = null
 var _cooked_for: int = -2
+var _bad_t: float = 0.0   # how long the signal has been junk
 
 func _init() -> void:
 	title = "RADIO"
@@ -281,9 +282,13 @@ func work(delta: float) -> void:
 		_talk.stop()
 		_sentence_cd = 0.15
 	if best < 0 or bs < 0.05:
-		if _talk.playing:
+		# GRACE: momentary blips (walking, dish jitter) must not kill the
+		# stream -- only a genuinely lost signal does
+		_bad_t += delta
+		if _bad_t > 0.6 and _talk.playing:
 			_talk.stop()
 		return
+	_bad_t = 0.0
 	var st: Dictionary = stations[best]
 	var talk_target := linear_to_db(clampf(clear, 0.05, 1.0))
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
