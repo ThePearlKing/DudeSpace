@@ -976,17 +976,17 @@ const AP_SPORTS := ["the tesselation finals", "orbit racing",
 # little personality collisions: injectable mid-segment, any topic
 const AX_BANTER := [
 	[[0, "you're humming again."], [1, "the hum is LOAD-BEARING."]],
-	[[3, "i have a chart for this."], [0, "you have a chart for everything."],
-		[3, "and yet."]],
+	[[1, "i have a chart for this."], [0, "you have a chart for everything."],
+		[1, "and yet."]],
 	[[2, "can i say something?"], [0, "no."], [2, "understood."]],
 	[[1, "my other job is calling."], [0, "you don't have another job."],
 		[1, "not with THAT attitude."]],
-	[[3, "correction from earlier: everything i said stands."]],
+	[[1, "correction from earlier: everything i said stands."]],
 	[[2, "is the studio spinning, or is that me?"], [1, "both. it's always both."]],
 	[[0, "we are NOT doing the jingle."], [2, "we never do the jingle."],
 		[0, "and morale has never been higher."]],
-	[[1, "i counted the ceiling tiles during the break."],
-		[3, "we don't have ceiling tiles."], [1, "i know what i counted."]],
+	[[3, "i counted the ceiling tiles during the break."],
+		[1, "we don't have ceiling tiles."], [3, "i know what i counted."]],
 	[[0, "producer says wrap it up."], [3, "the producer is a lamp."],
 		[0, "a lamp with a SCHEDULE."]]]
 
@@ -1271,16 +1271,16 @@ static func _ax_story(p: String, p2: String, foreign: bool = false) -> Array:
 # 2 = the sincere wonderer. 3 = the precise analyst.
 const AX_VOICE_PRE := {
 	0: ["moving on:", "for the record:", "in summary:"],
-	1: ["mm.", "again?", "noted."],
+	1: ["per my chart,", "point of order:", "actuarially speaking,"],
 	2: ["oh --", "wait, wait --", "okay but --"],
-	3: ["per my chart,", "point of order:", "actuarially speaking,"]}
+	3: ["mm.", "again?", "noted."]}
 const AX_VOICE_POST := {
 	0: [" -- next item.", " and that's confirmed.", " stay with us."],
-	1: [" as it always was.", " nothing changes.", " i've said my piece."],
+	1: [" margin of error: yes.", " i have the figures.",
+		" the data agrees, reluctantly."],
 	2: [" ...isn't that something?", " i think about that a lot.",
 		" the universe is so much."],
-	3: [" margin of error: yes.", " i have the figures.",
-		" the data agrees, reluctantly."]}
+	3: [" as it always was.", " nothing changes.", " i've said my piece."]}
 
 ## The personality pass: ~one line in four picks up its speaker's habit.
 static func _ax_voice(host: int, line: String) -> String:
