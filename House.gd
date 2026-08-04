@@ -691,6 +691,24 @@ func _build_interior() -> void:
 			_iroot.add_child(odome)
 			odome.global_position = c + Vector3(0, sz.y * 0.5 - 0.1, 0)
 			_mb_dome_in = odome
+			# the dome is SOLID: a convex shell collider so nobody flies
+			# out through the glass into the pocket void
+			var pts := PackedVector3Array()
+			for ring in 4:
+				var vy := float(ring) / 3.0
+				var rr := 5.6 * sqrt(1.0 - vy * vy)
+				for k in 12:
+					var aa := TAU * float(k) / 12.0
+					pts.append(Vector3(cos(aa) * rr, vy * 4.5, sin(aa) * rr))
+			pts.append(Vector3(0, 4.5, 0))
+			var dbody := StaticBody3D.new()
+			var dcol := CollisionShape3D.new()
+			var cvx := ConvexPolygonShape3D.new()
+			cvx.points = pts
+			dcol.shape = cvx
+			dbody.add_child(dcol)
+			_iroot.add_child(dbody)
+			dbody.global_position = odome.global_position
 			# wing dressing: bunk west, console east, floor decals
 			_deco(c + Vector3(-9.5, fy - c.y + 0.55, 2.5),
 				Vector3(1.1, 0.5, 2.2), Color("#5a7aa0"))
@@ -921,6 +939,7 @@ func _build_windows() -> void:
 		ecam.global_position = c + Vector3(0, sz.y * 0.5 - 0.9, 0.01)
 		ecam.look_at(c + Vector3(0, -sz.y * 0.5, 0), Vector3.FORWARD)
 		var icam: Camera3D = iv[1]
+		icam.fov = 95.0   # wide: the dome shows a lot of sky
 		var upv: Vector3 = global_transform.basis.y
 		icam.global_position = global_position + upv * 5.5
 		icam.look_at(icam.global_position + upv, -global_transform.basis.z)
@@ -930,6 +949,12 @@ func _build_windows() -> void:
 			em.albedo_color = Color(1.0, 0.62, 0.25, 0.62)   # SEE-THROUGH orange
 			em.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			em.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			em.uv1_triplanar = true
+			var orad: float = 5.0
+			if _mb_dome_out.mesh is SphereMesh:
+				orad = (_mb_dome_out.mesh as SphereMesh).radius
+			em.uv1_scale = Vector3.ONE * (1.0 / (orad * 2.0))
+			em.uv1_offset = Vector3.ONE * 0.5
 			_mb_dome_out.material_override = em
 		if _mb_dome_in:
 			var im := StandardMaterial3D.new()
@@ -938,6 +963,11 @@ func _build_windows() -> void:
 			im.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			im.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			im.cull_mode = BaseMaterial3D.CULL_DISABLED   # visible from BELOW
+			# TRIPLANAR: project the sky image straight down onto the dome
+			# instead of smearing it around the polar UVs (the warp)
+			im.uv1_triplanar = true
+			im.uv1_scale = Vector3.ONE * (1.0 / 11.2)
+			im.uv1_offset = Vector3.ONE * 0.5
 			_mb_dome_in.material_override = im
 		return
 	if kind == "box":
