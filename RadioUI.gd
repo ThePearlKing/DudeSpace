@@ -336,7 +336,7 @@ func _process(_d: float) -> void:
 		return
 	_map.queue_redraw()
 	_spec.queue_redraw()
-	var live := Game.playtime < radio.now_line_until
+	var live: bool = Game.playtime < radio.now_line_until
 	var saucey: bool = live and radio.now_line.begins_with("⊙")
 	if _subs != null:
 		_subs.text = radio.now_line if (live and not saucey) else ""
