@@ -252,7 +252,7 @@ func _ready() -> void:
 		{"id": "generator", "tab": "Electric", "name": "Generator",      "cost": {"ingot": 8},   "desc": "Burns coal: 1 coal -> 25 EU."},
 		{"id": "coaldrill", "tab": "Electric", "name": "Coal Drill",     "cost": {"ingot": 6, "irid": 2}, "desc": "Digs 1 coal / 5s. Funnel it into a generator."},
 		{"id": "bioreactor","tab": "Electric", "name": "Bioreactor",     "cost": {"ingot": 6, "plantfiber": 6}, "desc": "Meat, plants, bananas, even THE APPLE -> energy."},
-		{"id": "bench", "tab": "Electric", "name": "Park Bench", "cost": {"plantfiber": 4, "ingot": 1}, "desc": "Public seating. Humans use it. F: so do you."},
+		{"id": "bench", "tab": "Machines", "name": "Park Bench", "cost": {"plantfiber": 4, "ingot": 1}, "desc": "Public seating. Humans use it. F: so do you."},
 		{"id": "nchip", "tab": "Electric", "name": "Neuralink Chip", "cost": {"ingot": 2, "wire": 3}, "desc": "Right-click near a human or animal: chip installed. They don't notice."},
 		{"id": "grenade", "tab": "Weapons", "name": "Grenade", "cost": {"ingot": 1, "sulfur": 2, "coal": 2}, "desc": "Right-click: throw. Wrecks machines point-blank, dents them nearby, shreds everything alive in range. You included."},
 		{"id": "nterm", "tab": "Electric", "name": "Neuralink Terminal", "cost": {"ingot": 5, "wire": 6}, "desc": "Browse chipped minds. See their eyes. Drive. Rewrite. F to use."},

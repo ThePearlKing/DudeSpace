@@ -1129,6 +1129,7 @@ func _use_selected() -> void:
 			var an3 := _nearest_in("animal", 6.0)
 			if hu2 and hu2 is EarthHuman:
 				hu2.chipped = true
+				hu2.add_chip_visual()
 				Inventory.clear_slot(slot)
 				Sfx.play("learn")
 			elif an3 and an3 is Animal:

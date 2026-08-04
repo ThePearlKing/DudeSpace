@@ -521,7 +521,8 @@ var _lost_t: float = 0.0        # how long the prey has been out of sight
 
 var chipped: bool = false       # neuralink chip in the head. unaware.
 var minded: bool = false        # actively driven from a terminal
-var mind_dir: Vector3 = Vector3.ZERO   # the chip's steering input
+var mind_dir: Vector3 = Vector3.ZERO   # the chip's strafe/walk input
+var mind_turn: float = 0.0             # the chip's turn input (rad/s)
 
 var home_city: int = -1         # index into Game.earth_cities. -2 = rural
 var _moved: bool = false        # already relocated once: settled now
@@ -569,6 +570,19 @@ func capture() -> Dictionary:
 func _ready() -> void:
 	add_to_group("earth_human")
 	floor_snap_length = 1.6   # hug the sphere: no curvature hop
+	if not saved.has("name"):
+		# prefer a name nobody nearby is wearing: draw a few times and
+		# keep the first free one (there are only so many Kevins)
+		var taken := {}
+		for other in get_tree().get_nodes_in_group("earth_human"):
+			if other is EarthHuman and other != self:
+				taken[other.human_name] = true
+		var pick: String = NAMES[randi() % NAMES.size()]
+		for attempt in 6:
+			if not taken.has(pick):
+				break
+			pick = NAMES[randi() % NAMES.size()]
+		saved["name"] = pick
 	human_name = str(_rv("name", NAMES[randi() % NAMES.size()]))
 	human_id = int(_rv("id", randi()))
 	hp = float(_rv("hp", 30.0))
@@ -577,6 +591,8 @@ func _ready() -> void:
 	home_city = int(saved.get("home_city", -1))
 	_moved = bool(saved.get("moved", false))
 	chipped = bool(saved.get("chip", false))
+	if chipped:
+		call_deferred("add_chip_visual")
 	var rop: Dictionary = saved.get("op", {})
 	for k in rop:
 		_opinion[int(k)] = float(rop[k])
@@ -752,6 +768,9 @@ func _dress_human() -> void:
 		slogan.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		slogan.modulate = Color.WHITE if shirt_col.get_luminance() < 0.5 else Color("#1a1a1a")
 		slogan.position = Vector3(0, 0.05, -0.3)
+		# empirically (screenshot-tested): rotated 180, double-sided on,
+		# the text reads correctly from the chest side. don't theorize.
+		slogan.rotation_degrees.y = 180.0
 		_body._torso.add_child(slogan)
 
 	# hair: one style from the rack, one colour from the bottle
@@ -1271,6 +1290,30 @@ func _can_see(p: Node3D) -> bool:
 	var hit := space.intersect_ray(q)
 	return hit.is_empty() or hit.get("collider") == p
 
+## The implant, visibly: a little glowing module on the BACK of the
+## skull. The one place they can't see it. That's not an accident.
+func add_chip_visual() -> void:
+	if _body == null or not is_instance_valid(_body._head_m):
+		return
+	if _body._head_m.has_node("nchip"):
+		return
+	var chip := MeshInstance3D.new()
+	chip.name = "nchip"
+	var cm := BoxMesh.new()
+	cm.size = Vector3(0.16, 0.16, 0.04)
+	chip.mesh = cm
+	chip.position = Vector3(0, 0.05, 0.3)
+	chip.material_override = Destructible.make_material(Color("#23232a"), 0.1)
+	_body._head_m.add_child(chip)
+	var led := MeshInstance3D.new()
+	var lm := SphereMesh.new()
+	lm.radius = 0.035
+	lm.height = 0.07
+	led.mesh = lm
+	led.position = Vector3(0, 0.05, 0.33)
+	led.material_override = Destructible.make_material(Color("#7bffb0"), 3.0)
+	_body._head_m.add_child(led)
+
 ## Chip command: swing at whoever's in arm's reach.
 func mind_punch() -> void:
 	for h in get_tree().get_nodes_in_group("earth_human"):
@@ -1557,18 +1600,26 @@ func _physics_process(delta: float) -> void:
 			_bubble.modulate.a = bam
 			_bubble.outline_modulate.a = bam
 			_bg_mat.set_shader_parameter("alpha", bam)
+		# facing is its own control (Q/E turn); movement STRAFES.
+		if _dir.length() < 0.1:
+			_dir = -global_transform.basis.z
+		if absf(mind_turn) > 0.01:
+			_dir = _dir.rotated(up, mind_turn * delta)
+		_dir = (_dir - up * _dir.dot(up)).normalized()
 		var msp := 0.0
-		if mind_dir.length() > 0.1:
-			_dir = (mind_dir - up * mind_dir.dot(up)).normalized()
+		var mv := mind_dir - up * mind_dir.dot(up)
+		if mv.length() > 0.1:
+			mv = mv.normalized()
 			msp = WALK_SPEED * 1.6
+		else:
+			mv = Vector3.ZERO
 		var mvu := velocity.dot(up) + Universe.gravity_at(global_position).dot(up) * delta
-		velocity = _dir * msp + up * mvu
+		velocity = mv * msp + up * mvu
 		up_direction = up
 		move_and_slide()
 		_grounded = is_on_floor()
-		if msp > 0.1 and _dir.length() > 0.1:
-			var xm := up.cross(_dir).normalized()
-			global_transform.basis = Basis(xm, up, -_dir).orthonormalized()
+		var xm := _dir.cross(up).normalized()
+		global_transform.basis = Basis(xm, up, -_dir).orthonormalized()
 		if _body:
 			_body.animate(msp, _grounded, delta)
 		return
@@ -1594,7 +1645,7 @@ func _physics_process(delta: float) -> void:
 				fwd = (fwd - nd * fwd.dot(nd))
 				if fwd.length() > 0.0001:
 					fwd = fwd.normalized()
-					var xr := nd.cross(fwd).normalized()
+					var xr := fwd.cross(nd).normalized()
 					global_transform.basis = Basis(xr, nd, -fwd).orthonormalized()
 				if _body:
 					_body.animate(0.0, true, delta)
@@ -1838,7 +1889,7 @@ func _physics_process(delta: float) -> void:
 
 	# face where we walk, feet planted along gravity
 	if (speed > 0.1 or _partner != null) and _dir.length() > 0.1:
-		var x := up.cross(_dir).normalized()
+		var x := _dir.cross(up).normalized()   # RIGHT-handed: no mirror
 		global_transform.basis = Basis(x, up, -_dir).orthonormalized()
 	else:
 		# idle: STILL stand along gravity. cage releases used to walk
@@ -1848,7 +1899,7 @@ func _physics_process(delta: float) -> void:
 		if fwd.length() < 0.05:
 			fwd = up.cross(Vector3.RIGHT)
 		fwd = fwd.normalized()
-		var x2 := up.cross(fwd).normalized()
+		var x2 := fwd.cross(up).normalized()
 		global_transform.basis = Basis(x2, up, -fwd).orthonormalized()
 	if _body and _eat_t <= 0.0:   # mid-bite the tween owns the limbs
 		_body.animate(speed, _grounded, delta)

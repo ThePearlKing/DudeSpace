@@ -25,6 +25,9 @@ var _face_rect: TextureRect
 var _talk_t := 6.0
 var _hint: Label
 
+const NEON := Color("#7bffb0")
+const DIM := Color("#9aa3ad")
+
 func _ready() -> void:
 	layer = 20
 	add_to_group("neuralink_ui")
@@ -32,17 +35,56 @@ func _ready() -> void:
 	_root = Panel.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var st := StyleBoxFlat.new()
-	st.bg_color = Color("#2a2a2e")
+	st.bg_color = Color("#191a1f")
+	st.border_color = NEON.darkened(0.45)
+	st.set_border_width_all(2)
 	_root.add_theme_stylebox_override("panel", st)
 	add_child(_root)
+	# the wordmark: glowing, clinical, faintly menacing
+	var wm := Label.new()
+	wm.text = "◉  N E U R A L I N K"
+	wm.add_theme_font_size_override("font_size", 30)
+	wm.add_theme_color_override("font_color", NEON)
+	wm.position = Vector2(28, 14)
+	_root.add_child(wm)
+	var sub := Label.new()
+	sub.text = "remote cognition console  ·  v0.β  ·  ESC to leave"
+	sub.add_theme_font_size_override("font_size", 13)
+	sub.add_theme_color_override("font_color", DIM)
+	sub.position = Vector2(30, 52)
+	_root.add_child(sub)
 	var x := Button.new()
-	x.text = "X"
+	x.text = "✕"
 	x.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	x.position = Vector2(-56, 12)
-	x.custom_minimum_size = Vector2(44, 44)
+	x.position = Vector2(-60, 14)
+	x.custom_minimum_size = Vector2(46, 46)
+	_style_btn(x)
 	x.pressed.connect(close)
 	_root.add_child(x)
 	_show_browse()
+
+func _style_btn(b: Button) -> void:
+	var n := StyleBoxFlat.new()
+	n.bg_color = Color("#22242b")
+	n.border_color = NEON.darkened(0.35)
+	n.set_border_width_all(1)
+	n.set_corner_radius_all(4)
+	n.set_content_margin_all(8)
+	var h := n.duplicate()
+	h.bg_color = Color("#2c3038")
+	h.border_color = NEON
+	b.add_theme_stylebox_override("normal", n)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", h)
+	b.add_theme_color_override("font_color", NEON)
+	b.add_theme_color_override("font_hover_color", Color.WHITE)
+
+func _header(txt: String) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.add_theme_font_size_override("font_size", 18)
+	l.add_theme_color_override("font_color", NEON)
+	return l
 
 ## ---------- browse ----------
 
@@ -55,22 +97,25 @@ func _show_browse() -> void:
 	_browse.custom_minimum_size = Vector2(480, 0)
 	_root.add_child(_browse)
 	var title := Label.new()
-	title.text = "NEURALINK — CONNECTED MINDS"
+	title.text = "CONNECTED MINDS"
 	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", NEON)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_browse.add_child(title)
 	var n := 0
 	for h in get_tree().get_nodes_in_group("earth_human"):
 		if h is EarthHuman and h.chipped:
 			var b := Button.new()
-			b.text = "%s   ·   human" % h.human_name
+			b.text = "◉  %s   ·   human" % h.human_name
+			_style_btn(b)
 			b.pressed.connect(select_target.bind(h))
 			_browse.add_child(b)
 			n += 1
 	for a in get_tree().get_nodes_in_group("animal"):
 		if a is Animal and a.get_meta("chipped", false):
 			var b2 := Button.new()
-			b2.text = "critter   ·   animal"
+			b2.text = "◉  critter   ·   animal"
+			_style_btn(b2)
 			b2.pressed.connect(select_target.bind(a))
 			_browse.add_child(b2)
 			n += 1
@@ -106,6 +151,7 @@ func select_target(t) -> void:
 	var vc := SubViewportContainer.new()
 	vc.stretch = true
 	vc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vc.mouse_filter = Control.MOUSE_FILTER_STOP   # clicks LAND here
 	vc.gui_input.connect(_view_input)
 	_left.add_child(vc)
 	_vp = SubViewport.new()
@@ -119,7 +165,8 @@ func select_target(t) -> void:
 	_hint.add_theme_font_size_override("font_size", 14)
 	_left.add_child(_hint)
 	var back := Button.new()
-	back.text = "< all minds"
+	back.text = "◂ all minds"
+	_style_btn(back)
 	back.pressed.connect(_show_browse)
 	_left.add_child(back)
 
@@ -343,7 +390,8 @@ func _process(delta: float) -> void:
 		if target != null:
 			_show_browse()
 		return
-	# steer: WASD in the target's own tangent frame while focused
+	# steer while focused: W/S along their facing, A/D STRAFE,
+	# Q/E turns the facing itself
 	if _focus:
 		var fwd: Vector3 = -target.global_transform.basis.z
 		var right: Vector3 = target.global_transform.basis.x
@@ -357,16 +405,22 @@ func _process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_D):
 			d += right
 		target.mind_dir = d.normalized() if d.length() > 0.1 else Vector3.ZERO
+		if target is EarthHuman:
+			target.mind_turn = (2.6 if Input.is_key_pressed(KEY_Q) else 0.0) \
+				- (2.6 if Input.is_key_pressed(KEY_E) else 0.0)
 	else:
 		target.mind_dir = Vector3.ZERO
+		if target is EarthHuman:
+			target.mind_turn = 0.0
 	if _hint:
-		_hint.text = ("CONTROLLING — WASD walk · P/click punch · ESC free mouse") \
-			if _focus else "click the view to take the wheel"
-	# their eyes: first-person-ish from the head
+		_hint.text = ("▶ LINKED — WASD move (A/D strafe) · Q/E turn · P/click punch · ESC release") \
+			if _focus else "○ standby — click the view to take the wheel · ESC leaves"
+		_hint.add_theme_color_override("font_color", NEON if _focus else DIM)
+	# third person: hover behind and above the puppet
 	var up: Vector3 = target.global_transform.basis.y
-	var f2: Vector3 = -target.global_transform.basis.z
-	_cam.global_position = target.global_position + up * 0.85 + f2 * 0.35
-	_cam.look_at(_cam.global_position + f2, up)
+	var back2: Vector3 = target.global_transform.basis.z
+	_cam.global_position = target.global_position + up * 2.3 + back2 * 4.4
+	_cam.look_at(target.global_position + up * 0.9, up)
 	# the chip talks for them
 	if target is EarthHuman:
 		_talk_t -= delta

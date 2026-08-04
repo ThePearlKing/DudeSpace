@@ -722,8 +722,15 @@ class NuclearReactor extends Machine:
 	const HEAT_RATE := 14.0       # degrees/s at full reaction (of 100)
 	const COOL_RATE := 8.0        # passive cooling degrees/s
 	const FUEL_SECS := 60.0       # one uranium = a minute of full burn
-	var rods: float = 1.0         # 1.0 = fully inserted = shutdown (safe default)
-	var temp: float = 0.0         # 0..100 internal, shown as 0..1000 deg
+	var rods: float = 1.0         # actual rod insertion (servo-driven, slow)
+	var rods_target: float = 1.0  # where the operator ORDERED the rods
+	var power: float = 0.0        # neutron power, 1.0 = 100% rated (can exceed)
+	var xenon: float = 0.0        # neutron poison: builds at power, burns at power
+	var temp: float = 0.0         # 0..100 internal, shown as 0..1000 deg C
+	var press: float = 0.0        # primary loop pressure, 0..100 bar
+	var coolant: float = 100.0    # coolant inventory %
+	var flow: int = 2             # coolant flow: 0 off · 1 half · 2 full
+	var _scram: bool = false      # rods dropping under gravity, not servo
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
 	var _rod_meshes: Array = []
 	var _glow: MeshInstance3D
@@ -782,19 +789,42 @@ class NuclearReactor extends Machine:
 			if int(in_slot["n"]) <= 0:
 				in_slot = {"id": "", "n": 0}
 			_fuel = FUEL_SECS
-		# the reaction: what the rods don't absorb, burns
-		var reaction := clampf(1.0 - rods, 0.0, 1.0) if _fuel > 0.0 else 0.0
-		_fuel = maxf(0.0, _fuel - reaction * delta)
-		buf = minf(buf_cap, buf + MAX_EU_S * reaction * delta)
-		# thermodynamics: heat in vs. cooling out. the margin is the game.
-		temp = clampf(temp + (reaction * HEAT_RATE - COOL_RATE) * delta, 0.0, 100.0)
-		# looks: rods sink with insertion, the pool glows with reaction,
+		# rod servos are SLOW. a scram is not: the rods just fall.
+		rods = move_toward(rods, rods_target, delta * (1.5 if _scram else 0.06))
+		if _scram and rods >= 1.0:
+			_scram = false
+		# --- neutron kinetics (the real thing, pocket-sized) ---
+		# reactivity: rod worth, minus xenon poison, minus the negative
+		# temperature coefficient that keeps a good core self-stabilizing
+		var rho := (0.65 - rods) * 0.9 - xenon * 0.5 - (temp / 100.0) * 0.25
+		if _fuel <= 0.0:
+			rho = -1.0
+		# exponential power response: pull too much and it RUNS
+		power = clampf(power + power * rho * delta * 2.2, \
+			0.002 if _fuel > 0.0 else 0.0, 2.0)
+		# xenon-135: builds as you burn, eats neutrons, burns off at high
+		# power. shut down hot and it PEAKS -- the restart trap is real
+		xenon = clampf(xenon + (0.045 * power - 0.09 * power * xenon \
+			- 0.012 * xenon) * delta, 0.0, 1.0)
+		_fuel = maxf(0.0, _fuel - power * delta)
+		# --- thermal-hydraulics: pump + coolant carry heat to the turbine ---
+		var fl := float(flow) * 0.5   # 0 / 0.5 / 1.0
+		var cooling := COOL_RATE * fl * (coolant / 100.0) + 1.5
+		temp = clampf(temp + (power * HEAT_RATE - cooling) * delta, 0.0, 100.0)
+		# electricity only flows when the coolant does: no flow, no steam
+		buf = minf(buf_cap, buf + MAX_EU_S * 1.4 * power * fl * delta)
+		# pressure follows core temp; the relief margin is YOUR problem
+		press = clampf(press + ((temp * 0.95) - press) * delta * 0.4, 0.0, 100.0)
+		# condensers recover coolant when things are calm
+		if temp < 40.0 and coolant < 100.0:
+			coolant = minf(100.0, coolant + 1.2 * delta)
+		# looks: rods sink with insertion, the pool glows with power,
 		# the gauge walks green -> red
 		for r in _rod_meshes:
 			r.position.y = lerpf(r.position.y, box_size.y + 0.25 + (1.0 - rods) * 0.75,
 				delta * 5.0)
 		if _glow and _glow.material_override:
-			_glow.material_override.emission_energy_multiplier = 0.2 + reaction * 3.2 \
+			_glow.material_override.emission_energy_multiplier = 0.2 + power * 3.2 \
 				+ (temp / 100.0) * 2.0
 		if _gauge and _gauge.material_override:
 			_gauge.material_override.emission = Color("#2bff5a").lerp(Color("#ff2b1a"),
@@ -805,7 +835,7 @@ class NuclearReactor extends Machine:
 			if _geiger_t <= 0.0:
 				_geiger_t = lerpf(0.9, 0.12, (temp - 70.0) / 30.0)
 				Sfx.play("click", -14.0)
-		if temp >= 100.0:
+		if temp >= 100.0 or press >= 100.0:
 			_meltdown()
 
 	func _meltdown() -> void:
@@ -865,24 +895,44 @@ class NuclearReactor extends Machine:
 
 	func actions() -> Array:
 		return [
-			["Rods OUT +10%  (more power, more heat)", func() -> void:
-				rods = clampf(rods - 0.1, 0.0, 1.0)
+			["Rods OUT +5%  (servo, slow)", func() -> void:
+				rods_target = clampf(rods_target - 0.05, 0.0, 1.0)
 				Sfx.play("click", -12.0)],
-			["Rods IN -10%", func() -> void:
-				rods = clampf(rods + 0.1, 0.0, 1.0)
+			["Rods IN +5%", func() -> void:
+				rods_target = clampf(rods_target + 0.05, 0.0, 1.0)
 				Sfx.play("click", -12.0)],
-			["SCRAM (full shutdown, NOW)", func() -> void:
-				rods = 1.0
+			["Coolant flow: OFF / HALF / FULL", func() -> void:
+				flow = (flow + 1) % 3
+				Sfx.play("click", -12.0)],
+			["Vent pressure  (-30 bar, -12% coolant)", func() -> void:
+				press = maxf(0.0, press - 30.0)
+				coolant = maxf(0.0, coolant - 12.0)
+				Sfx.play("hurt", -18.0)],
+			["SCRAM (drop every rod, NOW)", func() -> void:
+				rods_target = 1.0
+				_scram = true
 				Sfx.play("denied", -6.0)],
 		]
 
 	func info_text() -> String:
-		var reaction := clampf(1.0 - rods, 0.0, 1.0) if _fuel > 0.0 else 0.0
-		return "energy: %.0f / %.0f EU   (+%.1f EU/s)\ncore: %.0f°C %s\ncontrol rods: %.0f%% inserted\nfuel: %s%s\ncooling carries ~60%% power. beyond that, the core climbs." % [
-			buf, buf_cap, MAX_EU_S * reaction,
-			temp * 10.0, "⚠ MELTDOWN IMMINENT" if temp > 80.0 else ("⚠ overheating" if temp > 55.0 else ""),
-			rods * 100.0,
-			("rod burning, %ds left" % int(_fuel)) if _fuel > 0.0 else "EMPTY",
+		var rho := (0.65 - rods) * 0.9 - xenon * 0.5 - (temp / 100.0) * 0.25
+		if _fuel <= 0.0:
+			rho = -1.0
+		var fl := float(flow) * 0.5
+		var warn := ""
+		if temp > 80.0 or press > 85.0:
+			warn = "  ⚠ MELTDOWN IMMINENT"
+		elif temp > 55.0 or press > 65.0:
+			warn = "  ⚠ excursion in progress"
+		elif xenon > 0.5 and power < 0.1:
+			warn = "  ⚠ xenon peak: restart will fight you"
+		return "energy: %.0f / %.0f EU   (+%.1f EU/s)\nPOWER %.0f%% rated   reactivity ρ %+.3f%s\nrods %.0f%% in (ordered %.0f%%)   xenon %.0f%%\ncore %.0f°C   pressure %.0f bar\ncoolant %.0f%%   flow %s\nfuel: %s%s" % [
+			buf, buf_cap, MAX_EU_S * 1.4 * power * fl,
+			power * 100.0, rho, warn,
+			rods * 100.0, rods_target * 100.0, xenon * 100.0,
+			temp * 10.0, press,
+			coolant, ["OFF", "HALF", "FULL"][flow],
+			("burning, %ds left" % int(_fuel)) if _fuel > 0.0 else "EMPTY",
 			"  · hopper: " + Inventory.slot_text(in_slot) if str(in_slot["id"]) != "" else ""]
 
 ## LIGHT BOX: a small indicator cube. Wire it to a computer output (or

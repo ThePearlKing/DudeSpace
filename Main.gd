@@ -147,6 +147,8 @@ func _ready() -> void:
 		_neuro_test()
 	if OS.get_environment("CTD_TEST") == "13":
 		_nade_test()
+	if OS.get_environment("CTD_TEST") == "14":
+		_sitshirt_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -390,6 +392,49 @@ func _shirt_test() -> void:
 	var img2 := get_viewport().get_texture().get_image()
 	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_back.png"))
 	print("SHIRTTEST saved back shot")
+
+## Windowed: a human seated on a chair, camera on their facing side.
+## Screenshot both sides -- chasing the sitting-mirrors-shirts report.
+func _sitshirt_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var hum := EarthHuman.new()
+	hum.saved = {"shirt_roll": 0.9, "slogan": "CERTIFIED MOON NOODLE"}
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = p.global_position + Vector3(5, 0, 0)
+	var crng := RandomNumberGenerator.new()
+	crng.seed = 1
+	var dir: Vector3 = ((p.global_position + Vector3(7, 0, 0)) - home.center).normalized()
+	_seat_prop(home, dir, crng, false)
+	await get_tree().create_timer(0.5).timeout
+	var seat: Node3D = null
+	var bd := 1e9
+	for sn in get_tree().get_nodes_in_group("seat"):
+		var d: float = sn.global_position.distance_to(p.global_position)
+		if d < bd:
+			bd = d
+			seat = sn
+	seat.set_meta("taken", true)
+	hum._seat = seat
+	hum._act = "goseat"
+	hum._act_t = 25.0
+	for i in 60:
+		await get_tree().create_timer(0.25).timeout
+		if hum._act == "sit":
+			break
+	await get_tree().create_timer(0.5).timeout
+	var cam := Camera3D.new()
+	add_child(cam)
+	var fwd: Vector3 = -hum.global_transform.basis.z
+	var hup: Vector3 = hum.global_transform.basis.y
+	cam.global_position = hum.global_position + fwd * 2.6 + hup * 0.3
+	cam.look_at(hum.global_position + hup * 0.3, hup)
+	cam.current = true
+	await get_tree().create_timer(0.6).timeout
+	get_viewport().get_texture().get_image().save_png(OS.get_environment("CTD_SHOT"))
+	print("SITSHIRT saved  act=", hum._act)
 
 ## Headless: one grenade, one point-blank furnace, one furnace at 5m,
 ## one bystander. Count the casualties.
