@@ -107,6 +107,10 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wavi := _ice_loop()
 		_music_cache[key] = wavi
 		return wavi
+	if kind == "earth":
+		var wave2 := _earth_loop(seed_v)
+		_music_cache[key] = wave2
+		return wave2
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var beat := 60.0 / float(st["bpm"])
@@ -481,6 +485,75 @@ static func _encode_loop(buf: PackedFloat32Array, total: int, cache_slot: String
 		_bh_wav = wav
 	elif cache_slot == "_ice":
 		_ice_wav = wav
+	return wav
+
+## EARTH2, done properly: easy listening with actual songcraft. I-vi-IV-V
+## pads swelling under a soft walking bass, a vibrato flute melody that
+## lands on chord tones at the downbeats, and a brushed tick on 2 and 4.
+static func _earth_loop(seed_v: int) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var base := 262.0
+	var beat := 60.0 / 84.0
+	var bars := 4
+	var barlen := int(4.0 * beat * SR)
+	var total := barlen * bars
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	var prog: Array = [[0, 4, 7], [-3, 0, 4], [5, 9, 12], [7, 11, 14]]
+	for bar in bars:
+		var ch: Array = prog[bar]
+		var b0 := bar * barlen
+		# pads: warm triad + octave root, swelling through the bar
+		for semi in [ch[0], ch[1], ch[2], ch[0] + 12]:
+			var f := base * pow(2.0, float(semi) / 12.0)
+			for i in mini(barlen, total - b0):
+				var t := float(i) / SR
+				var env := sin(PI * float(i) / float(barlen))
+				buf[b0 + i] += sin(TAU * f * t) * 0.05 * env * env
+		# bass: root on 1 and 3, soft and round
+		for q in [0, 2]:
+			var bs := b0 + int(float(q) * beat * SR)
+			var bf := base * 0.5 * pow(2.0, float(ch[0]) / 12.0)
+			for i in mini(int(beat * SR * 1.6), total - bs):
+				var t2 := float(i) / SR
+				buf[bs + i] += sin(TAU * bf * t2) * 0.14 \
+					* minf(1.0, float(i) / (SR * 0.02)) * exp(-t2 * 1.4)
+		# brushes: a soft tick on 2 and 4
+		for q2 in [1, 3]:
+			var ts := b0 + int(float(q2) * beat * SR)
+			for i in mini(int(0.05 * SR), total - ts):
+				buf[ts + i] += (randf() * 2.0 - 1.0) * 0.05 * exp(-float(i) / (SR * 0.014))
+		# melody: flute with vibrato -- chord tone ON the downbeats,
+		# scale steps drifting between them
+		var scale: Array = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16]
+		for h in 4:
+			if h % 2 == 0 or rng.randf() < 0.75:
+				var semi2: int
+				if h % 2 == 0:
+					semi2 = int(ch[rng.randi() % ch.size()]) + 12
+				else:
+					semi2 = int(scale[rng.randi() % scale.size()]) + 12
+				var mf := base * pow(2.0, float(semi2) / 12.0)
+				var ms := b0 + int(float(h) * beat * SR)
+				var md := int(beat * SR * (0.9 if rng.randf() < 0.7 else 1.8))
+				for i in mini(md, total - ms):
+					var t3 := float(i) / SR
+					var env3 := minf(1.0, float(i) / (SR * 0.05)) \
+						* minf(1.0, float(md - i) / (SR * 0.1))
+					var vib := 1.0 + 0.007 * sin(TAU * 5.0 * t3) * minf(1.0, t3 * 3.0)
+					buf[ms + i] += (sin(TAU * mf * vib * t3) \
+						+ 0.2 * sin(TAU * mf * 2.0 * t3)) * 0.16 * env3
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
 	return wav
 
 ## The shadow temple's frequency: no music, no words. A slow drone,
