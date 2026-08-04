@@ -1120,8 +1120,27 @@ func _use_selected() -> void:
 	var place := body.center + up * body.radius
 	# In flat/zero zones the surface is wherever you stand, not a planet shell.
 	if Game.zone != "":
+		# indoors: machines go where you LOOK, snapped down to the
+		# floor or a catwalk deck -- never embedded in a wall
 		up = Vector3.UP
-		place = global_position - global_transform.basis.z * 3.0
+		var isp := get_world_3d().direct_space_state
+		var f0 := _camera.global_position
+		var iq := PhysicsRayQueryParameters3D.create(f0,
+			f0 - _camera.global_transform.basis.z * 10.0)
+		iq.exclude = [get_rid()]
+		var ih := isp.intersect_ray(iq)
+		if ih:
+			var drop := PhysicsRayQueryParameters3D.create(
+				ih.position + Vector3.UP * 0.3, ih.position + Vector3.DOWN * 8.0)
+			drop.exclude = [get_rid()]
+			var gh := isp.intersect_ray(drop)
+			if gh and gh.normal.dot(Vector3.UP) > 0.7:
+				place = gh.position
+			else:
+				Sfx.play("denied")   # that's a wall. walls hold paintings.
+				return
+		else:
+			place = global_position - global_transform.basis.z * 3.0
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
