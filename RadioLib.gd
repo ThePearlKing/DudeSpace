@@ -703,11 +703,11 @@ const SAUCE_VERSE2: Array = [
 
 ## The autotuned moments: hook lines pinned to notes of a minor line.
 const SAUCE_TUNED := {
-	"the fork.": 196.0, "is coming.": 165.0,
-	"zholgoth.": 220.0, "vraxulemn.": 196.0,
-	"othrunquay.": 175.0, "melgrahz.": 147.0,
-	"when the timer rings its final ring,": 196.0,
-	"the fork descends on everything.": 165.0}
+	"the fork.": 175.0, "is coming.": 165.0,
+	"zholgoth.": 175.0, "vraxulemn.": 170.0,
+	"othrunquay.": 160.0, "melgrahz.": 150.0,
+	"when the timer rings its final ring,": 175.0,
+	"the fork descends on everything.": 160.0}
 
 static var _sauce_wav: AudioStreamWAV = null
 
@@ -794,11 +794,11 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		for i in mini(int(0.16 * SR), total - b0):
 			var tb := float(i) / SR
 			var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.15, 1.0)
-			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.62 * duck
+			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.85 * duck
 		var toff := b0 + int(float(barlen) * 0.5)
 		for i in mini(int(0.05 * SR), total - toff):
 			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
-			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.15 * duck2
+			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.2 * duck2
 		bi += 1
 	# the TURNAROUND: a bar-long reverse-cymbal swell that crests exactly
 	# on the loop point, sucking the song back to the top

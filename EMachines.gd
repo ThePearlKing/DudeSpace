@@ -741,10 +741,6 @@ class NuclearReactor extends Machine:
 	var _waters: Array = []       # the pool volumes, one per window
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
 
-	func accepts(id: String) -> bool:
-		# funnels can keep the hopper stocked with rods
-		return id == "uranium"
-
 	var _rhits: int = 0
 
 	## Containment takes SIX hits, not three -- and cracking a LIVE core
