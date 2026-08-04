@@ -590,8 +590,10 @@ static func noodle_broadcast() -> AudioStreamWAV:
 			pos += barlen   # a rest: the beat carries the bar alone
 			continue
 		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
-		var wc := _light_echo(HumanVoice.render(str(ln),
-			{"base": 112.0, "var": 0.12, "wave": "saw", "rate": 0.8, "artic": 1.5}))
+		# the clear take is fully DRY -- any echo on it and the words go.
+		# the eldritch layer underneath supplies all the haunt.
+		var wc := HumanVoice.render(str(ln),
+			{"base": 118.0, "var": 0.12, "wave": "saw", "rate": 0.9, "artic": 1.7})
 		segs.append([pos, w.data, wc.data])
 		var nlen: int = maxi(w.data.size(), wc.data.size()) / 2
 		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
@@ -603,10 +605,10 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		var st: int = sg[0]
 		var pd: PackedByteArray = sg[1]
 		for i in mini(pd.size() / 2, total - st):
-			buf[st + i] += pd.decode_s16(i * 2) / 32768.0 * 0.4
+			buf[st + i] += pd.decode_s16(i * 2) / 32768.0 * 0.28
 		var pc: PackedByteArray = sg[2]
 		for i in mini(pc.size() / 2, total - st):
-			buf[st + i] += pc.decode_s16(i * 2) / 32768.0 * 0.85
+			buf[st + i] += pc.decode_s16(i * 2) / 32768.0 * 1.0
 	# sidechain the CONTINUOUS beat under the assembled verse
 	var env := PackedFloat32Array()
 	env.resize(total)
