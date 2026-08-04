@@ -139,7 +139,7 @@ func _build_hand() -> void:
 	var fm := BoxMesh.new()
 	fm.size = Vector3(0.3, 0.32, 0.34)
 	fist.mesh = fm
-	fist.material_override = ShaderLib.make(_char_shader(), _char_color())
+	fist.material_override = skin   # same skin as the arm, fx included
 	_hand.add_child(fist)
 
 	# held item shown in front of the fist (a tiny MODEL, not a cube)
