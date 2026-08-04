@@ -973,6 +973,23 @@ const AP_SLOGANS := ["now with fewer dimensions.",
 	"side effects include existing.", "it just renders RIGHT."]
 const AP_SPORTS := ["the tesselation finals", "orbit racing",
 	"competitive shadow tug", "freestyle rotation"]
+# little personality collisions: injectable mid-segment, any topic
+const AX_BANTER := [
+	[[0, "you're humming again."], [1, "the hum is LOAD-BEARING."]],
+	[[3, "i have a chart for this."], [0, "you have a chart for everything."],
+		[3, "and yet."]],
+	[[2, "can i say something?"], [0, "no."], [2, "understood."]],
+	[[1, "my other job is calling."], [0, "you don't have another job."],
+		[1, "not with THAT attitude."]],
+	[[3, "correction from earlier: everything i said stands."]],
+	[[2, "is the studio spinning, or is that me?"], [1, "both. it's always both."]],
+	[[0, "we are NOT doing the jingle."], [2, "we never do the jingle."],
+		[0, "and morale has never been higher."]],
+	[[1, "i counted the ceiling tiles during the break."],
+		[3, "we don't have ceiling tiles."], [1, "i know what i counted."]],
+	[[0, "producer says wrap it up."], [3, "the producer is a lamp."],
+		[0, "a lamp with a SCHEDULE."]]]
+
 const AP_FOIL := ["i am wearing the foil cone until the listening stops.",
 	"the foil cone stays ON this cycle. no debate.",
 	"foil is not fear. foil is fashion with boundaries.",
@@ -1352,6 +1369,13 @@ static func alien_exchange(in_room: bool = false) -> Array:
 				[1, "that's nothing. " + _ax_fresh(AP_HUMAN_DUMB)],
 				[2, _ax_opinion()],
 				[0, _ax_fresh(AX_HUM_CLOSE)]]
+	# BANTER: the four of them are coworkers, and it shows. ~1 in 4
+	# segments gets a little personality collision woven in.
+	if randi() % 4 == 0:
+		var banter: Array = AX_BANTER[randi() % AX_BANTER.size()]
+		var at := 1 + randi() % maxi(1, out.size() - 1)
+		for bi in range(banter.size() - 1, -1, -1):
+			out.insert(at, banter[bi])
 	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
 	if randi() % 12 == 0:
 		out.append([2, _ax_fresh(AP_FOIL)])
