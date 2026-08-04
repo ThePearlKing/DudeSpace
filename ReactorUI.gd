@@ -331,6 +331,14 @@ RULES OF NOT EXPLODING:
    the readout is how much. it's why power sinks while RODS
    and FUEL look fine.
 
+HOW TO SET POWER (you can't. you steer it):
+ · there is no power dial. RODS steer ρ, and ρ steers power:
+   ρ positive = power climbs. ρ negative = power falls.
+   ρ near zero = power HOLDS where it is.
+ · so to get to, say, 60%%: rods OUT until ρ reads ~+0.05,
+   watch POWER climb, and when it reaches ~60%%, rods back IN
+   until ρ reads ~0. that's it. that's driving a reactor.
+
 HOW TO NOT LET THE ASH RUIN YOUR DAY (the playbook):
  1. CRUISE at 50-70%% power, FLOW FULL. this is the sweet
     spot: steady heat, and the ash levels off instead of
@@ -420,6 +428,14 @@ func _process(delta: float) -> void:
 		coach = "\n>> ρ positive -- power climbing, hold on"
 	elif rx.mode == 1 and rx.temp < 15.0:
 		coach = "\n>> warming: power heats the core toward RUN (150°C)"
+	elif rx.mode == 2 and rho > 0.1:
+		coach = "\n>> ρ HIGH: power is running away -- rods IN, now"
+	elif rx.mode == 2 and rx.power > 0.75:
+		coach = "\n>> high power piles heat AND ash -- ease rods IN, settle 50-70%"
+	elif rx.mode == 2 and rx.power < 0.45 and rho <= 0.005 and rx.xenon < 0.4:
+		coach = "\n>> to raise power: rods OUT until ρ ~ +0.05, ride it up,\n   rods back IN when POWER hits your number"
+	elif rx.mode == 2 and absf(rho) < 0.03 and rx.power >= 0.45:
+		coach = "\n>> cruising. hold ρ near 0: nudge rods only when POWER drifts"
 	elif rho <= 0.0 and rx.xenon * 0.5 > (0.65 - rx.rods) * 0.9:
 		# the XENON PIT: the poison alone is out-arguing the rods
 		coach = "\n>> XENON (the ash) is smothering the reaction." \
