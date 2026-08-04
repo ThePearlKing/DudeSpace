@@ -443,25 +443,27 @@ func _drive_tv(delta: float, p: Node3D) -> void:
 				var bb = _tv_bodies[1]
 				var mid2: Vector3 = (ba.center + bb.center) * 0.5
 				var sepv: Vector3 = bb.center - ba.center
-				var phase := fmod(_t, 14.0)
+				var phase := fmod(_t, 12.0)
 				var orb3 := _t * 0.2
 				var side := sepv.cross(Vector3.UP)
 				if side.length() < 1.0:
 					side = sepv.cross(Vector3.RIGHT)
 				side = side.normalized()
-				if phase < 6.0:
+				if phase < 4.0:
 					var wd: float = sepv.length() * 0.9 + float(ba.radius) * 3.0
 					_tv_cam.global_position = mid2 + side.rotated(sepv.normalized(),
 						orb3) * wd
 					_tv_cam.look_at(mid2, Vector3.UP)
 					_tv_cam.fov = 58.0
 				else:
-					var tgt = ba if phase < 10.0 else bb
-					var rr: float = float(tgt.radius) * 2.4
+					var tgt = ba if phase < 8.0 else bb
+					# comfortable close-up: planet fills MOST of the frame,
+					# not the whole lens pressed against it
+					var rr: float = float(tgt.radius) * 3.4
 					_tv_cam.global_position = tgt.center + Vector3(cos(orb3 * 2.0) * rr,
 						rr * 0.3, sin(orb3 * 2.0) * rr)
 					_tv_cam.look_at(tgt.center, Vector3.UP)
-					_tv_cam.fov = lerpf(_tv_cam.fov, 26.0, 0.05)
+					_tv_cam.fov = lerpf(_tv_cam.fov, 40.0, 0.05)
 		"humans":
 			# an Earth camera pivots onto some human and ZOOMS. rude.
 			_human_pick_t -= delta
