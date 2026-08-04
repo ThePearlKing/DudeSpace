@@ -255,6 +255,7 @@ const TIPS := [
 	"tip: a bioreactor accepts a permadeath apple. 500 EU. coward.",
 	"tip: the sell station buys meat, salad, even coal. everything has a price.",
 	"tip: humans may seem smart. they are dumb and inefficient.",
+	"tip: crafting, furniture and houses can pull materials straight from your backpack.",
 	"tip: F5 changes camera. G strikes a pose. combine responsibly.",
 	"tip: dying on a sun vaporizes your items. there is no going back for them.",
 	"tip: a control coil on a power extender is a valve. valves in a row are an AND gate.",

@@ -246,8 +246,8 @@ func try_buy(id: String) -> void:
 	if not Game.tut_can_buy(id):
 		Sfx.play("denied", -14.0)   # tutorial: not this one, not yet
 		return
-	if _tab == "Creative" and Game.creative:
-		# free: stackables come in tens
+	if Game.creative:
+		# creative: EVERYTHING is free craft, wires included, any tab
 		Inventory.give(id, 10 if Inventory.STACKABLE.has(id) else 1)
 		Sfx.play("coin")
 		return

@@ -33,10 +33,11 @@ func _ready() -> void:
 			seats = [Vector3(-0.65, 0.62, 0), Vector3(0, 0.62, 0), Vector3(0.65, 0.62, 0)]
 			_hitbox(Vector3(2.4, 1.2, 0.9), Vector3(0, 0.6, 0))
 		"carpet":
-			_m(Vector3(2.6, 0.05, 1.8), Vector3(0, 0.03, 0), cloth)
-			_m(Vector3(2.75, 0.04, 1.95), Vector3(0, 0.015, 0),
+			# big, flat, and NO collision: a carpet you trip on is a rug
+			# with a grudge
+			_m(Vector3(4.2, 0.05, 3.0), Vector3(0, 0.03, 0), cloth)
+			_m(Vector3(4.4, 0.04, 3.2), Vector3(0, 0.015, 0),
 				Destructible.make_material(cloth.albedo_color.darkened(0.3), 0.03))
-			_hitbox(Vector3(2.6, 0.1, 1.8), Vector3(0, 0.05, 0))
 		"bed":
 			_m(Vector3(1.2, 0.35, 2.3), Vector3(0, 0.28, 0), wood)
 			_m(Vector3(1.1, 0.16, 2.1), Vector3(0, 0.53, 0), cloth)

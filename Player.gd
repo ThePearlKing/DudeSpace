@@ -182,10 +182,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Game.mode != Game.Mode.ON_FOOT or Game.dead:
 		return
 	if _ghost != null and event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			_confirm_ghost()
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel_ghost()
+		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			_confirm_ghost()   # either button places. Esc cancels.
 		get_viewport().set_input_as_handled()
 		return
 	if _ghost != null and event is InputEventKey and event.pressed 			and event.keycode == KEY_ESCAPE:
@@ -269,7 +267,17 @@ func _start_ghost(cat: String, kind: String) -> void:
 				hh = 3.0
 		bm.size = Vector3(w, hh, w)
 	else:
-		bm.size = Vector3(1.8, 1.0, 0.8) if kind in ["bench", "sofa"] 			else Vector3(1.2, 0.8, 1.6)
+		match kind:
+			"carpet":
+				bm.size = Vector3(4.4, 0.08, 3.2)
+			"bench":
+				bm.size = Vector3(1.9, 1.1, 0.7)
+			"sofa":
+				bm.size = Vector3(2.4, 1.2, 0.9)
+			"bed":
+				bm.size = Vector3(1.3, 0.8, 2.4)
+			_:
+				bm.size = Vector3(0.7, 1.1, 0.7)
 	_ghost.mesh = bm
 	var gm := StandardMaterial3D.new()
 	gm.albedo_color = Color(0.4, 1.0, 0.6, 0.35)
@@ -309,14 +317,16 @@ func _confirm_ghost() -> void:
 		hn.set_meta("owner", Net.my_name())
 		hn.global_transform = Transform3D(tf.basis, base_pos)
 		hn.rotate_object_local(Vector3.UP, randf() * TAU)
-		Inventory.remove_res("housekit", 1)
+		if not Game.creative:
+			Inventory.remove_res("housekit", 1)
 		Sfx.play("place")
 	else:
-		if Inventory.res_count("plantfiber") < 2:
-			Sfx.play("denied")
-			_cancel_ghost()
-			return
-		Inventory.remove_res("plantfiber", 2)
+		if not Game.creative:
+			if Inventory.res_count("plantfiber") < 2:
+				Sfx.play("denied")
+				_cancel_ghost()
+				return
+			Inventory.remove_res("plantfiber", 2)
 		var fn := Furniture.new()
 		fn.kind = _ghost_kind
 		get_parent().add_child(fn)
@@ -358,6 +368,14 @@ func _physics_process(delta: float) -> void:
 			var su2: Vector3 = seated.global_transform.basis.y
 			global_position = seated.global_position + su2 * 0.6
 			velocity = Vector3.ZERO
+			# seated is not PARALYZED: the head still turns
+			if not _ui_open() and not Game.dead:
+				var ssens := MOUSE_SENS * Settings.mouse_sensitivity
+				if _look.x != 0.0:
+					rotate_object_local(Vector3.UP, -_look.x * ssens)
+				_pitch = clampf(_pitch - _look.y * ssens, -1.4, 1.4)
+				_head.rotation.x = _pitch
+			_look = Vector2.ZERO
 			return
 	# passenger seat: glued to the pilot's synced rocket, no physics of ours
 	if riding_peer != -1:

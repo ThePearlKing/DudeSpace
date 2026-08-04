@@ -35,7 +35,23 @@ static func tex(id: String, tree: SceneTree) -> Texture2D:
 	vp.add_child(sun)
 	var holder := Node3D.new()
 	vp.add_child(holder)
-	holder.add_child(build_model(id))
+	# the REAL in-game model when one exists (chest looks like the
+	# chest, sell station like the sell station); minis otherwise
+	var real: Node3D = null
+	var cs = tree.current_scene
+	if cs != null and cs.has_method("_spawn_world_obj"):
+		real = cs._spawn_world_obj(id)
+	if real != null:
+		real.process_mode = Node.PROCESS_MODE_DISABLED
+		holder.add_child(real)
+		var ext := 1.4
+		if "box_size" in real:
+			ext = maxf(real.box_size.x, maxf(real.box_size.y, real.box_size.z))
+		var sc := 0.62 / maxf(0.6, ext)
+		real.scale = Vector3(sc, sc, sc)
+		real.position = Vector3(0, -0.25, 0)
+	else:
+		holder.add_child(build_model(id))
 	# the spin: unhurried, like a furniture showroom
 	var tw := holder.create_tween().set_loops()
 	tw.tween_property(holder, "rotation:y", TAU, 9.0).from(0.0)
