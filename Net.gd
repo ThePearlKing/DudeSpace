@@ -210,6 +210,7 @@ func _req_world(pname: String) -> void:
 		"playtime": Game.playtime,
 		"spawn": [Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z],
 		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
+		"wseed": Game.world_seed,
 	}
 	_world_snapshot.rpc_id(id, snap, Save.guest_blob(pname))
 

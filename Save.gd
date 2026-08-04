@@ -195,6 +195,7 @@ func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
 		"spawn": snap.get("spawn", null),
 		"spawn_up": snap.get("spawn_up", [0, 1, 0]),
 		"pos": snap.get("spawn", null),   # arrive at the server spawn
+		"wseed": snap.get("wseed", 0),    # guests build the HOST's terrain
 	}
 	for k in blob.keys():
 		if k == "character":
@@ -237,6 +238,12 @@ func apply_progress() -> void:
 		Game.has_saved_spawn = false
 	Game.tutorial_done = bool(_progress.get("tut_done", false))
 	Game.god_cycles = int(_progress.get("god_cycles", 0))
+	# world seed: minted once per save, permanent after -- terrain stops
+	# rerolling itself every time you rejoin
+	Game.world_seed = int(_progress.get("wseed", 0))
+	if Game.world_seed == 0:
+		Game.world_seed = randi() | 1
+		_progress["wseed"] = Game.world_seed
 	Game.god_standby_until = float(_progress.get("god_standby_until", -1.0))
 	var hc = _progress.get("host_cfg", null)
 	if hc is Dictionary:
@@ -328,6 +335,7 @@ func save_progress() -> void:
 		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
 		"tut_done": Game.tutorial_done,
 		"god_cycles": Game.god_cycles,
+		"wseed": Game.world_seed,
 		"god_standby_until": Game.god_standby_until,
 		"host_cfg": Game.host_cfg,
 		"guest_data": _progress.get("guest_data", {}),

@@ -1025,6 +1025,7 @@ func _use_selected() -> void:
 			_apple_prompt(slot)
 		"cage":
 			var an := _nearest_in("animal", 6.0)
+			var hu := _nearest_in("earth_human", 6.0)
 			if an and an is Animal:
 				# store its GENOME -- the exact same creature comes back
 				# out, even after saving and quitting
@@ -1036,21 +1037,37 @@ func _use_selected() -> void:
 				Inventory.clear_slot(slot)
 				Inventory.give("caged_animal", 1)
 				Sfx.play("place")
+			elif hu and hu is EarthHuman:
+				# humans fit in cages too. same guy comes back out --
+				# name, face, shirt, grudges, everything
+				Inventory.caged_data.append({"human": hu.capture()})
+				hu.queue_free()
+				Inventory.clear_slot(slot)
+				Inventory.give("caged_animal", 1)
+				Sfx.play("place")
 			else:
 				Sfx.play("denied")
 		"caged_animal":
-			var out := Animal.new()
 			var body2 := Universe.nearest(global_position)
-			if not Inventory.caged_data.is_empty():
-				var d2: Dictionary = Inventory.caged_data.pop_back()
-				out.setup(body2, bool(d2.get("ground", false)), bool(d2.get("bug", false)), int(d2.get("g", -1)))
-				get_parent().add_child(out)
-				if bool(d2.get("tamed", false)):
-					out.tame()
+			var d2: Dictionary = Inventory.caged_data.pop_back() \
+				if not Inventory.caged_data.is_empty() else {}
+			if d2.has("human"):
+				var outh := EarthHuman.new()
+				outh.saved = d2["human"]
+				outh.setup(body2)
+				get_parent().add_child(outh)
+				outh.global_position = place + up * 1.0
 			else:
-				out.setup(body2)
-				get_parent().add_child(out)
-			out.global_position = place + up * 1.0
+				var out := Animal.new()
+				if not d2.is_empty():
+					out.setup(body2, bool(d2.get("ground", false)), bool(d2.get("bug", false)), int(d2.get("g", -1)))
+					get_parent().add_child(out)
+					if bool(d2.get("tamed", false)):
+						out.tame()
+				else:
+					out.setup(body2)
+					get_parent().add_child(out)
+				out.global_position = place + up * 1.0
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")

@@ -120,6 +120,7 @@ var tutorial_done: bool = false     # interactive tutorial finished/skipped
 var tutorial_session: bool = false  # throwaway tutorial world (set by Title, never saved)
 var god_standby_until: float = -1.0 # after a death the god broods instead of acting
 var god_cycles: int = 0             # every brood it wakes STRONGER and pettier
+var world_seed: int = 0             # fixes terrain layout across reloads
 # What the shop will sell right now. ["*"] = everything (normal play);
 # [] = nothing; otherwise an allowlist of ids. The tutorial drives this so
 # a new player can't blow their coins on the wrong thing mid-lesson.

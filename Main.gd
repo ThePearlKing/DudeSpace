@@ -119,6 +119,8 @@ func _ready() -> void:
 
 	Game.reset()
 	Save.apply_progress()   # restore this slot's run (no-op on a fresh slot)
+	# deterministic world-gen: same save, same Earth, every single time
+	seed(Game.world_seed)
 	if OS.get_environment("CTD_TEST") == "1":
 		_self_test()
 	if OS.get_environment("CTD_TEST") == "2":
@@ -127,6 +129,14 @@ func _ready() -> void:
 		_map_pick_test()
 	if OS.get_environment("CTD_TEST") == "4":
 		_board_test()
+	if OS.get_environment("CTD_TEST") == "5":
+		_talk_test()
+	if OS.get_environment("CTD_TEST") == "6":
+		_convo_test()
+	if OS.get_environment("CTD_TEST") == "7":
+		_apple_test()
+	if OS.get_environment("CTD_TEST") == "8":
+		_cage_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -137,6 +147,7 @@ func _ready() -> void:
 		var cfg := Game.host_cfg.duplicate()
 		cfg["port"] = 25999   # off the real port so tests never collide
 		print("NETTEST host: ", Net.host(cfg))
+	randomize()   # world built: gameplay dice go back to being dice
 	if _player:
 		_player.restore_jet()   # jetpack comes back ON if you left it on
 	if Game.door_open:
@@ -164,6 +175,130 @@ func _ready() -> void:
 			rk.global_position = sp
 			rk.hyperdrive = Save.was_hyper()
 			rk.board(_player)
+
+## Headless: park a Human in front of the player's face and press F.
+func _talk_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var cam: Camera3D = p.camera()
+	var hum := EarthHuman.new()
+	hum.setup(Universe.nearest(p.global_position))
+	add_child(hum)
+	hum.global_position = cam.global_position - cam.global_transform.basis.z * 4.0
+	await get_tree().create_timer(0.5).timeout
+	p._interact()
+	await get_tree().create_timer(0.3).timeout
+	print("TALKTEST bubble: '", hum._bubble.text, "'  alpha: ", hum._bubble.modulate.a)
+
+## Headless: drop a grumpy Kevin next to a mild John, force a chat,
+## watch the ledger. Prints every line said plus final opinions.
+func _convo_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var kevin := EarthHuman.new()
+	var john := EarthHuman.new()
+	kevin.setup(home)
+	john.setup(home)
+	add_child(kevin)
+	add_child(john)
+	kevin.global_position = p.global_position + Vector3(3, 0, 0)
+	john.global_position = p.global_position + Vector3(5, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	kevin.human_name = "Kevin"
+	john.human_name = "John"
+	kevin._pers = {"anxious": 5, "confident": 40, "dreamy": 5, "dumb": 20,
+		"grumpy": 95, "goofy": 5, "edgy": 70, "awkward": 5}
+	john._pers = {"anxious": 60, "confident": 20, "dreamy": 40, "dumb": 20,
+		"grumpy": 10, "goofy": 30, "edgy": 5, "awkward": 40}
+	kevin._start_convo(john)
+	var k_last := ""
+	var j_last := ""
+	for i in 120:
+		await get_tree().create_timer(0.25).timeout
+		if kevin._bubble.text != k_last:
+			k_last = kevin._bubble.text
+			print("CONVOTEST Kevin: ", k_last)
+		if john._bubble.text != j_last:
+			j_last = john._bubble.text
+			print("CONVOTEST John:  ", j_last)
+		if kevin._partner == null and john._partner == null and i > 20:
+			break
+	print("CONVOTEST john's opinion of kevin: ", john._op(kevin.human_id))
+	print("CONVOTEST kevin's opinion of john: ", kevin._op(john.human_id))
+	print("CONVOTEST john panicking (fled/punched): ", john._panic_t > 0.0)
+
+## Headless: one human, one dropped permadeath apple. Watch the whole
+## arc: lure, bite, boom, meat -- then kill a second one the crude way.
+func _apple_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var hum := EarthHuman.new()
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = p.global_position + Vector3(6, 0, 0)
+	var witness := EarthHuman.new()
+	witness.setup(home)
+	add_child(witness)
+	witness.global_position = p.global_position + Vector3(6, 0, 4)
+	var ap := ItemDrop.new()
+	ap.setup("permapple", 1)
+	add_child(ap)
+	ap.global_position = p.global_position + Vector3(10, 0, 0)
+	for i in 80:
+		await get_tree().create_timer(0.25).timeout
+		if not is_instance_valid(hum):
+			break
+	var meat := 0
+	for d in get_tree().get_nodes_in_group("itemdrop"):
+		if d is ItemDrop and d.id == "meat":
+			meat += d.count
+	print("APPLETEST exploded: ", not is_instance_valid(hum),
+		"  apple gone: ", not is_instance_valid(ap), "  meat: ", meat)
+	print("APPLETEST witness opinion of player: ", witness._op(-1))
+	var hum2 := EarthHuman.new()
+	hum2.setup(home)
+	add_child(hum2)
+	hum2.global_position = p.global_position + Vector3(-6, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	hum2.take_damage(100.0, Vector3.UP)
+	await get_tree().create_timer(0.3).timeout
+	var meat2 := 0
+	for d in get_tree().get_nodes_in_group("itemdrop"):
+		if d is ItemDrop and d.id == "meat":
+			meat2 += d.count
+	print("APPLETEST killed dead: ", not is_instance_valid(hum2),
+		"  meat now: ", meat2)
+	print("APPLETEST witness opinion after kill: ", witness._op(-1))
+
+## Headless: box a human, JSON round-trip the box (as a real save would),
+## release, and check the same person walked back out.
+func _cage_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var a := EarthHuman.new()
+	a.setup(home)
+	add_child(a)
+	a.global_position = p.global_position + Vector3(6, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	a._op_add(12345, -60.0)   # a grudge to carry through the cage
+	var box: Dictionary = a.capture()
+	a.queue_free()
+	var b := EarthHuman.new()
+	b.saved = JSON.parse_string(JSON.stringify(box))
+	b.setup(home)
+	add_child(b)
+	b.global_position = p.global_position + Vector3(6, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	print("CAGETEST name ok: ", b.human_name == str(box["name"]),
+		"  id ok: ", b.human_id == int(box["id"]),
+		"  grudge ok: ", b._op(12345) == -60.0)
+	print("CAGETEST slogan ok: ", str(b.saved.get("slogan", "-")) == str(box.get("slogan", "-")),
+		"  hair ok: ", int(b.saved.get("hair", -1)) == int(box.get("hair", -1)),
+		"  skin ok: ", str(b.saved.get("skin", "-")) == str(box.get("skin", "-")))
+	print("CAGETEST pers ok: ", float(b._pers["grumpy"]) == float(box["pers"]["grumpy"]))
 
 ## Headless: park a rocket in front of the player's face and press F.
 func _board_test() -> void:
@@ -1316,6 +1451,31 @@ func _populate(b) -> void:
 				var hd := _surface_dir()
 				hum.global_transform = Transform3D(_basis_from_up(hd),
 					b.center + hd * (b.radius + 1.2))
+			# two cities: towers with lit windows, and the crowds that
+			# come with towers. humanity clusters. it always has.
+			# city LAYOUT gets its OWN world-seeded dice: the shared
+			# stream drifts with density settings and everything rolled
+			# before this line, but a city is an address. it stays put.
+			var crng := RandomNumberGenerator.new()
+			crng.seed = hash(str(Game.world_seed) + "::cities")
+			for ci in 2:
+				var centre := Vector3.ZERO
+				while centre.length() < 0.1:
+					centre = Vector3(crng.randf_range(-1, 1),
+						crng.randf_range(-1, 1), crng.randf_range(-1, 1))
+				centre = centre.normalized()
+				for i in _n(10):
+					var bd := (centre + Vector3(crng.randf_range(-0.16, 0.16),
+						crng.randf_range(-0.16, 0.16), crng.randf_range(-0.16, 0.16))).normalized()
+					_city_building(b, bd)
+				for i in _n(14):
+					var ch := EarthHuman.new()
+					ch.setup(b)
+					add_child(ch)
+					var cd := (centre + Vector3(crng.randf_range(-0.2, 0.2),
+						crng.randf_range(-0.2, 0.2), crng.randf_range(-0.2, 0.2))).normalized()
+					ch.global_transform = Transform3D(_basis_from_up(cd),
+						b.center + cd * (b.radius + 1.2))
 			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
 			for i in _n(5):
@@ -1397,6 +1557,53 @@ func _populate(b) -> void:
 			_build_mine(b, MINE_DIRS["Crystalia"], "ultima", 1, Color("#7df9ff"), 14)
 		_:
 			pass
+
+## A city tower: concrete box, lit windows scattered up its faces, roof
+## lip. Humanity's whole architectural output, honestly.
+func _city_building(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(5.0, 15.0)
+	var w := randf_range(2.5, 4.5)
+	var d := randf_range(2.5, 4.5)
+	var tone := randf_range(0.45, 0.7)
+	var tower := MeshInstance3D.new()
+	var tm := BoxMesh.new()
+	tm.size = Vector3(w, h, d)
+	tower.mesh = tm
+	tower.position = Vector3(0, h * 0.5 - 0.3, 0)
+	tower.material_override = Destructible.make_material(Color(tone, tone, tone * 1.04), 0.03)
+	root.add_child(tower)
+	var lip := MeshInstance3D.new()
+	var lm := BoxMesh.new()
+	lm.size = Vector3(w + 0.3, 0.25, d + 0.3)
+	lip.mesh = lm
+	lip.position = Vector3(0, h - 0.2, 0)
+	lip.material_override = Destructible.make_material(Color(tone * 0.7, tone * 0.7, tone * 0.72), 0.02)
+	root.add_child(lip)
+	# lit windows: some floors home, some floors not
+	for i in randi_range(6, 14):
+		var win := MeshInstance3D.new()
+		var wm := BoxMesh.new()
+		wm.size = Vector3(0.5, 0.35, 0.06)
+		win.mesh = wm
+		var face := randi() % 4
+		var fx := randf_range(-w * 0.35, w * 0.35)
+		var fy := randf_range(0.8, h - 1.0)
+		match face:
+			0: win.position = Vector3(fx, fy, -d * 0.5 - 0.03)
+			1: win.position = Vector3(fx, fy, d * 0.5 + 0.03)
+			2:
+				win.position = Vector3(-w * 0.5 - 0.03, fy, fx)
+				win.rotation_degrees.y = 90
+			3:
+				win.position = Vector3(w * 0.5 + 0.03, fy, fx)
+				win.rotation_degrees.y = 90
+		win.material_override = Destructible.make_material(
+			Color("#ffe9a8") if randf() < 0.7 else Color("#9adfff"), 1.6)
+		root.add_child(win)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, randf() * TAU)
 
 ## Earth trees: proper trunk + leafy blobs. Not Verdant's alien flora --
 ## the boring, beautiful, regular kind.

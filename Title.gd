@@ -237,6 +237,7 @@ func _do_join(ip: String, port: int) -> void:
 ## Things the game never tells you but should. Dry, true, useful.
 const TIPS := [
 	"tip: your hotbar AND jetpack drop where you die. go back for them.",
+	"One in-game day lasts 10 real minutes. Press K to see the calendar.",
 	"tip: stuck in the black hole? Reset Character in the pause menu gets you out. costs half your coins.",
 	"tip: the black hole eats dropped items too. don't die near it.",
 	"tip: banked coins survive death. carried coins don't. the ATM is your friend.",
