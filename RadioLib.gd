@@ -64,6 +64,10 @@ static func style_for(kind: String) -> Dictionary:
 			# drone and a hand drum. The pyramid approves.
 			return {"scale": [0, 1, 4, 5, 7, 8, 11], "bpm": 92, "wave": "reed",
 				"base": 220.0, "drone": true}
+		"venus", "rock":
+			# VENUS ROCK: distorted power chords, driving drums, pentatonic riff
+			return {"scale": [0, 3, 5, 7, 10, 12], "bpm": 126, "wave": "saw",
+				"base": 196.0, "rock": true}
 		"circuit", "logic":
 			return {"scale": [0, 3, 7, 10, 12], "bpm": 160, "wave": "square",
 				"base": 392.0}   # chip factory
@@ -83,6 +87,10 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wavj := _jazz_loop(seed_v, st)
 		_music_cache[key] = wavj
 		return wavj
+	if bool(st.get("rock", false)):
+		var wavr := _rock_loop(seed_v, st)
+		_music_cache[key] = wavr
+		return wavr
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var beat := 60.0 / float(st["bpm"])
@@ -231,6 +239,82 @@ static func _jazz_loop(seed_v: int, st: Dictionary) -> AudioStreamWAV:
 			var vib := 1.0 + 0.008 * sin(TAU * 5.2 * t3)
 			buf[hs + i] += (sin(TAU * f2 * vib * t3) + 0.3 * sin(TAU * f2 * 2.0 * vib * t3) \
 				+ 0.12 * sin(TAU * f2 * 3.0 * t3)) * 0.2 * env3
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
+	return wav
+
+## ROCK: clipped power chords on the downbeats, kick on 1 and 3, snare
+## cracking 2 and 4, eighth-note hats, and a pentatonic riff on top with
+## the same distortion. Venus wants it loud.
+static func _rock_loop(seed_v: int, st: Dictionary) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var base: float = st["base"]
+	var beat := 60.0 / float(st["bpm"])
+	var bars := 4
+	var total := int(float(bars) * 4.0 * beat * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# chord roots per bar (semitones): i - bVI - bVII - i, the rock classic
+	var prog: Array = [0, 8, 10, 0]
+	for bar in bars:
+		var root := base * pow(2.0, float(prog[bar % 4]) / 12.0) * 0.5
+		var b0 := int(float(bar) * 4.0 * beat * SR)
+		# power chords: chugging eighths, root + fifth + octave, CLIPPED
+		for e8 in 8:
+			var stq := b0 + int(float(e8) * 0.5 * beat * SR)
+			var dur := int(0.42 * beat * SR)
+			if e8 == 6 and rng.randf() < 0.4:
+				dur = int(0.9 * beat * SR)   # let one ring
+			for i in mini(dur, total - stq):
+				var t := float(i) / SR
+				var raw := (fmod(root * t, 1.0) * 2.0 - 1.0) \
+					+ (fmod(root * 1.5 * t, 1.0) * 2.0 - 1.0) * 0.8 \
+					+ (fmod(root * 2.0 * t, 1.0) * 2.0 - 1.0) * 0.5
+				var env := minf(1.0, float(i) / (SR * 0.004)) * (1.0 - float(i) / float(dur) * 0.55)
+				buf[stq + i] += clampf(raw * 1.8, -0.85, 0.85) * 0.17 * env
+		# drums
+		for q in 4:
+			var qs := b0 + int(float(q) * beat * SR)
+			if q % 2 == 0:   # kick on 1 and 3
+				for i in mini(int(0.1 * SR), total - qs):
+					var tt := float(i) / SR
+					buf[qs + i] += sin(TAU * (95.0 - tt * 320.0) * tt) * exp(-tt * 30.0) * 0.7
+			else:            # snare on 2 and 4
+				for i in mini(int(0.12 * SR), total - qs):
+					var tt2 := float(i) / SR
+					buf[qs + i] += ((randf() * 2.0 - 1.0) * 0.5 \
+						+ sin(TAU * 180.0 * tt2) * 0.2) * exp(-tt2 * 22.0)
+			for hh in 2:     # eighth hats
+				var hsp := qs + int(float(hh) * 0.5 * beat * SR)
+				for i in mini(int(0.025 * SR), total - hsp):
+					buf[hsp + i] += (randf() * 2.0 - 1.0) * 0.09 * exp(-float(i) / (SR * 0.006))
+	# the riff: distorted pentatonic lead, one octave up
+	var scale: Array = st["scale"]
+	var deg := 2
+	for s8 in bars * 8:
+		if rng.randf() < 0.35:
+			continue
+		deg = clampi(deg + rng.randi_range(-2, 2), 0, scale.size() - 1)
+		var f2 := base * 2.0 * pow(2.0, float(scale[deg]) / 12.0)
+		var hs := int(float(s8) * 0.5 * beat * SR)
+		var hd := int(beat * SR * (0.45 if rng.randf() < 0.75 else 1.1))
+		for i in mini(hd, total - hs):
+			var t3 := float(i) / SR
+			var env3 := minf(1.0, float(i) / (SR * 0.006)) \
+				* minf(1.0, float(hd - i) / (SR * 0.04))
+			var vib := 1.0 + 0.01 * sin(TAU * 6.0 * t3) * minf(1.0, t3 * 4.0)
+			var raw2 := (fmod(f2 * vib * t3, 1.0) * 2.0 - 1.0) \
+				+ 0.4 * (fmod(f2 * 2.0 * vib * t3, 1.0) * 2.0 - 1.0)
+			buf[hs + i] += clampf(raw2 * 2.2, -0.8, 0.8) * 0.13 * env3
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:

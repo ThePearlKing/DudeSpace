@@ -96,7 +96,7 @@ func _build_stations() -> void:
 					"body": b, "kind": "rick"})
 			"Wth":
 				st = {"name": "??? (shader system)", "type": "alien"}
-			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol":
+			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol", "Venus":
 				st = {"name": b.name.to_upper(), "type": "music"}
 			"Jupiter":
 				st = {"name": "JUPITER", "type": "music"}
