@@ -778,7 +778,7 @@ static func _euclid_loop(seed_v: int) -> AudioStreamWAV:
 # last line it's just the hole again.
 const EH_END := 246.0
 const EH_LOG: Array = [
-	[7.0, "there it is again. the sound. people call it a howl. it isn't. a howl wants something. this is the sound of a thing that already has it."],
+	[13.0, "there it is again. the sound. people call it a howl. it isn't. a howl wants something. this is the sound of a thing that already has it."],
 	[15.0, "i used to think you listened to a place like this to feel small. no. you listen to check whether it remembers you."],
 	[23.0, "i found something once. back on earth, back when my knees were a rumor i hadn't heard yet."],
 	[31.0, "a field past the east fence line. clover, mostly. bees working it like they were paid."],

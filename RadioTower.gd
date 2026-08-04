@@ -409,8 +409,12 @@ func work(delta: float) -> void:
 		Game.eh_log_t += delta
 		var el := RadioLib.eh_line(Game.eh_log_t)
 		if el != "":
-			now_line = el
-			now_line_col = Color("#b388ff")
+			if el != _last_cue:
+				# set the Label ONCE per line -- every-frame reassignment
+				# was the blink and the lag, same as the sauce bug
+				_last_cue = el
+				now_line = el
+				now_line_col = Color("#b388ff")
 			now_line_until = Game.playtime + 0.8
 		if Game.eh_log_t >= RadioLib.EH_END:
 			Game.eh_log_done = true
