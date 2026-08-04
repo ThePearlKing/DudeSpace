@@ -80,10 +80,10 @@ func _ready() -> void:
 	var col := CollisionShape3D.new()
 	var cs := BoxShape3D.new()
 	cs.size = col_size
-	if wall_button:
-		col.position = Vector3(0, 1.25, 0)
 	col.shape = cs
-	col.position = Vector3(0, col_size.y * 0.5, 0)
+	# wall buttons hang at hand height; overwriting this put the collider
+	# inside the wall and F could never hit it
+	col.position = Vector3(0, 1.25, 0) if wall_button else Vector3(0, col_size.y * 0.5, 0)
 	add_child(col)
 
 func use(player: Player) -> void:

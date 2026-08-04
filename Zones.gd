@@ -8,6 +8,22 @@ const CAVERN_POS := Vector3(0, -40000, -40000)
 const TEMPLE_POS := Vector3(40000, 12000, 40000)
 const SHADOW_POS := Vector3(-16000, -4000, -14000)   # exterior temple, in space
 
+static var temple_exit := Vector3.ZERO   # where the Euclid temple door is, outside
+
+## Where a pocket-interior position "really is" in the outside world:
+## house interiors map to their house's exterior, the Euclid temple
+## interior maps to the pyramid door. Everything else maps to itself.
+static func exterior_of(p: Vector3) -> Vector3:
+	if temple_exit != Vector3.ZERO and p.distance_to(TEMPLE_POS) < 2600.0:
+		return temple_exit
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		for h in tree.get_nodes_in_group("house"):
+			if h is House and is_instance_valid(h) \
+					and p.distance_to(h.room_center()) < 380.0:
+				return h.global_position + h.global_transform.basis.y * 2.0
+	return p
+
 # ------------------------------------------------------------ mine cavern
 
 # (the Home mine is now a REAL hole in the planet -- built in Main.gd)
@@ -15,6 +31,7 @@ const SHADOW_POS := Vector3(-16000, -4000, -14000)   # exterior temple, in space
 # --------------------------------------------------------- euclid temple
 
 static func build_temple_interior(root: Node3D, exit_target: Vector3, dummy_body) -> void:
+	temple_exit = exit_target
 	var p := TEMPLE_POS
 	# TARDIS: huge inside
 	_room(root, p, Vector3(120, 30, 120), Color("#d8c48a"), 0.1)

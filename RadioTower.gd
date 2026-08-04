@@ -65,12 +65,14 @@ func _ready() -> void:
 	fmi.material_override = Surfaces.metal(Color("#8a9098"))
 	_dish_pivot.add_child(fmi)
 	_talk = AudioStreamPlayer3D.new()
-	_talk.unit_size = 9.0
-	_talk.max_distance = 120.0
+	# loud beside it, NORMAL across your whole base, quiet only when
+	# you're genuinely far (other-side-of-the-planet territory)
+	_talk.unit_size = 40.0
+	_talk.max_distance = 1200.0
 	add_child(_talk)
 	_hiss = AudioStreamPlayer3D.new()
-	_hiss.unit_size = 7.0
-	_hiss.max_distance = 60.0
+	_hiss.unit_size = 24.0
+	_hiss.max_distance = 600.0
 	_hiss.stream = RadioLib.static_noise()
 	add_child(_hiss)
 	_build_stations()
@@ -114,25 +116,39 @@ func _build_stations() -> void:
 		"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1), "body": null,
 		"kind": "eerie", "fixed_dir": Zones.SHADOW_POS})
 
+## Where this set counts as BEING for signal purposes. A radio inside a
+## house uses the house's spot on the planet, not the pocket void's
+## coordinates way out past everything.
+var _site_cache := Vector3.INF
+var _site_t := 0.0
+
+func _site() -> Vector3:
+	if _site_t > 0.0 and _site_cache != Vector3.INF:
+		return _site_cache
+	_site_t = 1.0
+	_site_cache = Zones.exterior_of(global_position)
+	return _site_cache
+
 func station_dir(st: Dictionary) -> Vector3:
+	var sp := _site()
 	if st.has("fixed_dir"):
-		return (st["fixed_dir"] - global_position).normalized()
+		return (st["fixed_dir"] - sp).normalized()
 	if st["body"] != null:
 		var bb = st["body"]
-		if global_position.distance_to(bb.center) < float(bb.radius) * 1.6:
+		if sp.distance_to(bb.center) < float(bb.radius) * 1.6:
 			# standing ON the broadcaster: signal's everywhere here, so
 			# the dish points at the SKY like a sensible local antenna
-			return (global_position - bb.center).normalized()
-		return (bb.center - global_position).normalized()
+			return (sp - bb.center).normalized()
+		return (bb.center - sp).normalized()
 	var w = get_tree().get_first_node_in_group("noodle_watcher")
 	if w != null and w is Node3D:
-		return (w.global_position - global_position).normalized()
-	return (global_position - Universe.nearest(global_position).center).normalized()
+		return (w.global_position - sp).normalized()
+	return (sp - Universe.nearest(sp).center).normalized()
 
 func _is_local(st: Dictionary) -> bool:
 	if st["body"] == null:
 		return false
-	return global_position.distance_to(st["body"].center) < float(st["body"].radius) * 1.6
+	return _site().distance_to(st["body"].center) < float(st["body"].radius) * 1.6
 
 ## Signal quality 0..1: dish alignment x frequency accuracy. Stations
 ## on the planet you're STANDING ON are omnidirectional: only the dial
@@ -152,12 +168,13 @@ func align_for(st: Dictionary) -> float:
 	return clampf((aim_dir.dot(station_dir(st)) - 0.996) / 0.004, 0.0, 1.0)
 
 func aim_at(body_center: Vector3) -> void:
-	var nb = Universe.nearest(global_position)
+	var sp := _site()
+	var nb = Universe.nearest(sp)
 	if body_center.distance_to(nb.center) < 1.0 \
-			and global_position.distance_to(nb.center) < float(nb.radius) * 1.6:
-		aim_dir = (global_position - nb.center).normalized()   # local: aim UP
+			and sp.distance_to(nb.center) < float(nb.radius) * 1.6:
+		aim_dir = (sp - nb.center).normalized()   # local: aim UP
 	else:
-		aim_dir = (body_center - global_position).normalized()
+		aim_dir = (body_center - sp).normalized()
 	Sfx.play("click", -16.0)
 
 func use() -> void:
@@ -193,7 +210,22 @@ func work(delta: float) -> void:
 	# volumes SLEW toward targets: analog, not stepped.
 	if not _hiss.playing:
 		_hiss.play()
-	var hiss_target := linear_to_db(clampf(0.85 - bs * 0.8, 0.05, 1.0)) - 6.0
+	# DISTANCE buries far stations in static: same alignment, worse SNR
+	var clear := bs
+	if best >= 0:
+		var stb: Dictionary = stations[best]
+		var src_pos := _site()
+		if stb.has("fixed_dir"):
+			src_pos = stb["fixed_dir"]
+		elif stb["body"] != null:
+			src_pos = stb["body"].center
+		else:
+			var wn = get_tree().get_first_node_in_group("noodle_watcher")
+			if wn != null and wn is Node3D:
+				src_pos = wn.global_position
+		var far := clampf(_site().distance_to(src_pos) / 45000.0, 0.0, 1.0)
+		clear = bs * (1.0 - 0.6 * far)
+	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	if best != _cur_station:
 		_cur_station = best
@@ -204,7 +236,7 @@ func work(delta: float) -> void:
 			_talk.stop()
 		return
 	var st: Dictionary = stations[best]
-	var talk_target := linear_to_db(clampf(bs, 0.05, 1.0))
+	var talk_target := linear_to_db(clampf(clear, 0.05, 1.0))
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
 	match str(st["type"]):
 		"music":
@@ -233,8 +265,9 @@ func work(delta: float) -> void:
 						wav = HumanVoice.render(RadioLib.alien_line(),
 							RadioLib.alien_profile())
 					"noodle":
-						wav = HumanVoice.render(RadioLib.noodle_line(),
-							RadioLib.noodle_profile())
+						# not a deep voice. an ARRIVAL of one.
+						wav = RadioLib.eldritch(HumanVoice.render(
+							RadioLib.noodle_line(), RadioLib.noodle_profile()))
 				if wav != null:
 					_talk.stream = wav
 					_talk.play()
@@ -242,6 +275,7 @@ func work(delta: float) -> void:
 
 func _process(d: float) -> void:
 	super._process(d)
+	_site_t -= d
 	# the dish TRACKS the aim always -- powered or not, you can see
 	# where it's pointed from across the yard
 	if _dish_pivot and aim_dir.length() > 0.1:
