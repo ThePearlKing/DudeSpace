@@ -276,7 +276,10 @@ func _face_row(h: EarthHuman, op: float) -> HBoxContainer:
 	icon.add_child(hair)
 	row.add_child(icon)
 	var l := Label.new()
-	l.text = "%s   %+d" % [h.human_name, int(op)]
+	# exact ledger, both directions: how the target rates them, and
+	# how they rate the target back
+	l.text = "%s   %+.1f  (they: %+.1f)" % [h.human_name, op,
+		h._op((target as EarthHuman).human_id) if target is EarthHuman else 0.0]
 	row.add_child(l)
 	return row
 
