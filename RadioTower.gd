@@ -319,7 +319,7 @@ func work(delta: float) -> void:
 						"noodle":
 							# the god does not talk. it PERFORMS.
 							return RadioLib.noodle_broadcast()
-					return null, false):
+					return null, t == "noodle"):
 					_sentence_cd = randf_range(2.0, 4.5)
 
 ## Play a cooked stream if one is ready for this station; otherwise cook
