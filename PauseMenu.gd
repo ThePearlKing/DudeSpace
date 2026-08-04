@@ -270,6 +270,7 @@ func _open_poses() -> void:
 		_panel.visible = true))
 
 var _cheats: PanelContainer
+var _cheat_upds: Array = []
 
 func _open_cheats() -> void:
 	if not Net.cheats_allowed():
@@ -278,6 +279,8 @@ func _open_cheats() -> void:
 	if _cheats:
 		_panel.visible = false
 		_cheats.visible = true
+		for u in _cheat_upds:
+			u.call()
 		return
 	_cheats = PanelContainer.new()
 	_cheats.set_anchors_preset(Control.PRESET_CENTER)
@@ -302,29 +305,52 @@ func _open_cheats() -> void:
 	warn.add_theme_font_size_override("font_size", 13)
 	warn.modulate = Color("#ff5a5a")
 	col.add_child(warn)
-	col.add_child(_btn("Godmode", func() -> void:
-		Game.cheated = true
-		Game.godmode = not Game.godmode
-		Sfx.play("learn" if Game.godmode else "click")))
-	col.add_child(_btn("Keep Inventory", func() -> void:
-		Game.cheated = true
-		Game.keep_inv = not Game.keep_inv
-		Sfx.play("learn" if Game.keep_inv else "click")))
-	col.add_child(_btn("Creative (free craft + creative tab)", func() -> void:
-		Game.cheated = true
-		Game.creative = not Game.creative
-		Game.free_craft = Game.creative
-		Sfx.play("learn" if Game.creative else "click")))
-	col.add_child(_btn("Infinite Fuel", func() -> void:
-		Game.cheated = true
-		Game.inf_fuel = not Game.inf_fuel
-		Sfx.play("learn" if Game.inf_fuel else "click")))
-	col.add_child(_btn("Noclip (fast fly)", func() -> void:
-		Game.cheated = true
-		var p := get_tree().get_first_node_in_group("player")
-		if p:
-			p.noclip = not p.noclip
-			Sfx.play("warp" if p.noclip else "click")))
+	# toggles GLOW while active -- you can see what's on at a glance
+	_cheat_upds.clear()
+	var mkc := func(text: String, get_on: Callable, tog: Callable) -> void:
+		var b := _btn(text, Callable())
+		b.pressed.connect(func() -> void:
+			Game.cheated = true
+			tog.call()
+			for u in _cheat_upds:
+				u.call())
+		col.add_child(b)
+		_cheat_upds.append(func() -> void:
+			var on: bool = get_on.call()
+			b.modulate = Color(0.55, 1.0, 0.65) if on else Color(1, 1, 1)
+			b.text = text + ("   ● ON" if on else ""))
+	mkc.call("Godmode",
+		func() -> bool: return Game.godmode,
+		func() -> void:
+			Game.godmode = not Game.godmode
+			Sfx.play("learn" if Game.godmode else "click"))
+	mkc.call("Keep Inventory",
+		func() -> bool: return Game.keep_inv,
+		func() -> void:
+			Game.keep_inv = not Game.keep_inv
+			Sfx.play("learn" if Game.keep_inv else "click"))
+	mkc.call("Creative (free craft + creative tab)",
+		func() -> bool: return Game.creative or Game.free_craft,
+		func() -> void:
+			Game.creative = not Game.creative
+			Game.free_craft = Game.creative
+			Sfx.play("learn" if Game.creative else "click"))
+	mkc.call("Infinite Fuel",
+		func() -> bool: return Game.inf_fuel,
+		func() -> void:
+			Game.inf_fuel = not Game.inf_fuel
+			Sfx.play("learn" if Game.inf_fuel else "click"))
+	mkc.call("Noclip (fast fly)",
+		func() -> bool:
+			var p := get_tree().get_first_node_in_group("player")
+			return p != null and p.noclip,
+		func() -> void:
+			var p := get_tree().get_first_node_in_group("player")
+			if p:
+				p.noclip = not p.noclip
+				Sfx.play("warp" if p.noclip else "click"))
+	for u0 in _cheat_upds:
+		u0.call()
 	# the gods, on a leash
 	var grow := HBoxContainer.new()
 	grow.add_theme_constant_override("separation", 8)

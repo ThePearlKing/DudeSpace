@@ -1858,13 +1858,14 @@ func _tool_connect(kind: String) -> void:
 			_wire_src = null
 			Sfx.play("explode", -18.0)
 			return
-		if not Game.creative and Inventory.res_count("wire") < 1:
+		if not (Game.creative or Game.free_craft) \
+				and Inventory.res_count("wire") < 1:
 			Sfx.play("denied")
 			var hud := get_tree().get_first_node_in_group("hud")
 			if hud:
 				hud.flash("no Wire. craft some (Electric tab).")
 			return
-		if not Game.creative:
+		if not (Game.creative or Game.free_craft):
 			Inventory.remove_res("wire", 1)
 		_wire_src.connect_wire(m, kind, _wire_port if _wire_src.port_count(kind) > 1 else 0)
 		_wire_src.set_selected(false)
