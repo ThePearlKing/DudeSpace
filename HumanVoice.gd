@@ -202,10 +202,15 @@ static func _parse(t: String) -> Array:
 				"i":
 					if wlen == 0 and word_end:   # the word I (and I'm): EYE
 						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
+					elif word_end:               # hi, sci-fi: EYE at word end
+						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
 					elif _magic_e(t, i):         # like, time: EYE
 						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]
+					elif t.substr(i + 1, 2) == "nd" or t.substr(i + 1, 2) == "ld":
+						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]   # find, wild
 					else:
-						vf = [[280.0, 2350.0, 0.085]]
+						# IH as in bit: its own vowel, NOT a copy of EE
+						vf = [[400.0, 1900.0, 0.08]]
 				"o":
 					if _magic_e(t, i):   # alone: OH, held longer
 						vf = [[450.0, 750.0, 0.11]]
