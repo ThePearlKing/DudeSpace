@@ -35,6 +35,8 @@ var _look: Vector2 = Vector2.ZERO
 var _cooldown: float = 0.0
 var _engine_on: bool = false
 var _f_held: bool = false
+var _traj_t: float = 0.0
+var _fuel_last: float = -1.0
 
 func _ready() -> void:
 	add_to_group("rocket")
@@ -51,7 +53,7 @@ func _ready() -> void:
 	_cam_pivot.add_child(_cam)
 
 	_smash_area = Area3D.new()
-	_smash_area.monitoring = true
+	_smash_area.monitoring = false   # parked rockets don't scan for overlaps
 	var sc := CollisionShape3D.new()
 	var sph := SphereShape3D.new()
 	sph.radius = SMASH_RADIUS
@@ -172,6 +174,7 @@ func board(p: Player) -> void:
 	piloted = true
 	_f_held = true   # swallow the same F press that boarded us
 	Game.mode = Game.Mode.IN_ROCKET
+	_smash_area.monitoring = true
 	p.enter_vehicle()
 	_cam.current = true
 	_ensure_traj()
@@ -184,6 +187,7 @@ func _try_exit() -> void:
 	var up := (global_position - body.center).normalized()
 	piloted = false
 	set_physics_process(false)
+	_smash_area.monitoring = false
 	_cam.current = false
 	Game.timewarp = 1.0
 	Game.board_lock = Game.playtime + 0.5   # no instant re-board
@@ -348,8 +352,17 @@ func _physics_process(delta: float) -> void:
 		_smash()
 		_cooldown = 0.14
 
-	Inventory.changed.emit()
-	_update_trajectory()
+	# UI refresh only when the fuel number actually moved -- emitting
+	# every physics frame made the whole HUD rebuild 60x/s
+	if absf(Inventory.fuel - _fuel_last) > 0.01:
+		_fuel_last = Inventory.fuel
+		Inventory.changed.emit()
+	# trajectory: ~7 Hz is indistinguishable from every-frame and ~10x
+	# cheaper; this line was the single laggiest thing in the game
+	_traj_t -= delta
+	if _traj_t <= 0.0:
+		_traj_t = 0.15
+		_update_trajectory()
 
 func _smash() -> void:
 	for b in _smash_area.get_overlapping_bodies():
@@ -381,14 +394,20 @@ func _update_trajectory() -> void:
 	var pts := PackedVector3Array()
 	var p := global_position
 	var v := vel
+	# fine steps near NOW (where you're flying), coarse steps for the far
+	# future; crash checks every 3rd coarse step. Same drawn horizon for a
+	# fraction of the body-loop work.
 	var dt := 0.5
-	for i in 900:
+	for i in 420:
+		if i == 120:
+			dt = 1.5
 		v += Universe.gravity_at(p) * dt
 		p += v * dt
 		pts.append(p)
-		var nb := Universe.nearest(p)
-		if p.distance_to(nb.center) < nb.radius + 0.5:
-			break
+		if i < 30 or i % 3 == 0:
+			var nb := Universe.nearest(p)
+			if p.distance_to(nb.center) < nb.radius + 0.5:
+				break
 		# came back around near the start -> that's an orbit, loop is drawn
 		if i > 60 and p.distance_to(global_position) < maxf(8.0, vel.length() * dt):
 			break
