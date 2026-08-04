@@ -2142,7 +2142,7 @@ func _populate(b) -> void:
 		"ice":
 			# XERO: pale craters and translucent ice spires catching the light
 			for i in _n(10):
-				_crater(b, _surface_dir(), randf_range(1.5, 4.0), Color("#d8f2ff"))
+				_crater(b, _surface_dir(), randf_range(1.5, 4.0), Color("#8fd4ff"))
 			for i in 12:
 				var sp := Destructible.new()
 				var sh := randf_range(1.8, 4.5)
