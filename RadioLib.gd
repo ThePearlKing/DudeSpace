@@ -553,6 +553,28 @@ const SAUCE_VERSE: Array = [
 
 static var _sauce_wav: AudioStreamWAV = null
 
+## A mild single-tap echo: presence intact, space added.
+static func _light_echo(src: AudioStreamWAV) -> AudioStreamWAV:
+	var d := src.data
+	var n := d.size() / 2
+	var total := n + int(SR * 0.5)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	for i in n:
+		buf[i] = d.decode_s16(i * 2) / 32768.0
+	var off := int(SR * 0.21)
+	for i in range(total - 1, off - 1, -1):
+		buf[i] += buf[i - off] * 0.22
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	return wav
+
 static func noodle_broadcast() -> AudioStreamWAV:
 	if _sauce_wav:
 		return _sauce_wav
@@ -560,15 +582,18 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	var barlen := int(beat * 2.0 * SR)
 	var segs: Array = []   # [start_sample, voice bytes]
 	var pos := 0
-	# delivered in the god's own MONOTONE. the flow comes from the bars,
-	# not from melody. it would not stoop to melody.
+	# TWO voices per line, same monotone god: the full eldritch render
+	# pushed back as texture, and a clearer take with a light echo on
+	# top so the words actually land
 	for ln in SAUCE_VERSE:
 		if str(ln) == "":
 			pos += barlen   # a rest: the beat carries the bar alone
 			continue
 		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
-		segs.append([pos, w.data])
-		var nlen: int = w.data.size() / 2
+		var wc := _light_echo(HumanVoice.render(str(ln),
+			{"base": 112.0, "var": 0.12, "wave": "saw", "rate": 0.8, "artic": 1.5}))
+		segs.append([pos, w.data, wc.data])
+		var nlen: int = maxi(w.data.size(), wc.data.size()) / 2
 		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
 		pos += bars * barlen
 	var total := pos + int(SR * 0.8)
@@ -578,7 +603,10 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		var st: int = sg[0]
 		var pd: PackedByteArray = sg[1]
 		for i in mini(pd.size() / 2, total - st):
-			buf[st + i] += pd.decode_s16(i * 2) / 32768.0
+			buf[st + i] += pd.decode_s16(i * 2) / 32768.0 * 0.4
+		var pc: PackedByteArray = sg[2]
+		for i in mini(pc.size() / 2, total - st):
+			buf[st + i] += pc.decode_s16(i * 2) / 32768.0 * 0.85
 	# sidechain the CONTINUOUS beat under the assembled verse
 	var env := PackedFloat32Array()
 	env.resize(total)
@@ -586,18 +614,27 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	for i in total:
 		epk = maxf(epk * 0.9995, absf(buf[i]))
 		env[i] = epk
+	# the beat gets its own buffer so it can carry REVERB without
+	# smearing the voices
+	var bbuf := PackedFloat32Array()
+	bbuf.resize(total)
 	var bi := 0
 	while bi * barlen < total:
 		var b0 := bi * barlen
 		for i in mini(int(0.16 * SR), total - b0):
 			var tb := float(i) / SR
 			var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.15, 1.0)
-			buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.24 * duck
+			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.24 * duck
 		var toff := b0 + int(float(barlen) * 0.5)
 		for i in mini(int(0.05 * SR), total - toff):
 			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
-			buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.06 * duck2
+			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.06 * duck2
 		bi += 1
+	var boff := int(SR * 0.29)
+	for i in range(total - 1, boff - 1, -1):
+		bbuf[i] += bbuf[i - boff] * 0.35
+	for i in total:
+		buf[i] += bbuf[i]
 	var peak := 0.001
 	for i in total:
 		peak = maxf(peak, absf(buf[i]))
