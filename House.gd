@@ -1436,24 +1436,39 @@ func cut_doorway(frame: Node3D) -> void:
 			else Vector3(wpos.x, seg[4], wpos.z + seg[1])
 
 ## The little hallway between two cut walls, plus the outside tunnel.
-func build_link_visuals(other) -> void:
+func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void:
 	var fa_p := Vector3.ZERO
 	var fb_p := Vector3.ZERO
-	# nearest pair of frames between the two houses
-	var bd := 1e9
-	for fa in get_tree().get_nodes_in_group("doorframe"):
-		if not (fa is Node3D) or fa.global_position.distance_to(room_center()) > room_size().length():
-			continue
-		for fb in get_tree().get_nodes_in_group("doorframe"):
-			if not (fb is Node3D) or fb.global_position.distance_to(other.room_center()) > other.room_size().length():
+	if fa_n != null and fb_n != null:
+		# the docked pair is KNOWN -- use it. (the old nearest-pair search
+		# could match a frame with ITSELF once the rooms sat adjacent,
+		# and the hallway silently never built: door to the void)
+		fa_p = fa_n.global_position
+		fb_p = fb_n.global_position
+	else:
+		var bd := 1e9
+		for fa in get_tree().get_nodes_in_group("doorframe"):
+			if not (fa is Node3D) \
+					or fa.global_position.distance_to(room_center()) > room_size().length():
 				continue
-			var d: float = fa.global_position.distance_to(fb.global_position)
-			if d < bd:
-				bd = d
-				fa_p = fa.global_position
-				fb_p = fb.global_position
-	if bd > 16.0:
-		return
+			for fb in get_tree().get_nodes_in_group("doorframe"):
+				if fb == fa or not (fb is Node3D) \
+						or fb.global_position.distance_to(other.room_center()) > other.room_size().length():
+					continue
+				# each frame must BELONG to its own house's side
+				if fa.global_position.distance_to(other.room_center()) \
+						< fa.global_position.distance_to(room_center()):
+					continue
+				if fb.global_position.distance_to(room_center()) \
+						< fb.global_position.distance_to(other.room_center()):
+					continue
+				var d: float = fa.global_position.distance_to(fb.global_position)
+				if d < bd:
+					bd = d
+					fa_p = fa.global_position
+					fb_p = fb.global_position
+		if bd > 16.0:
+			return
 	var mid := (fa_p + fb_p) * 0.5 + Vector3(0, 1.35, 0)
 	var dirv := (fb_p - fa_p)
 	dirv.y = 0.0
@@ -1565,7 +1580,7 @@ func connect_frames(fa: Node3D, other, fb: Node3D) -> bool:
 			sh2.queue_free()
 	cut_doorway(fa)
 	other.cut_doorway(fb)
-	build_link_visuals(other)
+	build_link_visuals(other, fa, fb)
 	Sfx.play("learn", -6.0)
 	return true
 
