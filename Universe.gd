@@ -39,7 +39,7 @@ func _ready() -> void:
 	_def("Logica",   Vector3(3600, 0, -2200),    72.0,  8.0,  "logic",   Color("#141820"))
 	_def("Pi",       Vector3(-4200, 1500, 3000), 115.0, 11.0, "pi",      Color("#5a2a00"))
 	# --- distant Shader System (a star + 4 shader planets + a moon) ---
-	_def("ShaderSun",Vector3(0, 0, -25000),      320.0, 20.0, "sun",       Color("#ffcc33"))
+	_def("ShaderSun",Vector3(0, 0, -25000),      270.0, 20.0, "sun",       Color("#ff9422"))
 	_def("Contrast", Vector3(0, 0, -24100),      60.0,  9.0,  "contrast",  Color("#ffffff"))
 	_def("Pixel",    Vector3(1600, 0, -25000),   82.0,  8.0,  "pixel",     Color("#ff66aa"))
 	_def("Wth",      Vector3(-1700, 300, -24000),88.0,  8.0,  "wth",       Color("#33ff99"))
