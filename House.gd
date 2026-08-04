@@ -816,7 +816,7 @@ func _counter(gpos: Vector3, length: float) -> void:
 ## A real staircase: N steps climbing `rise` along `step_vec` (x,z per
 ## step), each with collision. The last step tops out AT the rise.
 func _stairs(base: Vector3, step_vec: Vector3, steps: int, rise: float,
-		col: Color, ramp_lift := 0.34, overhang := 0.8) -> void:
+		col: Color, ramp_lift := 0.12, overhang := 0.2) -> void:
 	for st in steps:
 		var t := float(st + 1) / float(steps)
 		_solid(base + Vector3(0, rise * t - 0.2, step_vec.z * float(st)),

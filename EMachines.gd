@@ -839,86 +839,92 @@ class NuclearReactor extends Machine:
 		dome.height = 1.4
 		dome.is_hemisphere = true
 		part(dome, Vector3(0, box_size.y, 0), Color("#9a9da0"), 0.05)
-		# THE LEAD WINDOWS: protruding BAY pools on BOTH sides. The pool
-		# hangs OUTSIDE the hull (the hull face was silently blocking the
-		# old view -- "solid gray glass"), so glass -> water -> rods is a
-		# clear line of sight. Steel shroud around each bay.
-		var hull := box_size.x * 0.5
-		for wside in [-90.0, 90.0]:
-			var win := Node3D.new()
-			win.rotation_degrees.y = wside
-			add_child(win)
-			var zc := hull + 0.42
-			var cavm: Material = Destructible.make_material(Color("#0a0e14"), 0.02)
-			var shroud: Material = Surfaces.metal(Color("#7d838c"))
-			# dark back panel ON the hull face + steel top/bottom/sides
-			for wall in [[Vector3(1.6, 1.5, 0.04), Vector3(0, 1.2, hull + 0.01), cavm],
-					[Vector3(1.6, 0.06, 0.95), Vector3(0, 0.44, zc), shroud],
-					[Vector3(1.6, 0.06, 0.95), Vector3(0, 1.96, zc), shroud],
-					[Vector3(0.06, 1.58, 0.95), Vector3(-0.8, 1.2, zc), shroud],
-					[Vector3(0.06, 1.58, 0.95), Vector3(0.8, 1.2, zc), shroud]]:
-				var wmi := MeshInstance3D.new()
-				var wmm := BoxMesh.new()
-				wmm.size = wall[0]
-				wmi.mesh = wmm
-				wmi.position = wall[1]
-				wmi.material_override = wall[2]
-				win.add_child(wmi)
-			# the water: translucent, Cherenkov-lit
-			var wat := MeshInstance3D.new()
-			var wbm := BoxMesh.new()
-			wbm.size = Vector3(1.5, 1.44, 0.8)
-			wat.mesh = wbm
-			wat.position = Vector3(0, 1.2, zc)
-			var wmat := StandardMaterial3D.new()
-			wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.4)
-			wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			wmat.emission_enabled = true
-			wmat.emission = Color("#38c8ff")
-			wmat.emission_energy_multiplier = 0.2
-			wat.material_override = wmat
-			win.add_child(wat)
-			_waters.append(wat)
-			# fuel bundle: five rods, each with its own radiation glow
-			for bx in [-0.48, -0.24, 0.0, 0.24, 0.48]:
-				var brod := CylinderMesh.new()
-				brod.top_radius = 0.05
-				brod.bottom_radius = 0.05
-				brod.height = 1.3
-				var frm := MeshInstance3D.new()
-				frm.mesh = brod
-				frm.position = Vector3(bx, 1.2, zc)
-				var fmat := StandardMaterial3D.new()
-				fmat.albedo_color = Color("#464b52")
-				fmat.emission_enabled = true
-				fmat.emission = Color("#38c8ff")
-				fmat.emission_energy_multiplier = 0.1
-				frm.material_override = fmat
-				win.add_child(frm)
-				_fuel_meshes.append(frm)
-			# four control blades riding between the rods
-			for bx2 in [-0.36, -0.12, 0.12, 0.36]:
-				var bl := MeshInstance3D.new()
-				var blm := BoxMesh.new()
-				blm.size = Vector3(0.05, 1.3, 0.5)
-				bl.mesh = blm
-				bl.position = Vector3(bx2, 1.2, zc)
-				bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
-				win.add_child(bl)
-				_blades.append(bl)
-			# the lead glass itself: CLEAR enough to actually see through
+		# THE HULL IS HOLLOW: the solid machine box is hidden and rebuilt
+		# as six real walls. Inside: ONE pool, ONE bundle. The side walls
+		# have genuine window openings with lead glass set into them --
+		# you look through the wall into the actual core.
+		_mesh.visible = false
+		var wallm: Material = Destructible.make_material(box_color, _base_emit)
+		var t := 0.16
+		var hx := box_size.x * 0.5
+		var hz := box_size.z * 0.5
+		var hy := box_size.y
+		var slabs: Array = [
+			[Vector3(box_size.x, t, box_size.z), Vector3(0, t * 0.5, 0)],
+			[Vector3(box_size.x, t, box_size.z), Vector3(0, hy - t * 0.5, 0)],
+			[Vector3(box_size.x, hy, t), Vector3(0, hy * 0.5, hz - t * 0.5)],
+			[Vector3(box_size.x, hy, t), Vector3(0, hy * 0.5, -hz + t * 0.5)],
+		]
+		# side walls: four segments each, leaving a 1.5 x 1.3 window
+		for sx in [-1.0, 1.0]:
+			var wx: float = sx * (hx - t * 0.5)
+			slabs.append([Vector3(t, 0.65, box_size.z), Vector3(wx, 0.325, 0)])
+			slabs.append([Vector3(t, hy - 1.95, box_size.z), Vector3(wx, (hy + 1.95) * 0.5, 0)])
+			for zp in [-1.0, 1.0]:
+				slabs.append([Vector3(t, 1.3, hz - 0.75), Vector3(wx, 1.3, zp * (hz + 0.75) * 0.5)])
+		for sl in slabs:
+			var smi := MeshInstance3D.new()
+			var sbm := BoxMesh.new()
+			sbm.size = sl[0]
+			smi.mesh = sbm
+			smi.position = sl[1]
+			smi.material_override = wallm
+			add_child(smi)
+		# the lead glass, set INTO each window opening
+		for sx2 in [-1.0, 1.0]:
 			var glass := MeshInstance3D.new()
 			var gbm := BoxMesh.new()
-			gbm.size = Vector3(1.6, 1.5, 0.06)
+			gbm.size = Vector3(0.08, 1.34, 1.54)
 			glass.mesh = gbm
-			glass.position = Vector3(0, 1.2, zc + 0.46)
+			glass.position = Vector3(sx2 * (hx - t * 0.5), 1.3, 0)
 			var gmat := StandardMaterial3D.new()
 			gmat.albedo_color = Color(0.55, 0.68, 0.6, 0.28)
 			gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			gmat.roughness = 0.08
 			gmat.metallic = 0.2
 			glass.material_override = gmat
-			win.add_child(glass)
+			add_child(glass)
+		# the ONE pool, filling the hollow: water, bundle, blades
+		var wat := MeshInstance3D.new()
+		var wbm := BoxMesh.new()
+		wbm.size = Vector3(box_size.x - t * 2.0 - 0.04, hy - t * 2.0 - 0.04, box_size.z - t * 2.0 - 0.04)
+		wat.mesh = wbm
+		wat.position = Vector3(0, hy * 0.5, 0)
+		var wmat := StandardMaterial3D.new()
+		wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.4)
+		wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		wmat.emission_enabled = true
+		wmat.emission = Color("#38c8ff")
+		wmat.emission_energy_multiplier = 0.2
+		wat.material_override = wmat
+		add_child(wat)
+		_waters.append(wat)
+		# fuel rods spread along z so BOTH side windows see the row
+		for bz in [-0.48, -0.24, 0.0, 0.24, 0.48]:
+			var brod := CylinderMesh.new()
+			brod.top_radius = 0.05
+			brod.bottom_radius = 0.05
+			brod.height = 1.6
+			var frm := MeshInstance3D.new()
+			frm.mesh = brod
+			frm.position = Vector3(0, 1.2, bz)
+			var fmat := StandardMaterial3D.new()
+			fmat.albedo_color = Color("#464b52")
+			fmat.emission_enabled = true
+			fmat.emission = Color("#38c8ff")
+			fmat.emission_energy_multiplier = 0.1
+			frm.material_override = fmat
+			add_child(frm)
+			_fuel_meshes.append(frm)
+		for bz2 in [-0.36, -0.12, 0.12, 0.36]:
+			var bl := MeshInstance3D.new()
+			var blm := BoxMesh.new()
+			blm.size = Vector3(0.5, 1.6, 0.05)
+			bl.mesh = blm
+			bl.position = Vector3(0, 1.2, bz2)
+			bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
+			add_child(bl)
+			_blades.append(bl)
 		# BACK dressing: coolant pipes, a valve wheel, a conduit box
 		var pipe_m: Material = Surfaces.metal(Color("#8a6f2a"))
 		for px in [-0.5, 0.0, 0.5]:
@@ -1030,7 +1036,7 @@ class NuclearReactor extends Machine:
 				fm.material_override.emission_energy_multiplier = \
 					0.08 + power * 4.5 + (temp / 100.0) * 1.5
 		for bl in _blades:
-			bl.position.y = lerpf(bl.position.y, 1.2 + (1.0 - rods) * 0.95,
+			bl.position.y = lerpf(bl.position.y, 1.2 + (1.0 - rods) * 0.55,
 				delta * 5.0)
 		# front panel: terse, honest, slightly blue
 		_panel_t -= delta
