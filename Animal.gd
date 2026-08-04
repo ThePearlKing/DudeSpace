@@ -20,6 +20,8 @@ var _hopper: bool = false
 var _ground_only: bool = false
 var _hop_t: float = 0.0
 var tamed: bool = false
+var minded: bool = false               # neuralink: the chip drives
+var mind_dir: Vector3 = Vector3.ZERO
 
 ## Called when released from a cage on a (possibly different) planet.
 func rehome(body) -> void:
@@ -210,7 +212,13 @@ func _physics_process(delta: float) -> void:
 	var spd := WANDER_SPEED
 	var p := get_tree().get_first_node_in_group("player")
 	_fly_chase = false
-	if tamed and staying:
+	if minded:
+		# neuralink passenger seat: steering wheel installed
+		_dir = (mind_dir - up * mind_dir.dot(up)).normalized() \
+			if mind_dir.length() > 0.1 else Vector3.ZERO
+		spd = FLEE_SPEED * 0.8
+		_retarget = 1.0
+	elif tamed and staying:
 		# sitting. not going anywhere. very good pet.
 		_dir = Vector3.ZERO
 		_retarget = 0.5

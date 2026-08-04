@@ -32,6 +32,7 @@ func build(color: Color, shader_kind: String, face_tex: Texture2D = null) -> voi
 	# transparent sheet, so the skin colour shows through everywhere else.
 	if face_tex:
 		var face := MeshInstance3D.new()
+		face_q = face
 		var q := QuadMesh.new()
 		q.size = Vector2(0.5, 0.5)
 		face.mesh = q
@@ -46,6 +47,19 @@ func build(color: Color, shader_kind: String, face_tex: Texture2D = null) -> voi
 		face.position = Vector3(0, 0, -0.281)   # front of the head (-Z)
 		face.rotation_degrees = Vector3(0, 180, 0)
 		_head_m.add_child(face)
+
+var face_q: MeshInstance3D = null   # the face decal, swappable at runtime
+
+## Neuralink surgery: put a different face (soul) on this head.
+func set_face(tex: Texture2D) -> void:
+	if face_q == null or not is_instance_valid(face_q):
+		return
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.render_priority = 2
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	face_q.material_override = mat
 
 func _part(size: Vector3, pos: Vector3, mat: Material) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()

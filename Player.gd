@@ -932,7 +932,7 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench":
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm":
 			var n: Node3D
 			match id:
 				"chest": n = Chest.new()
@@ -957,6 +957,7 @@ func _use_selected() -> void:
 				"lightbox": n = EMachines.LightBox.new()
 				"switch": n = EMachines.Switch.new()
 				"bench": n = Bench.new()
+				"nterm": n = NeuralinkTerminal.new()
 				"teleporter": n = EMachines.Teleporter.new()
 				"extender": n = EMachines.Extender.new()
 			get_parent().add_child(n)
@@ -1111,6 +1112,20 @@ func _use_selected() -> void:
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
+		"nchip":
+			# brain surgery, field edition: nearest head within reach
+			var hu2 := _nearest_in("earth_human", 6.0)
+			var an3 := _nearest_in("animal", 6.0)
+			if hu2 and hu2 is EarthHuman:
+				hu2.chipped = true
+				Inventory.clear_slot(slot)
+				Sfx.play("learn")
+			elif an3 and an3 is Animal:
+				an3.set_meta("chipped", true)
+				Inventory.clear_slot(slot)
+				Sfx.play("learn")
+			else:
+				Sfx.play("denied")
 		"catfood":
 			var an2 := _nearest_in("animal", 6.0)
 			if an2 and an2 is Animal and not an2.tamed:

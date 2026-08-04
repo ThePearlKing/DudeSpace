@@ -519,6 +519,10 @@ var _gossip_cd: float = 0.0     # cooldown on bad-mouthing the blue dude
 var _los_t: float = 0.0         # sight-check throttle while hunting
 var _lost_t: float = 0.0        # how long the prey has been out of sight
 
+var chipped: bool = false       # neuralink chip in the head. unaware.
+var minded: bool = false        # actively driven from a terminal
+var mind_dir: Vector3 = Vector3.ZERO   # the chip's steering input
+
 var home_city: int = -1         # index into Game.earth_cities. -2 = rural
 var _moved: bool = false        # already relocated once: settled now
 var _travel_to: int = -1        # riding the rail toward this city
@@ -559,6 +563,7 @@ func capture() -> Dictionary:
 	saved["hp"] = hp
 	saved["home_city"] = home_city
 	saved["moved"] = _moved
+	saved["chip"] = chipped
 	return saved.duplicate()
 
 func _ready() -> void:
@@ -571,6 +576,7 @@ func _ready() -> void:
 	# them back or every old enemy becomes a stranger
 	home_city = int(saved.get("home_city", -1))
 	_moved = bool(saved.get("moved", false))
+	chipped = bool(saved.get("chip", false))
 	var rop: Dictionary = saved.get("op", {})
 	for k in rop:
 		_opinion[int(k)] = float(rop[k])
@@ -1253,6 +1259,22 @@ func _can_see(p: Node3D) -> bool:
 	var hit := space.intersect_ray(q)
 	return hit.is_empty() or hit.get("collider") == p
 
+## Chip command: swing at whoever's in arm's reach.
+func mind_punch() -> void:
+	for h in get_tree().get_nodes_in_group("earth_human"):
+		if h == self or not (h is EarthHuman):
+			continue
+		if global_position.distance_squared_to(h.global_position) < 4.0:
+			var pd: Vector3 = (h.global_position - global_position).normalized()
+			h.take_fight_hit(self, (pd - _up() * pd.dot(_up())).normalized())
+			Sfx.play("hurt", -20.0)
+			return
+	Sfx.play("click", -26.0)
+
+## Chip autopilot small talk: the terminal talks FOR them.
+func mind_talk() -> void:
+	_say(_social_line() if randf() < 0.5 else _smalltalk_line())
+
 ## Which city is this, then. -2 means the countryside: no city within
 ## ~80m of surface arc, no leash, no civic duties.
 func _nearest_city() -> int:
@@ -1514,6 +1536,30 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	var up := _up()
+
+	# neuralink: the chip drives. AI unplugged, body obeys.
+	if minded:
+		if _bubble_t > 0.0:
+			_bubble_t -= delta
+			var bam := clampf(_bubble_t / 0.8, 0.0, 1.0)
+			_bubble.modulate.a = bam
+			_bubble.outline_modulate.a = bam
+			_bg_mat.set_shader_parameter("alpha", bam)
+		var msp := 0.0
+		if mind_dir.length() > 0.1:
+			_dir = (mind_dir - up * mind_dir.dot(up)).normalized()
+			msp = WALK_SPEED * 1.6
+		var mvu := velocity.dot(up) + Universe.gravity_at(global_position).dot(up) * delta
+		velocity = _dir * msp + up * mvu
+		up_direction = up
+		move_and_slide()
+		_grounded = is_on_floor()
+		if msp > 0.1 and _dir.length() > 0.1:
+			var xm := up.cross(_dir).normalized()
+			global_transform.basis = Basis(xm, up, -_dir).orthonormalized()
+		if _body:
+			_body.animate(msp, _grounded, delta)
+		return
 
 	# riding the rail: glide the great-circle line to the destination.
 	# commuters stand. it's the law.

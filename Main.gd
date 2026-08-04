@@ -143,6 +143,8 @@ func _ready() -> void:
 		_gang_test()
 	if OS.get_environment("CTD_TEST") == "11":
 		_shirt_test()
+	if OS.get_environment("CTD_TEST") == "12":
+		_neuro_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -386,6 +388,53 @@ func _shirt_test() -> void:
 	var img2 := get_viewport().get_texture().get_image()
 	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_back.png"))
 	print("SHIRTTEST saved back shot")
+
+## Headless: chip a human, open the terminal UI, take the wheel, walk
+## them, punch a bystander, rewrite the soul. The full violation.
+func _neuro_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var hum := EarthHuman.new()
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = p.global_position + Vector3(5, 0, 0)
+	var victim := EarthHuman.new()
+	victim.setup(home)
+	add_child(victim)
+	victim.global_position = p.global_position + Vector3(6.5, 0, 0)
+	await get_tree().create_timer(0.4).timeout
+	hum.chipped = true
+	var ui := NeuralinkUI.new()
+	add_child(ui)
+	await get_tree().create_timer(0.3).timeout
+	ui.select_target(hum)
+	await get_tree().create_timer(0.2).timeout
+	print("NEUROTEST minded: ", hum.minded, "  focus: ", ui._focus)
+	var start: Vector3 = hum.global_position
+	var evw := InputEventKey.new()
+	evw.keycode = KEY_W
+	evw.physical_keycode = KEY_W
+	evw.pressed = true
+	Input.parse_input_event(evw)
+	await get_tree().create_timer(1.5).timeout
+	print("NEUROTEST walked: %.1f m" % start.distance_to(hum.global_position))
+	var evr := InputEventKey.new()
+	evr.keycode = KEY_W
+	evr.physical_keycode = KEY_W
+	evr.pressed = false
+	Input.parse_input_event(evr)
+	hum.global_position = victim.global_position + Vector3(1.0, 0, 0)
+	await get_tree().create_timer(0.2).timeout
+	var vhp: float = victim.hp
+	hum.mind_punch()
+	await get_tree().create_timer(0.2).timeout
+	print("NEUROTEST punch landed: ", victim.hp < vhp)
+	ui._on_axis(95.0, "goofy")
+	print("NEUROTEST face repicked: ", str(hum.saved.get("face", "")))
+	ui.close()
+	await get_tree().create_timer(0.2).timeout
+	print("NEUROTEST released: ", not hum.minded)
 
 ## Headless: a human and a chair. Verify walk-to-seat, the sit, the pose.
 func _sit_test() -> void:
@@ -2854,7 +2903,7 @@ func net_break(pos: Vector3) -> void:
 ## graph (as indices into this same list).
 func collect_world() -> Array:
 	var nodes: Array = []
-	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop", "bench"]:
+	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop", "bench", "nterm"]:
 		for n in get_tree().get_nodes_in_group(grp):
 			if is_instance_valid(n) and (n.has_meta("placed_id") or n is ItemDrop) and not nodes.has(n):
 				if n is Rocket and n.piloted:
@@ -3013,6 +3062,7 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"bench":
 			var bn := Bench.new()
 			return bn
+		"nterm": return NeuralinkTerminal.new()
 		"chairseat":
 			var cn := Bench.new()
 			cn.is_bench = false
