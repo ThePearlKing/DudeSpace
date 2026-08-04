@@ -105,6 +105,8 @@ var _out_ports: Array = []      # exterior port machines
 var _win_out_mesh: MeshInstance3D    # exterior window pane
 var _win_in_mesh: MeshInstance3D     # interior window pane
 var _views: Array = []          # every window viewport (paused when unseen)
+var _mb_dome_out: MeshInstance3D = null   # moonbase: orange dome (exterior)
+var _mb_dome_in: MeshInstance3D = null    # moonbase: dome ceiling (interior)
 var _isurf: int = Surfaces.PLASTER   # this interior's wall surface
 var _haz_t := 0.0
 var _rad := false
@@ -161,7 +163,7 @@ func room_size() -> Vector3:
 		"tower":
 			return Vector3(16, 20, 16)
 		"moonbase":
-			return Vector3(38, 5, 14)   # hub + hallways + pods, bounding
+			return Vector3(26, 4.5, 10)   # hub + two wings, one sealed hull
 		_:
 			return Vector3(13, 5.5, 13)
 
@@ -219,13 +221,17 @@ func _build_exterior() -> void:
 		"box":
 			w = 3.4
 			h = 3.0
+		"moonbase":
+			w = 7.0
+			h = 3.0
 	_w = w
 	# FOUNDATION: a deep plug so the house never floats on curvature
 	var found := _box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0),
 		wall.darkened(0.35))
 	found.material_override = Surfaces.stone(wall.darkened(0.35))
-	# main shell
-	_box(self, Vector3(w, h, w), Vector3(0, h * 0.5, 0), wall)
+	# main shell (the moonbase is all domes; it skips the cottage)
+	if kind != "moonbase":
+		_box(self, Vector3(w, h, w), Vector3(0, h * 0.5, 0), wall)
 	if kind == "tower":
 		# glassy bands up the shaft
 		for f in int(h / 3.0):
@@ -260,6 +266,8 @@ func _build_exterior() -> void:
 			add_child(gb)
 		_box(self, Vector3(0.6, 0.25, 0.05), Vector3(w * 0.28, 2.5, -w * 0.5 - 0.03),
 			Color("#7bffb0"), 1.4)
+	elif kind == "moonbase":
+		pass   # domes are their own roof
 	elif true:
 		# pitched roof (two slabs)
 		for sgn in [-1.0, 1.0]:
@@ -406,6 +414,8 @@ func _moonbase_exterior(w: float) -> void:
 		owin.rotation_degrees.x = -55.0
 		owin.material_override = omat
 		add_child(owin)
+		if _mb_dome_out == null:
+			_mb_dome_out = owin   # the big one becomes a real window
 	# the AIRLOCK: cylindrical snout with a round hatch, front and center
 	var snout := MeshInstance3D.new()
 	var sn := CylinderMesh.new()
@@ -501,10 +511,7 @@ func _build_interior() -> void:
 	var c := room_center()
 	var sz := room_size()
 	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
-	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower"] else Surfaces.PLASTER
-	if kind == "moonbase":
-		_moonbase_interior(c)
-		return
+	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower", "moonbase"] else Surfaces.PLASTER
 	# the basement supplies its own floor (the one with the HOLE in it)
 	_iroom(c, sz, warm, 0.12, [0] if kind == "basement" else [])
 	var fy := c.y - sz.y * 0.5
@@ -657,6 +664,49 @@ func _build_interior() -> void:
 				Vector3(0, 0, 0.6), 6, cwy + sz.y * 0.5 - 0.3, cw.darkened(0.15))
 			_stairs(c + Vector3(-sz.x * 0.35, -sz.y * 0.5 + 0.3, sz.z * 0.5 - 2.6),
 				Vector3(0, 0, -0.6), 6, cwy + sz.y * 0.5 - 0.3, cw.darkened(0.15))
+		"moonbase":
+			# one sealed hull, divided into hub + two wings by walls
+			# with real doorways: hallway energy, zero leaks to space
+			var mgray := Color("#9aa0a8")
+			for dx in [-5.0, 5.0]:
+				# piers either side of a centered doorway + header
+				for zs3 in [-1.0, 1.0]:
+					_solid(c + Vector3(dx, 0, zs3 * (sz.z * 0.25 + 0.6)),
+						Vector3(0.5, sz.y - 0.2, sz.z * 0.5 - 1.2), mgray)
+				_solid(c + Vector3(dx, sz.y * 0.5 - 0.7, 0),
+					Vector3(0.5, 1.2, 2.6), mgray)
+			# corridor light strips over each doorway
+			for dx2 in [-5.0, 5.0]:
+				_deco(c + Vector3(dx2, sz.y * 0.5 - 1.35, 0),
+					Vector3(0.6, 0.06, 2.2), Color("#fff2c8"), 1.4)
+			# ORANGE dome skylight over the hub: warped, tinted, glowing
+			var odome := MeshInstance3D.new()
+			var odm := SphereMesh.new()
+			odm.radius = 2.0
+			odm.height = 2.0
+			odm.is_hemisphere = true
+			var omat2 := StandardMaterial3D.new()
+			omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.5)
+			omat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			omat2.emission_enabled = true
+			omat2.emission = Color(1.0, 0.5, 0.12)
+			omat2.emission_energy_multiplier = 1.1
+			odome.mesh = odm
+			odome.material_override = omat2
+			_iroot.add_child(odome)
+			odome.global_position = c + Vector3(0, sz.y * 0.5 - 0.4, 0)
+			_mb_dome_in = odome
+			# wing dressing: bunk west, console east, floor decals
+			_deco(c + Vector3(-9.5, fy - c.y + 0.55, 2.5),
+				Vector3(1.1, 0.5, 2.2), Color("#5a7aa0"))
+			_deco(c + Vector3(9.5, fy - c.y + 0.5, -2.5),
+				Vector3(2.2, 1.0, 0.7), Color("#2a2f38"))
+			_deco(c + Vector3(9.5, fy - c.y + 1.15, -2.5),
+				Vector3(1.8, 0.5, 0.1), Color("#7bffb0"), 1.3)
+			_deco(c + Vector3(0, fy - c.y + 0.04, 0), Vector3(5.5, 0.05, 5.5),
+				Color("#7a8088"))
+			_deco(c + Vector3(0, fy - c.y + 0.08, 0), Vector3(1.5, 0.05, 1.5),
+				Color("#ffa040"), 0.8)
 		"box":
 			pass   # a blank canvas. bring your own everything.
 		_:
@@ -674,6 +724,14 @@ func _build_interior() -> void:
 	_iroot.add_child(out)
 	out.global_position = c + Vector3(0, fy - c.y + 1.0, sz.z * 0.5 - 1.4)
 	out.set_meta("house", self)
+	if not human_home:
+		# the red button: owner-only, press twice, house becomes a kit
+		var dem := Gate.new().configure({
+			"action": "house_demolish", "label": "DEMOLISH", "color": Color("#a82020")})
+		_iroot.add_child(dem)
+		dem.global_position = c + Vector3(-sz.x * 0.5 + 1.3, fy - c.y + 0.55,
+			sz.z * 0.5 - 1.4)
+		dem.set_meta("house", self)
 
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop
 ## looking like the inside of a shipping box.
@@ -710,59 +768,6 @@ func _hole_floor(center: Vector3, size: Vector2, hole: Rect2, c: Color) -> void:
 	if hz1 < half.y:
 		_solid(center + Vector3((hx0 + hx1) * 0.5, 0, (hz1 + half.y) * 0.5),
 			Vector3(hx1 - hx0, 0.4, half.y - hz1), c)
-
-## Moonbase interior: gray HALLWAYS (a first), a domed hub, two pods.
-## Hub in the middle, corridors east and west, airlock spawn south.
-func _moonbase_interior(c: Vector3) -> void:
-	var gray := Color("#9aa0a8")
-	_isurf = Surfaces.METAL
-	# hub
-	_iroom(c, Vector3(10, 4.5, 10), gray, 0.1, [3, 2])   # open east+west walls
-	# corridors: floor/ceiling/front/back only -- open tubes
-	for side in [-1.0, 1.0]:
-		_iroom(c + Vector3(side * 8.0, 0, 0), Vector3(6.2, 3.2, 3.0),
-			gray.darkened(0.12), 0.08, [2, 3])
-		# pods at the ends, open toward the corridor
-		_iroom(c + Vector3(side * 14.5, 0, 0), Vector3(7, 4, 8),
-			gray.lightened(0.05), 0.1, [3] if side < 0.0 else [2])
-		# corridor light strips
-		_deco(c + Vector3(side * 8.0, 1.35, 0), Vector3(5.6, 0.06, 0.3),
-			Color("#fff2c8"), 1.4)
-	# hub wall stubs closing the gap between hub opening and corridor
-	for side2 in [-1.0, 1.0]:
-		for zs2 in [-1.0, 1.0]:
-			_solid(c + Vector3(side2 * 5.0, 0, zs2 * 3.25),
-				Vector3(1.0, 4.5, 3.5), gray)
-		_solid(c + Vector3(side2 * 5.0, 1.9, 0), Vector3(1.0, 0.8, 3.2), gray)
-		_solid(c + Vector3(side2 * 5.0, -1.9, 0), Vector3(1.0, 0.8, 3.2), gray)
-	# ORANGE dome skylight in the hub ceiling: warped, tinted, glowing
-	var odome := MeshInstance3D.new()
-	var odm := SphereMesh.new()
-	odm.radius = 2.2
-	odm.height = 2.2
-	odm.is_hemisphere = true
-	var omat2 := StandardMaterial3D.new()
-	omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.5)
-	omat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	omat2.emission_enabled = true
-	omat2.emission = Color(1.0, 0.5, 0.12)
-	omat2.emission_energy_multiplier = 1.1
-	odome.mesh = odm
-	odome.material_override = omat2
-	_iroot.add_child(odome)
-	odome.global_position = c + Vector3(0, 2.2, 0)
-	# hub ring light + floor decal
-	_deco(c + Vector3(0, -2.2 + 0.04, 0), Vector3(6.0, 0.05, 6.0),
-		Color("#7a8088"))
-	_deco(c + Vector3(0, -2.2 + 0.08, 0), Vector3(1.6, 0.05, 1.6),
-		Color("#ffa040"), 0.8)
-	# pod dressing: bunk in one, console in the other
-	_deco(c + Vector3(-14.5, -2.0 + 0.55, 2.0), Vector3(1.1, 0.5, 2.2),
-		Color("#5a7aa0"))
-	_deco(c + Vector3(14.5, -2.0 + 0.5, -2.0), Vector3(2.2, 1.0, 0.7),
-		Color("#2a2f38"))
-	_deco(c + Vector3(14.5, -2.0 + 1.15, -2.0), Vector3(1.8, 0.5, 0.1),
-		Color("#7bffb0"), 1.3)
 
 ## A soft rug: fabric, warm, zero collision. Room glue.
 func _rug(gpos: Vector3, size: Vector2, col: Color) -> void:
@@ -908,6 +913,32 @@ func _build_windows() -> void:
 		w = 4.0
 	if kind == "box":
 		w = 3.4
+	if kind == "moonbase":
+		# the DOME pair: outside dome shows the hub (orange-tinted,
+		# warped over the hemisphere); inside dome shows the sky the
+		# same warped way. windows, but round.
+		var ev := _mk_view(Vector2i(256, 200))
+		var iv := _mk_view(Vector2i(320, 240))
+		var ecam: Camera3D = ev[1]
+		ecam.global_position = c + Vector3(0, sz.y * 0.5 - 0.9, 0.01)
+		ecam.look_at(c + Vector3(0, -sz.y * 0.5, 0), Vector3.FORWARD)
+		var icam: Camera3D = iv[1]
+		var upv: Vector3 = global_transform.basis.y
+		icam.global_position = global_position + upv * 5.5
+		icam.look_at(icam.global_position + upv, -global_transform.basis.z)
+		if _mb_dome_out:
+			var em := StandardMaterial3D.new()
+			em.albedo_texture = ev[0].get_texture()
+			em.albedo_color = Color(1.0, 0.62, 0.25)   # orange through glass
+			em.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_mb_dome_out.material_override = em
+		if _mb_dome_in:
+			var im := StandardMaterial3D.new()
+			im.albedo_texture = iv[0].get_texture()
+			im.albedo_color = Color(1.0, 0.62, 0.25)
+			im.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_mb_dome_in.material_override = im
+		return
 	if kind == "box":
 		# the skylight pair: roof glass <-> ceiling glass, one camera
 		# at each end, looking through like the hole was real

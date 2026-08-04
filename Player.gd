@@ -310,7 +310,7 @@ func _start_ghost(cat: String, kind: String) -> void:
 			"bed":
 				bm.size = Vector3(1.3, 0.8, 2.4)
 			"catwalk":
-				bm.size = Vector3(3.0, 2.3, 2.0)
+				bm.size = Vector3(5.4, 2.3, 2.0)
 			"moonbase":
 				bm.size = Vector3(7.0, 3.5, 7.0)
 			"doorframe":
@@ -337,6 +337,15 @@ func _update_ghost() -> void:
 		var up2: Vector3 = (hit.position - Universe.nearest(hit.position).center).normalized()
 		if Game.zone != "":
 			up2 = Vector3.UP
+		if _ghost_cat == "furn":
+			# furniture stands on FLOORS: if you aimed at a wall, drop
+			# the point to the ground beneath it
+			var q2 := PhysicsRayQueryParameters3D.create(
+				hit.position + up2 * 0.3, hit.position - up2 * 8.0)
+			q2.exclude = [get_rid()]
+			var hit2 := sp.intersect_ray(q2)
+			if hit2:
+				hit.position = hit2.position
 		_ghost.global_transform = Transform3D(_basis_from_up(up2),
 			hit.position + up2 * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4))
 		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
@@ -1116,7 +1125,7 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm":
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
 			if id in ["coaldrill", "autominer"] and Game.zone != "":
 				Sfx.play("denied")   # nothing to drill in a pocket dimension
 				return
@@ -1145,6 +1154,7 @@ func _use_selected() -> void:
 				"switch": n = EMachines.Switch.new()
 				"bench": n = Bench.new()
 				"nterm": n = NeuralinkTerminal.new()
+				"radio": n = RadioTower.new()
 				"teleporter": n = EMachines.Teleporter.new()
 				"extender": n = EMachines.Extender.new()
 			get_parent().add_child(n)

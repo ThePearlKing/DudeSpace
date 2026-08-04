@@ -71,6 +71,24 @@ func use(player: Player) -> void:
 		if h != null and is_instance_valid(h):
 			h.exit_to_door(player)
 		return
+	if action == "house_demolish":
+		var h2 = get_meta("house", null)
+		if h2 == null or not is_instance_valid(h2):
+			return
+		if str(h2.get_meta("owner", "")) != Net.my_name():
+			Sfx.play("denied")   # not yours. the button knows.
+			return
+		if not get_meta("armed", false):
+			set_meta("armed", true)
+			Sfx.play("click", -6.0)   # press again to mean it
+			return
+		h2.exit_to_door(player)
+		Inventory.give("housekit", 1)
+		Destructible.spawn_debris(h2.get_parent(), h2.global_position,
+			Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
+		Sfx.play("explode", -10.0)
+		h2.queue_free()
+		return
 	match action:
 		"recipe":
 			if not Inventory.ak47_recipe:

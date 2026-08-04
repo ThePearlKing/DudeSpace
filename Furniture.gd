@@ -66,15 +66,15 @@ func _ready() -> void:
 			# industrial platform: legs, deck, rails. machines welcome
 			# on top. house-interior use only, per the placer.
 			var steel: Material = Surfaces.metal(Color("#6a6f78"))
-			_m(Vector3(3.0, 0.22, 2.0), Vector3(0, 1.5, 0), steel)
-			for lx2 in [-1.3, 1.3]:
+			_m(Vector3(5.4, 0.22, 2.0), Vector3(0, 1.5, 0), steel)
+			for lx2 in [-2.4, 0.0, 2.4]:
 				for lz2 in [-0.8, 0.8]:
 					_m(Vector3(0.14, 1.5, 0.14), Vector3(lx2, 0.75, lz2), steel)
 			for rz3 in [-0.95, 0.95]:
-				_m(Vector3(3.0, 0.07, 0.07), Vector3(0, 2.25, rz3), steel)
-				for px2 in [-1.3, 0.0, 1.3]:
+				_m(Vector3(5.4, 0.07, 0.07), Vector3(0, 2.25, rz3), steel)
+				for px2 in [-2.4, -0.8, 0.8, 2.4]:
 					_m(Vector3(0.06, 0.6, 0.06), Vector3(px2, 1.95, rz3), steel)
-			_hitbox(Vector3(3.0, 0.25, 2.0), Vector3(0, 1.5, 0))
+			_hitbox(Vector3(5.4, 0.25, 2.0), Vector3(0, 1.5, 0))
 			# ramp up one end so you can walk onto it
 			var rmp := StaticBody3D.new()
 			var rmc := CollisionShape3D.new()
@@ -83,7 +83,7 @@ func _ready() -> void:
 			rmc.shape = rmb
 			rmp.add_child(rmc)
 			add_child(rmp)
-			rmp.position = Vector3(2.0, 0.8, 0)
+			rmp.position = Vector3(3.2, 0.8, 0)
 			rmp.rotation.z = atan2(1.6, 2.2)
 		"bed":
 			_m(Vector3(1.2, 0.35, 2.3), Vector3(0, 0.28, 0), wood)

@@ -14,6 +14,25 @@ const SR := 22050
 ## Build the phrase into a WAV and play it from `parent`. Returns the
 ## player so the caller can cut a voice off when new words replace old.
 static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStreamPlayer3D:
+	var wav := render(text, prof)
+	if wav == null:
+		return null
+	var pl := AudioStreamPlayer3D.new()
+	pl.stream = wav
+	# close-range voice: inverse-SQUARE falloff, so a few steps away is
+	# already noticeably quieter, and fully silent past ~18m
+	pl.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+	pl.unit_size = 2.5
+	pl.max_distance = 18.0
+	pl.max_db = -6.0
+	pl.volume_db = -8.0
+	parent.add_child(pl)
+	pl.finished.connect(pl.queue_free)
+	pl.play()
+	return pl
+
+## Render a sentence to a WAV without playing it (radio, etc).
+static func render(text: String, prof: Dictionary) -> AudioStreamWAV:
 	var segs := _parse(text.to_lower())
 	if segs.is_empty():
 		return null
@@ -73,20 +92,7 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = SR
 	wav.data = bytes
-	var pl := AudioStreamPlayer3D.new()
-	pl.stream = wav
-	# close-range voice: inverse-SQUARE falloff, so a few steps away is
-	# already noticeably quieter, and fully silent past ~18m -- you hear
-	# YOUR corner of the city, not all of it
-	pl.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
-	pl.unit_size = 2.5
-	pl.max_distance = 18.0
-	pl.max_db = -6.0
-	pl.volume_db = -8.0
-	parent.add_child(pl)
-	pl.finished.connect(pl.queue_free)
-	pl.play()
-	return pl
+	return wav
 
 ## Text -> rough phoneme segments, with actual English spelling rules:
 ## Y after a consonant says EE (society, happy) but glides before a

@@ -3672,6 +3672,9 @@ func collect_world() -> Array:
 			e["hlinks"] = n.links.duplicate()
 		if n is Furniture:
 			e["fkind"] = n.kind
+		if n is RadioTower:
+			e["rfreq"] = n.freq
+			e["raim"] = [n.aim_dir.x, n.aim_dir.y, n.aim_dir.z]
 		if n is Rocket:
 			e["hyper"] = n.hyperdrive
 		out.append(e)
@@ -3733,6 +3736,10 @@ func restore_world() -> void:
 				n.links.append(int(lv))
 		if n is Furniture:
 			n.kind = str(e.get("fkind", "bench"))
+		if n is RadioTower:
+			n.freq = float(e.get("rfreq", 98.0))
+			var ra = e.get("raim", [0, 1, 0])
+			n.aim_dir = Vector3(float(ra[0]), float(ra[1]), float(ra[2])).normalized()
 		add_child(n)
 		n.set_meta("placed_id", e["id"])
 		n.set_meta("owner", str(e.get("owner", "")))
@@ -3821,6 +3828,7 @@ func _spawn_world_obj(id: String) -> Node3D:
 			var bn := Bench.new()
 			return bn
 		"nterm": return NeuralinkTerminal.new()
+		"radio": return RadioTower.new()
 		"house": return House.new()
 		"furn": return Furniture.new()
 		"chairseat":

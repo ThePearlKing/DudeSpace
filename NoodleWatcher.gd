@@ -24,6 +24,7 @@ var _grudge: float = 0.0    # time spent hated: the effects compound
 var _whisper_t: float = 9.0
 
 func _ready() -> void:
+	add_to_group("noodle_watcher")
 	# the eye
 	var eye := MeshInstance3D.new()
 	var em := SphereMesh.new()
