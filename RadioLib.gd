@@ -351,32 +351,48 @@ static var _bh_wav: AudioStreamWAV = null
 static func _bh_loop() -> AudioStreamWAV:
 	if _bh_wav:
 		return _bh_wav
-	# the FAMOUS sound: a black hole doesn't swoosh, it MOANS -- a deep
-	# beating cluster that growls and leans toward you and away, like the
-	# Perseus sonification everyone has heard at 3am. Frequencies chosen
-	# so the loop closes on whole cycles (no seam pop).
+	# THE internet black hole sound: not a dark groan -- an eerie mid-range
+	# WAIL. A chorus of detuned voices, each sliding pitch on its own slow
+	# clock (real phase accumulation, so the bends are smooth), swelling
+	# unevenly, with a thin breath of noise. Rendered long and crossfaded
+	# onto itself so the loop never clicks.
 	var total := int(16.0 * SR)
+	var render := int(18.0 * SR)
 	var buf := PackedFloat32Array()
-	buf.resize(total)
+	buf.resize(render)
+	var voices: Array = [
+		[196.0, 0.9, 1.7, 0.0], [233.0, 1.3, 0.6, 2.1], [311.0, 0.7, 2.3, 4.0],
+		[415.0, 1.1, 1.2, 1.0], [155.0, 0.5, 2.9, 3.3]]
+	for v in voices:
+		var f0: float = v[0]
+		var r1: float = v[1]
+		var r2: float = v[2]
+		var ph0: float = v[3]
+		var phase := 0.0
+		for i in render:
+			var t := float(i) / SR
+			var lp := t / 16.0 * TAU
+			var bend := 1.0 + 0.09 * sin(lp * r1 + ph0) \
+				+ 0.045 * sin(lp * r2 * 1.9 + ph0 * 2.0)
+			phase += TAU * f0 * bend / SR
+			var amp := 0.16 * (0.45 + 0.55 * sin(lp * r2 + ph0 * 3.0))
+			buf[i] += (sin(phase) + 0.35 * sin(phase * 2.0)) * amp
+	for i in render:
+		var t2 := float(i) / SR
+		# one warbling overtone + a thin breath: the "what IS that" layer
+		buf[i] += sin(TAU * 622.0 * t2) * 0.05 \
+			* (0.5 + 0.5 * sin(TAU * 0.31 * t2)) * (0.6 + 0.4 * sin(TAU * 7.0 * t2)) \
+			+ (randf() * 2.0 - 1.0) * 0.02
+	var out := PackedFloat32Array()
+	out.resize(total)
+	var xf := render - total
 	for i in total:
-		var t := float(i) / SR
-		var lp := float(i) / float(total) * TAU
-		var wob1 := 1.0 + 0.015 * sin(lp * 2.0)
-		var wob2 := 1.0 + 0.02 * sin(lp * 3.0)
-		var g := sin(TAU * 54.0 * wob1 * t) + sin(TAU * 57.25 * wob2 * t) * 0.8 \
-			+ sin(TAU * 61.5 * t + 2.0 * sin(lp)) * 0.6
-		# roughness: a fast tremble turns the hum into a GROWL
-		g *= 0.62 + 0.38 * sin(TAU * 16.0 * t + sin(lp * 2.0) * 3.0)
-		# harmonic snarl up top, quiet
-		g += sin(TAU * 108.0 * wob1 * t) * 0.18 + sin(TAU * 162.0 * t) * 0.09
-		var v := g * 0.24
-		# the moan cycle: it swells and recedes, unevenly
-		v *= 0.55 + 0.45 * sin(lp + sin(lp * 2.0) * 0.6)
-		# the abyss floor
-		v += sin(TAU * 27.0 * t) * 0.1 * (0.5 + 0.5 * sin(lp * 2.0)) \
-			+ (randf() * 2.0 - 1.0) * 0.018
-		buf[i] = v
-	return _encode_loop(buf, total, "_bh")
+		var v2 := buf[i]
+		if i < xf:
+			var k := float(i) / float(xf)
+			v2 = buf[total + i] * (1.0 - k) + buf[i] * k
+		out[i] = v2
+	return _encode_loop(out, total, "_bh")
 
 ## Stars hum. Weirdly. Inharmonic shimmer partials breathing on their
 ## own clocks, solar-crackle granules, and a deep fusion roar.
