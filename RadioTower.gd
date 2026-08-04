@@ -75,12 +75,12 @@ func _ready() -> void:
 	# you're genuinely far (other-side-of-the-planet territory)
 	_talk.unit_size = 40.0
 	_talk.max_distance = 1200.0
-	_talk.max_db = 0.0   # CAP: standing next to it must not blast you
+	_talk.max_db = -1.0   # CAP: standing next to it must not blast you
 	add_child(_talk)
 	_hiss = AudioStreamPlayer3D.new()
 	_hiss.unit_size = 24.0
 	_hiss.max_distance = 600.0
-	_hiss.max_db = -6.0
+	_hiss.max_db = -7.0
 	_hiss.stream = RadioLib.static_noise()
 	add_child(_hiss)
 	_build_stations()
