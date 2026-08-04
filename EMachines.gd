@@ -838,39 +838,40 @@ class NuclearReactor extends Machine:
 		dome.height = 1.4
 		dome.is_hemisphere = true
 		part(dome, Vector3(0, box_size.y, 0), Color("#9a9da0"), 0.05)
-		# lead glass: a murky pane you can ALMOST see through, straight
-		# into the pool. behind it, the core -- which glows Cherenkov
-		# blue when the reaction is real
+		# THE LEAD WINDOW lives on the SIDE (+x face): a whole assembly --
+		# murky pane, hollow pool, glowing water, fuel bundle, control
+		# blades -- built in a container rotated to face sideways. The
+		# front face belongs entirely to the info panel.
+		var win := Node3D.new()
+		win.rotation_degrees.y = -90.0   # container +z face -> world +x
+		add_child(win)
 		var glass := MeshInstance3D.new()
 		var gbm := BoxMesh.new()
 		gbm.size = Vector3(1.5, 1.4, 0.07)
 		glass.mesh = gbm
-		glass.position = Vector3(0, 1.2, box_size.z * 0.5 + 0.04)
+		glass.position = Vector3(0, 1.2, box_size.x * 0.5 + 0.04)
 		var gmat := StandardMaterial3D.new()
 		gmat.albedo_color = Color(0.32, 0.38, 0.42, 0.8)
 		gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		gmat.roughness = 0.12
 		gmat.metallic = 0.35
 		glass.material_override = gmat
-		add_child(glass)
-		# the HOLLOW pool behind the glass: dark cavity walls, the actual
-		# fuel bundle standing in the water, control blades riding between
-		# the rods. What you see through the lead glass IS the core state.
-		var zc := box_size.z * 0.5 - 0.42
+		win.add_child(glass)
+		var zc := box_size.x * 0.5 - 0.42
 		var cav := Color("#0a0e14")
-		var wb := BoxMesh.new()
-		wb.size = Vector3(1.5, 1.4, 0.05)
-		part(wb, Vector3(0, 1.2, zc - 0.4), cav, 0.02)
-		for sxw in [-0.76, 0.76]:
-			var sw := BoxMesh.new()
-			sw.size = Vector3(0.05, 1.4, 0.85)
-			part(sw, Vector3(sxw, 1.2, zc), cav, 0.02)
-		var fb := BoxMesh.new()
-		fb.size = Vector3(1.5, 0.05, 0.85)
-		part(fb, Vector3(0, 0.52, zc), cav, 0.02)
-		var tb := BoxMesh.new()
-		tb.size = Vector3(1.5, 0.05, 0.85)
-		part(tb, Vector3(0, 1.88, zc), cav, 0.02)
+		var cavm: Material = Destructible.make_material(cav, 0.02)
+		for wall in [[Vector3(1.5, 1.4, 0.05), Vector3(0, 1.2, zc - 0.4)],
+				[Vector3(0.05, 1.4, 0.85), Vector3(-0.76, 1.2, zc)],
+				[Vector3(0.05, 1.4, 0.85), Vector3(0.76, 1.2, zc)],
+				[Vector3(1.5, 0.05, 0.85), Vector3(0, 0.52, zc)],
+				[Vector3(1.5, 0.05, 0.85), Vector3(0, 1.88, zc)]]:
+			var wmi := MeshInstance3D.new()
+			var wmm := BoxMesh.new()
+			wmm.size = wall[0]
+			wmi.mesh = wmm
+			wmi.position = wall[1]
+			wmi.material_override = cavm
+			win.add_child(wmi)
 		# the water: a translucent volume that glows Cherenkov blue
 		var wat := MeshInstance3D.new()
 		var wbm := BoxMesh.new()
@@ -884,7 +885,7 @@ class NuclearReactor extends Machine:
 		wmat.emission = Color("#38c8ff")
 		wmat.emission_energy_multiplier = 0.2
 		wat.material_override = wmat
-		add_child(wat)
+		win.add_child(wat)
 		_glow = wat
 		# the bundle: five fuel rods, each with its own radiation glow
 		for bx in [-0.4, -0.2, 0.0, 0.2, 0.4]:
@@ -901,7 +902,7 @@ class NuclearReactor extends Machine:
 			fmat.emission = Color("#38c8ff")
 			fmat.emission_energy_multiplier = 0.1
 			frm.material_override = fmat
-			add_child(frm)
+			win.add_child(frm)
 			_fuel_meshes.append(frm)
 		# four control blades between the rods: they SINK as you insert
 		for bx2 in [-0.3, -0.1, 0.1, 0.3]:
@@ -911,19 +912,19 @@ class NuclearReactor extends Machine:
 			bl.mesh = blm
 			bl.position = Vector3(bx2, 1.15, zc)
 			bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
-			add_child(bl)
+			win.add_child(bl)
 			_blades.append(bl)
-		# front status panel: a dark plate with the numbers that matter
+		# FRONT: the info panel gets the whole face the window used to block
 		var pbk := BoxMesh.new()
-		pbk.size = Vector3(1.5, 0.62, 0.04)
-		part(pbk, Vector3(0, 0.45, box_size.z * 0.5 + 0.02), Color("#10141a"), 0.05)
+		pbk.size = Vector3(1.3, 1.7, 0.04)
+		part(pbk, Vector3(0, 1.15, box_size.z * 0.5 + 0.02), Color("#10141a"), 0.05)
 		_panel = Label3D.new()
-		_panel.font_size = 26
-		_panel.pixel_size = 0.0038
+		_panel.font_size = 30
+		_panel.pixel_size = 0.0046
 		_panel.modulate = Color("#7be8ff")
 		_panel.outline_size = 4
 		_panel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_panel.position = Vector3(0, 0.45, box_size.z * 0.5 + 0.05)
+		_panel.position = Vector3(0, 1.15, box_size.z * 0.5 + 0.05)
 		add_child(_panel)
 		# control rod actuators: four rods that VISIBLY sink into the dome
 		for sx in [-0.45, 0.45]:
