@@ -42,6 +42,7 @@ var now_line_col: Color = Color("#ffd166")
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _bad_t: float = 0.0   # how long the signal has been junk
 var _unpow_t: float = 99.0   # how long the buffer has been empty
+var _warn_cd: float = 0.0
 
 func _init() -> void:
 	title = "RADIO"
@@ -329,6 +330,14 @@ func work(delta: float) -> void:
 	else:
 		_unpow_t += delta
 	powered = fed or _unpow_t < 1.5
+	# STARVATION is a diagnosis, not a mystery: if the set browns out
+	# while someone's listening, say so on the HUD (rate-limited)
+	if not fed and near and buf <= 0.0 and (_talk.playing or _hiss.playing) \
+			and _warn_cd <= 0.0:
+		_warn_cd = 12.0
+		var hudw = get_tree().get_first_node_in_group("hud")
+		if hudw:
+			hudw.flash("RADIO BROWNOUT — supply can't keep up with %.1f EU/s drain" % DRAIN)
 	if not powered:
 		if _talk.playing:
 			_talk.stop()
@@ -516,6 +525,7 @@ func _deliver(wav: AudioStreamWAV, idx: int, cl: String = "") -> void:
 func _process(d: float) -> void:
 	super._process(d)
 	_site_t -= d
+	_warn_cd = maxf(0.0, _warn_cd - d)
 	# paint the spectrogram: shift left, append the newest column
 	_spec_t -= d
 	if _spec_t <= 0.0 and _an != null and _spec_img != null:
