@@ -243,23 +243,6 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			var back := BoxMesh.new()
 			back.size = Vector3(0.6, 0.18, 0.04)
 			_p(r, back, Vector3(0, 0.12, 0.09), c)
-		"furnkit":
-			var seat2 := BoxMesh.new()
-			seat2.size = Vector3(0.42, 0.05, 0.2)
-			_p(r, seat2, Vector3(-0.1, 0, 0), c)
-			var bed := BoxMesh.new()
-			bed.size = Vector3(0.24, 0.1, 0.34)
-			_p(r, bed, Vector3(0.22, -0.05, 0), Color("#a04848"), 0.2)
-		"housekit":
-			var hb := BoxMesh.new()
-			hb.size = Vector3(0.45, 0.3, 0.45)
-			_p(r, hb, Vector3(0, -0.08, 0), c)
-			var roof := CylinderMesh.new()
-			roof.top_radius = 0.0
-			roof.bottom_radius = 0.38
-			roof.height = 0.25
-			roof.radial_segments = 4
-			_p(r, roof, Vector3(0, 0.2, 0), Color("#7a4a3a"), 0.15, Vector3(0, 45, 0))
 		"fuel":
 			var can := CylinderMesh.new()
 			can.top_radius = 0.18

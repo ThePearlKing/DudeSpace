@@ -998,6 +998,31 @@ func _make_held_model(id: String) -> void:
 			_hm_cyl(0.11, 0.16, Vector3(0, 0.24, 0), Color("#ff5964"), 0.6, 0.0)
 			for fx in [-0.12, 0.12]:
 				_hm_box(Vector3(0.05, 0.14, 0.02), Vector3(fx, -0.22, 0), Color("#ff5964"), 0.4)
+		"housekit":
+			# rolled blueprint + the little demo house from the box art
+			_hm_cyl(0.05, 0.42, Vector3(-0.14, 0.02, 0), Color("#7cb8ff"), 0.5).rotation_degrees = Vector3(0, 0, 90)
+			_hm_box(Vector3(0.22, 0.16, 0.22), Vector3(0.1, -0.05, 0), Color("#c9b8a0"), 0.2)
+			var kroof := MeshInstance3D.new()
+			var krm := CylinderMesh.new()
+			krm.top_radius = 0.0
+			krm.bottom_radius = 0.17
+			krm.height = 0.14
+			krm.radial_segments = 4
+			kroof.mesh = krm
+			kroof.position = Vector3(0.1, 0.1, 0)
+			kroof.rotation_degrees.y = 45.0
+			kroof.material_override = Destructible.make_material(Color("#7a4a3a"), 0.15)
+			_held.add_child(kroof)
+			_hm_box(Vector3(0.05, 0.08, 0.01), Vector3(0.1, -0.09, 0.11), Color("#4a3a28"), 0.1)
+		"furnkit":
+			# the placer: wooden mallet + a pocket chair sample
+			var khandle := _hm_cyl(0.03, 0.3, Vector3(-0.12, -0.02, 0), Color("#7a5a34"), 0.2)
+			khandle.rotation_degrees = Vector3(0, 0, 12)
+			_hm_box(Vector3(0.16, 0.09, 0.09), Vector3(-0.15, 0.14, 0), Color("#5a4428"), 0.2)
+			_hm_box(Vector3(0.12, 0.02, 0.1), Vector3(0.12, 0.0, 0), Color("#7a5a34"), 0.25)
+			_hm_box(Vector3(0.12, 0.11, 0.02), Vector3(0.12, 0.06, 0.05), Color("#7a5a34"), 0.25)
+			for klx in [-0.045, 0.045]:
+				_hm_box(Vector3(0.02, 0.07, 0.02), Vector3(0.12 + klx, -0.05, 0), Color("#3a3a3e"), 0.1)
 		"cage", "caged_animal", "caged_human":
 			var cm2 := IconLib.build_model(id, get_tree())
 			cm2.scale = Vector3(0.55, 0.55, 0.55)
