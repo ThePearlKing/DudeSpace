@@ -169,7 +169,7 @@ func store_guest_blob(pname: String, blob: Dictionary) -> void:
 
 ## Everything that makes THIS player themselves (synced to the host).
 func build_player_blob() -> Dictionary:
-	return {
+	var blob := {
 		"character": character,
 		"coins": Inventory.coins,
 		"equip": Inventory.equip,
@@ -183,6 +183,12 @@ func build_player_blob() -> Dictionary:
 		"fuel": Inventory.fuel,
 		"fuel_max": Inventory.fuel_max,
 	}
+	# where I'm standing rides along: rejoining puts me back HERE, not
+	# at the server spawn on the north pole
+	var p = get_tree().get_first_node_in_group("player")
+	if p:
+		blob["pos"] = [p.global_position.x, p.global_position.y, p.global_position.z]
+	return blob
 
 ## Guest joining a LAN server: boot into the HOST's world snapshot.
 ## Ephemeral -- this machine's disk is never touched.
@@ -194,7 +200,9 @@ func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
 		"playtime": float(snap.get("playtime", 0.0)),
 		"spawn": snap.get("spawn", null),
 		"spawn_up": snap.get("spawn_up", [0, 1, 0]),
-		"pos": snap.get("spawn", null),   # arrive at the server spawn
+		"pos": snap.get("spawn", null),   # fallback: the server spawn
+		# (a returning player's blob overrides this below -- you come
+		# back exactly where you logged out)
 		"wseed": snap.get("wseed", 0),    # guests build the HOST's terrain
 	}
 	for k in blob.keys():

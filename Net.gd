@@ -27,7 +27,7 @@ var player_pos: Dictionary = {}      # peer id -> last known Vector3
 var player_ups: Dictionary = {}      # peer id -> last known up axis
 var host_settings: Dictionary = {}   # host's rules, mirrored to guests
 var applying_remote: bool = false    # guard: mirrored events don't re-broadcast
-var _blob_t: float = 15.0
+var _blob_t: float = 5.0
 var _ident_t: float = 3.0
 var _last_equip: String = ""
 
@@ -343,11 +343,12 @@ func _process(delta: float) -> void:
 		if e != _last_equip:
 			_last_equip = e
 			refresh_identity()
-	# guests: push our player data to the host every 15s (persists by name)
+	# guests: push our player data to the host every 5s (persists by
+	# name -- position included, so rejoining puts you back where you were)
 	if not is_host:
 		_blob_t -= delta
 		if _blob_t <= 0.0:
-			_blob_t = 15.0
+			_blob_t = 5.0
 			_store_blob.rpc_id(1, my_name(), Save.build_player_blob())
 
 @rpc("any_peer", "unreliable")

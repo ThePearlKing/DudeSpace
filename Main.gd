@@ -298,7 +298,10 @@ func _cage_test() -> void:
 	print("CAGETEST slogan ok: ", str(b.saved.get("slogan", "-")) == str(box.get("slogan", "-")),
 		"  hair ok: ", int(b.saved.get("hair", -1)) == int(box.get("hair", -1)),
 		"  skin ok: ", str(b.saved.get("skin", "-")) == str(box.get("skin", "-")))
-	print("CAGETEST pers ok: ", float(b._pers["grumpy"]) == float(box["pers"]["grumpy"]))
+	# JSON text rounds the last float bits; anything under a thousandth
+	# of a personality point is the same soul
+	print("CAGETEST pers ok: ",
+		absf(float(b._pers["grumpy"]) - float(box["pers"]["grumpy"])) < 0.001)
 
 ## Headless: park a rocket in front of the player's face and press F.
 func _board_test() -> void:
@@ -1478,8 +1481,6 @@ func _populate(b) -> void:
 						b.center + cd * (b.radius + 1.2))
 			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
-			for i in _n(5):
-				_earth_lake(b, _surface_dir())
 			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
 		"luna":
 			# barren. gray. historic. no loot -- the Moon has nothing to sell

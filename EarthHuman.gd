@@ -640,7 +640,11 @@ func _dress_human() -> void:
 		slogan.autowrap_mode = TextServer.AUTOWRAP_WORD
 		slogan.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		slogan.modulate = Color.WHITE if shirt_col.get_luminance() < 0.5 else Color("#1a1a1a")
-		slogan.position = Vector3(0, 0.05, -0.24)
+		slogan.position = Vector3(0, 0.05, -0.3)
+		# face OUT the chest, not into it -- unrotated Label3D reads
+		# mirrored from the front. no more backwards shirts.
+		slogan.rotation_degrees.y = 180.0
+		slogan.double_sided = false
 		_body._torso.add_child(slogan)
 
 	# hair: one style from the rack, one colour from the bottle
@@ -776,7 +780,9 @@ func take_damage(dmg: float, dir: Vector3) -> void:
 
 func _say(t: String) -> void:
 	_bubble.text = t
-	_bubble_t = 4.5
+	# words hang around until replaced (or ~12s, whichever first) --
+	# a conversation you walk past should still be readable
+	_bubble_t = 12.0
 	# size the card to the words: rough glyph math, generous padding
 	var px: float = t.length() * 11.0
 	var w: float = clampf(px + 36.0, 90.0, 440.0)
@@ -999,7 +1005,8 @@ func take_punch_from(from: EarthHuman, dir: Vector3) -> void:
 	_end_convo()
 	_panic_t = 3.0
 	_dir = (dir - _up() * dir.dot(_up())).normalized()
-	velocity += dir * 5.0 + _up() * 3.0
+	velocity += dir * 2.0 + _up() * 1.2   # a shove, not a launch: the
+	# insults have to stay READABLE
 	var mean := float(_pers.get("grumpy", 25.0)) + float(_pers.get("edgy", 25.0))
 	_say(_insult_line() if mean > 90.0 \
 		else "WHY. " + from.human_name.to_upper() + ". WHY.")
@@ -1118,8 +1125,15 @@ func _physics_process(delta: float) -> void:
 	if _lod_t <= 0.0:
 		_lod_t = 0.5
 		var pl = get_tree().get_first_node_in_group("player")
-		_active = pl != null \
-			and global_position.distance_squared_to(pl.global_position) < 3600.0
+		var d2 := global_position.distance_squared_to(pl.global_position) \
+			if pl != null else INF
+		_active = d2 < 3600.0
+		# labels only exist up close: no nametag dots dotting the
+		# horizon from the far side of the planet
+		var near := d2 < 625.0
+		_bubble.visible = near
+		_bg.visible = near
+		_tag.visible = near
 	if not _active:
 		return
 	var up := _up()
@@ -1239,5 +1253,15 @@ func _physics_process(delta: float) -> void:
 	if (speed > 0.1 or _partner != null) and _dir.length() > 0.1:
 		var x := up.cross(_dir).normalized()
 		global_transform.basis = Basis(x, up, -_dir).orthonormalized()
+	else:
+		# idle: STILL stand along gravity. cage releases used to walk
+		# out sideways and simply live like that. no longer.
+		var fwd := -global_transform.basis.z
+		fwd = fwd - up * fwd.dot(up)
+		if fwd.length() < 0.05:
+			fwd = up.cross(Vector3.RIGHT)
+		fwd = fwd.normalized()
+		var x2 := up.cross(fwd).normalized()
+		global_transform.basis = Basis(x2, up, -fwd).orthonormalized()
 	if _body and _eat_t <= 0.0:   # mid-bite the tween owns the limbs
 		_body.animate(speed, _grounded, delta)
