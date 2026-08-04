@@ -100,16 +100,29 @@ func use(player: Player) -> void:
 		if str(h2.get_meta("owner", "")) != Net.my_name():
 			Sfx.play("denied")   # not yours. the button knows.
 			return
-		if not get_meta("armed", false):
-			set_meta("armed", true)
-			Sfx.play("click", -6.0)   # press again to mean it
-			return
+		# step outside first -- nobody demolishes a building from inside it
 		h2.exit_to_door(player)
-		Inventory.give("housekit", 1)
-		Destructible.spawn_debris(h2.get_parent(), h2.global_position,
-			Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
-		Sfx.play("explode", -10.0)
-		h2.queue_free()
+		var dlg := ConfirmationDialog.new()
+		dlg.title = "Demolish"
+		dlg.dialog_text = "Are you sure you want to demolish %s?\nThe construction kit comes back. The furniture doesn't move itself." % h2.display_name()
+		dlg.ok_button_text = "DEMOLISH"
+		dlg.cancel_button_text = "keep it"
+		get_tree().current_scene.add_child(dlg)
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		var recapture := func() -> void:
+			if not Game.dead:
+				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			dlg.queue_free()
+		dlg.confirmed.connect(func() -> void:
+			if is_instance_valid(h2):
+				Inventory.give("housekit", 1)
+				Destructible.spawn_debris(h2.get_parent(), h2.global_position,
+					Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
+				Sfx.play("explode", -10.0)
+				h2.queue_free()
+			recapture.call())
+		dlg.canceled.connect(recapture)
+		dlg.popup_centered()
 		return
 	match action:
 		"recipe":
