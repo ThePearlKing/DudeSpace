@@ -266,9 +266,10 @@ func _is_local(st: Dictionary) -> bool:
 func signal_for(st: Dictionary) -> float:
 	var a := align_for(st)
 	var ferr: float = absf(freq - float(st["freq"]))
-	# TIGHT tuning window: 0.6 MHz off = silence, not a faint ghost
+	# TIGHT window AND a steep curve: 0.15 off already hurts, 0.3 off is
+	# half-buried, 0.6 off is silence -- being spot-on means something
 	var f := clampf(1.0 - ferr / 0.6, 0.0, 1.0)
-	return a * f
+	return a * f * f
 
 ## Alignment (spectrum display: activity you COULD tune). PENCIL beam,
 ## ~5 degrees -- it barely spreads with distance, so you hear the one
@@ -395,6 +396,18 @@ func work(delta: float) -> void:
 				_serve(func() -> AudioStreamWAV:
 					return RadioLib.rick_song(), true)
 		_:
+			# THE SAUCE gets live subtitles keyed to the tape position --
+			# spaghettified, credited to the eye above
+			if str(st["type"]) == "noodle" and _talk.playing \
+					and RadioLib.sauce_cues.size() > 0:
+				var tpos := fmod(Game.playtime, RadioLib.sauce_len)
+				var curc := ""
+				for cue in RadioLib.sauce_cues:
+					if tpos >= float(cue[0]):
+						curc = str(cue[1])
+				if curc != "":
+					now_line = "⊙: " + RadioLib.spaghettify(curc)
+					now_line_until = Game.playtime + 0.6
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
 				var t := str(st["type"])

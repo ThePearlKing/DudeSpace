@@ -1134,6 +1134,23 @@ const SAUCE_TUNED := {
 	"the fork descends on everything.": 160.0}
 
 static var _sauce_wav: AudioStreamWAV = null
+static var sauce_cues: Array = []   # [start_seconds, line] over the tape
+static var sauce_len: float = 1.0
+
+## SPAGHETTIFY: the event horizon does this to text. Letters stretch,
+## strands connect them, vowels get pulled long. Readable if you fight.
+static func spaghettify(txt: String) -> String:
+	var out := ""
+	for i in txt.length():
+		var c := txt[i]
+		out += c
+		var h := (i * 31 + c.unicode_at(0)) % 10
+		if c in "aeiou" and h < 4:
+			for k in 1 + (h % 3):
+				out += c
+		if h < 5 and c != " ":
+			out += String.chr(0x035C + (h % 3))
+	return out
 
 ## A mild single-tap echo: presence intact, space added.
 static func _light_echo(src: AudioStreamWAV) -> AudioStreamWAV:
@@ -1167,10 +1184,12 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	# TWO voices per line, same monotone god: the full eldritch render
 	# pushed back as texture, and a clearer take with a light echo on
 	# top so the words actually land
+	sauce_cues.clear()
 	for ln in SAUCE_VERSE + SAUCE_VERSE2:
 		if str(ln) == "":
 			pos += barlen   # a rest: the beat carries the bar alone
 			continue
+		sauce_cues.append([float(pos) / float(SR), str(ln)])
 		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
 		# the GROWL: the god's old saw throat, kept quiet under the mix
 		var wg := HumanVoice.render(str(ln),
@@ -1265,6 +1284,7 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	# the tape RESTARTS itself: the sermon never actually ends
 	_sauce_wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	_sauce_wav.loop_end = total
+	sauce_len = float(total) / float(SR)
 	return _sauce_wav
 
 static func noodle_profile() -> Dictionary:
