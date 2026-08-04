@@ -557,7 +557,7 @@ func _build_interior() -> void:
 			# full drop, never meets a wall, no orphan landings
 			var cellar_floor := -sz.y * 1.5 + 0.3
 			_stairs(c + Vector3(4.0, cellar_floor, -1.3),
-				Vector3(0, 0, 0.5), 13, sz.y, Color("#6a6255"))
+				Vector3(0, 0, 0.5), 13, sz.y, Color("#6a6255"), 0.12, -0.3)
 			# railing around the open hole so nobody just falls in
 			_deco(c + Vector3(2.35, fy - c.y + 0.8, 3.0), Vector3(0.08, 1.1, 4.2),
 				warm.darkened(0.4))
@@ -783,15 +783,17 @@ func _counter(gpos: Vector3, length: float) -> void:
 ## A real staircase: N steps climbing `rise` along `step_vec` (x,z per
 ## step), each with collision. The last step tops out AT the rise.
 func _stairs(base: Vector3, step_vec: Vector3, steps: int, rise: float,
-		col: Color) -> void:
+		col: Color, ramp_lift := 0.34, overhang := 0.8) -> void:
 	for st in steps:
 		var t := float(st + 1) / float(steps)
 		_solid(base + Vector3(0, rise * t - 0.2, step_vec.z * float(st)),
 			Vector3(2.2, 0.42, absf(step_vec.z) + 0.35), col)
-	# the part that makes them CLIMBABLE: an invisible ramp lying over
-	# the steps, so walking up is walking, not parkour
+	# the part that makes them a SLOPE: an invisible ramp lying over the
+	# steps, so walking up is walking, not parkour. ramp_lift/overhang
+	# tune how proud it sits -- a ramp that outgrows its stairwell pokes
+	# an invisible lip through the floor above.
 	var run := step_vec.z * float(steps - 1)
-	var length := sqrt(run * run + rise * rise) + 0.8
+	var length := sqrt(run * run + rise * rise) + overhang
 	var ramp := StaticBody3D.new()
 	var rcol := CollisionShape3D.new()
 	var rbs := BoxShape3D.new()
@@ -799,7 +801,7 @@ func _stairs(base: Vector3, step_vec: Vector3, steps: int, rise: float,
 	rcol.shape = rbs
 	ramp.add_child(rcol)
 	_iroot.add_child(ramp)
-	ramp.global_position = base + Vector3(0, rise * 0.5 + 0.34, run * 0.5)
+	ramp.global_position = base + Vector3(0, rise * 0.5 + ramp_lift, run * 0.5)
 	ramp.rotation.x = atan2(rise, -run) if run < 0.0 else -atan2(rise, run)
 
 ## Cosmetic block (no collision): trim, beams, railings, clutter.
