@@ -1,11 +1,12 @@
 class_name HumanVoice
 ## Experimental formant TTS: it TRIES to say the sentence in English.
-## Vowels are stacks of formant tones riding a glottal pulse, F and S
+## Vowels are harmonic wavetables shaped by formant resonances, F and S
 ## and TH are real noise, plosives are little bursts, M and N hum.
-## Not perfect. Recognizably trying. Like the humans themselves.
+## Adjacent voiced sounds CONNECT: one continuous voicing run with the
+## mouth-shape gliding between letters -- "arctic", not "a-r-c-t-i-c".
 ##
 ## The voice profile (from personality) bends it: pitch, monotone-ness,
-## the glottal waveform (nerd square, sour saw, weird wobble, and the
+## the glottal timbre (nerd square, sour saw, weird wobble, and the
 ## mosquito buzz for face_017), and talking speed.
 
 const SR := 22050
@@ -21,40 +22,49 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	var wave := str(prof.get("wave", "sine"))
 	var rate := float(prof.get("rate", 1.0))
 	var qmark := text.ends_with("?")
-	var buf := PackedFloat32Array()
-	var word := 0
+	# first pass: give every segment its pitch (the sentence melody)
+	# and final duration
 	var total := segs.size()
+	var word := 0
 	for idx in total:
 		var sg: Dictionary = segs[idx]
-		var dur := float(sg.get("d", 0.06)) * rate
-		if sg["t"] == "sp":
-			word += 1
-			_silence(buf, dur)
-			continue
-		# sentence melody: starts a touch high, settles at the end;
-		# questions bend UP. monotone voices barely move at all.
+		sg["d"] = float(sg.get("d", 0.06)) * rate
 		var prog := float(idx) / maxf(1.0, float(total - 1))
 		var contour := 1.0 + (0.06 - 0.16 * prog) * clampf(vary * 2.5, 0.15, 1.0)
 		if qmark and prog > 0.75:
 			contour += (prog - 0.75) * 0.8 * clampf(vary * 2.5, 0.3, 1.0)
-		var pitch := pitch0 * contour \
+		if sg["t"] == "sp":
+			word += 1
+		sg["pitch"] = pitch0 * contour \
 			* (1.0 + vary * 0.2 * sin(float(word) * 1.7 + float(idx) * 0.35))
+	# second pass: synth. voiced neighbours fuse into runs.
+	var buf := PackedFloat32Array()
+	var i := 0
+	while i < segs.size():
+		var sg: Dictionary = segs[i]
 		match sg["t"]:
-			"v":
-				var f: Array = sg["f"]
-				_vowel(buf, float(f[0]), float(f[1]), dur, pitch, wave)
+			"sp":
+				_silence(buf, float(sg["d"]))
+				i += 1
 			"f":
-				_fric(buf, bool(sg["b"]), bool(sg["vo"]), dur, pitch)
+				_fric(buf, bool(sg["b"]), bool(sg["vo"]), float(sg["d"]),
+					float(sg["pitch"]))
+				i += 1
 			"p":
-				_plosive(buf, bool(sg["vo"]), pitch)
-			"n":
-				_nasal(buf, dur, pitch)
+				_plosive(buf, bool(sg["vo"]), float(sg["pitch"]))
+				i += 1
+			_:
+				var run: Array = []
+				while i < segs.size() and (segs[i]["t"] == "v" or segs[i]["t"] == "n"):
+					run.append(segs[i])
+					i += 1
+				_voiced_run(buf, run, wave)
 	if buf.is_empty():
 		return null
 	var bytes := PackedByteArray()
 	bytes.resize(buf.size() * 2)
-	for i in buf.size():
-		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 32000.0))
+	for j in buf.size():
+		bytes.encode_s16(j * 2, int(clampf(buf[j], -1.0, 1.0) * 32000.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = SR
@@ -74,6 +84,7 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 
 ## Text -> rough phoneme segments. Digraphs first (th/sh/ch/ee/oo/ng),
 ## then letter classes. English spelling is lies, but close enough.
+## Vowel formants deliberately EXAGGERATED so ah/ee/oh read clearly.
 static func _parse(t: String) -> Array:
 	var out: Array = []
 	var i := 0
@@ -81,11 +92,11 @@ static func _parse(t: String) -> Array:
 		var two := t.substr(i, 2)
 		var c := t.substr(i, 1)
 		if two == "ee" or two == "ea":
-			out.append({"t": "v", "f": [300.0, 2200.0], "d": 0.085})
+			out.append({"t": "v", "f": [270.0, 2400.0], "d": 0.1})
 			i += 2
 			continue
 		if two == "oo":
-			out.append({"t": "v", "f": [320.0, 880.0], "d": 0.085})
+			out.append({"t": "v", "f": [300.0, 750.0], "d": 0.1})
 			i += 2
 			continue
 		if two == "th":
@@ -103,17 +114,17 @@ static func _parse(t: String) -> Array:
 		i += 1
 		match c:
 			"a":
-				out.append({"t": "v", "f": [660.0, 1220.0], "d": 0.07})
+				out.append({"t": "v", "f": [800.0, 1100.0], "d": 0.09})
 			"e":
-				out.append({"t": "v", "f": [530.0, 1680.0], "d": 0.07})
+				out.append({"t": "v", "f": [580.0, 1900.0], "d": 0.085})   # EH, as in bed
 			"i":
-				out.append({"t": "v", "f": [390.0, 1990.0], "d": 0.07})
+				out.append({"t": "v", "f": [280.0, 2350.0], "d": 0.085})
 			"o":
-				out.append({"t": "v", "f": [500.0, 900.0], "d": 0.075})
+				out.append({"t": "v", "f": [450.0, 750.0], "d": 0.09})
 			"u":
-				out.append({"t": "v", "f": [420.0, 1000.0], "d": 0.07})
+				out.append({"t": "v", "f": [320.0, 850.0], "d": 0.085})
 			"l", "r", "w", "y":
-				out.append({"t": "v", "f": [440.0, 1300.0], "d": 0.05})
+				out.append({"t": "v", "f": [420.0, 1350.0], "d": 0.055})
 			"f", "h":
 				out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
 			"v":
@@ -127,12 +138,92 @@ static func _parse(t: String) -> Array:
 			"b", "d", "g":
 				out.append({"t": "p", "vo": true})
 			"m", "n":
-				out.append({"t": "n", "d": 0.06})
+				out.append({"t": "n", "d": 0.065})
 			" ":
 				out.append({"t": "sp", "d": 0.045})
 			".", ",", "?", "!":
 				out.append({"t": "sp", "d": 0.1})
 	return out
+
+## One glottal cycle with the harmonics weighted by the vocal tract:
+## sharp resonances at F1/F2 (plus a hint of F3) so each vowel has its
+## OWN color. Source rolloff sets the personality timbre.
+static func _table(f1: float, f2: float, pitch: float, wave: String,
+		gain: float) -> PackedFloat32Array:
+	if wave == "buzz":
+		pitch *= 1.35   # the mosquito registers
+	var period := maxi(8, int(SR / pitch))
+	var tbl := PackedFloat32Array()
+	tbl.resize(period)
+	var nh := mini(30, int((SR * 0.45) / pitch))
+	for k in range(1, nh + 1):
+		var fk := float(k) * pitch
+		var src := 1.0 / float(k)
+		if wave == "square" and k % 2 == 0:
+			src *= 0.15   # hollow odd-harmonic nerd timbre
+		elif wave == "sine":
+			src = 1.0 if k == 1 else 1.0 / float(k * k)   # soft and round
+		var amp := src * (0.06 \
+			+ 1.0 * exp(-pow((fk - f1) / 130.0, 2.0)) \
+			+ 0.95 * exp(-pow((fk - f2) / 180.0, 2.0)) \
+			+ 0.15 * exp(-pow((fk - 3000.0) / 350.0, 2.0)))
+		for i in period:
+			tbl[i] += sin(TAU * float(k) * float(i) / float(period)) * amp
+	var peak := 0.001
+	for i in period:
+		peak = maxf(peak, absf(tbl[i]))
+	for i in period:
+		tbl[i] = tbl[i] / peak * 0.5 * gain
+	return tbl
+
+## A run of connected voiced sounds: ONE unbroken voicing, the mouth
+## shape crossfading from letter to letter at every joint. This is what
+## turns a-r-c-t-i-c into arctic.
+static func _voiced_run(buf: PackedFloat32Array, run: Array, wave: String) -> void:
+	var tbls: Array = []
+	var lens: Array = []
+	for ev in run:
+		var f1: float
+		var f2: float
+		var gain := 1.0
+		if ev["t"] == "n":
+			f1 = 260.0
+			f2 = 1100.0
+			gain = 0.5   # nasal: dark and muted, everything via the nose
+		else:
+			var f: Array = ev["f"]
+			f1 = float(f[0])
+			f2 = float(f[1])
+		tbls.append(_table(f1, f2, float(ev["pitch"]), wave, gain))
+		lens.append(int(float(ev["d"]) * SR))
+	var xf := int(0.032 * SR)   # formant glide window at each joint
+	var start := buf.size()
+	var pos := 0
+	for si in run.size():
+		var tbl: PackedFloat32Array = tbls[si]
+		var p := tbl.size()
+		var has_next := si + 1 < run.size()
+		var nxt: PackedFloat32Array = tbls[si + 1] if has_next else tbl
+		var pn := nxt.size()
+		var n: int = lens[si]
+		for j in n:
+			var idx := pos
+			if wave == "wobble":   # vibrato that never settles
+				idx = int(float(pos) * (1.0 + 0.06 * sin(TAU * 5.0 * float(pos) / SR)))
+			var s := tbl[idx % p]
+			var rem := n - j
+			if has_next and rem < xf:   # glide the mouth to the next letter
+				var m := 1.0 - float(rem) / float(xf)
+				s = s * (1.0 - m) + nxt[idx % pn] * m
+			if wave == "buzz":   # wing-flutter tremolo
+				s *= 0.65 + 0.35 * sin(TAU * 26.0 * float(pos) / SR)
+			buf.append(s)
+			pos += 1
+	# envelope over the WHOLE run -- letters inside it stay joined
+	var rn := buf.size() - start
+	for j in rn:
+		buf[start + j] *= minf(1.0, float(j) / (SR * 0.012)) \
+			* minf(1.0, float(rn - j) / (SR * 0.03))
 
 static func _env(i: int, n: int, atk: float, rel: float) -> float:
 	return minf(1.0, float(i) / (SR * atk)) * minf(1.0, float(n - i) / (SR * rel))
@@ -140,45 +231,6 @@ static func _env(i: int, n: int, atk: float, rel: float) -> float:
 static func _silence(buf: PackedFloat32Array, dur: float) -> void:
 	for i in int(dur * SR):
 		buf.append(0.0)
-
-## A vowel, done properly-ish: build ONE cycle of the waveform from the
-## harmonics of the pitch, each harmonic weighted by how close it sits
-## to the vowel's formant resonances. "A" comes out sounding like AH,
-## "ee" like EE. Then loop the cycle for the duration. Cheap AND vowel.
-static func _vowel(buf: PackedFloat32Array, f1: float, f2: float,
-		dur: float, pitch: float, wave: String) -> void:
-	if wave == "buzz":
-		pitch *= 1.35   # the mosquito registers
-	var period := maxi(8, int(SR / pitch))
-	var tbl := PackedFloat32Array()
-	tbl.resize(period)
-	var nh := mini(26, int((SR * 0.45) / pitch))
-	for k in range(1, nh + 1):
-		var fk := float(k) * pitch
-		# glottal rolloff by voice type, then the vocal-tract filter
-		var src := 1.0 / float(k)
-		if wave == "square" and k % 2 == 0:
-			src *= 0.15   # hollow odd-harmonic nerd timbre
-		elif wave == "sine":
-			src = 1.0 if k == 1 else 1.0 / float(k * k)   # soft and round
-		var amp := src * (0.22 \
-			+ 1.0 * exp(-pow((fk - f1) / 220.0, 2.0)) \
-			+ 0.8 * exp(-pow((fk - f2) / 320.0, 2.0)) \
-			+ 0.25 * exp(-pow((fk - 2600.0) / 400.0, 2.0)))
-		for i in period:
-			tbl[i] += sin(TAU * float(k) * float(i) / float(period)) * amp
-	var peak := 0.001
-	for i in period:
-		peak = maxf(peak, absf(tbl[i]))
-	var n := int(dur * SR)
-	for i in n:
-		var idx := i
-		if wave == "wobble":   # vibrato that never settles
-			idx = int(float(i) * (1.0 + 0.06 * sin(TAU * 5.0 * float(i) / SR)))
-		var s := tbl[idx % period] / peak * 0.5
-		if wave == "buzz":     # wing-flutter tremolo
-			s *= 0.65 + 0.35 * sin(TAU * 26.0 * float(i) / SR)
-		buf.append(s * _env(i, n, 0.012, 0.03))
 
 ## Fricatives: noise, shaped crudely. Bright = hissy (s/sh/ch),
 ## dull = breathy wash (f/th/h). Voiced ones hum underneath (v/z).
@@ -200,20 +252,11 @@ static func _fric(buf: PackedFloat32Array, bright: bool, voiced: bool,
 
 ## Plosives: a beat of closure, then the little explosion.
 static func _plosive(buf: PackedFloat32Array, voiced: bool, pitch: float) -> void:
-	_silence(buf, 0.018)
-	var n := int(0.035 * SR)
+	_silence(buf, 0.014)
+	var n := int(0.032 * SR)
 	for i in n:
 		var fall := 1.0 - float(i) / float(n)
 		var s := (randf() * 2.0 - 1.0) * 0.5 * fall
 		if voiced:
 			s += sin(TAU * pitch * float(i) / SR) * 0.25 * fall
 		buf.append(s)
-
-## Nasals: lips shut, everything comes out the nose. A dark hum.
-static func _nasal(buf: PackedFloat32Array, dur: float, pitch: float) -> void:
-	var n := int(dur * SR)
-	for i in n:
-		var t := float(i) / SR
-		var s := sin(TAU * pitch * t) * 0.3 + sin(TAU * 240.0 * t) * 0.25 \
-			+ sin(TAU * 2.2 * pitch * t) * 0.08
-		buf.append(s * _env(i, n, 0.015, 0.03))
