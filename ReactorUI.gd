@@ -14,6 +14,7 @@ const DARKL := Color("#3a3126")
 
 var rx = null   # the NuclearReactor being operated
 var _read: Label
+var _pool_view: Control
 var _lamps := {}
 var _arm_t := 0.0
 var _vent_b: Button
@@ -27,9 +28,13 @@ func _ready() -> void:
 	add_to_group("reactor_ui")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var root := Panel.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# COMPACT window, slightly transparent -- the world stays visible
+	root.anchor_left = 0.09
+	root.anchor_top = 0.05
+	root.anchor_right = 0.91
+	root.anchor_bottom = 0.95
 	var st := StyleBoxFlat.new()
-	st.bg_color = Color("#1c1d20")
+	st.bg_color = Color(0.11, 0.114, 0.125, 0.86)
 	st.border_color = AMBER.darkened(0.5)
 	st.set_border_width_all(2)
 	root.add_theme_stylebox_override("panel", st)
@@ -88,6 +93,14 @@ func _ready() -> void:
 	_read.add_theme_font_size_override("font_size", 17)
 	_read.add_theme_color_override("font_color", GREEN)
 	root.add_child(_read)
+	# CORE POOL PREVIEW: the bundle, live, exactly as blue as it is
+	_pool_view = Control.new()
+	_pool_view.anchor_left = 0.33
+	_pool_view.anchor_top = 0.6
+	_pool_view.anchor_right = 0.58
+	_pool_view.anchor_bottom = 0.93
+	_pool_view.draw.connect(_draw_pool)
+	root.add_child(_pool_view)
 
 	# RIGHT: the controls
 	var col := VBoxContainer.new()
@@ -324,6 +337,31 @@ RULES OF NOT EXPLODING:
 	msc.add_child(t2)
 	Sfx.play("click", -16.0)
 
+## The pool, painted: water glow, five rods lerping gray -> Cherenkov
+## blue with the reaction, blades sinking to their real insertion.
+func _draw_pool() -> void:
+	if rx == null or not is_instance_valid(rx):
+		return
+	var szp := _pool_view.size
+	var glow := clampf(0.08 + rx.power * 0.8 + rx.temp / 100.0 * 0.4, 0.0, 1.0)
+	var blue := Color(0.22, 0.78, 1.0)
+	_pool_view.draw_rect(Rect2(Vector2.ZERO, szp),
+		Color(0.02, 0.05 + glow * 0.12, 0.1 + glow * 0.3, 0.9))
+	for i in 5:
+		var x := szp.x * (0.15 + 0.175 * float(i))
+		if glow > 0.05:
+			_pool_view.draw_rect(Rect2(Vector2(x - 8, szp.y * 0.1),
+				Vector2(16, szp.y * 0.8)), Color(blue.r, blue.g, blue.b, glow * 0.28))
+		_pool_view.draw_rect(Rect2(Vector2(x - 4, szp.y * 0.12),
+			Vector2(8, szp.y * 0.76)), Color(0.27, 0.29, 0.32).lerp(blue, glow))
+	var bh := szp.y * 0.76 * clampf(rx.rods, 0.0, 1.0)
+	for i in 4:
+		var bx := szp.x * (0.2375 + 0.175 * float(i))
+		_pool_view.draw_rect(Rect2(Vector2(bx - 3, szp.y * 0.12), Vector2(6, bh)),
+			Color(0.12, 0.13, 0.16))
+	_pool_view.draw_string(ThemeDB.fallback_font, Vector2(6, 16), "CORE POOL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.4))
+
 func close() -> void:
 	queue_free()
 	if not Game.dead and not _other_ui_open():
@@ -336,6 +374,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _process(delta: float) -> void:
+	if _pool_view != null:
+		_pool_view.queue_redraw()
 	if rx == null or not is_instance_valid(rx):
 		close()
 		return
