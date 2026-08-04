@@ -204,12 +204,16 @@ func _map_input(event: InputEvent) -> void:
 				bd = d
 				best = b
 		var w = get_tree().get_first_node_in_group("noodle_watcher")
-		if w != null and w is Node3D \
-				and _to_px(w.global_position).distance_to(event.position) < bd:
-			radio.track_body = null
-			radio.track_node = w   # the dish follows the god around
-			Sfx.play("click", -14.0)
-			return
+		if w != null and w is Node3D:
+			# hit-test the marker WHERE IT'S DRAWN (pinned to the edge),
+			# not the true off-map position nobody can click
+			var np := _to_px(w.global_position)
+			np = np.clamp(Vector2(40, 40), _map.size - Vector2(40, 40))
+			if np.distance_to(event.position) < maxf(bd, 46.0):
+				radio.track_body = null
+				radio.track_node = w   # the dish follows the god around
+				Sfx.play("click", -14.0)
+				return
 		if best != null:
 			radio.track_node = null
 			radio.track_body = best   # follow the planet as it moves
