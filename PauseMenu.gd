@@ -308,7 +308,7 @@ func _open_cheats() -> void:
 	# toggles GLOW while active -- you can see what's on at a glance
 	_cheat_upds.clear()
 	var mkc := func(text: String, get_on: Callable, tog: Callable) -> void:
-		var b := _btn(text, Callable())
+		var b := _btn(text, func() -> void: pass)
 		b.pressed.connect(func() -> void:
 			Game.cheated = true
 			tog.call()
