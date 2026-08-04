@@ -143,14 +143,6 @@ func use() -> void:
 	get_tree().current_scene.add_child(ui)
 
 func work(delta: float) -> void:
-	# point the visible dish where the aim says
-	if _dish_pivot and aim_dir.length() > 0.1:
-		var gz := -aim_dir
-		var gx := aim_dir.cross(global_transform.basis.y)
-		if gx.length() < 0.05:
-			gx = aim_dir.cross(global_transform.basis.x)
-		gx = gx.normalized()
-		_dish_pivot.global_transform.basis = Basis(gx, gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
 	var p = get_tree().get_first_node_in_group("player")
 	var near: bool = p != null \
 		and p.global_position.distance_to(global_position) < HEAR_RANGE
@@ -212,6 +204,16 @@ func work(delta: float) -> void:
 
 func _process(d: float) -> void:
 	super._process(d)
+	# the dish TRACKS the aim always -- powered or not, you can see
+	# where it's pointed from across the yard
+	if _dish_pivot and aim_dir.length() > 0.1:
+		var gz := -aim_dir
+		var gx := aim_dir.cross(global_transform.basis.y)
+		if gx.length() < 0.05:
+			gx = aim_dir.cross(global_transform.basis.x)
+		gx = gx.normalized()
+		_dish_pivot.global_transform.basis = Basis(gx,
+			gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
 	# a discharged control coil silences the set COMPLETELY
 	if has_coil and coil_node != null and is_instance_valid(coil_node) \
 			and coil_node.buf <= 0.0:
