@@ -150,12 +150,17 @@ func _draw_map() -> void:
 	var w = get_tree().get_first_node_in_group("noodle_watcher")
 	if w != null and w is Node3D:
 		var np := _to_px(w.global_position)
-		# the god parks WAY out past the planets now: pin its marker to
-		# the map edge instead of drawing it in the void off-screen
-		np = np.clamp(Vector2(10, 10), _map.size - Vector2(10, 10))
-		_map.draw_circle(np, 5.0, Color("#ffcf40"))
-		_map.draw_arc(np, 9.0, 0, TAU, 20, Color("#e8b830"), 1.5)
-		_map.draw_string(ThemeDB.fallback_font, np + Vector2(8, 4), "noodle god",
+		# the god parks WAY out past the planets: pin it to the map edge
+		# and draw it COSMIC -- eye and tangle, bigger than any planet dot
+		np = np.clamp(Vector2(40, 40), _map.size - Vector2(40, 40))
+		for k in 5:
+			_map.draw_arc(np, 24.0 + float(k) * 6.0, float(k) * 1.2,
+				float(k) * 1.2 + TAU * 0.62, 28,
+				Color(1.0, 0.81, 0.25, 0.45 - float(k) * 0.07), 2.0)
+		_map.draw_circle(np, 18.0, Color(0.95, 0.9, 0.83, 0.92))
+		_map.draw_circle(np, 8.0, Color(0.06, 0.04, 0.01))
+		_map.draw_arc(np, 12.5, 0, TAU, 28, Color("#c89020"), 2.5)
+		_map.draw_string(ThemeDB.fallback_font, np + Vector2(-38, 66), "noodle god",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffcf40"))
 	# the radio + the dish's pointing line
 	var rp := _to_px(radio.global_position)

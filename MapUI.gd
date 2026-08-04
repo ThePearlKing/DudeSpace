@@ -174,16 +174,16 @@ class _MapView extends Control:
 			var margin := 80.0
 			var pinned := gsp.clamp(Vector2(margin, margin), vp - Vector2(margin, margin))
 			var gc := Color("#ffcf40")
-			for k in 5:   # the tangle
-				draw_arc(pinned, 30.0 + float(k) * 7.0, float(k) * 1.3,
-					float(k) * 1.3 + TAU * 0.62, 28,
-					Color(1.0, 0.81, 0.25, 0.5 - float(k) * 0.07), 2.5)
-			draw_circle(pinned, 24.0, Color(0.95, 0.9, 0.83, 0.92))   # the eye
-			draw_circle(pinned, 11.0, Color(0.06, 0.04, 0.01))
-			draw_arc(pinned, 17.0, 0, TAU, 32, Color("#c89020"), 3.0)
-			draw_string(font, pinned + Vector2(-62, 76), "THE NOODLE GOD",
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, gc)
-			draw_string(font, pinned + Vector2(-46, 92),
+			for k in 8:   # the tangle: a nest that dwarfs every planet dot
+				draw_arc(pinned, 62.0 + float(k) * 13.0, float(k) * 1.1,
+					float(k) * 1.1 + TAU * 0.62, 40,
+					Color(1.0, 0.81, 0.25, 0.45 - float(k) * 0.045), 4.0)
+			draw_circle(pinned, 50.0, Color(0.95, 0.9, 0.83, 0.92))   # the eye
+			draw_circle(pinned, 22.0, Color(0.06, 0.04, 0.01))
+			draw_arc(pinned, 34.0, 0, TAU, 40, Color("#c89020"), 5.0)
+			draw_string(font, pinned + Vector2(-72, 150), "THE NOODLE GOD",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 17, gc)
+			draw_string(font, pinned + Vector2(-52, 168),
 				"≈ %.0f km  (?)" % (me.distance_to(gp) * 4.0 / 1000.0),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 0.8, 0.3, 0.7))
 
