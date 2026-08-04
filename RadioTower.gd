@@ -43,6 +43,8 @@ var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _bad_t: float = 0.0   # how long the signal has been junk
 var _unpow_t: float = 99.0   # how long the buffer has been empty
 var _warn_cd: float = 0.0
+var _last_buf: float = 0.0
+var _in_rate: float = 0.0   # measured incoming EU/s (smoothed)
 
 func _init() -> void:
 	title = "RADIO"
@@ -324,6 +326,9 @@ func work(delta: float) -> void:
 	# BROWNOUT GRACE: wire power arrives in bursts, and a one-frame empty
 	# buffer was hard-stopping the set (and restarting the sauce tape).
 	# Only a sustained outage kills playback.
+	# measure real INFLOW so the panel can say 'nothing is arriving'
+	var gained: float = maxf(0.0, buf - _last_buf)
+	_in_rate = lerpf(_in_rate, gained / maxf(delta, 0.001), minf(1.0, delta * 3.0))
 	var fed: bool = buf > 0.0 and near
 	if fed:
 		_unpow_t = 0.0
@@ -346,6 +351,7 @@ func work(delta: float) -> void:
 		_cur_station = -1
 		return
 	buf = maxf(0.0, buf - DRAIN * delta)
+	_last_buf = buf
 	# find the strongest signal on the current dial + aim -- every
 	# frame, so dragging the dial/dish changes the sound LIVE. When two
 	# stations are effectively tied, the CLOSEST one wins the receiver.
@@ -532,13 +538,6 @@ func _process(d: float) -> void:
 		_spec_t = 1.0 / 15.0
 		var region := _spec_img.get_region(Rect2i(1, 0, 191, 64))
 		_spec_img.blit_rect(region, Rect2i(0, 0, 191, 64), Vector2i(0, 0))
-		if not powered:
-			# the screens SAY it: dim red column = the set has no power
-			for b0 in 64:
-				_spec_img.set_pixel(191, 63 - b0,
-					Color(0.25, 0.02, 0.02) if b0 % 8 < 4 else Color(0.05, 0.0, 0.0))
-			spec_tex.update(_spec_img)
-			return
 		for b in 64:
 			var f0 := 60.0 * pow(8000.0 / 60.0, float(b) / 64.0)
 			var f1 := 60.0 * pow(8000.0 / 60.0, float(b + 1) / 64.0)
@@ -580,5 +579,8 @@ func info_text() -> String:
 		if align_for(st) > 0.4 and signal_for(st) < 0.3:
 			act = "\nactivity near %.1f MHz -- open the dish map [F]" % float(st["freq"])
 			break
-	return "energy: %.0f / %.0f EU (drain %.1f/s)\ntuned: %.1f MHz%s" % [
-		buf, buf_cap, DRAIN, freq, act]
+	var feed_line := "receiving: %.1f EU/s" % _in_rate
+	if _in_rate < 0.05 and buf <= 0.0:
+		feed_line = "receiving: NOTHING — wire must run generator → radio"
+	return "energy: %.0f / %.0f EU (drain %.1f/s)\n%s\ntuned: %.1f MHz%s" % [
+		buf, buf_cap, DRAIN, feed_line, freq, act]

@@ -313,7 +313,7 @@ func _draw_spec() -> void:
 				continue
 			_spec.draw_rect(Rect2(Vector2(float(b) * cw, float(r) * rh),
 				Vector2(cw, rh)),
-				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.18 + v * 0.45))
+				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.28 + v * 0.55))
 	# LAYER 2: the HD yellow audio spectrogram riding on top
 	if radio.spec_tex != null:
 		_spec.draw_texture_rect(radio.spec_tex, Rect2(Vector2.ZERO, sz),

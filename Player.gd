@@ -1867,7 +1867,18 @@ func _tool_connect(kind: String) -> void:
 			return
 		if not (Game.creative or Game.free_craft):
 			Inventory.remove_res("wire", 1)
-		_wire_src.connect_wire(m, kind, _wire_port if _wire_src.port_count(kind) > 1 else 0)
+		var srcm = _wire_src
+		var dstm = m
+		if kind == "power" and srcm is Machine and dstm is Machine \
+				and srcm.gen_rate <= 0.0 and dstm.gen_rate > 0.0:
+			# sink -> source is backwards and delivers nothing; flip it so
+			# the electricity actually arrives
+			srcm = m
+			dstm = _wire_src
+			var hudf = get_tree().get_first_node_in_group("hud")
+			if hudf:
+				hudf.flash("wire flipped: power flows %s → %s" % [srcm.title, dstm.title])
+		srcm.connect_wire(dstm, kind, _wire_port if srcm.port_count(kind) > 1 else 0)
 		_wire_src.set_selected(false)
 		_wire_src = null
 		Sfx.play("learn")

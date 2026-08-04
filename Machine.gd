@@ -550,8 +550,7 @@ func destroy(push_dir: Vector3) -> void:
 
 func _on_destroyed(push_dir: Vector3) -> void:
 	Net.broadcast_remove(global_position)   # mirror the demolition
-	if has_coil:
-		Inventory.give_at("coil", 1, global_position)
+	# the coil dies with the machine -- no coil refund, just the machine
 	# take our outgoing cables with us
 	for entry in _conn_vis:
 		for nd in entry["nodes"]:
