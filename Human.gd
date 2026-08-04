@@ -232,6 +232,11 @@ func animate(speed: float, grounded: bool, delta: float, jetting: bool = false) 
 				_arm_r.rotation = Vector3(1.2, 0, -1.1)
 				_leg_l.rotation = Vector3(0, 0, -0.2)
 				_leg_r.rotation = Vector3(0.3, 0, 0.1)
+			6:   # sitting: legs out over the seat edge, hands on the lap
+				_arm_l.rotation = Vector3(0.5, 0, -0.15)
+				_arm_r.rotation = Vector3(0.5, 0, 0.15)
+				_leg_l.rotation = Vector3(1.5, 0, 0)
+				_leg_r.rotation = Vector3(1.5, 0, 0)
 			5:   # AK stance: BOTH arms parallel along one diagonal gun line.
 				# same rotation on both arms + shoulder offset = right hand
 				# lands at the grip, left hand further up the handguard.

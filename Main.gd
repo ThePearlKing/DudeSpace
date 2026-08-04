@@ -137,6 +137,8 @@ func _ready() -> void:
 		_apple_test()
 	if OS.get_environment("CTD_TEST") == "8":
 		_cage_test()
+	if OS.get_environment("CTD_TEST") == "9":
+		_sit_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -302,6 +304,43 @@ func _cage_test() -> void:
 	# of a personality point is the same soul
 	print("CAGETEST pers ok: ",
 		absf(float(b._pers["grumpy"]) - float(box["pers"]["grumpy"])) < 0.001)
+
+## Headless: a human and a chair. Verify walk-to-seat, the sit, the pose.
+func _sit_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var hum := EarthHuman.new()
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = p.global_position + Vector3(4, 0, 0)
+	var crng := RandomNumberGenerator.new()
+	crng.seed = 1
+	var dir: Vector3 = ((p.global_position + Vector3(8, 0, 0)) - home.center).normalized()
+	_seat_prop(home, dir, crng, false)
+	await get_tree().create_timer(0.5).timeout
+	var seat: Node3D = null
+	var bd := 1e9
+	for sn in get_tree().get_nodes_in_group("seat"):
+		var d: float = sn.global_position.distance_to(p.global_position)
+		if d < bd:
+			bd = d
+			seat = sn
+	seat.set_meta("taken", true)
+	hum._seat = seat
+	hum._act = "goseat"
+	hum._act_t = 25.0
+	for i in 80:
+		await get_tree().create_timer(0.25).timeout
+		if hum._act == "sit":
+			break
+	print("SITTEST act: ", hum._act, "  pose: ", hum._body.pose,
+		"  dist: ", hum.global_position.distance_to(seat.global_position))
+	# and the getting-up half: shove them and check the seat frees up
+	hum.take_damage(1.0, Vector3(1, 0, 0))
+	await get_tree().create_timer(0.5).timeout
+	print("SITTEST stood up: ", hum._act != "sit",
+		"  seat freed: ", not seat.get_meta("taken"))
 
 ## Headless: park a rocket in front of the player's face and press F.
 func _board_test() -> void:
@@ -1479,6 +1518,16 @@ func _populate(b) -> void:
 						crng.randf_range(-0.2, 0.2), crng.randf_range(-0.2, 0.2))).normalized()
 					ch.global_transform = Transform3D(_basis_from_up(cd),
 						b.center + cd * (b.radius + 1.2))
+				# street furniture: benches and the odd lone chair.
+				# the sitting economy.
+				for i in 4:
+					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
+						crng.randf_range(-0.18, 0.18),
+						crng.randf_range(-0.18, 0.18))).normalized(), crng, true)
+				for i in 2:
+					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
+						crng.randf_range(-0.18, 0.18),
+						crng.randf_range(-0.18, 0.18))).normalized(), crng, false)
 			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
 			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
@@ -1558,6 +1607,48 @@ func _populate(b) -> void:
 			_build_mine(b, MINE_DIRS["Crystalia"], "ultima", 1, Color("#7df9ff"), 14)
 		_:
 			pass
+
+## Somewhere to sit: a park bench (two seats) or a lone chair (one).
+## Humans find these on their own. It is very important to them.
+func _seat_prop(b, dir: Vector3, rng: RandomNumberGenerator, bench: bool) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var wood := Destructible.make_material(Color("#7a5a34"), 0.05)
+	var dark := Destructible.make_material(Color("#3a3a3e"), 0.02)
+	var w := 1.8 if bench else 0.6
+	var seat := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(w, 0.08, 0.55)
+	seat.mesh = sm
+	seat.position = Vector3(0, 0.55, 0)
+	seat.material_override = wood
+	root.add_child(seat)
+	var back := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(w, 0.5, 0.08)
+	back.mesh = bm
+	back.position = Vector3(0, 0.85, 0.28)
+	back.material_override = wood
+	root.add_child(back)
+	for lx in [-w * 0.45, w * 0.45]:
+		for lz in [-0.22, 0.22]:
+			var leg := MeshInstance3D.new()
+			var lm := BoxMesh.new()
+			lm.size = Vector3(0.07, 0.55, 0.07)
+			leg.mesh = lm
+			leg.position = Vector3(lx, 0.27, lz)
+			leg.material_override = dark
+			root.add_child(leg)
+	# seat markers: the points humans actually claim
+	var offs: Array = [-0.45, 0.45] if bench else [0.0]
+	for ox in offs:
+		var s := Node3D.new()
+		s.position = Vector3(ox, 0.55, 0)
+		s.add_to_group("seat")
+		s.set_meta("taken", false)
+		root.add_child(s)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, rng.randf() * TAU)
 
 ## A city tower: concrete box, lit windows scattered up its faces, roof
 ## lip. Humanity's whole architectural output, honestly.

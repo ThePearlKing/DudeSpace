@@ -441,6 +441,8 @@ var _bg: MeshInstance3D          # the bubble card behind the words
 var _bg_mesh: QuadMesh
 var _bg_mat: ShaderMaterial
 var _ptalk_t: float = 0.0        # player pressed F recently: we're TALKING here
+var _voice: Dictionary = {}      # tone-TTS profile: pitch, spread, waveform, speed
+var _vp: AudioStreamPlayer3D = null   # the currently-playing voice
 var _grounded: bool = false
 var _fly_t: float = 0.0     # airborne grace before the slam-down
 
@@ -460,6 +462,7 @@ var _active: bool = true        # false = player far away, human unrendered by r
 
 var hp: float = 30.0
 var _dead: bool = false
+var _seat: Node3D = null        # the bench spot this human has claimed
 var _apple: ItemDrop = null     # a spotted permadeath apple. destiny.
 var _eat_t: float = 0.0         # chewing countdown. after this, physics
 
@@ -488,6 +491,7 @@ static func _v3(a) -> Vector3:
 ## looks (already in `saved`) plus the live state -- name, personality,
 ## health, and every grudge in the ledger.
 func capture() -> Dictionary:
+	_release_seat()   # the seat stays; the sitter is inventory now
 	saved["name"] = human_name
 	saved["id"] = human_id
 	saved["pers"] = _pers.duplicate()
@@ -568,6 +572,7 @@ func _ready() -> void:
 		if _rv("squat", randf() < 0.4):
 			_body.scale.y *= float(_rv("squaty", randf_range(0.72, 0.85)))
 	_dress_human()
+	_voice = _build_voice()
 
 	_bubble = Label3D.new()
 	_bubble.font_size = 22
@@ -729,6 +734,27 @@ func _hair(mesh: Mesh, pos: Vector3, mat: Material) -> MeshInstance3D:
 	return mi
 
 func _pick_act() -> void:
+	_release_seat()
+	# a free seat nearby? sometimes a human just SITS. peak behavior.
+	if randf() < 0.22:
+		var best: Node3D = null
+		var bd := 900.0   # 30m, squared
+		for s in get_tree().get_nodes_in_group("seat"):
+			if bool(s.get_meta("taken", false)):
+				continue
+			var sd := global_position.distance_squared_to(s.global_position)
+			if sd < bd:
+				bd = sd
+				best = s
+		if best != null:
+			best.set_meta("taken", true)
+			_seat = best
+			_act = "goseat"
+			_act_t = 25.0   # time to get there before giving up
+			var up_s := _up()
+			var to_s: Vector3 = best.global_position - global_position
+			_dir = (to_s - up_s * to_s.dot(up_s)).normalized()
+			return
 	# personality leaks into behaviour: dreamers stare, the dumb spin,
 	# the confident follow you around, the anxious keep moving
 	var w := {
@@ -767,6 +793,43 @@ func _up() -> Vector3:
 		return Vector3.UP
 	return (global_position - _home.center).normalized()
 
+## Every soul gets a voicebox. Pitch dice come from the id; everything
+## else comes from who they are. Monotone for the dumb, the grumpy and
+## the edgy. Square-wave nerd voice for the anxious and awkward. Wobble
+## for the weird. And the mosquito face buzzes. Obviously.
+func _build_voice() -> Dictionary:
+	var h := absi(human_id)
+	var base := 240.0 + float(h % 200)
+	base += float(_pers.get("goofy", 25.0)) * 0.9 + float(_pers.get("anxious", 25.0)) * 0.6
+	base -= float(_pers.get("grumpy", 25.0)) * 0.9 + float(_pers.get("edgy", 25.0)) * 0.6
+	base = clampf(base, 120.0, 520.0)
+	var mono := maxf(float(_pers.get("dumb", 25.0)),
+		maxf(float(_pers.get("grumpy", 25.0)), float(_pers.get("edgy", 25.0))))
+	var vary := 0.08 if mono > 60.0 else 0.35 + float(_pers.get("dreamy", 25.0)) * 0.004
+	var wave := "sine"
+	if str(saved.get("face", "")).begins_with("face_017"):
+		wave = "buzz"
+	elif maxf(float(_pers.get("awkward", 25.0)), float(_pers.get("anxious", 25.0))) > 60.0:
+		wave = "square"
+	elif maxf(float(_pers.get("grumpy", 25.0)), float(_pers.get("edgy", 25.0))) > 60.0:
+		wave = "saw"
+	elif float(_pers.get("goofy", 25.0)) > 60.0 or h % 10 == 0:
+		wave = "wobble"
+	var rate := 1.0
+	rate -= float(_pers.get("goofy", 25.0)) * 0.002 + float(_pers.get("anxious", 25.0)) * 0.002
+	rate += float(_pers.get("dreamy", 25.0)) * 0.003 + float(_pers.get("dumb", 25.0)) * 0.002
+	return {"base": base, "var": vary, "wave": wave, "rate": clampf(rate, 0.6, 1.5)}
+
+## Vacate the seat (if any) and get back on official standing business.
+func _release_seat() -> void:
+	if _seat != null and is_instance_valid(_seat):
+		_seat.set_meta("taken", false)
+	_seat = null
+	if _body:
+		_body.pose = 0
+	if _act == "sit" or _act == "goseat":
+		_act = "wander"
+
 ## F: ask what's on their mind. WHICH mind depends on the face.
 func use() -> void:
 	# weighted draw: each axis pool weighted by the face's value for it,
@@ -792,6 +855,7 @@ func use() -> void:
 
 func take_damage(dmg: float, dir: Vector3) -> void:
 	# violence: observably effective, emotionally complicated
+	_release_seat()
 	hp -= dmg
 	if hp <= 0.0:
 		_witness(-25.0)   # they all saw that. all of them.
@@ -815,6 +879,13 @@ func take_damage(dmg: float, dir: Vector3) -> void:
 
 func _say(t: String) -> void:
 	_bubble.text = t
+	# the experimental voice: beeped, not spoken. only within earshot,
+	# and new words cut the old ones off mid-beep
+	var plr = get_tree().get_first_node_in_group("player")
+	if plr != null and global_position.distance_squared_to(plr.global_position) < 196.0:
+		if _vp != null and is_instance_valid(_vp):
+			_vp.queue_free()
+		_vp = HumanVoice.speak(self, t, _voice)
 	# words hang around until replaced (or ~12s, whichever first) --
 	# a conversation you walk past should still be readable
 	_bubble_t = 12.0
@@ -1071,6 +1142,7 @@ func _die(dir: Vector3 = Vector3.UP) -> void:
 	if _dead:
 		return
 	_dead = true
+	_release_seat()
 	# a human, it turns out, is a few meats waiting to happen
 	Destructible.spawn_debris(get_parent(), global_position,
 		Vector3(0.7, 1.6, 0.7), Color("#c05050"), dir)
@@ -1117,6 +1189,7 @@ func _explode() -> void:
 	if _dead:
 		return
 	_dead = true
+	_release_seat()
 	_burst(Color("#ff4020"), 10.0, 60)
 	_burst(Color("#ffffff"), 6.0, 30)
 	Sfx.play("explode", -6.0)
@@ -1183,6 +1256,17 @@ func _physics_process(delta: float) -> void:
 		_bubble.modulate.a = ba
 		_bubble.outline_modulate.a = ba
 		_bg_mat.set_shader_parameter("alpha", ba)
+
+	# the voice cuts through when you're actually LOOKING at the
+	# speaker: focus is a volume knob. glance away, it blends back
+	# into the crowd
+	if _vp != null and is_instance_valid(_vp):
+		var pl2 = get_tree().get_first_node_in_group("player")
+		if pl2:
+			var cam: Camera3D = pl2.camera()
+			var to_me: Vector3 = (global_position - cam.global_position).normalized()
+			var focus := clampf(-cam.global_transform.basis.z.dot(to_me), 0.0, 1.0)
+			_vp.volume_db = lerpf(-16.0, -1.0, pow(focus, 3.0))
 
 	_act_t -= delta
 	if _act_t <= 0.0 and _panic_t <= 0.0:
@@ -1255,6 +1339,36 @@ func _physics_process(delta: float) -> void:
 						speed = WALK_SPEED
 				else:
 					speed = WALK_SPEED   # "following" nothing. still counts.
+			"goseat":
+				if _seat == null or not is_instance_valid(_seat):
+					_pick_act()
+				else:
+					var to_s: Vector3 = _seat.global_position - global_position
+					_dir = (to_s - up * to_s.dot(up)).normalized()
+					if to_s.length() < 1.1:
+						# arrived. commence sitting. a while.
+						_act = "sit"
+						_act_t = randf_range(12.0, 30.0)
+						if _body:
+							_body.pose = 6
+					else:
+						speed = WALK_SPEED
+			"sit":
+				speed = 0.0
+
+	# planted on a seat: physics is paused. the universe can wait.
+	if _act == "sit":
+		if _panic_t > 0.0 or _apple != null or _seat == null \
+				or not is_instance_valid(_seat):
+			_release_seat()
+		else:
+			velocity = Vector3.ZERO
+			global_transform = Transform3D(
+				_seat.global_transform.basis.orthonormalized(),
+				_seat.global_position + up * 0.12)
+			if _body:
+				_body.animate(0.0, true, delta)
+			return
 
 	# re-level the walk direction to the CURRENT local up every frame --
 	# a stale tangent on a sphere points slowly skyward, which had them
