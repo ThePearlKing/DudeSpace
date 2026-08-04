@@ -76,7 +76,7 @@ func _ready() -> void:
 	_def("Extroma",  TC + Vector3(1900, -240, -700),  85.0, 9.0,  "volcanic", Color("#c8a83a"))
 	_def("Varnisol", TC + Vector3(-3400, 420, 1500), 100.0, 9.0,  "varnisol", Color("#3f8f3a"))
 	# --- Xero: Varnisol's ice moon. Light blue, cold, quietly beautiful. ---
-	_def("Xero",     TC + Vector3(-3400, 460, 1720), 26.0, 3.5,  "ice",      Color("#bfe8ff"))
+	_def("Xero",     TC + Vector3(-3400, 460, 1720), 26.0, 3.5,  "ice",      Color("#6ec2ff"))
 
 ## Tutorial universe: ONLY the tutorial planet + its moon exist. The real
 ## body list is stashed and put back when the title screen returns.
