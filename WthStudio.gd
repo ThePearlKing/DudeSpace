@@ -30,6 +30,10 @@ var _cur_text := ""
 var _bubble_linger := 0.9
 var _tv_bodies: Array = []
 var _table: MeshInstance3D = null
+var _ad_root: Node3D = null
+var _ad_pivot: Node3D = null
+var _ad_label: Label3D = null
+var _ad_bg: MeshInstance3D = null
 
 class _AlienShell extends StaticBody3D:
 	var studio = null
@@ -333,6 +337,31 @@ func _build_studio() -> void:
 			"zone": "", "label": "EXIT", "color": Color("#0a2a1e")})
 		add_child(out)
 		out.global_position = POS + Vector3(half.x - 1.4, -2.6, half.z - 1.2)
+	# the AD SET: a hidden little product-shoot stage far below the
+	# studio; the TV cuts to it during sponsor segments
+	_ad_root = Node3D.new()
+	add_child(_ad_root)
+	_ad_root.global_position = POS + Vector3(0, -70, 0)
+	_ad_bg = MeshInstance3D.new()
+	var abgm := QuadMesh.new()
+	abgm.size = Vector2(10, 6)
+	_ad_bg.mesh = abgm
+	_ad_root.add_child(_ad_bg)
+	_ad_bg.position = Vector3(0, 0, -3)
+	var adl := OmniLight3D.new()
+	adl.light_energy = 2.0
+	adl.omni_range = 16.0
+	_ad_root.add_child(adl)
+	adl.position = Vector3(2, 3, 4)
+	_ad_pivot = Node3D.new()
+	_ad_root.add_child(_ad_pivot)
+	_ad_label = Label3D.new()
+	_ad_label.font_size = 44
+	_ad_label.pixel_size = 0.008
+	_ad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ad_label.outline_size = 10
+	_ad_root.add_child(_ad_label)
+	_ad_label.position = Vector3(0, -1.8, 0)
 	_talk = AudioStreamPlayer3D.new()
 	_talk.unit_size = 14.0
 	_talk.max_distance = 60.0
@@ -471,15 +500,75 @@ func _apply_topic(meta: Dictionary) -> void:
 			_tv_bodies = [b]
 		else:
 			_tv_mode = "player"
+	elif topic == 6:
+		# SPONSOR SEGMENT: cut to a freshly generated product shoot
+		_gen_ad(str(meta.get("product", "product")), str(meta.get("slogan", "")))
+		_tv_mode = "ad"
 	else:
-		# markets, ads, fourth wall, nothing much: the camera is HERE,
+		# markets, fourth wall, nothing much: the camera is HERE,
 		# in the room, and it is looking at YOU
 		_tv_mode = "player"
+
+## A one-off generated commercial: random brand palette, a random
+## primitive sculpture as the "product", name + slogan on the card.
+func _gen_ad(product: String, slogan: String) -> void:
+	if _ad_pivot == null:
+		return
+	for ch in _ad_pivot.get_children():
+		ch.queue_free()
+	var hue := randf()
+	var bgmat := StandardMaterial3D.new()
+	bgmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bgmat.albedo_color = Color.from_hsv(hue, 0.55, 0.35)
+	_ad_bg.material_override = bgmat
+	var pcol := Color.from_hsv(fmod(hue + 0.45, 1.0), 0.7, 0.95)
+	var acc := Color.from_hsv(fmod(hue + 0.13, 1.0), 0.8, 1.0)
+	for i in 3 + randi() % 3:
+		var mi := MeshInstance3D.new()
+		match randi() % 4:
+			0:
+				var bm := BoxMesh.new()
+				bm.size = Vector3(randf_range(0.3, 1.0), randf_range(0.3, 1.2),
+					randf_range(0.3, 1.0))
+				mi.mesh = bm
+			1:
+				var cm := CylinderMesh.new()
+				cm.top_radius = randf_range(0.1, 0.4)
+				cm.bottom_radius = randf_range(0.2, 0.5)
+				cm.height = randf_range(0.4, 1.2)
+				mi.mesh = cm
+			2:
+				var sm2 := SphereMesh.new()
+				sm2.radius = randf_range(0.2, 0.5)
+				sm2.height = sm2.radius * 2.0
+				mi.mesh = sm2
+			_:
+				var tm2 := TorusMesh.new()
+				tm2.inner_radius = randf_range(0.15, 0.3)
+				tm2.outer_radius = randf_range(0.35, 0.6)
+				mi.mesh = tm2
+		mi.material_override = Destructible.make_material(
+			pcol if i % 2 == 0 else acc, 0.6 if i % 2 == 0 else 1.4)
+		mi.position = Vector3(randf_range(-0.7, 0.7), randf_range(-0.4, 0.9),
+			randf_range(-0.4, 0.4))
+		mi.rotation = Vector3(randf() * TAU, randf() * TAU, randf() * TAU)
+		_ad_pivot.add_child(mi)
+	_ad_label.text = "%s\n%s" % [product.to_upper(), slogan]
+	_ad_label.modulate = acc
 
 func _drive_tv(delta: float, p: Node3D) -> void:
 	if _tv_cam == null:
 		return
 	match _tv_mode:
+		"ad":
+			# the product rotates. the camera believes in it.
+			if _ad_pivot != null:
+				_ad_pivot.rotation.y = _t * 0.8
+				_tv_cam.global_position = _ad_root.global_position \
+					+ Vector3(sin(_t * 0.2) * 1.2, 0.4, 5.0)
+				_tv_cam.look_at(_ad_root.global_position + Vector3(0, -0.2, 0),
+					Vector3.UP)
+				_tv_cam.fov = 38.0 + 5.0 * sin(_t * 0.5)
 		"planet":
 			# ORBIT the subject: slow circle, breathing zoom
 			if _tv_bodies.size() >= 1:

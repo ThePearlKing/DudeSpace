@@ -1334,9 +1334,12 @@ static func alien_exchange(in_room: bool = false) -> Array:
 		5:
 			out = _ax_story(p, p2, not AP.has(p))
 		6:
+			var prod := _ax_fresh(AP_PRODUCTS)
+			var slog := _ax_fresh(AP_SLOGANS)
+			last_alien_meta["product"] = prod
+			last_alien_meta["slogan"] = slog
 			out = [[0, _ax_fresh(AX_AD_IN)],
-				[1, "%s. %s" % [_ax_fresh(AP_PRODUCTS).capitalize(),
-					_ax_fresh(AP_SLOGANS)]],
+				[1, "%s. %s" % [prod.capitalize(), slog]],
 				[0, _ax_fresh(AX_AD_OUT)]]
 		7:
 			out = [[0, _ax_fresh(AX_HIST_IN) % (100 + randi() % 900)],
