@@ -40,6 +40,8 @@ var now_line: String = ""       # what the dish is SAYING right now
 var now_line_until: float = 0.0
 var now_line_col: Color = Color("#ffd166")
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
+var _sauce_pos: float = 0.0     # where the tape was when the signal dropped
+var _sauce_seen: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
 var _unpow_t: float = 99.0   # how long the buffer has been empty
 var _warn_cd: float = 0.0
@@ -466,6 +468,10 @@ func work(delta: float) -> void:
 			# spaghettified, credited to the eye above
 			if str(st["type"]) == "noodle" and _talk.playing \
 					and RadioLib.sauce_cues.size() > 0:
+				# remember our place: brief signal drops (the god drifting
+				# across the sky) RESUME instead of restarting the tape
+				_sauce_pos = _talk.get_playback_position()
+				_sauce_seen = Game.playtime
 				var tpos := fmod(_talk.get_playback_position(), RadioLib.sauce_len)
 				var curc := ""
 				for cue in RadioLib.sauce_cues:
@@ -522,7 +528,12 @@ func _serve(builder: Callable, clock_sync: bool) -> bool:
 		if clock_sync:
 			_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
 		else:
-			_talk.play()
+			var seek := 0.0
+			if _cur_station >= 0 and _cur_station < stations.size() \
+					and str(stations[_cur_station]["type"]) == "noodle" \
+					and Game.playtime - _sauce_seen < 20.0:
+				seek = _sauce_pos   # the drop was a blink: pick up mid-song
+			_talk.play(seek)
 		return true
 	if not _cooking:
 		_cooking = true
