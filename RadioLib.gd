@@ -1136,6 +1136,41 @@ const AX_TWIST := ["and now there's talk of FRAUD.",
 	"an anonymous tip blames %s.",
 	"insurance refuses to define it."]
 
+# DEBATE parts: subject x claim x counter x verdict, composed per airing
+const AX_DEB_SUBJ := ["resolution", "shadow ownership", "corner access",
+	"gravity", "the skybox", "rendering order", "silence", "symmetry",
+	"the intermission", "horizon rights"]
+const AX_DEB_PRO := ["%s is a right.", "%s belongs to everyone.",
+	"%s should be free at the point of use.", "you cannot OWN %s.",
+	"%s built this system. show respect."]
+const AX_DEB_CON := ["%s is a PRIVILEGE.", "%s must be earned.",
+	"%s is a finite resource and %s is hoarding it.",
+	"unlimited %s is how we lost the second sun.",
+	"regulate %s or drown in it."]
+const AX_DEB_OUT := ["strong words. the phones are melting.",
+	"we'll settle this off-air. with rulers.",
+	"the board will hear both of you. reluctantly.",
+	"and THAT'S why we can't have nice geometry.",
+	"take it to the comment dimension."]
+const AX_CALL_IN := ["caller from %s, you're on the air.",
+	"the phones. %s, go ahead.", "we have %s on line one, allegedly.",
+	"next voice, courtesy of %s."]
+const AX_CALL_OUT := ["next caller. keep it euclidean.",
+	"hang up gently. the lines are heritage.",
+	"and that's why we screen calls.", "thank you, mystery shape."]
+const AX_WEATHER_IN := ["weather across the system.",
+	"skies, everyone. skies.", "the atmospheric minute.",
+	"what's falling, and where:"]
+const AX_AD_IN := ["a word from our sponsor.",
+	"this broadcast is paid for by:", "and now, commerce.",
+	"capitalism break:"]
+const AX_AD_OUT := ["we legally had to air that.",
+	"no refunds. anywhere. ever.", "the sponsor is watching. wave.",
+	"back to the show, allegedly."]
+const AX_HIST_IN := ["history minute. %d cycles ago today:",
+	"from the archive, %d cycles back:",
+	"the past is calling. %d cycles, collect:"]
+
 static var _ax_doms: Array = []
 
 ## Subject -> domain -> optional twist -> assembled segment. No two
@@ -1217,18 +1252,23 @@ static func alien_exchange(in_room: bool = false) -> Array:
 		0:
 			out = _ax_story(p, p2, not AP.has(p))
 		1:
-			out = [[0, "caller from %s, you're on the air." % p],
+			out = [[0, _ax_fresh(AX_CALL_IN) % p],
 				[2, _ax_fresh(AP_QUESTIONS) % p2],
 				[1, _ax_fresh(AP_ANSWERS) % p2],
-				[0, "next caller. keep it euclidean."]]
+				[0, _ax_fresh(AX_CALL_OUT)]]
 		2:
-			out = [[1, "resolution is a right."],
-				[3, "resolution is a PRIVILEGE. %s proves it. after all, %s" % [
-					p, _ax_sentence(p, p2)]],
-				[1, _ax_opinion()],
-				[0, "strong words. the phones are melting."]]
+			# a COMPOSED debate: fresh subject, fresh claim, fresh counter,
+			# evidence assembled on the spot -- never the same argument
+			var ds := _ax_fresh(AX_DEB_SUBJ)
+			var con := _ax_fresh(AX_DEB_CON)
+			con = con % [ds, p] if con.count("%s") == 2 else con % ds
+			out = [[1, _ax_fresh(AX_DEB_PRO) % ds],
+				[3, con],
+				[1, "exhibit A: %s" % _ax_sentence(p, p2)],
+				[2, _ax_opinion()],
+				[0, _ax_fresh(AX_DEB_OUT)]]
 		3:
-			out = [[0, "weather across the system."],
+			out = [[0, _ax_fresh(AX_WEATHER_IN)],
 				[1, "%s: %s overnight. %s: %s by dawn. the sun: orange again. nobody asked it to be." % [
 					p, _ax_fresh(AP_PHENOM), p2, _ax_fresh(AP_PHENOM)]]]
 		4:
@@ -1236,12 +1276,12 @@ static func alien_exchange(in_room: bool = false) -> Array:
 		5:
 			out = _ax_story(p, p2, not AP.has(p))
 		6:
-			out = [[0, "a word from our sponsor."],
+			out = [[0, _ax_fresh(AX_AD_IN)],
 				[1, "%s. %s" % [_ax_fresh(AP_PRODUCTS).capitalize(),
 					_ax_fresh(AP_SLOGANS)]],
-				[0, "we legally had to air that."]]
+				[0, _ax_fresh(AX_AD_OUT)]]
 		7:
-			out = [[0, "history minute. %d cycles ago today:" % (100 + randi() % 900)],
+			out = [[0, _ax_fresh(AX_HIST_IN) % (100 + randi() % 900)],
 				[3, "%s we still feel it." % _ax_sentence(p, p2)],
 				[2, _ax_opinion()]]
 		8:
