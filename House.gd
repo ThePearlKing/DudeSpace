@@ -1420,26 +1420,40 @@ func build_link_visuals(other) -> void:
 		b3.global_transform = Transform3D(
 			Basis(xr, Vector3.UP, dirv).orthonormalized(), mid) \
 			* Transform3D(Basis(), spec[1])
-	# the outside: a skewed connector between the two shells
+	# the outside: a skewed connector between the two shells, with a
+	# glowing seam and a label saying WHO is docked to WHOM
 	if is_instance_valid(other):
 		var a_out := global_position + global_transform.basis.y * 1.4
 		var b_out: Vector3 = other.global_position + other.global_transform.basis.y * 1.4
 		var seg2 := b_out - a_out
-		if seg2.length() > 1.0:
+		if seg2.length() > 0.5:
 			var tube := MeshInstance3D.new()
 			var tm := BoxMesh.new()
-			tm.size = Vector3(1.6, 1.6, seg2.length() - 3.0)
+			tm.size = Vector3(1.4, 1.4, maxf(seg2.length() - 1.0, 1.2))
 			tube.mesh = tm
 			tube.material_override = Surfaces.metal(Color("#9aa0a8"))
 			get_tree().current_scene.add_child(tube)
 			tube.global_position = (a_out + b_out) * 0.5
-			var fz := seg2.normalized()
-			var fx := fz.cross(global_transform.basis.y)
-			if fx.length() < 0.05:
-				fx = fz.cross(Vector3.RIGHT)
-			fx = fx.normalized()
-			tube.global_transform.basis = Basis(fx, fx.cross(fz).normalized() * -1.0, fz).orthonormalized()
-			tube.global_position = (a_out + b_out) * 0.5
+			var upm := (global_transform.basis.y + other.global_transform.basis.y).normalized()
+			if absf(seg2.normalized().dot(upm)) > 0.95:
+				upm = global_transform.basis.x
+			tube.look_at(tube.global_position + seg2.normalized(), upm)
+			var seam := MeshInstance3D.new()
+			var sm3 := BoxMesh.new()
+			sm3.size = Vector3(1.5, 0.16, tm.size.z + 0.1)
+			seam.mesh = sm3
+			seam.material_override = Surfaces.portal(Color("#7bffb0"))
+			tube.add_child(seam)
+			seam.position = Vector3(0, 0.72, 0)
+			var linklbl := Label3D.new()
+			linklbl.text = "%s  ⇄  %s" % [display_name(), other.display_name()]
+			linklbl.font_size = 20
+			linklbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			linklbl.no_depth_test = true
+			linklbl.outline_size = 6
+			linklbl.modulate = Color(0.6, 1.0, 0.75, 0.9)
+			tube.add_child(linklbl)
+			linklbl.position = Vector3(0, 1.6, 0)
 
 ## THE MERGE: dock `other`'s complex so its frame faces ours across a
 ## short hallway. Everything inside moves with it. Everything.
