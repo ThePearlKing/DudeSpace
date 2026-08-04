@@ -497,6 +497,23 @@ static func rick_song() -> AudioStreamWAV:
 				var d0 := wav0.data
 				var n0 := d0.size() / 2
 				var start := int((bar_off * 4.0 + sb) * beat * SR)
+				if word == "doun":
+					# the Down~ : held LONGER, pitch sagging as it goes.
+					# variable-rate read bends it flat-ward; the vowel tail
+					# loops so the hold keeps singing instead of cutting.
+					var cap2 := mini(int(2.2 * beat * SR), total - start)
+					var vtail := int(float(n0) * 0.6)
+					var vlen := maxi(1, n0 - vtail)
+					var ph2 := 0.0
+					for i in cap2:
+						var frac := float(i) / float(cap2)
+						ph2 += 1.0 - 0.14 * frac
+						var si := int(ph2)
+						if si >= n0:
+							si = vtail + (si - n0) % vlen
+						var fade2 := minf(1.0, float(cap2 - i) / (SR * 0.07))
+						buf[start + i] += d0.decode_s16(si * 2) / 32768.0 * 0.95 * fade2
+					continue
 				var cap := mini(n0, int(lb * beat * SR * 1.15))
 				for i in mini(cap, total - start):
 					var fade := minf(1.0, float(cap - i) / (SR * 0.02))
