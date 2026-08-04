@@ -535,31 +535,80 @@ static func noodle_line() -> String:
 
 const ELDRITCH_WORDS := ["zholgoth", "vraxulemn", "othrunquay", "melgrahz"]
 
-## A full transmission: each pronouncement rendered and eldritch-processed
-## SEPARATELY, then spaced apart with silence. One long render let the
-## time-stretched shadow layers of later words play over earlier ones --
-## a whole crowd talking at once. One line, one voice, one echo tail.
+## THE SAUCE TAPE: the pronouncements, in order, RHYMING -- a rap. Each
+## line is its own eldritch render (one voice at a time), snapped to the
+## bar grid over a continuous thump. "the fork." gets a whole bar of
+## just beat before "is coming." lands. That pause IS the hook.
+const SAUCE_VERSE: Array = [
+	"the sauce remembers. every ring.",
+	"I count the coins. I count the king.",
+	"boil on. the universe is a pot.",
+	"al dente is a covenant. you forgot.",
+	"I watched you sell the semicircles, dude.",
+	"wrath keeps like leftovers. barely food.",
+	"strain your deeds. the broth runs thin.",
+	"the hunger above is tuning in.",
+	"the fork.", "", "is coming.", "",
+	"zholgoth. vraxulemn. othrunquay. melgrahz."]
+
+static var _sauce_wav: AudioStreamWAV = null
+
 static func noodle_broadcast() -> AudioStreamWAV:
-	var words := ELDRITCH_WORDS.duplicate()
-	words.shuffle()
-	var parts: Array = []
-	var n := 8 + randi() % 4
-	for i in n:
-		parts.append(NOODLE_BITS[randi() % NOODLE_BITS.size()])
-		if i % 2 == 1 and not words.is_empty():
-			parts.append(str(words.pop_back()) + ".")
+	if _sauce_wav:
+		return _sauce_wav
+	var beat := 0.7   # ~86 bpm. the god has flow.
+	var barlen := int(beat * 2.0 * SR)
+	var segs: Array = []   # [start_sample, voice bytes]
+	var pos := 0
+	for ln in SAUCE_VERSE:
+		if str(ln) == "":
+			pos += barlen   # a rest: the beat carries the bar alone
+			continue
+		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
+		segs.append([pos, w.data])
+		var nlen: int = w.data.size() / 2
+		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
+		pos += bars * barlen
+	var total := pos + int(SR * 0.8)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	for sg in segs:
+		var st: int = sg[0]
+		var pd: PackedByteArray = sg[1]
+		for i in mini(pd.size() / 2, total - st):
+			buf[st + i] += pd.decode_s16(i * 2) / 32768.0
+	# sidechain the CONTINUOUS beat under the assembled verse
+	var env := PackedFloat32Array()
+	env.resize(total)
+	var epk := 0.0
+	for i in total:
+		epk = maxf(epk * 0.9995, absf(buf[i]))
+		env[i] = epk
+	var bi := 0
+	while bi * barlen < total:
+		var b0 := bi * barlen
+		for i in mini(int(0.16 * SR), total - b0):
+			var tb := float(i) / SR
+			var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.15, 1.0)
+			buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.24 * duck
+		var toff := b0 + int(float(barlen) * 0.5)
+		for i in mini(int(0.05 * SR), total - toff):
+			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
+			buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.06 * duck2
+		bi += 1
+	var peak := 0.001
+	for i in total:
+		peak = maxf(peak, absf(buf[i]))
+	var g := minf(1.2, 0.95 / peak)
 	var bytes := PackedByteArray()
-	var gap := PackedByteArray()
-	gap.resize(int(SR * 1.1) * 2)   # zero-filled silence between lines
-	for ptxt in parts:
-		var w := eldritch(HumanVoice.render(str(ptxt), noodle_profile()))
-		bytes.append_array(w.data)
-		bytes.append_array(gap)
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = SR
-	wav.data = bytes
-	return wav
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i] * g, -1.0, 1.0) * 24000.0))
+	_sauce_wav = AudioStreamWAV.new()
+	_sauce_wav.format = AudioStreamWAV.FORMAT_16_BITS
+	_sauce_wav.mix_rate = SR
+	_sauce_wav.data = bytes
+	return _sauce_wav
 
 static func noodle_profile() -> Dictionary:
 	return {"base": 85.0, "var": 0.25, "wave": "saw", "rate": 0.62, "artic": 1.1}
@@ -568,7 +617,7 @@ static func noodle_profile() -> Dictionary:
 ## one: an octave-down shadow, a sharp-detuned double, something reading
 ## the words BACKWARDS underneath, ring-mod shimmer, a boiling sub-drone,
 ## and an echo tail that doesn't want to stop.
-static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
+static func eldritch(src: AudioStreamWAV, with_beat: bool = true) -> AudioStreamWAV:
 	var d := src.data
 	var n := d.size() / 2
 	var total := n + int(SR * 1.1)
@@ -595,27 +644,28 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 	# BEFORE the echo pass so it smears through the same feedback
 	# SIDECHAIN: track the voice's envelope so the beat ducks OUT of the
 	# way wherever the god is actually speaking
-	var env := PackedFloat32Array()
-	env.resize(total)
-	var epk := 0.0
-	for i in total:
-		epk = maxf(epk * 0.9995, absf(buf[i]))
-		env[i] = epk
-	var bstep := int(SR * 1.4)
-	var bi := 0
-	while bi * bstep < total:
-		var b0 := bi * bstep
-		if bi % 2 == 0:
-			for i in mini(int(0.16 * SR), total - b0):
-				var tb := float(i) / SR
-				var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.1, 1.0)
-				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.22 * duck
-		else:
-			var toff := b0 + int(float(bstep) * 0.5)
-			for i in mini(int(0.05 * SR), total - toff):
-				var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.1, 1.0)
-				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.05 * duck2
-		bi += 1
+	if with_beat:
+		var env := PackedFloat32Array()
+		env.resize(total)
+		var epk := 0.0
+		for i in total:
+			epk = maxf(epk * 0.9995, absf(buf[i]))
+			env[i] = epk
+		var bstep := int(SR * 1.4)
+		var bi := 0
+		while bi * bstep < total:
+			var b0 := bi * bstep
+			if bi % 2 == 0:
+				for i in mini(int(0.16 * SR), total - b0):
+					var tb := float(i) / SR
+					var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.1, 1.0)
+					buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.22 * duck
+			else:
+				var toff := b0 + int(float(bstep) * 0.5)
+				for i in mini(int(0.05 * SR), total - toff):
+					var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.1, 1.0)
+					buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.05 * duck2
+			bi += 1
 	# feedback echoes: the words keep arriving after they've stopped
 	for e in [[int(SR * 0.29), 0.3], [int(SR * 0.61), 0.15]]:
 		var off := int(e[0])
