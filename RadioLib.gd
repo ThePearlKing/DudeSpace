@@ -548,7 +548,7 @@ const SAUCE_VERSE: Array = [
 	"wrath keeps like leftovers. barely food.",
 	"strain your deeds. the broth runs thin.",
 	"the hunger above is tuning in.",
-	"the fork.", "", "is coming.", "",
+	"the fork. its coming.",
 	"zholgoth. vraxulemn. othrunquay. melgrahz."]
 
 static var _sauce_wav: AudioStreamWAV = null
