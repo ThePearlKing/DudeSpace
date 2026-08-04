@@ -38,6 +38,12 @@ func _ready() -> void:
 	add_child(root)
 	var title := Label.new()
 	title.text = "📡  DISH MAP — left-click a body to lock on · right-click to free-aim · ESC closes"
+	var tip := Label.new()
+	tip.text = "fuzzy signal? point PERFECTLY at the planet (left-click locks dead-center) and land the dial spot-on — the closer both are, the clearer it gets"
+	tip.add_theme_font_size_override("font_size", 13)
+	tip.add_theme_color_override("font_color", Color("#8fa8b8"))
+	tip.position = Vector2(24, 40)
+	root.add_child(tip)
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", NEON)
 	title.position = Vector2(24, 12)
