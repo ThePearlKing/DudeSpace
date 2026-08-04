@@ -143,7 +143,12 @@ void fragment() {
 	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
 	METALLIC = 0.85;
 	ROUGHNESS = 0.12;
-	EMISSION = rainbow * (0.25 + 0.55 * fres);
+	// the warp-portal shimmer, dialed DOWN: drifting energy rings and a
+	// slow sweep riding on top of the rainbow
+	float ring = abs(fract(UV.y * 3.0 - TIME * 0.35) - 0.5) * 2.0;
+	ring = pow(1.0 - ring, 3.0);
+	float sw = 0.5 + 0.5 * sin(TIME * 2.0 + UV.x * 12.0);
+	EMISSION = rainbow * (0.25 + 0.55 * fres) + rainbow * (ring * 0.45 + sw * 0.14);
 }
 """
 	_prism_mat = ShaderMaterial.new()
