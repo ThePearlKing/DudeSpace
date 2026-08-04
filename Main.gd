@@ -3689,6 +3689,8 @@ func collect_world() -> Array:
 		if n is RadioTower:
 			e["rfreq"] = n.freq
 			e["raim"] = [n.aim_dir.x, n.aim_dir.y, n.aim_dir.z]
+			e["rtrack"] = "@noodle" if n.track_node != null \
+				else (str(n.track_body.name) if n.track_body != null else "")
 		if n is Waypoint:
 			e["wcol"] = n.col_i
 			e["won"] = n.enabled
@@ -3757,6 +3759,13 @@ func restore_world() -> void:
 			n.freq = float(e.get("rfreq", 98.0))
 			var ra = e.get("raim", [0, 1, 0])
 			n.aim_dir = Vector3(float(ra[0]), float(ra[1]), float(ra[2])).normalized()
+			var rtn := str(e.get("rtrack", ""))
+			if rtn == "@noodle":
+				var nw = get_tree().get_first_node_in_group("noodle_watcher")
+				if nw != null and nw is Node3D:
+					n.track_node = nw
+			elif rtn != "":
+				n.track_body = Universe.body_named(rtn)
 		if n is Waypoint:
 			n.col_i = int(e.get("wcol", 0))
 			n.enabled = bool(e.get("won", true))
@@ -3795,6 +3804,8 @@ func restore_world() -> void:
 				n.on = bool(e["sw_on"])
 				if n.has_method("_apply_visual"):
 					n._apply_visual()
+				if n.has_method("_refresh_state_lbl"):
+					n._refresh_state_lbl()
 		if n is Chest and e.has("storage"):
 			n.storage = Save.parse_slots(e["storage"], 20)
 	# second pass: rebuild the wire graph (visual arrows included)

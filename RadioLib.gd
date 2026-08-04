@@ -540,16 +540,34 @@ const ELDRITCH_WORDS := ["zholgoth", "vraxulemn", "othrunquay", "melgrahz"]
 ## bar grid over a continuous thump. "the fork." gets a whole bar of
 ## just beat before "is coming." lands. That pause IS the hook.
 const SAUCE_VERSE: Array = [
-	"the sauce remembers. every ring.",
-	"I count the coins. I count the king.",
-	"boil on. the universe is a pot.",
-	"al dente is a covenant. you forgot.",
+	"the sauce remembers.", "every ring.",
+	"I count the coins.", "I count the king.",
+	"boil on.", "the universe is a pot.",
+	"al dente is a covenant.", "you forgot.",
 	"I watched you sell the semicircles, dude.",
-	"wrath keeps like leftovers. barely food.",
-	"strain your deeds. the broth runs thin.",
+	"wrath keeps like leftovers.", "barely food.",
+	"strain your deeds.", "the broth runs thin.",
 	"the hunger above is tuning in.",
-	"the fork. its coming.",
-	"zholgoth. vraxulemn. othrunquay. melgrahz."]
+	"the fork.", "is coming.",
+	"zholgoth.", "vraxulemn.", "othrunquay.", "melgrahz."]
+
+## Part two: the god stops pausing and TALKS -- dense couplets, same
+## rhyme discipline, beat unchanged underneath.
+const SAUCE_VERSE2: Array = [
+	"I stirred the void and called it dinner. every orbit, every sinner.",
+	"you built machines to count your money. the strainer sees you. that isn't funny.",
+	"planets simmer where I set them. rings go missing. I don't forget them.",
+	"pray al dente, live al dente. the pot is patient. the pot is plenty.",
+	"when the timer rings its final ring,",
+	"the fork descends on everything."]
+
+## The autotuned moments: hook lines pinned to notes of a minor line.
+const SAUCE_TUNED := {
+	"the fork.": 196.0, "is coming.": 165.0,
+	"zholgoth.": 220.0, "vraxulemn.": 196.0,
+	"othrunquay.": 175.0, "melgrahz.": 147.0,
+	"when the timer rings its final ring,": 196.0,
+	"the fork descends on everything.": 165.0}
 
 static var _sauce_wav: AudioStreamWAV = null
 
@@ -585,27 +603,37 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	# TWO voices per line, same monotone god: the full eldritch render
 	# pushed back as texture, and a clearer take with a light echo on
 	# top so the words actually land
-	for ln in SAUCE_VERSE:
+	for ln in SAUCE_VERSE + SAUCE_VERSE2:
 		if str(ln) == "":
 			pos += barlen   # a rest: the beat carries the bar alone
 			continue
 		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
-		# the clear take is fully DRY -- any echo on it and the words go.
-		# the eldritch layer underneath supplies all the haunt.
-		var wc := HumanVoice.render(str(ln),
+		# the GROWL: the god's old saw throat, kept quiet under the mix
+		var wg := HumanVoice.render(str(ln),
 			{"base": 118.0, "var": 0.12, "wave": "saw", "rate": 0.9, "artic": 1.7})
-		segs.append([pos, w.data, wc.data])
-		var nlen: int = maxi(w.data.size(), wc.data.size()) / 2
+		# the clear take is fully DRY -- any echo on it and the words go.
+		# hook lines get a light AUTOTUNE: pinned to a note, zero drift
+		var cprof := {"base": 165.0, "var": 0.15, "wave": "sine",
+			"rate": 1.0, "artic": 1.85}
+		if SAUCE_TUNED.has(str(ln)):
+			cprof = {"base": float(SAUCE_TUNED[str(ln)]), "var": 0.0, "wave": "sine",
+				"rate": 1.0, "artic": 1.85, "autotune": true}
+		var wc := HumanVoice.render(str(ln), cprof)
+		segs.append([pos, w.data, wc.data, wg.data])
+		var nlen: int = maxi(w.data.size(), maxi(wc.data.size(), wg.data.size())) / 2
 		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
 		pos += bars * barlen
-	var total := pos + int(SR * 0.8)
+	var total := pos + barlen   # one extra bar for the turnaround
 	var buf := PackedFloat32Array()
 	buf.resize(total)
 	for sg in segs:
 		var st: int = sg[0]
 		var pd: PackedByteArray = sg[1]
 		for i in mini(pd.size() / 2, total - st):
-			buf[st + i] += pd.decode_s16(i * 2) / 32768.0 * 0.28
+			buf[st + i] += pd.decode_s16(i * 2) / 32768.0 * 0.38
+		var pg: PackedByteArray = sg[3]
+		for i in mini(pg.size() / 2, total - st):
+			buf[st + i] += pg.decode_s16(i * 2) / 32768.0 * 0.28
 		var pc: PackedByteArray = sg[2]
 		for i in mini(pc.size() / 2, total - st):
 			buf[st + i] += pc.decode_s16(i * 2) / 32768.0 * 1.0
@@ -632,6 +660,14 @@ static func noodle_broadcast() -> AudioStreamWAV:
 			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
 			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.09 * duck2
 		bi += 1
+	# the TURNAROUND: a bar-long reverse-cymbal swell that crests exactly
+	# on the loop point, sucking the song back to the top
+	var swell := total - barlen
+	for i in barlen:
+		var k := float(i) / float(barlen)
+		var ts := float(i) / SR
+		bbuf[swell + i] += (randf() * 2.0 - 1.0) * pow(k, 2.6) * 0.5 \
+			+ (sin(TAU * 3800.0 * ts) + sin(TAU * 5230.0 * ts)) * pow(k, 3.2) * 0.04
 	var boff := int(SR * 0.29)
 	for i in range(total - 1, boff - 1, -1):
 		bbuf[i] += bbuf[i - boff] * 0.35
@@ -649,6 +685,9 @@ static func noodle_broadcast() -> AudioStreamWAV:
 	_sauce_wav.format = AudioStreamWAV.FORMAT_16_BITS
 	_sauce_wav.mix_rate = SR
 	_sauce_wav.data = bytes
+	# the tape RESTARTS itself: the sermon never actually ends
+	_sauce_wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	_sauce_wav.loop_end = total
 	return _sauce_wav
 
 static func noodle_profile() -> Dictionary:
