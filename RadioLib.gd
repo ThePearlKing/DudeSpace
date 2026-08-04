@@ -39,7 +39,7 @@ static func style_for(kind: String) -> Dictionary:
 			return {"scale": [0, 2, 4, 7, 9, 12, 14], "bpm": 150, "wave": "square",
 				"base": 330.0, "digits": true}   # the melody IS pi
 		"earth":
-			return {"scale": [0, 2, 4, 7, 9, 12], "bpm": 96, "wave": "sine",
+			return {"scale": [0, 2, 4, 7, 9, 12], "bpm": 96, "wave": "flute",
 				"base": 294.0}   # easy listening for a doomed species
 		"rick":
 			return {"scale": [0, 2, 4, 5, 7, 9], "bpm": 113, "wave": "square",
@@ -48,11 +48,11 @@ static func style_for(kind: String) -> Dictionary:
 			return {"scale": [0, 2, 3, 5, 7, 9, 10], "bpm": 88, "wave": "sine",
 				"base": 220.0, "jazz": true}   # gas giants swing
 		"life", "varnisol":
-			return {"scale": [0, 3, 5, 7, 10, 12], "bpm": 84, "wave": "sine",
-				"base": 262.0}   # gentle pentatonic
+			return {"scale": [0, 3, 5, 7, 10, 12], "bpm": 84, "wave": "pluck",
+				"base": 262.0}   # gentle plucked pentatonic
 		"crystal":
-			return {"scale": [0, 4, 7, 11, 12, 16], "bpm": 100, "wave": "sine",
-				"base": 523.0}   # glassy heights
+			return {"scale": [0, 4, 7, 11, 12, 16], "bpm": 100, "wave": "bell",
+				"base": 523.0}   # glassy heights, struck
 		"torus":
 			return {"scale": [0, 2, 3, 6, 8, 12], "bpm": 122, "wave": "wobble",
 				"base": 294.0}   # donut logic
@@ -60,13 +60,15 @@ static func style_for(kind: String) -> Dictionary:
 			return {"scale": [0, 1, 5, 6, 10, 12], "bpm": 132, "wave": "saw",
 				"base": 147.0}   # aggressive low
 		"sand":
-			return {"scale": [0, 1, 4, 5, 7, 8, 11], "bpm": 92, "wave": "sine",
-				"base": 220.0}   # desert modal
+			# EUCLID: double-harmonic scale, reedy ornamented lead, tanpura
+			# drone and a hand drum. The pyramid approves.
+			return {"scale": [0, 1, 4, 5, 7, 8, 11], "bpm": 92, "wave": "reed",
+				"base": 220.0, "drone": true}
 		"circuit", "logic":
 			return {"scale": [0, 3, 7, 10, 12], "bpm": 160, "wave": "square",
 				"base": 392.0}   # chip factory
 		_:
-			return {"scale": [0, 2, 4, 5, 7, 9, 11, 12], "bpm": 110, "wave": "sine",
+			return {"scale": [0, 2, 4, 5, 7, 9, 11, 12], "bpm": 110, "wave": "pluck",
 				"base": 262.0}
 
 static var _music_cache := {}
@@ -77,6 +79,10 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	if _music_cache.has(key):
 		return _music_cache[key]
 	var st := style_for(kind)
+	if bool(st.get("jazz", false)):
+		var wavj := _jazz_loop(seed_v, st)
+		_music_cache[key] = wavj
+		return wavj
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var beat := 60.0 / float(st["bpm"])
@@ -88,7 +94,6 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	var base: float = st["base"]
 	var wave: String = st["wave"]
 	var pi_digits := "3141592653589793238462643383279"
-	var jazz: bool = bool(st.get("jazz", false))
 	var deg := 0
 	for ni in notes:
 		if bool(st.get("digits", false)):
@@ -104,8 +109,6 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		if rng.randf() < 0.2:
 			f *= 0.5   # bass note drop
 		var start := int(float(ni) * beat * SR)
-		if jazz and ni % 2 == 1:
-			start += int(beat * SR * 0.16)   # the swing. essential.
 		var dur := int(beat * SR * (0.9 if rng.randf() < 0.7 else 1.8))
 		for i in mini(dur, total - start):
 			var t := float(i) / SR
@@ -117,16 +120,41 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 					v = (fmod(f * t, 1.0) * 2.0 - 1.0) * 0.3
 				"wobble":
 					v = sin(TAU * f * t + 2.0 * sin(TAU * 5.0 * t)) * 0.32
+				"pluck":
+					v = (sin(TAU * f * t) + 0.5 * sin(TAU * f * 2.0 * t) \
+						+ 0.25 * sin(TAU * f * 3.0 * t)) * 0.4 * exp(-t * 5.0)
+				"bell":
+					v = (sin(TAU * f * t) + 0.55 * sin(TAU * f * 2.76 * t) \
+						+ 0.3 * sin(TAU * f * 5.4 * t)) * 0.33 * exp(-t * 3.5)
+				"reed":
+					var fv := f * (1.0 + 0.012 * sin(TAU * 5.5 * t))
+					v = (fmod(fv * t, 1.0) * 2.0 - 1.0) * 0.15 + sin(TAU * fv * t) * 0.18
+				"flute":
+					v = sin(TAU * f * (1.0 + 0.006 * sin(TAU * 5.0 * t)) * t) * 0.32 \
+						+ (randf() * 2.0 - 1.0) * 0.02
 				_:
 					v = sin(TAU * f * t) * 0.35 + sin(TAU * f * 2.0 * t) * 0.08
 			var env := minf(1.0, float(i) / (SR * 0.01)) \
 				* minf(1.0, float(dur - i) / (SR * 0.08))
 			buf[start + i] += v * env
-			if jazz and ni % 4 == 0:
-				# a lush chord under the downbeats: root + 3rd + 7th
-				var t2 := float(i) / SR
-				buf[start + i] += (sin(TAU * f * 1.26 * t2)
-					+ sin(TAU * f * 1.78 * t2)) * 0.14 * env
+	if bool(st.get("drone", false)):
+		# tanpura drone + hand drum: dum on the downbeats, tek between
+		for i in total:
+			var td := float(i) / SR
+			buf[i] += (sin(TAU * base * 0.5 * td) * 0.09 \
+				+ sin(TAU * base * 0.75 * td) * 0.045) \
+				* (0.8 + 0.2 * sin(TAU * 0.25 * td))
+		var beat_s := int(beat * SR)
+		for bi in notes:
+			var b0 := bi * beat_s
+			if bi % 2 == 0:
+				for i in mini(int(0.11 * SR), total - b0):
+					var tt := float(i) / SR
+					buf[b0 + i] += sin(TAU * 78.0 * tt) * exp(-tt * 26.0) * 0.5
+			else:
+				var tk := b0 + int(beat_s * 0.5)
+				for i in mini(int(0.04 * SR), total - tk):
+					buf[tk + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.008)) * 0.16
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
@@ -138,6 +166,81 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	wav.loop_end = total
 	_music_cache[key] = wav
+	return wav
+
+## Actual jazz: walking bass on quarters, swung ride, sparse two-note
+## comp stabs (3rd+7th shells -- NOT the whole chord mashed at once),
+## and a swung horn line. Changes move ii-V-I-vi so it goes somewhere.
+static func _jazz_loop(seed_v: int, st: Dictionary) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var base: float = st["base"]
+	var beat := 60.0 / float(st["bpm"])
+	var bars := 4
+	var total := int(float(bars) * 4.0 * beat * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# root, 3rd, 7th in semitones from base: Dm7 G7 Cmaj7 A7
+	var chords: Array = [[2, 5, 12], [7, 11, 17], [0, 4, 11], [9, 13, 19]]
+	for bar in bars:
+		var ch: Array = chords[bar % 4]
+		var b0 := int(float(bar) * 4.0 * beat * SR)
+		# walking bass: root, 3rd, 5th, chromatic approach to the next root
+		var walk: Array = [int(ch[0]), int(ch[0]) + 4, int(ch[0]) + 7,
+			int(chords[(bar + 1) % 4][0]) - 1]
+		for q in 4:
+			var f := base * 0.5 * pow(2.0, float(walk[q]) / 12.0)
+			var stq := b0 + int(float(q) * beat * SR)
+			var dur := int(beat * SR * 0.95)
+			for i in mini(dur, total - stq):
+				var t := float(i) / SR
+				var env := minf(1.0, float(i) / (SR * 0.008)) * exp(-t * 2.2)
+				buf[stq + i] += (sin(TAU * f * t) + 0.4 * sin(TAU * f * 2.0 * t)) * 0.3 * env
+			# ride tick each beat, swung skip note on 2 and 4
+			for i in mini(int(0.05 * SR), total - stq):
+				buf[stq + i] += (randf() * 2.0 - 1.0) * 0.08 * exp(-float(i) / (SR * 0.012))
+			if q % 2 == 1:
+				var sk := stq + int(beat * SR * 0.66)
+				for i in mini(int(0.04 * SR), total - sk):
+					buf[sk + i] += (randf() * 2.0 - 1.0) * 0.06 * exp(-float(i) / (SR * 0.01))
+		# ONE comp stab per bar, offbeat, two notes only
+		var stab_b := 0.66 if rng.randf() < 0.5 else 2.66
+		var stab_s := b0 + int(stab_b * beat * SR)
+		for i in mini(int(0.22 * SR), total - stab_s):
+			var t2 := float(i) / SR
+			var env2 := minf(1.0, float(i) / (SR * 0.004)) * exp(-t2 * 9.0)
+			buf[stab_s + i] += (sin(TAU * base * pow(2.0, float(ch[1]) / 12.0) * t2) \
+				+ sin(TAU * base * pow(2.0, float(ch[2]) / 12.0) * t2)) * 0.12 * env2
+	# the horn: swung 8ths over dorian, plenty of air between phrases
+	var scale: Array = [0, 2, 3, 5, 7, 9, 10, 12, 14]
+	var deg := 4
+	for s8 in bars * 8:
+		if rng.randf() < 0.3:
+			continue
+		deg = clampi(deg + rng.randi_range(-2, 2), 0, scale.size() - 1)
+		var f2 := base * 2.0 * pow(2.0, float(scale[deg]) / 12.0)
+		var pos_b := float(s8) * 0.5 + (0.17 if s8 % 2 == 1 else 0.0)
+		var hs := int(pos_b * beat * SR)
+		var hd := int(beat * SR * (0.35 if s8 % 2 == 1 else 0.5))
+		if rng.randf() < 0.15:
+			hd = int(beat * SR * 1.4)
+		for i in mini(hd, total - hs):
+			var t3 := float(i) / SR
+			var env3 := minf(1.0, float(i) / (SR * 0.02)) \
+				* minf(1.0, float(hd - i) / (SR * 0.05))
+			var vib := 1.0 + 0.008 * sin(TAU * 5.2 * t3)
+			buf[hs + i] += (sin(TAU * f2 * vib * t3) + 0.3 * sin(TAU * f2 * 2.0 * vib * t3) \
+				+ 0.12 * sin(TAU * f2 * 3.0 * t3)) * 0.2 * env3
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
 	return wav
 
 ## The shadow temple's frequency: no music, no words. A slow drone,

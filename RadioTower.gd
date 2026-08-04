@@ -87,8 +87,8 @@ func _build_stations() -> void:
 		var st := {}
 		match b.name:
 			"Earth":
-				st = {"name": "EARTH NEWS", "type": "news"}
-				stations.append({"name": "EARTH CLASSICS", "type": "music",
+				st = {"name": "EARTH1", "type": "news"}
+				stations.append({"name": "EARTH2", "type": "music",
 					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
 					"body": b, "kind": "earth"})
 				stations.append({"name": "RICK FM", "type": "rick",
@@ -97,9 +97,9 @@ func _build_stations() -> void:
 			"Wth":
 				st = {"name": "??? (shader system)", "type": "alien"}
 			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol":
-				st = {"name": "%s FM" % b.name, "type": "music"}
+				st = {"name": b.name.to_upper(), "type": "music"}
 			"Jupiter":
-				st = {"name": "JUPITER JAZZ", "type": "music"}
+				st = {"name": "JUPITER", "type": "music"}
 			_:
 				continue
 		st["freq"] = snappedf(rng.randf_range(88.5, 107.5), 0.1)
@@ -157,6 +157,17 @@ func station_dir(st: Dictionary) -> Vector3:
 		return (w.global_position - sp).normalized()
 	return (sp - Universe.nearest(sp).center).normalized()
 
+## Where a station's signal physically comes from.
+func _src_pos(st: Dictionary) -> Vector3:
+	if st.has("fixed_dir"):
+		return st["fixed_dir"]
+	if st["body"] != null:
+		return st["body"].center
+	var wn = get_tree().get_first_node_in_group("noodle_watcher")
+	if wn != null and wn is Node3D:
+		return wn.global_position
+	return _site()
+
 func _is_local(st: Dictionary) -> bool:
 	if st["body"] == null:
 		return false
@@ -210,13 +221,20 @@ func work(delta: float) -> void:
 		return
 	buf = maxf(0.0, buf - DRAIN * delta)
 	# find the strongest signal on the current dial + aim -- every
-	# frame, so dragging the dial/dish changes the sound LIVE
+	# frame, so dragging the dial/dish changes the sound LIVE. When two
+	# stations are effectively tied, the CLOSEST one wins the receiver.
 	var best := -1
 	var bs := 0.0
+	var bdist := 1e18
 	for i in stations.size():
 		var sgn := signal_for(stations[i])
-		if sgn > bs:
-			bs = sgn
+		if sgn <= 0.0:
+			continue
+		var dd: float = _site().distance_to(_src_pos(stations[i]))
+		if sgn > bs + 0.03 or (absf(sgn - bs) <= 0.03 and dd < bdist and best >= 0) \
+				or best < 0:
+			bs = maxf(bs, sgn)
+			bdist = dd
 			best = i
 	# static bed always runs while powered; ducks under a good signal.
 	# volumes SLEW toward targets: analog, not stepped.
@@ -225,17 +243,7 @@ func work(delta: float) -> void:
 	# DISTANCE buries far stations in static: same alignment, worse SNR
 	var clear := bs
 	if best >= 0:
-		var stb: Dictionary = stations[best]
-		var src_pos := _site()
-		if stb.has("fixed_dir"):
-			src_pos = stb["fixed_dir"]
-		elif stb["body"] != null:
-			src_pos = stb["body"].center
-		else:
-			var wn = get_tree().get_first_node_in_group("noodle_watcher")
-			if wn != null and wn is Node3D:
-				src_pos = wn.global_position
-		var far := clampf(_site().distance_to(src_pos) / 45000.0, 0.0, 1.0)
+		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 45000.0, 0.0, 1.0)
 		clear = bs * (1.0 - 0.6 * far)
 	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
@@ -259,6 +267,11 @@ func work(delta: float) -> void:
 			if not _talk.playing:
 				_talk.stream = RadioLib.eerie_loop()
 				_talk.play()
+		"rick":
+			# RICK FM plays the hook. autotuned. with the band. forever.
+			if not _talk.playing:
+				_talk.stream = RadioLib.rick_song()
+				_talk.play()
 		_:
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
@@ -268,11 +281,6 @@ func work(delta: float) -> void:
 						wav = HumanVoice.render(RadioLib.news_line(),
 							{"base": 185.0, "var": 0.42, "wave": "sine",
 							"rate": 1.35, "artic": 1.6})
-					"rick":
-						# the smoothest voice on the dial. suspicious.
-						wav = HumanVoice.render(RadioLib.rick_line(),
-							{"base": 150.0, "var": 0.55, "wave": "sine",
-							"rate": 1.25, "artic": 1.4})
 					"alien":
 						wav = HumanVoice.render(RadioLib.alien_line(),
 							RadioLib.alien_profile())

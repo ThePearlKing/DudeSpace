@@ -67,7 +67,8 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 16)
 	strip.add_child(col)
 	var left := VBoxContainer.new()
-	left.custom_minimum_size = Vector2(420, 0)
+	left.custom_minimum_size = Vector2(700, 0)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(left)
 	_freq_lbl = Label.new()
 	_freq_lbl.add_theme_font_size_override("font_size", 24)
@@ -77,14 +78,18 @@ func _ready() -> void:
 	_slider.min_value = 88.0
 	_slider.max_value = 108.0
 	_slider.step = 0.1
-	_slider.custom_minimum_size = Vector2(400, 24)
+	_slider.custom_minimum_size = Vector2(680, 26)
+	_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_slider.value = radio.freq if radio else 98.0
 	_slider.value_changed.connect(func(v: float) -> void:
 		if radio:
 			radio.freq = v)
 	left.add_child(_slider)
 	_spec = Control.new()
-	_spec.custom_minimum_size = Vector2(400, 70)
+	# WIDE: close-together channels need room to read
+	_spec.custom_minimum_size = Vector2(680, 96)
+	_spec.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_spec.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_spec.draw.connect(_draw_spec)
 	left.add_child(_spec)
 	var right := VBoxContainer.new()
