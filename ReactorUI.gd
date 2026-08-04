@@ -271,12 +271,13 @@ func _open_manual() -> void:
 		_manual = null
 		return
 	_manual = Panel.new()
-	# the booklet hangs off the LEFT edge so it never blankets the panel
-	_manual.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	# the booklet lives ENTIRELY in the free left gutter (the control
+	# window starts at 20% screen width) -- it covers nothing at all
+	_manual.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	var vps := get_viewport().get_visible_rect().size
-	_manual.custom_minimum_size = Vector2(470, minf(720.0, vps.y - 40.0))
+	_manual.custom_minimum_size = Vector2(minf(360.0, vps.x * 0.19), vps.y - 16.0)
 	_manual.size = _manual.custom_minimum_size
-	_manual.position = Vector2(8, -_manual.size.y * 0.5)
+	_manual.position = Vector2(4, -_manual.size.y - 8.0)
 	var st2 := StyleBoxFlat.new()
 	st2.bg_color = Color("#26241c")
 	st2.border_color = AMBER
@@ -333,7 +334,9 @@ RULES OF NOT EXPLODING:
    xenon will make restart annoying. annoying beats glowing.
 
 (click MANUAL again to close)"""
-	t2.add_theme_font_size_override("font_size", 12)
+	t2.add_theme_font_size_override("font_size", 11)
+	t2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t2.custom_minimum_size = Vector2(320, 0)
 	t2.add_theme_color_override("font_color", Color("#e8dcb8"))
 	msc.add_child(t2)
 	Sfx.play("click", -16.0)
@@ -400,6 +403,11 @@ func _process(delta: float) -> void:
 		coach = "\n>> ρ positive -- power climbing, hold on"
 	elif rx.mode == 1 and rx.temp < 15.0:
 		coach = "\n>> warming: power heats the core toward RUN (150°C)"
+	elif rho <= 0.0 and rx.xenon * 0.5 > (0.65 - rx.rods) * 0.9:
+		# the XENON PIT: the poison alone is out-arguing the rods
+		coach = "\n>> XENON PIT: poison built up and sank ρ. pull rods" \
+			+ "\n   further (RUN mode goes past the startup floor)," \
+			+ "\n   or idle low and let it decay. fuel is fine."
 	_read.text = ("POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" + coach) % [
 		rx.power * 100.0, rho, rx.rods * 100.0, rx.rods_target * 100.0,
 		rx.xenon * 100.0, rx.temp * 10.0, rx.press,
