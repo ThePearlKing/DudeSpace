@@ -32,15 +32,44 @@ var _tv_bodies: Array = []
 
 class _AlienShell extends StaticBody3D:
 	var studio = null
+	var idx := -1
 	func destroy(_push: Vector3) -> void:
 		if studio != null:
-			studio.jitter_voice()
+			studio.orb_hit(idx, global_position)
 
-func jitter_voice() -> void:
-	_jitter_t = 0.05
-	if _talk != null:
+## A bullet meets an anchor: it DEFLECTS with a proper metallic ping,
+## and only if THAT orb is mid-sentence does its voice jitter.
+func orb_hit(idx: int, at: Vector3) -> void:
+	_play_ping(at)
+	if idx == _cur_host and _talk != null and _talk.playing:
+		_jitter_t = 0.05
 		_talk.pitch_scale = randf_range(0.55, 1.7)
-	Sfx.play("click", -16.0)   # plink. it bounces.
+
+var _ping_wav: AudioStreamWAV = null
+
+func _play_ping(at: Vector3) -> void:
+	if _ping_wav == null:
+		# a tight metallic ricochet: two ringing partials, fast decay
+		var n := int(0.14 * 22050)
+		var bytes := PackedByteArray()
+		bytes.resize(n * 2)
+		for i in n:
+			var t := float(i) / 22050.0
+			var v := (sin(TAU * 1900.0 * t) * 0.6 + sin(TAU * 2640.0 * t) * 0.35 \
+				+ (randf() * 2.0 - 1.0) * 0.15 * exp(-t * 90.0)) * exp(-t * 34.0)
+			bytes.encode_s16(i * 2, int(clampf(v, -1.0, 1.0) * 22000.0))
+		_ping_wav = AudioStreamWAV.new()
+		_ping_wav.format = AudioStreamWAV.FORMAT_16_BITS
+		_ping_wav.mix_rate = 22050
+		_ping_wav.data = bytes
+	var pl := AudioStreamPlayer3D.new()
+	pl.stream = _ping_wav
+	pl.unit_size = 6.0
+	pl.pitch_scale = randf_range(0.9, 1.15)
+	add_child(pl)
+	pl.global_position = at
+	pl.play()
+	pl.finished.connect(pl.queue_free)
 
 func _ready() -> void:
 	_build_surface()
@@ -188,6 +217,7 @@ func _build_studio() -> void:
 		# jitters for a blink. they are above harm. slightly below dignity.
 		var shell := _AlienShell.new()
 		shell.studio = self
+		shell.idx = i
 		var scol := CollisionShape3D.new()
 		var sph := SphereShape3D.new()
 		sph.radius = 0.75
