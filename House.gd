@@ -1224,8 +1224,8 @@ static func house_at(p: Vector3) -> House:
 		if h is House and is_instance_valid(h):
 			var sz: Vector3 = h.room_size()
 			var rel: Vector3 = p - h.room_center()
-			if absf(rel.x) < sz.x * 0.6 and absf(rel.z) < sz.z * 0.6 \
-					and absf(rel.y) < sz.y:
+			if absf(rel.x) < sz.x * 0.75 and absf(rel.z) < sz.z * 0.75 \
+					and absf(rel.y) < sz.y * 1.2:
 				return h
 	return null
 
@@ -1496,12 +1496,13 @@ func connect_frames(fa: Node3D, other, fb: Node3D) -> bool:
 	other.links.append(slot)
 	fa.set_meta("linked", true)
 	fb.set_meta("linked", true)
-	var sh := fa.get_node_or_null("shimmer")
-	if sh:
-		sh.queue_free()
-	var sh2 := fb.get_node_or_null("shimmer")
-	if sh2:
-		sh2.queue_free()
+	for nm in ["shimmer", "clickpane"]:
+		var sh = fa.get_node_or_null(nm)
+		if sh:
+			sh.queue_free()
+		var sh2 = fb.get_node_or_null(nm)
+		if sh2:
+			sh2.queue_free()
 	cut_doorway(fa)
 	other.cut_doorway(fb)
 	build_link_visuals(other)

@@ -60,8 +60,24 @@ func _ready() -> void:
 			_hitbox(Vector3(0.2, 2.6, 0.2), Vector3(-0.95, 1.3, 0))
 			_hitbox(Vector3(0.2, 2.6, 0.2), Vector3(0.95, 1.3, 0))
 			_hitbox(Vector3(2.1, 0.2, 0.2), Vector3(0, 2.7, 0))
+			# the shimmer is CLICKABLE: a ray-only pane (layer 2) fills the
+			# opening so the door tool works aimed anywhere at the frame.
+			# movement ignores layer 2; the pane leaves with the shimmer.
+			var pane := StaticBody3D.new()
+			pane.collision_layer = 2
+			var pc := CollisionShape3D.new()
+			var pcs := BoxShape3D.new()
+			pcs.size = Vector3(1.7, 2.5, 0.1)
+			pc.shape = pcs
+			pc.position = Vector3(0, 1.3, 0)
+			pane.add_child(pc)
+			pane.name = "clickpane"
+			add_child(pane)
 			add_to_group("doorframe")
 			set_meta("linked", false)
+			# frames are ALWAYS square on their wall: snap after the world
+			# finishes moving us (covers placement AND save-restore)
+			call_deferred("_snap_wall")
 		"catwalk":
 			# industrial platform: legs, deck, rails. machines welcome
 			# on top. house-interior use only, per the placer.
@@ -106,6 +122,18 @@ func _ready() -> void:
 		s.set_meta("taken", false)
 		add_child(s)
 	rotate_object_local(Vector3.UP, yaw)
+
+func _snap_wall() -> void:
+	if kind != "doorframe" or not is_inside_tree() \
+			or bool(get_meta("linked", false)):
+		return
+	var hh = House.house_at(global_position)
+	if hh == null:
+		return
+	var rel: Vector3 = global_position - hh.room_center()
+	var outv := Vector3(signf(rel.x), 0, 0) if absf(rel.x) > absf(rel.z) \
+		else Vector3(0, 0, signf(rel.z))
+	global_transform.basis = Basis(Vector3.UP, atan2(-outv.x, -outv.z))
 
 func _m(size: Vector3, pos: Vector3, mat: Material) -> void:
 	var mi := MeshInstance3D.new()

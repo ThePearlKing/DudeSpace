@@ -75,12 +75,12 @@ func _ready() -> void:
 	# you're genuinely far (other-side-of-the-planet territory)
 	_talk.unit_size = 40.0
 	_talk.max_distance = 1200.0
-	_talk.max_db = -2.0   # CAP: standing next to it must not blast you
+	_talk.max_db = 0.0   # CAP: standing next to it must not blast you
 	add_child(_talk)
 	_hiss = AudioStreamPlayer3D.new()
 	_hiss.unit_size = 24.0
 	_hiss.max_distance = 600.0
-	_hiss.max_db = -8.0
+	_hiss.max_db = -6.0
 	_hiss.stream = RadioLib.static_noise()
 	add_child(_hiss)
 	_build_stations()
@@ -271,10 +271,12 @@ func work(delta: float) -> void:
 	# DISTANCE buries far stations in static: same alignment, worse SNR
 	var clear := bs
 	if best >= 0 and stations[best]["body"] != null:
-		# planet stations fade into static with distance. The SAUCE and
-		# the unlabeled thing don't -- they transmit at cosmic power.
-		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 45000.0, 0.0, 1.0)
-		clear = bs * (1.0 - 0.6 * far)
+		# planet stations fade into static with distance -- scaled to the
+		# whole MAP, so cross-cluster (Sanus from Earth, ~105km) arrives
+		# buried while a neighbour cluster (Euclid, ~56km) is just fuzzy.
+		# The SAUCE and the unlabeled thing transmit at cosmic power.
+		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 140000.0, 0.0, 1.0)
+		clear = bs * (1.0 - 0.9 * pow(far, 1.3))
 	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	# HYSTERESIS: the tuned station keeps the receiver unless something

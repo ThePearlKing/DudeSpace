@@ -3702,6 +3702,11 @@ func collect_world() -> Array:
 			e["hlinks"] = n.links.duplicate()
 		if n is Furniture:
 			e["fkind"] = n.kind
+			# ACTUAL orientation, as yaw relative to the restore basis --
+			# rejoining used to randomize it and doorframes went sideways
+			var refb: Basis = _basis_from_up(up)
+			var zz: Vector3 = refb.inverse() * n.global_transform.basis.z
+			e["fyaw"] = atan2(zz.x, zz.z)
 		if n is RadioTower:
 			e["rfreq"] = n.freq
 			e["raim"] = [n.aim_dir.x, n.aim_dir.y, n.aim_dir.z]
@@ -3802,6 +3807,8 @@ func restore_world() -> void:
 			n.hyperdrive = bool(e.get("hyper", false))
 		else:
 			n.global_transform = Transform3D(_basis_from_up(up), pos)
+			if n is Furniture:
+				n.rotate_object_local(Vector3.UP, float(e.get("fyaw", 0.0)))
 		if n is Machine:
 			n.buf = float(e.get("buf", 0.0))
 			var si = e.get("slot_in", null)
