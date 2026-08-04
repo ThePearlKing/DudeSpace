@@ -50,6 +50,10 @@ static func style_for(kind: String) -> Dictionary:
 		"life", "varnisol":
 			return {"scale": [0, 3, 5, 7, 10, 12], "bpm": 84, "wave": "pluck",
 				"base": 262.0}   # gentle plucked pentatonic
+		"ice":
+			# XERO: sparse glassy bells over a very cold, very slow pulse
+			return {"scale": [0, 2, 7, 9, 12, 14], "bpm": 68, "wave": "bell",
+				"base": 587.0}
 		"crystal":
 			return {"scale": [0, 4, 7, 11, 12, 16], "bpm": 100, "wave": "bell",
 				"base": 523.0}   # glassy heights, struck

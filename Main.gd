@@ -1641,6 +1641,8 @@ func _planet_material(kind: String, color: Color) -> Material:
 			return _earth_material()
 		"luna", "mercury":
 			return _rocky_material(color)
+		"ice":
+			return _rocky_material(color.lightened(0.1))
 		"mars":
 			return _rocky_material(color, 1.0)
 		"venus":
@@ -2137,6 +2139,20 @@ func _populate(b) -> void:
 			for i in _n(16):
 				_crater(b, _surface_dir(), randf_range(1.5, 4.5), Color("#a8a8ac"))
 			_moon_flag(b)
+		"ice":
+			# XERO: pale craters and translucent ice spires catching the light
+			for i in _n(10):
+				_crater(b, _surface_dir(), randf_range(1.5, 4.0), Color("#d8f2ff"))
+			for i in 12:
+				var sp := Destructible.new()
+				var sh := randf_range(1.8, 4.5)
+				sp.setup(Vector3(randf_range(0.6, 1.1), sh, randf_range(0.6, 1.1)),
+					Color("#aee4ff"), 2, 4, 1.2)
+				add_child(sp)
+				var sd := _surface_dir()
+				sp.global_transform = Transform3D(_basis_from_up(sd),
+					b.center + sd * (b.radius + sh * 0.5))
+			_spawn_rocks(b, 8, Color("#cfe8f4"))
 		"mercury":
 			# scorched crater field: baked boulders to smash, coal in the dark ones
 			for i in _n(12):

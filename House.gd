@@ -552,28 +552,12 @@ func _build_interior() -> void:
 			_hole_floor(Vector3(c.x, fy, c.z), Vector2(sz.x, sz.z), hole,
 				warm.darkened(0.15))
 			_wood_floor(Vector3(c.x - 2.5, fy + 0.2, c.z), Vector2(sz.x - 6.0, sz.z - 1.0))
-			# a two-flight switchback with a mid landing: both flights
-			# under the 45-degree walkable-slope limit
+			# ONE straight flight, REVERSED: you step into the hole at its
+			# far edge and walk down toward the middle of the cellar --
+			# full drop, never meets a wall, no orphan landings
 			var cellar_floor := -sz.y * 1.5 + 0.3
-			var midy := cellar_floor + 2.6
-			_stairs(c + Vector3(4.0, midy, 4.6),
-				Vector3(0, 0, -0.42), 9, 2.6, Color("#6a6255"))
-			_solid(c + Vector3(4.0, midy - 0.2, 0.2), Vector3(2.4, 0.4, 2.0),
-				Color("#6a6255"))
-			var lf := c + Vector3(4.0, cellar_floor, -0.6)
-			for st2 in 8:
-				var t3 := float(st2 + 1) / 8.0
-				_solid(lf + Vector3(-float(st2) * 0.5, 2.6 * t3 - 0.2, 0),
-					Vector3(0.85, 0.42, 2.0), Color("#6a6255"))
-			var r2 := StaticBody3D.new()
-			var rc2 := CollisionShape3D.new()
-			var rb2 := BoxShape3D.new()
-			rb2.size = Vector3(sqrt(3.5 * 3.5 + 2.6 * 2.6) + 0.8, 0.12, 2.0)
-			rc2.shape = rb2
-			r2.add_child(rc2)
-			_iroot.add_child(r2)
-			r2.global_position = lf + Vector3(-1.75, 1.64, 0)
-			r2.rotation.z = atan2(2.6, 3.5)
+			_stairs(c + Vector3(4.0, cellar_floor, -1.3),
+				Vector3(0, 0, 0.5), 13, sz.y, Color("#6a6255"))
 			# railing around the open hole so nobody just falls in
 			_deco(c + Vector3(2.35, fy - c.y + 0.8, 3.0), Vector3(0.08, 1.1, 4.2),
 				warm.darkened(0.4))
