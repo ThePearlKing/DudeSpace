@@ -42,6 +42,18 @@ func _ready() -> void:
 	col.position = Vector3(0, 0.55, 0)
 	add_child(col)
 
+	# GHOST GUARD: the phantom marker at the home planet's core was a
+	# junk waypoint restored deep inside the planet. Any waypoint that
+	# finds itself buried in a body deletes itself.
+	call_deferred("_core_check")
+
+func _core_check() -> void:
+	if not is_inside_tree():
+		return
+	var nb = Universe.nearest(global_position)
+	if nb != null and global_position.distance_to(nb.center) < float(nb.radius) * 0.6:
+		queue_free()
+
 func _process(delta: float) -> void:
 	if _mesh:
 		_mesh.rotate_y(delta * 1.5)
