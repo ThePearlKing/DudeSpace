@@ -186,6 +186,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			_confirm_ghost()   # either button places. Esc cancels.
 		get_viewport().set_input_as_handled()
 		return
+	if _door_mode and event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		_door_click()
+		get_viewport().set_input_as_handled()
+		return
+	if _door_mode and event is InputEventKey and event.pressed \
+			and event.keycode == KEY_ESCAPE:
+		_door_mode = false
+		_door_frame = null
+		Sfx.play("click", -18.0)
+		get_viewport().set_input_as_handled()
+		return
 	if _ghost != null and event is InputEventKey and event.pressed 			and event.keycode == KEY_ESCAPE:
 		_cancel_ghost()
 		get_viewport().set_input_as_handled()
@@ -247,34 +259,117 @@ var _ghost: Node3D = null   # placement preview hologram
 var _ghost_cat := ""        # "house" | "furn"
 var _ghost_kind := ""
 var _ghost_yaw := 0.0
-var _door_a = null   # first house selected by the Door tool
+var _door_mode: bool = false      # door tool armed: clicks select frames
+var _door_frame: Node3D = null    # first frame clicked
 
 ## The Door tool: OUTSIDE, pick house A (with a free frame), then
 ## house B. They dock into one build, hallway and all.
+## DOOR TOOL v2: works like the wiring tool. Arm it, then LEFT-CLICK a
+## door frame, then click a second frame -- a hologram over the first
+## frame previews the merged layout (green = docks, red = why not).
 func _door_tool() -> void:
-	if Game.zone != "":
-		Sfx.play("denied")   # doors are decided from the street
+	_door_mode = true
+	_door_frame = null
+	Sfx.play("click", -12.0)
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud:
+		hud.flash("DOOR TOOL — click the first door frame (Esc puts it away)")
+
+func _frame_under_crosshair() -> Node3D:
+	var space := get_world_3d().direct_space_state
+	var from := _camera.global_position
+	var q := PhysicsRayQueryParameters3D.create(from,
+		from - _camera.global_transform.basis.z * 9.0)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit:
+		var n: Node = hit.collider
+		while n:
+			if n.is_in_group("doorframe"):
+				return n
+			n = n.get_parent()
+	return null
+
+func _door_click() -> void:
+	_cooldown = 0.3   # the same click must not also punch
+	var hud = get_tree().get_first_node_in_group("hud")
+	var fr := _frame_under_crosshair()
+	if fr == null:
+		Sfx.play("denied", -18.0)
 		return
-	var target = _nearest_in("house", 14.0)
-	if target == null or not (target is House):
+	if bool(fr.get_meta("linked", false)):
 		Sfx.play("denied")
-		_door_a = null
+		if hud:
+			hud.flash("that frame already has a door")
 		return
-	if target.my_frames().is_empty() and _door_a == null:
-		Sfx.play("denied")   # no frame inside, nothing to connect
+	if _door_frame == null or not is_instance_valid(_door_frame):
+		_door_frame = fr
+		Sfx.play("click", -10.0)
+		var ha = House.house_at(fr.global_position)
+		if ha != null:
+			_door_holo(fr, [[ha, Color("#7be8ff")]], Vector3.ZERO, 2.5)
+		if hud:
+			hud.flash("frame A armed — click frame B")
 		return
-	if _door_a == null or not is_instance_valid(_door_a):
-		_door_a = target
-		Sfx.play("click", -10.0)   # house A armed. now go touch house B
-		return
-	if target == _door_a:
+	if fr == _door_frame:
 		Sfx.play("click", -18.0)
 		return
-	if _door_a.connect_house(target):
-		_door_a = null
-	else:
+	var ha2 = House.house_at(_door_frame.global_position)
+	var hb = House.house_at(fr.global_position)
+	if ha2 == null or hb == null:
 		Sfx.play("denied")
-		_door_a = null
+		_door_frame = null
+		return
+	var ck: Dictionary = ha2.dock_check(_door_frame, hb, fr)
+	if not bool(ck["ok"]):
+		Sfx.play("denied")
+		if hud:
+			hud.flash("DOOR: " + str(ck["reason"]))
+		_door_holo(_door_frame, [[ha2, Color("#7be8ff")], [hb, Color("#ff5964")]],
+			ck["delta"], 2.5)
+		_door_frame = null
+		return
+	# valid: flash the merged layout GREEN, then dock for real
+	_door_holo(_door_frame, [[ha2, Color("#7be8ff")], [hb, Color("#4dff9a")]],
+		ck["delta"], 1.4)
+	ha2.connect_frames(_door_frame, hb, fr)
+	_door_frame = null
+	_door_mode = false
+	if hud:
+		hud.flash("DOORWAY CUT — houses merged")
+
+## A tabletop HOLOGRAM floating over the frame: every room of each
+## complex as a translucent box, set 1+ drawn at its DOCKED position.
+func _door_holo(anchor: Node3D, sets: Array, delta_b: Vector3, secs: float) -> void:
+	var root := Node3D.new()
+	get_parent().add_child(root)
+	root.global_position = anchor.global_position + Vector3(0, 2.5, 0)
+	var sc := 0.02
+	var origin: Vector3 = anchor.global_position
+	for si in sets.size():
+		var hh0 = sets[si][0]
+		var colr: Color = sets[si][1]
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(colr.r, colr.g, colr.b, 0.4)
+		mat.emission_enabled = true
+		mat.emission = colr
+		mat.emission_energy_multiplier = 0.8
+		for h in hh0.complex():
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = h.room_size() * sc
+			mi.mesh = bm
+			mi.material_override = mat
+			root.add_child(mi)
+			var off: Vector3 = h.room_center() - origin
+			if si > 0:
+				off += delta_b
+			mi.position = off * sc
+	get_tree().create_timer(secs).timeout.connect(func() -> void:
+		if is_instance_valid(root):
+			root.queue_free())
 
 func _start_ghost(cat: String, kind: String) -> void:
 	if cat == "house" and Game.zone != "":
@@ -380,6 +475,33 @@ func _confirm_ghost() -> void:
 				_cancel_ghost()
 				return
 			Inventory.remove_res("plantfiber", 2)
+		if _ghost_kind == "doorframe":
+			var hh2 = House.house_at(base_pos)
+			if hh2 != null:
+				var rel: Vector3 = base_pos - hh2.room_center()
+				var side := ""
+				var outv := Vector3.ZERO
+				if absf(rel.x) > absf(rel.z):
+					side = "x+" if rel.x > 0.0 else "x-"
+					outv = Vector3(signf(rel.x), 0, 0)
+				else:
+					side = "z+" if rel.z > 0.0 else "z-"
+					outv = Vector3(0, 0, signf(rel.z))
+				for fr2 in hh2.all_frames():
+					var r3: Vector3 = fr2.global_position - hh2.room_center()
+					var s2: String = ("x+" if r3.x > 0.0 else "x-") \
+						if absf(r3.x) > absf(r3.z) \
+						else ("z+" if r3.z > 0.0 else "z-")
+					if s2 == side:
+						Sfx.play("denied")
+						var hud3 = get_tree().get_first_node_in_group("hud")
+						if hud3:
+							hud3.flash("ONE door frame per wall")
+						_cancel_ghost()
+						return
+				# snap: the frame faces OUT through its wall (docking
+				# throws the hallway out the local -Z)
+				tf = Transform3D(Basis(Vector3.UP, atan2(-outv.x, -outv.z)), tf.origin)
 		var fn := Furniture.new()
 		fn.kind = _ghost_kind
 		get_parent().add_child(fn)
@@ -603,7 +725,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	_cooldown -= delta
-	if not _ui_open() and not Game.dead and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _cooldown <= 0.0:
+	if not _ui_open() and not Game.dead and not _door_mode \
+			and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _cooldown <= 0.0:
 		_fire()
 		_cooldown = float(Inventory.current_weapon()["rate"])
 	_update_shake(delta)
@@ -1359,7 +1482,7 @@ func _use_selected() -> void:
 				if k2 == "doorframe":
 					lbl2 = "Door Frame (place INSIDE, on a wall)"
 				fopts.append({"id": k2, "label": lbl2})
-			fopts.append({"id": "door", "label": "Door (OUTSIDE: link two framed houses)"})
+			fopts.append({"id": "door", "label": "Door Tool (click two door frames)"})
 			var pui2 := PickUI.new().configure("FURNITURE (2 plantfiber)", fopts,
 				func(kind: String) -> void:
 					if kind == "door":

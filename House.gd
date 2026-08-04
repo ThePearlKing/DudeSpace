@@ -1215,6 +1215,31 @@ func furnish_for(pers: Dictionary) -> void:
 # ------------------------------------------------- door-merge machinery
 
 ## Every unlinked doorframe standing inside this house's rooms.
+## The house whose room contains a pocket-space point (or null).
+static func house_at(p: Vector3) -> House:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return null
+	for h in tree.get_nodes_in_group("house"):
+		if h is House and is_instance_valid(h):
+			var sz: Vector3 = h.room_size()
+			var rel: Vector3 = p - h.room_center()
+			if absf(rel.x) < sz.x * 0.6 and absf(rel.z) < sz.z * 0.6 \
+					and absf(rel.y) < sz.y:
+				return h
+	return null
+
+## Every frame in this room, linked or not (wall-occupancy checks).
+func all_frames() -> Array:
+	var out: Array = []
+	var c := room_center()
+	var r := room_size().length()
+	for f in get_tree().get_nodes_in_group("doorframe"):
+		if f is Furniture and is_instance_valid(f) \
+				and f.global_position.distance_to(c) < r:
+			out.append(f)
+	return out
+
 func my_frames() -> Array:
 	var out: Array = []
 	var c := room_center()
@@ -1437,20 +1462,13 @@ func build_link_visuals(other) -> void:
 			tube.add_child(linklbl)
 			linklbl.position = Vector3(0, 1.6, 0)
 
-## THE MERGE: dock `other`'s complex so its frame faces ours across a
-## short hallway. Everything inside moves with it. Everything.
-func connect_house(other) -> bool:
+## Would docking `other` through these two frames work? Returns
+## {ok, reason, delta, moving} -- the door tool asks BEFORE cutting.
+func dock_check(fa: Node3D, other, fb: Node3D) -> Dictionary:
 	if other == self or other == null or not is_instance_valid(other):
-		return false
+		return {"ok": false, "reason": "same house", "delta": Vector3.ZERO}
 	if other.slot in links:
-		return false
-	var mine := my_frames()
-	var theirs: Array = other.my_frames()
-	if mine.is_empty() or theirs.is_empty():
-		return false
-	var fa: Node3D = mine[0]
-	var fb: Node3D = theirs[0]
-	# frames face out their local -Z; dock fb 3.0m in front of fa
+		return {"ok": false, "reason": "already connected", "delta": Vector3.ZERO}
 	var fwd_a: Vector3 = -fa.global_transform.basis.z
 	fwd_a.y = 0.0
 	if fwd_a.length() < 0.1:
@@ -1461,11 +1479,19 @@ func connect_house(other) -> bool:
 	delta.y = fa.global_position.y - fb.global_position.y
 	var moving: Array = other.complex()
 	if moving.has(self):
-		return false
+		return {"ok": false, "reason": "same complex -- that fold is non-euclidean",
+			"delta": Vector3.ZERO}
 	if not _area_free(delta, moving):
+		return {"ok": false, "reason": "rooms would collide", "delta": delta}
+	return {"ok": true, "reason": "", "delta": delta, "moving": moving}
+
+## THE MERGE, via two specific frames (the door tool's chosen pair).
+func connect_frames(fa: Node3D, other, fb: Node3D) -> bool:
+	var ck := dock_check(fa, other, fb)
+	if not bool(ck["ok"]):
 		return false
-	for h in moving:
-		h.shift_rooms(delta)
+	for h in ck["moving"]:
+		h.shift_rooms(ck["delta"])
 	links.append(other.slot)
 	other.links.append(slot)
 	fa.set_meta("linked", true)
@@ -1481,6 +1507,16 @@ func connect_house(other) -> bool:
 	build_link_visuals(other)
 	Sfx.play("learn", -6.0)
 	return true
+
+## Legacy path (tests, nearest-frame docking): first free frame each.
+func connect_house(other) -> bool:
+	if other == null or not is_instance_valid(other):
+		return false
+	var mine := my_frames()
+	var theirs: Array = other.my_frames()
+	if mine.is_empty() or theirs.is_empty():
+		return false
+	return connect_frames(mine[0], other, theirs[0])
 
 func _exit_tree() -> void:
 	# demolition severs every docking link so neighbours don't keep a

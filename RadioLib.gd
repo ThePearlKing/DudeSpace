@@ -95,6 +95,18 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wavr := _rock_loop(seed_v, st)
 		_music_cache[key] = wavr
 		return wavr
+	if kind == "blackhole":
+		var wavb := _bh_loop()
+		_music_cache[key] = wavb
+		return wavb
+	if kind == "sun":
+		var wavs := _star_loop(seed_v)
+		_music_cache[key] = wavs
+		return wavs
+	if kind == "ice":
+		var wavi := _ice_loop()
+		_music_cache[key] = wavi
+		return wavi
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var beat := 60.0 / float(st["bpm"])
@@ -329,6 +341,122 @@ static func _rock_loop(seed_v: int, st: Dictionary) -> AudioStreamWAV:
 	wav.data = bytes
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	wav.loop_end = total
+	return wav
+
+## TIN 618: what a black hole sounds like on the dial. Bottomless
+## detuned drones bending under the loop phase, slow accretion sweeps
+## of filtered noise, and a sub-thump like something orbiting too close.
+static var _bh_wav: AudioStreamWAV = null
+
+static func _bh_loop() -> AudioStreamWAV:
+	if _bh_wav:
+		return _bh_wav
+	var total := int(14.0 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	for i in total:
+		var t := float(i) / SR
+		var lp := float(i) / float(total) * TAU
+		var v := sin(TAU * 34.0 * t + 3.0 * sin(lp)) * 0.3 \
+			+ sin(TAU * 51.0 * t + 2.0 * sin(lp * 2.0)) * 0.18 \
+			+ sin(TAU * 27.0 * t) * 0.16 * (0.5 + 0.5 * sin(lp * 3.0))
+		# accretion sweeps: noise that rushes past twice a loop
+		var g := maxf(0.0, sin(lp * 2.0 + sin(lp)) - 0.55) * 2.2
+		v += (randf() * 2.0 - 1.0) * 0.12 * g * g
+		# the too-close orbit: a sub thump, four per loop
+		var ph := fmod(t, 3.5)
+		if ph < 0.25:
+			v += sin(TAU * 30.0 * ph) * exp(-ph * 18.0) * 0.5
+		buf[i] = v * (0.75 + 0.25 * sin(lp))
+	return _encode_loop(buf, total, "_bh")
+
+## Stars hum. Weirdly. Inharmonic shimmer partials breathing on their
+## own clocks, solar-crackle granules, and a deep fusion roar.
+static func _star_loop(seed_v: int) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var total := int(12.0 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	var f0 := roundf(rng.randf_range(320.0, 640.0) * 12.0) / 12.0
+	var parts: Array = [1.0, 2.76, 4.07, 5.43]
+	var phases: Array = []
+	for k in parts.size():
+		phases.append(rng.randf() * TAU)
+	for i in total:
+		var t := float(i) / SR
+		var lp := float(i) / float(total) * TAU
+		var v := sin(TAU * 55.0 * t) * 0.12   # the roar
+		for k in parts.size():
+			var am := 0.5 + 0.5 * sin(lp * float(k + 1) + float(phases[k]))
+			v += sin(TAU * f0 * float(parts[k]) * t) * 0.09 * am
+		buf[i] = v
+	# solar crackle: granular pops, denser than silence, sparser than rain
+	for c in 260:
+		var st2 := rng.randi() % (total - 220)
+		var amp := rng.randf_range(0.05, 0.16)
+		for j in 200:
+			buf[st2 + j] += (rng.randf() * 2.0 - 1.0) * amp * exp(-float(j) / 40.0)
+	return _encode_loop(buf, total, "")
+
+## XERO: cold maj7/maj9 chord pads swelling over a constant low drone
+## with a slow detune shimmer, sparse high bells off the chord tones,
+## and a thin wind. Nothing like Crystalia's arpeggios.
+static var _ice_wav: AudioStreamWAV = null
+
+static func _ice_loop() -> AudioStreamWAV:
+	if _ice_wav:
+		return _ice_wav
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	var base := 294.0
+	var total := int(14.0 * SR)
+	var barlen := int(3.5 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# the drone: root an octave down + a hair-detuned twin (slow beating)
+	for i in total:
+		var t := float(i) / SR
+		buf[i] += (sin(TAU * 147.0 * t) + sin(TAU * 147.35 * t)) * 0.09 \
+			+ (randf() * 2.0 - 1.0) * 0.014   # the wind
+	# chords: Imaj7 IVmaj7 vim7 V7 -- swelling pads, zero at bar edges
+	var prog: Array = [[0, 4, 7, 11], [5, 9, 12, 16], [-3, 0, 4, 7], [7, 11, 14, 17]]
+	for bar in 4:
+		var ch: Array = prog[bar]
+		var b0 := bar * barlen
+		for semi in ch:
+			var f := base * pow(2.0, float(semi) / 12.0)
+			for i in mini(barlen, total - b0):
+				var t2 := float(i) / SR
+				var env := sin(PI * float(i) / float(barlen))   # swell in, swell out
+				buf[b0 + i] += sin(TAU * f * t2) * 0.055 * env * env
+		# two or three bells off the chord, high and brief
+		for nb in 2 + rng.randi() % 2:
+			var bf := base * 2.0 * pow(2.0, float(ch[rng.randi() % ch.size()]) / 12.0)
+			var bs := b0 + rng.randi() % int(barlen * 0.7)
+			for i in mini(int(1.4 * SR), total - bs):
+				var t3 := float(i) / SR
+				buf[bs + i] += (sin(TAU * bf * t3) + 0.4 * sin(TAU * bf * 2.76 * t3)) \
+					* 0.11 * exp(-t3 * 3.2)
+	return _encode_loop(buf, total, "_ice")
+
+## Shared tail: normalize-ish clamp, 16-bit, forward loop. cache_slot
+## "_bh"/"_ice" pins the wav to the matching static (seedless loops).
+static func _encode_loop(buf: PackedFloat32Array, total: int, cache_slot: String) -> AudioStreamWAV:
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
+	if cache_slot == "_bh":
+		_bh_wav = wav
+	elif cache_slot == "_ice":
+		_ice_wav = wav
 	return wav
 
 ## The shadow temple's frequency: no music, no words. A slow drone,
