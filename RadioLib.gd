@@ -1318,6 +1318,11 @@ const AX_VOICE_POST := {
 		" the universe is so much."],
 	3: [" as it always was.", " nothing changes.", " i've said my piece."]}
 
+## Safe single-slot format: lines without a %s pass through untouched
+## (several call-in lines have no blank -- forcing % on them crashed).
+static func _fmt1(t: String, a: String) -> String:
+	return t % a if t.find("%s") >= 0 else t
+
 ## The personality pass: ~one line in four picks up its speaker's habit.
 static func _ax_voice(host: int, line: String) -> String:
 	if randi() % 4 != 0:
@@ -1375,9 +1380,9 @@ static func alien_exchange(in_room: bool = false) -> Array:
 		0:
 			out = _ax_story(p, p2, not AP.has(p))
 		1:
-			out = [[0, _ax_fresh(AX_CALL_IN) % p],
-				[2, _ax_fresh(AP_QUESTIONS) % p2],
-				[1, _ax_fresh(AP_ANSWERS) % p2],
+			out = [[0, _fmt1(_ax_fresh(AX_CALL_IN), p)],
+				[2, _fmt1(_ax_fresh(AP_QUESTIONS), p2)],
+				[1, _fmt1(_ax_fresh(AP_ANSWERS), p2)],
 				[0, _ax_fresh(AX_CALL_OUT)]]
 		2:
 			# a COMPOSED debate: fresh subject, fresh claim, fresh counter,

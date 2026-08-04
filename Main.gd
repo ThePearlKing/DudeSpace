@@ -1161,6 +1161,8 @@ func _notification(what: int) -> void:
 		# of "leaked at exit" warnings on quit. Drop them first.
 		Surfaces.shutdown()
 		IconLib.shutdown(get_tree())
+		Human._prism_mat = null
+		ShaderLib._fx_shader = null
 		RadioLib._music_cache.clear()
 		RadioLib._static_wav = null
 		RadioLib._eerie_wav = null
