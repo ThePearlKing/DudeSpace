@@ -631,11 +631,14 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 					var env3 := minf(1.0, float(i) / (SR * 0.003)) \
 						* (1.0 - float(i) / (s16 * 0.9) * 0.5)
 					buf[bs2 + i] += tri2 * 0.34 * env3
-			# PART 2 drums: a real electro-funk kit. Two alternating bar
-			# patterns, swung hats with accents and an open hat, ghost
-			# snares, and every fourth bar ends in a rising tom-snare fill.
+			# PART 2 drums: an actually complicated kit. Four rotating
+			# syncopated kick patterns, backbeat snares with a GHOST
+			# NETWORK and flams, swung velocity hats with 32nd-note
+			# RATCHETS and open-hat pushes, syncopated toms on odd bars,
+			# and every fourth bar ends in a rising cascade fill.
 			var p2i := bar - 8
-			var kick_pat: Array = [0, 7, 10] if p2i % 2 == 0 else [0, 5, 10, 13]
+			var kick_pat: Array = [[0, 6, 10], [0, 3, 6, 11, 14],
+				[0, 7, 8, 10], [0, 5, 10, 12, 13]][p2i % 4]
 			var fill := p2i % 4 == 3
 			for kn in kick_pat:
 				var ks: int = b0 + int(kn) * s16
@@ -643,14 +646,32 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 					var tk := float(i) / SR
 					buf[ks + i] += sin(TAU * (85.0 - tk * 300.0) * tk) \
 						* exp(-tk * 30.0) * 0.52
-			var snare_pat: Array = [4, 12] if p2i % 2 == 0 else [4, 9, 12]
-			for sn in snare_pat:
+			# snares: backbeat + a shifting web of ghosts + occasional flam
+			for sn in [4, 12]:
 				var ss: int = b0 + int(sn) * s16
-				var samp := 0.3 if int(sn) != 9 else 0.1   # 9 is a ghost
 				for i in mini(int(0.08 * SR), total - ss):
 					buf[ss + i] += ((randf() * 2.0 - 1.0) * 0.7 \
 						+ sin(TAU * 190.0 * float(i) / SR) * 0.3) \
-						* exp(-float(i) / (SR * 0.02)) * samp
+						* exp(-float(i) / (SR * 0.02)) * 0.3
+				if int(sn) == 12 and rng.randf() < 0.5:
+					var fs2: int = ss + int(0.03 * SR)   # the FLAM
+					for i in mini(int(0.05 * SR), total - fs2):
+						buf[fs2 + i] += (randf() * 2.0 - 1.0) \
+							* exp(-float(i) / (SR * 0.015)) * 0.16
+			for gn in [[3, 0.09], [7, 0.11], [9, 0.08], [11, 0.07], [15, 0.1]]:
+				if rng.randf() < 0.55:
+					var gs: int = b0 + int(gn[0]) * s16
+					for i in mini(int(0.045 * SR), total - gs):
+						buf[gs + i] += (randf() * 2.0 - 1.0) \
+							* exp(-float(i) / (SR * 0.012)) * float(gn[1])
+			# toms answer on odd bars: syncopated two-note figures
+			if p2i % 2 == 1:
+				for tspec in [[11, 150.0], [13, 118.0]]:
+					var ts2: int = b0 + int(tspec[0]) * s16
+					for i in mini(int(0.07 * SR), total - ts2):
+						var tt3 := float(i) / SR
+						buf[ts2 + i] += sin(TAU * (float(tspec[1]) - tt3 * 160.0) * tt3) \
+							* exp(-tt3 * 24.0) * 0.26
 			for n4 in 16:
 				if fill and n4 >= 12:
 					continue   # the fill owns the last quarter
@@ -661,6 +682,14 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 				for i in mini(int(hlen * SR), total - hs2):
 					buf[hs2 + i] += (randf() * 2.0 - 1.0) * hamp \
 						* (1.0 - float(i) / (hlen * SR))
+				# RATCHET: sometimes a 16th bursts into a 32nd-note roll
+				if rng.randf() < 0.12:
+					for rk in 3:
+						var rs2: int = hs2 + (rk + 1) * s16 / 4
+						var ramp2 := hamp * (0.8 - 0.2 * float(rk))
+						for i in mini(int(0.008 * SR), total - rs2):
+							buf[rs2 + i] += (randf() * 2.0 - 1.0) * ramp2 \
+								* (1.0 - float(i) / (0.008 * SR))
 			if fill:
 				# rising fill: tom, tom, snare, snare -- each hotter
 				var ffreqs: Array = [140.0, 180.0, 0.0, 0.0]
