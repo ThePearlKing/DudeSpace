@@ -618,10 +618,10 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 			# part one keeps it simple: JUST a clean backbeat snare
 			for sn1 in [4, 12]:
 				var ss1: int = b0 + int(sn1) * s16
-				for i in mini(int(0.07 * SR), total - ss1):
+				for i in mini(int(0.14 * SR), total - ss1):
 					buf[ss1 + i] += ((randf() * 2.0 - 1.0) * 0.7 \
 						+ sin(TAU * 195.0 * float(i) / SR) * 0.3) \
-						* exp(-float(i) / (SR * 0.018)) * 0.26
+						* exp(-float(i) / (SR * 0.035)) * 0.4
 		else:
 			# PART 2 bass: syncopated 16ths walking root/octave/fifth with
 			# chromatic approaches -- the triangle learns to funk
@@ -649,43 +649,43 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 			var fill := p2i % 4 == 3
 			for kn in kick_pat:
 				var ks: int = b0 + int(kn) * s16
-				for i in mini(int(0.09 * SR), total - ks):
+				for i in mini(int(0.16 * SR), total - ks):
 					var tk := float(i) / SR
 					buf[ks + i] += sin(TAU * (85.0 - tk * 300.0) * tk) \
-						* exp(-tk * 30.0) * 0.95
+						* exp(-tk * 16.0) * 1.0
 			# snares: backbeat + a shifting web of ghosts + occasional flam
 			for sn in [4, 12]:
 				var ss: int = b0 + int(sn) * s16
-				for i in mini(int(0.08 * SR), total - ss):
+				for i in mini(int(0.18 * SR), total - ss):
 					buf[ss + i] += ((randf() * 2.0 - 1.0) * 0.7 \
 						+ sin(TAU * 190.0 * float(i) / SR) * 0.3) \
-						* exp(-float(i) / (SR * 0.02)) * 0.55
+						* exp(-float(i) / (SR * 0.045)) * 0.7
 				if int(sn) == 12 and rng.randf() < 0.5:
 					var fs2: int = ss + int(0.03 * SR)   # the FLAM
-					for i in mini(int(0.05 * SR), total - fs2):
+					for i in mini(int(0.1 * SR), total - fs2):
 						buf[fs2 + i] += (randf() * 2.0 - 1.0) \
-							* exp(-float(i) / (SR * 0.015)) * 0.3
+							* exp(-float(i) / (SR * 0.03)) * 0.4
 			for gn in [[3, 0.09], [7, 0.11], [9, 0.08], [11, 0.07], [15, 0.1]]:
 				if rng.randf() < 0.55:
 					var gs: int = b0 + int(gn[0]) * s16
-					for i in mini(int(0.045 * SR), total - gs):
+					for i in mini(int(0.08 * SR), total - gs):
 						buf[gs + i] += (randf() * 2.0 - 1.0) \
-							* exp(-float(i) / (SR * 0.012)) * float(gn[1]) * 2.0
+							* exp(-float(i) / (SR * 0.025)) * float(gn[1]) * 2.4
 			# toms answer on odd bars: syncopated two-note figures
 			if p2i % 2 == 1:
 				for tspec in [[11, 150.0], [13, 118.0]]:
 					var ts2: int = b0 + int(tspec[0]) * s16
-					for i in mini(int(0.07 * SR), total - ts2):
+					for i in mini(int(0.14 * SR), total - ts2):
 						var tt3 := float(i) / SR
 						buf[ts2 + i] += sin(TAU * (float(tspec[1]) - tt3 * 160.0) * tt3) \
-							* exp(-tt3 * 24.0) * 0.5
+							* exp(-tt3 * 14.0) * 0.6
 			for n4 in 16:
 				if fill and n4 >= 12:
 					continue   # the fill owns the last quarter
 				# SWING: odd 16ths land a third late
 				var hs2 := b0 + n4 * s16 + (int(s16 * 0.33) if n4 % 2 == 1 else 0)
 				var hamp := 0.16 if n4 % 4 == 0 else (0.1 if n4 % 2 == 0 else 0.06)
-				var hlen := 0.055 if (n4 == 7 and p2i % 2 == 1) else 0.012
+				var hlen := 0.1 if (n4 == 7 and p2i % 2 == 1) else 0.016
 				for i in mini(int(hlen * SR), total - hs2):
 					buf[hs2 + i] += (randf() * 2.0 - 1.0) * hamp \
 						* (1.0 - float(i) / (hlen * SR))
@@ -713,10 +713,15 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 							buf[fs + i] += ((randf() * 2.0 - 1.0) * 0.75 \
 								+ sin(TAU * 200.0 * tf) * 0.25) \
 								* exp(-tf * 42.0) * famp
+	# normalize: the hot kit was clipping into mush, which read as QUIET
+	var peak := 0.001
+	for i in total:
+		peak = maxf(peak, absf(buf[i]))
+	var g2 := minf(1.4, 0.95 / peak)
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
-		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+		bytes.encode_s16(i * 2, int(clampf(buf[i] * g2, -1.0, 1.0) * 24000.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = SR
