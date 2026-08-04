@@ -580,18 +580,18 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 		buf[i] = v
 	# the BEAT: a slow ceremonial thump with a dry tick between, laid in
 	# BEFORE the echo pass so it smears through the same feedback
-	var bstep := int(SR * 0.75)
+	var bstep := int(SR * 1.4)
 	var bi := 0
 	while bi * bstep < total:
 		var b0 := bi * bstep
 		if bi % 2 == 0:
 			for i in mini(int(0.16 * SR), total - b0):
 				var tb := float(i) / SR
-				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.5
+				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.26
 		else:
 			var toff := b0 + int(float(bstep) * 0.5)
 			for i in mini(int(0.05 * SR), total - toff):
-				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.1
+				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.06
 		bi += 1
 	# feedback echoes: the words keep arriving after they've stopped
 	for e in [[int(SR * 0.29), 0.3], [int(SR * 0.61), 0.15]]:
@@ -599,10 +599,16 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 		var g := float(e[1])
 		for i in range(total - 1, off - 1, -1):
 			buf[i] += buf[i - off] * g
+	# normalize to the true peak: hard clipping here was what let the
+	# beat + echo pileup swallow the voice
+	var peak := 0.001
+	for i in total:
+		peak = maxf(peak, absf(buf[i]))
+	var g := minf(1.2, 0.95 / peak)
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
-		bytes.encode_s16(i * 2, int(clampf(buf[i] * 0.75, -1.0, 1.0) * 24000.0))
+		bytes.encode_s16(i * 2, int(clampf(buf[i] * g, -1.0, 1.0) * 24000.0))
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = SR
