@@ -186,6 +186,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			_confirm_ghost()   # either button places. Esc cancels.
 		get_viewport().set_input_as_handled()
 		return
+	# door/DESTROY modes only bite while the Furniture Placer is in hand;
+	# swap items and your clicks are punches again, no funeral
+	if (_door_mode or _wreck_mode) \
+			and Inventory.slot_id(Inventory.selected) != "furnkit":
+		if _door_mode or _wreck_mode:
+			_door_mode = false
+			_wreck_mode = false
+			_door_frame = null
+			var hudm = get_tree().get_first_node_in_group("hud")
+			if hudm:
+				hudm.flash("door/destroy tool sleeps — hold the Furniture Placer to use it")
 	if _door_mode and event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		_door_click()

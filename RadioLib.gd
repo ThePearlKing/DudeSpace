@@ -357,17 +357,25 @@ static func _bh_loop() -> AudioStreamWAV:
 	for i in total:
 		var t := float(i) / SR
 		var lp := float(i) / float(total) * TAU
-		var v := sin(TAU * 34.0 * t + 3.0 * sin(lp)) * 0.3 \
-			+ sin(TAU * 51.0 * t + 2.0 * sin(lp * 2.0)) * 0.18 \
-			+ sin(TAU * 27.0 * t) * 0.16 * (0.5 + 0.5 * sin(lp * 3.0))
-		# accretion sweeps: noise that rushes past twice a loop
-		var g := maxf(0.0, sin(lp * 2.0 + sin(lp)) - 0.55) * 2.2
-		v += (randf() * 2.0 - 1.0) * 0.12 * g * g
-		# the too-close orbit: a sub thump, four per loop
-		var ph := fmod(t, 3.5)
-		if ph < 0.25:
-			v += sin(TAU * 30.0 * ph) * exp(-ph * 18.0) * 0.5
-		buf[i] = v * (0.75 + 0.25 * sin(lp))
+		var v := 0.0
+		# INFALL: two staggered chirps forever falling in pitch and gone
+		for c in 2:
+			var ph := fmod(t + 7.0 * float(c), 14.0)
+			var env := sin(PI * ph / 14.0)
+			env = env * env
+			var f := 105.0 * exp(-ph * 0.22) + 21.0
+			v += sin(TAU * f * ph) * 0.3 * env
+		# the void bed: barely-there sub, breathing once per loop
+		v += sin(TAU * 23.0 * t) * 0.15 * (0.6 + 0.4 * sin(lp))
+		# accretion wind: dark noise that leans in and away
+		v += (randf() * 2.0 - 1.0) * 0.05 \
+			* (0.35 + 0.65 * maxf(0.0, sin(lp * 2.0 + 1.0)))
+		# the WOOM: a rising sub swell that swallows itself
+		var wp := fmod(t, 14.0)
+		if wp > 5.0 and wp < 9.0:
+			var k := (wp - 5.0) / 4.0
+			v += sin(TAU * (16.0 + 26.0 * k) * wp) * sin(PI * k) * 0.42
+		buf[i] = v
 	return _encode_loop(buf, total, "_bh")
 
 ## Stars hum. Weirdly. Inharmonic shimmer partials breathing on their
@@ -417,8 +425,8 @@ static func _ice_loop() -> AudioStreamWAV:
 	# the drone: root an octave down + a hair-detuned twin (slow beating)
 	for i in total:
 		var t := float(i) / SR
-		buf[i] += (sin(TAU * 147.0 * t) + sin(TAU * 147.35 * t)) * 0.09 \
-			+ (randf() * 2.0 - 1.0) * 0.014   # the wind
+		buf[i] += (sin(TAU * 147.0 * t) + sin(TAU * 147.35 * t)) * 0.115 \
+			+ (randf() * 2.0 - 1.0) * 0.017   # the wind
 	# chords: Imaj7 IVmaj7 vim7 V7 -- swelling pads, zero at bar edges
 	var prog: Array = [[0, 4, 7, 11], [5, 9, 12, 16], [-3, 0, 4, 7], [7, 11, 14, 17]]
 	for bar in 4:
@@ -429,7 +437,7 @@ static func _ice_loop() -> AudioStreamWAV:
 			for i in mini(barlen, total - b0):
 				var t2 := float(i) / SR
 				var env := sin(PI * float(i) / float(barlen))   # swell in, swell out
-				buf[b0 + i] += sin(TAU * f * t2) * 0.055 * env * env
+				buf[b0 + i] += sin(TAU * f * t2) * 0.07 * env * env
 		# two or three bells off the chord, high and brief
 		for nb in 2 + rng.randi() % 2:
 			var bf := base * 2.0 * pow(2.0, float(ch[rng.randi() % ch.size()]) / 12.0)
@@ -437,7 +445,7 @@ static func _ice_loop() -> AudioStreamWAV:
 			for i in mini(int(1.4 * SR), total - bs):
 				var t3 := float(i) / SR
 				buf[bs + i] += (sin(TAU * bf * t3) + 0.4 * sin(TAU * bf * 2.76 * t3)) \
-					* 0.11 * exp(-t3 * 3.2)
+					* 0.14 * exp(-t3 * 3.2)
 	return _encode_loop(buf, total, "_ice")
 
 ## Shared tail: normalize-ish clamp, 16-bit, forward loop. cache_slot
@@ -786,11 +794,11 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		for i in mini(int(0.16 * SR), total - b0):
 			var tb := float(i) / SR
 			var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.15, 1.0)
-			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.38 * duck
+			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.62 * duck
 		var toff := b0 + int(float(barlen) * 0.5)
 		for i in mini(int(0.05 * SR), total - toff):
 			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
-			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.09 * duck2
+			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.15 * duck2
 		bi += 1
 	# the TURNAROUND: a bar-long reverse-cymbal swell that crests exactly
 	# on the loop point, sucking the song back to the top
@@ -805,6 +813,19 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		bbuf[i] += bbuf[i - boff] * 0.35
 	for i in total:
 		buf[i] += bbuf[i]
+	# the DRONES: bar-synced, walking the rap's dark line -- i, i, bIII,
+	# bVII under the monotone. Each bar breathes in and out (no clicks).
+	var droots: Array = [55.0, 55.0, 65.41, 49.0]
+	var nbars := int(ceil(float(total) / float(barlen)))
+	for bi2 in nbars:
+		var f0 := float(droots[bi2 % droots.size()])
+		var b2 := bi2 * barlen
+		for i in mini(barlen, total - b2):
+			var td := float(i) / SR
+			var denv := sin(PI * float(i) / float(barlen))
+			buf[b2 + i] += (sin(TAU * f0 * td) * 0.09 \
+				+ sin(TAU * (f0 + 0.4) * td) * 0.06 \
+				+ sin(TAU * f0 * 1.5 * td) * 0.04) * denv
 	var peak := 0.001
 	for i in total:
 		peak = maxf(peak, absf(buf[i]))

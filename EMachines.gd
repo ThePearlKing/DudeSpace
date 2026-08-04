@@ -738,6 +738,7 @@ class NuclearReactor extends Machine:
 	var _panel_t: float = 0.0
 	var _fuel_meshes: Array = []  # the visible bundle, Cherenkov-lit
 	var _blades: Array = []       # control blades sinking between rods
+	var _waters: Array = []       # the pool volumes, one per window
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
 
 	var _rhits: int = 0
@@ -838,89 +839,113 @@ class NuclearReactor extends Machine:
 		dome.height = 1.4
 		dome.is_hemisphere = true
 		part(dome, Vector3(0, box_size.y, 0), Color("#9a9da0"), 0.05)
-		# THE LEAD WINDOW lives on the SIDE (+x face): a whole assembly --
-		# murky pane, hollow pool, glowing water, fuel bundle, control
-		# blades -- built in a container rotated to face sideways. The
-		# front face belongs entirely to the info panel.
-		var win := Node3D.new()
-		win.rotation_degrees.y = -90.0   # container +z face -> world +x
-		add_child(win)
-		var glass := MeshInstance3D.new()
-		var gbm := BoxMesh.new()
-		gbm.size = Vector3(1.5, 1.4, 0.07)
-		glass.mesh = gbm
-		glass.position = Vector3(0, 1.2, box_size.x * 0.5 + 0.04)
-		var gmat := StandardMaterial3D.new()
-		gmat.albedo_color = Color(0.32, 0.38, 0.42, 0.8)
-		gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		gmat.roughness = 0.12
-		gmat.metallic = 0.35
-		glass.material_override = gmat
-		win.add_child(glass)
-		var zc := box_size.x * 0.5 - 0.42
-		var cav := Color("#0a0e14")
-		var cavm: Material = Destructible.make_material(cav, 0.02)
-		for wall in [[Vector3(1.5, 1.4, 0.05), Vector3(0, 1.2, zc - 0.4)],
-				[Vector3(0.05, 1.4, 0.85), Vector3(-0.76, 1.2, zc)],
-				[Vector3(0.05, 1.4, 0.85), Vector3(0.76, 1.2, zc)],
-				[Vector3(1.5, 0.05, 0.85), Vector3(0, 0.52, zc)],
-				[Vector3(1.5, 0.05, 0.85), Vector3(0, 1.88, zc)]]:
-			var wmi := MeshInstance3D.new()
-			var wmm := BoxMesh.new()
-			wmm.size = wall[0]
-			wmi.mesh = wmm
-			wmi.position = wall[1]
-			wmi.material_override = cavm
-			win.add_child(wmi)
-		# the water: a translucent volume that glows Cherenkov blue
-		var wat := MeshInstance3D.new()
-		var wbm := BoxMesh.new()
-		wbm.size = Vector3(1.42, 1.3, 0.75)
-		wat.mesh = wbm
-		wat.position = Vector3(0, 1.2, zc)
-		var wmat := StandardMaterial3D.new()
-		wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.45)
-		wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		wmat.emission_enabled = true
-		wmat.emission = Color("#38c8ff")
-		wmat.emission_energy_multiplier = 0.2
-		wat.material_override = wmat
-		win.add_child(wat)
-		_glow = wat
-		# the bundle: five fuel rods, each with its own radiation glow
-		for bx in [-0.4, -0.2, 0.0, 0.2, 0.4]:
-			var brod := CylinderMesh.new()
-			brod.top_radius = 0.05
-			brod.bottom_radius = 0.05
-			brod.height = 1.05
-			var frm := MeshInstance3D.new()
-			frm.mesh = brod
-			frm.position = Vector3(bx, 1.15, zc)
-			var fmat := StandardMaterial3D.new()
-			fmat.albedo_color = Color("#464b52")
-			fmat.emission_enabled = true
-			fmat.emission = Color("#38c8ff")
-			fmat.emission_energy_multiplier = 0.1
-			frm.material_override = fmat
-			win.add_child(frm)
-			_fuel_meshes.append(frm)
-		# four control blades between the rods: they SINK as you insert
-		for bx2 in [-0.3, -0.1, 0.1, 0.3]:
-			var bl := MeshInstance3D.new()
-			var blm := BoxMesh.new()
-			blm.size = Vector3(0.05, 1.05, 0.4)
-			bl.mesh = blm
-			bl.position = Vector3(bx2, 1.15, zc)
-			bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
-			win.add_child(bl)
-			_blades.append(bl)
-		# FRONT: the info panel gets the whole face the window used to block
+		# THE LEAD WINDOWS: protruding BAY pools on BOTH sides. The pool
+		# hangs OUTSIDE the hull (the hull face was silently blocking the
+		# old view -- "solid gray glass"), so glass -> water -> rods is a
+		# clear line of sight. Steel shroud around each bay.
+		var hull := box_size.x * 0.5
+		for wside in [-90.0, 90.0]:
+			var win := Node3D.new()
+			win.rotation_degrees.y = wside
+			add_child(win)
+			var zc := hull + 0.42
+			var cavm: Material = Destructible.make_material(Color("#0a0e14"), 0.02)
+			var shroud: Material = Surfaces.metal(Color("#7d838c"))
+			# dark back panel ON the hull face + steel top/bottom/sides
+			for wall in [[Vector3(1.6, 1.5, 0.04), Vector3(0, 1.2, hull + 0.01), cavm],
+					[Vector3(1.6, 0.06, 0.95), Vector3(0, 0.44, zc), shroud],
+					[Vector3(1.6, 0.06, 0.95), Vector3(0, 1.96, zc), shroud],
+					[Vector3(0.06, 1.58, 0.95), Vector3(-0.8, 1.2, zc), shroud],
+					[Vector3(0.06, 1.58, 0.95), Vector3(0.8, 1.2, zc), shroud]]:
+				var wmi := MeshInstance3D.new()
+				var wmm := BoxMesh.new()
+				wmm.size = wall[0]
+				wmi.mesh = wmm
+				wmi.position = wall[1]
+				wmi.material_override = wall[2]
+				win.add_child(wmi)
+			# the water: translucent, Cherenkov-lit
+			var wat := MeshInstance3D.new()
+			var wbm := BoxMesh.new()
+			wbm.size = Vector3(1.5, 1.44, 0.8)
+			wat.mesh = wbm
+			wat.position = Vector3(0, 1.2, zc)
+			var wmat := StandardMaterial3D.new()
+			wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.4)
+			wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			wmat.emission_enabled = true
+			wmat.emission = Color("#38c8ff")
+			wmat.emission_energy_multiplier = 0.2
+			wat.material_override = wmat
+			win.add_child(wat)
+			_waters.append(wat)
+			# fuel bundle: five rods, each with its own radiation glow
+			for bx in [-0.48, -0.24, 0.0, 0.24, 0.48]:
+				var brod := CylinderMesh.new()
+				brod.top_radius = 0.05
+				brod.bottom_radius = 0.05
+				brod.height = 1.3
+				var frm := MeshInstance3D.new()
+				frm.mesh = brod
+				frm.position = Vector3(bx, 1.2, zc)
+				var fmat := StandardMaterial3D.new()
+				fmat.albedo_color = Color("#464b52")
+				fmat.emission_enabled = true
+				fmat.emission = Color("#38c8ff")
+				fmat.emission_energy_multiplier = 0.1
+				frm.material_override = fmat
+				win.add_child(frm)
+				_fuel_meshes.append(frm)
+			# four control blades riding between the rods
+			for bx2 in [-0.36, -0.12, 0.12, 0.36]:
+				var bl := MeshInstance3D.new()
+				var blm := BoxMesh.new()
+				blm.size = Vector3(0.05, 1.3, 0.5)
+				bl.mesh = blm
+				bl.position = Vector3(bx2, 1.2, zc)
+				bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
+				win.add_child(bl)
+				_blades.append(bl)
+			# the lead glass itself: CLEAR enough to actually see through
+			var glass := MeshInstance3D.new()
+			var gbm := BoxMesh.new()
+			gbm.size = Vector3(1.6, 1.5, 0.06)
+			glass.mesh = gbm
+			glass.position = Vector3(0, 1.2, zc + 0.46)
+			var gmat := StandardMaterial3D.new()
+			gmat.albedo_color = Color(0.55, 0.68, 0.6, 0.28)
+			gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			gmat.roughness = 0.08
+			gmat.metallic = 0.2
+			glass.material_override = gmat
+			win.add_child(glass)
+		# BACK dressing: coolant pipes, a valve wheel, a conduit box
+		var pipe_m: Material = Surfaces.metal(Color("#8a6f2a"))
+		for px in [-0.5, 0.0, 0.5]:
+			var pp := CylinderMesh.new()
+			pp.top_radius = 0.09
+			pp.bottom_radius = 0.09
+			pp.height = 2.0
+			part(pp, Vector3(px, 1.1, -box_size.z * 0.5 - 0.12), Color("#8a6f2a"), 0.1)
+		var vw := TorusMesh.new()
+		vw.inner_radius = 0.16
+		vw.outer_radius = 0.26
+		var vmi := MeshInstance3D.new()
+		vmi.mesh = vw
+		vmi.rotation_degrees.x = 90.0
+		vmi.position = Vector3(-0.75, 1.4, -box_size.z * 0.5 - 0.18)
+		vmi.material_override = Surfaces.metal(Color("#c23a2a"))
+		add_child(vmi)
+		var cb := BoxMesh.new()
+		cb.size = Vector3(0.55, 0.75, 0.16)
+		part(cb, Vector3(0.75, 0.7, -box_size.z * 0.5 - 0.1), Color("#2a2f38"), 0.15)
+		# FRONT: the info panel owns the face; text WRAPS to fit the plate
 		var pbk := BoxMesh.new()
 		pbk.size = Vector3(1.3, 1.7, 0.04)
 		part(pbk, Vector3(0, 1.15, box_size.z * 0.5 + 0.02), Color("#10141a"), 0.05)
 		_panel = Label3D.new()
-		_panel.font_size = 30
-		_panel.pixel_size = 0.0046
+		_panel.font_size = 26
+		_panel.pixel_size = 0.0042
 		_panel.modulate = Color("#7be8ff")
 		_panel.outline_size = 4
 		_panel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -935,10 +960,7 @@ class NuclearReactor extends Machine:
 				rod.height = 1.1
 				_rod_meshes.append(part(rod, Vector3(sx, box_size.y + 0.9, sz),
 					Color("#2e3238"), 0.15))
-		# temperature strip up the side + hazard stripes + vent stack
-		var strip := BoxMesh.new()
-		strip.size = Vector3(0.2, 1.8, 0.06)
-		_gauge = part(strip, Vector3(-0.7, 1.2, box_size.z * 0.5 + 0.03), Color("#2bff5a"), 1.0)
+		# hazard stripes + vent stack (the lime gauge strip is gone)
 		for i in 4:
 			var stp := BoxMesh.new()
 			stp.size = Vector3(0.24, 0.24, 0.03)
@@ -998,27 +1020,26 @@ class NuclearReactor extends Machine:
 		for r in _rod_meshes:
 			r.position.y = lerpf(r.position.y, box_size.y + 0.25 + (1.0 - rods) * 0.75,
 				delta * 5.0)
-		if _glow and _glow.material_override:
-			_glow.material_override.emission_energy_multiplier = 0.2 + power * 3.2 \
-				+ (temp / 100.0) * 2.0
+		for wt in _waters:
+			if wt.material_override:
+				wt.material_override.emission_energy_multiplier = 0.2 + power * 3.2 \
+					+ (temp / 100.0) * 2.0
 		# fuel rods glow with the reaction; blades ride the rod servos
 		for fm in _fuel_meshes:
 			if fm.material_override:
 				fm.material_override.emission_energy_multiplier = \
 					0.08 + power * 4.5 + (temp / 100.0) * 1.5
 		for bl in _blades:
-			bl.position.y = lerpf(bl.position.y, 1.15 + (1.0 - rods) * 0.85,
+			bl.position.y = lerpf(bl.position.y, 1.2 + (1.0 - rods) * 0.95,
 				delta * 5.0)
-		if _gauge and _gauge.material_override:
-			_gauge.material_override.emission = Color("#2bff5a").lerp(Color("#ff2b1a"),
-				temp / 100.0)
 		# front panel: terse, honest, slightly blue
 		_panel_t -= delta
 		if _panel != null and _panel_t <= 0.0:
 			_panel_t = 0.3
-			_panel.text = "PWR %3.0f%%  T %3.0f°C  P %3.0f bar\nRODS %3.0f%%  Xe %2.0f%%  COOL %3.0f%%\nFUEL %3.0f%%  FLOW %s  %s" % [
-				power * 100.0, temp * 10.0, press,
-				rods * 100.0, xenon * 100.0, coolant,
+			_panel.text = "PWR %3.0f%%  T %3.0f°C\nP %3.0f bar  Xe %2.0f%%\nRODS %3.0f%%  COOL %3.0f%%\nFUEL %3.0f%%  FLOW %s\n%s" % [
+				power * 100.0, temp * 10.0,
+				press, xenon * 100.0,
+				rods * 100.0, coolant,
 				_fuel / FUEL_SECS * 100.0, ["OFF", "HALF", "FULL"][flow],
 				"SCRAM" if _scram else ["SHUTDOWN", "STARTUP", "RUN"][mode]]
 		# hot core clicks at you. that clicking is a WORD, and the word is RUN
