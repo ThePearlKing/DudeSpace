@@ -30,9 +30,12 @@ func _ready() -> void:
 
 	var panel := Panel.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(470, 870)
-	panel.size = Vector2(470, 870)
-	panel.position = Vector2(-235, -435)
+	# fit the screen: everything past the edge scrolls instead of hanging off
+	var vps := get_viewport().get_visible_rect().size
+	var ph := minf(870.0, vps.y - 24.0)
+	panel.custom_minimum_size = Vector2(470, ph)
+	panel.size = Vector2(470, ph)
+	panel.position = Vector2(-235, -ph * 0.5)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color("#141414")
 	sb.border_color = Color("#e8956a")
@@ -46,9 +49,13 @@ func _ready() -> void:
 	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
 		pad_m.add_theme_constant_override(side, 18)
 	panel.add_child(pad_m)
+	var body_sc := ScrollContainer.new()
+	body_sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	pad_m.add_child(body_sc)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
-	pad_m.add_child(col)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_sc.add_child(col)
 
 	var title := Label.new()
 	title.text = "HUMAN FACE EDITOR  (dev · F9)"

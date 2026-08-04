@@ -259,13 +259,23 @@ func _open_manual() -> void:
 		return
 	_manual = Panel.new()
 	_manual.set_anchors_preset(Control.PRESET_CENTER)
-	_manual.custom_minimum_size = Vector2(560, 520)
+	var vps := get_viewport().get_visible_rect().size
+	_manual.custom_minimum_size = Vector2(600, minf(760.0, vps.y - 60.0))
+	_manual.size = _manual.custom_minimum_size
+	_manual.position = -_manual.size * 0.5
 	var st2 := StyleBoxFlat.new()
 	st2.bg_color = Color("#26241c")
 	st2.border_color = AMBER
 	st2.set_border_width_all(2)
 	_manual.add_theme_stylebox_override("panel", st2)
 	get_child(0).add_child(_manual)
+	var msc := ScrollContainer.new()
+	msc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	msc.offset_left = 18
+	msc.offset_top = 14
+	msc.offset_right = -14
+	msc.offset_bottom = -14
+	_manual.add_child(msc)
 	var t2 := Label.new()
 	t2.text = """OPERATOR'S MANUAL — DO NOT LAMINATE
 
@@ -298,8 +308,7 @@ RULES OF NOT EXPLODING:
 (click MANUAL again to close)"""
 	t2.add_theme_font_size_override("font_size", 14)
 	t2.add_theme_color_override("font_color", Color("#e8dcb8"))
-	t2.position = Vector2(18, 14)
-	_manual.add_child(t2)
+	msc.add_child(t2)
 	Sfx.play("click", -16.0)
 
 func close() -> void:

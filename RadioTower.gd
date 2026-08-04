@@ -188,9 +188,20 @@ func signal_for(st: Dictionary) -> float:
 func align_for(st: Dictionary) -> float:
 	if _is_local(st):
 		return 1.0
-	return clampf((aim_dir.dot(station_dir(st)) - 0.996) / 0.004, 0.0, 1.0)
+	# the beam only has to TOUCH the planet's field, not its center dot:
+	# widen acceptance by the body's angular radius (x2.5 for the field)
+	var slack := 0.0
+	if st["body"] != null:
+		var dist := _site().distance_to(st["body"].center)
+		if dist > 1.0:
+			var ang := asin(clampf(float(st["body"].radius) * 2.5 / dist, 0.0, 0.9))
+			slack = 1.0 - cos(ang)
+	return clampf((aim_dir.dot(station_dir(st)) - (0.996 - slack)) / 0.004, 0.0, 1.0)
 
-func aim_at(body_center: Vector3) -> void:
+var track_body = null       # left-click lock: the dish FOLLOWS this body
+var track_node: Node3D = null   # ...or this node (the noodle god roams)
+
+func _aim_toward(body_center: Vector3) -> void:
 	var sp := _site()
 	var nb = Universe.nearest(sp)
 	if body_center.distance_to(nb.center) < 1.0 \
@@ -198,6 +209,9 @@ func aim_at(body_center: Vector3) -> void:
 		aim_dir = (sp - nb.center).normalized()   # local: aim UP
 	else:
 		aim_dir = (body_center - sp).normalized()
+
+func aim_at(body_center: Vector3) -> void:
+	_aim_toward(body_center)
 	Sfx.play("click", -16.0)
 
 func use() -> void:
@@ -296,6 +310,11 @@ func work(delta: float) -> void:
 func _process(d: float) -> void:
 	super._process(d)
 	_site_t -= d
+	# a locked dish TRACKS its target as it moves
+	if track_node != null and is_instance_valid(track_node):
+		aim_dir = (track_node.global_position - _site()).normalized()
+	elif track_body != null:
+		_aim_toward(track_body.center)
 	# the dish TRACKS the aim always -- powered or not, you can see
 	# where it's pointed from across the yard
 	if _dish_pivot and aim_dir.length() > 0.1:

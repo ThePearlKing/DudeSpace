@@ -198,10 +198,13 @@ func _map_input(event: InputEvent) -> void:
 		var w = get_tree().get_first_node_in_group("noodle_watcher")
 		if w != null and w is Node3D \
 				and _to_px(w.global_position).distance_to(event.position) < bd:
-			radio.aim_dir = (w.global_position - radio.global_position).normalized()
+			radio.track_body = null
+			radio.track_node = w   # the dish follows the god around
 			Sfx.play("click", -14.0)
 			return
 		if best != null:
+			radio.track_node = null
+			radio.track_body = best   # follow the planet as it moves
 			radio.aim_at(best.center)
 	elif event.button_index == MOUSE_BUTTON_RIGHT:
 		# RIGHT: free-aim -- point the dish at the clicked spot on the map
@@ -209,6 +212,8 @@ func _map_input(event: InputEvent) -> void:
 		var half := _map.size * 0.5
 		var rel: Vector2 = (event.position - half) / half
 		var world := Vector3(rel.x * sc, radio.global_position.y, rel.y * sc)
+		radio.track_body = null
+		radio.track_node = null
 		radio.aim_dir = (world - radio.global_position).normalized()
 		Sfx.play("click", -18.0)
 

@@ -390,12 +390,14 @@ static func rick_song() -> AudioStreamWAV:
 				for i in mini(int(0.09 * SR), total - sn):
 					buf[sn + i] += (randf() * 2.0 - 1.0) * 0.19 * (1.0 - float(i) / (0.09 * SR))
 	# --- the voice: [syllable, pitch Hz, start beat, length beats] ---
+	# 16th-note pickup ne-ver-gon-na, then the payoff on the beat grid,
+	# high note on the verb, stepping DOWN through "you up"/"you down"
 	var up_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
 		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
-		["giv", 494.0, 1.0, 0.75], ["yoo", 494.0, 1.75, 0.5], ["up", 440.0, 2.25, 1.2]]
+		["giv", 494.0, 1.0, 0.5], ["yoo", 440.0, 1.5, 0.5], ["up", 392.0, 2.0, 1.6]]
 	var down_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
 		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
-		["let", 440.0, 1.0, 0.75], ["yoo", 440.0, 1.75, 0.5], ["doun", 392.0, 2.25, 1.2]]
+		["let", 440.0, 1.0, 0.5], ["yoo", 392.0, 1.5, 0.5], ["doun", 294.0, 2.0, 1.6]]
 	for rep in [0.0, 4.0]:
 		for ph in [[rep, up_line], [rep + 2.0, down_line]]:
 			var bar_off: float = float(ph[0])
