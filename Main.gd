@@ -149,6 +149,8 @@ func _ready() -> void:
 		_nade_test()
 	if OS.get_environment("CTD_TEST") == "14":
 		_sitshirt_test()
+	if OS.get_environment("CTD_TEST") == "15":
+		_reactor_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -435,6 +437,34 @@ func _sitshirt_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	get_viewport().get_texture().get_image().save_png(OS.get_environment("CTD_SHOT"))
 	print("SITSHIRT saved  act=", hum._act)
+
+## Headless: exercise the reactor control-room interlocks.
+func _reactor_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var rx := EMachines.NuclearReactor.new()
+	add_child(rx)
+	rx.global_position = Vector3(0, 200, 0)
+	await get_tree().create_timer(0.3).timeout
+	print("RXTEST rods in shutdown refused: ", not rx.order_rods(-0.05))
+	rx.flow = 0
+	print("RXTEST startup w/o flow refused: ", not rx.set_mode(1))
+	rx.flow = 2
+	print("RXTEST startup w/ flow ok: ", rx.set_mode(1))
+	rx.order_rods(-0.5)
+	rx.order_rods(-0.5)
+	print("RXTEST startup rod floor 45%%: ", absf(rx.rods_target - 0.45) < 0.001)
+	print("RXTEST RUN on cold core refused: ", not rx.set_mode(2))
+	rx.power = 0.5
+	rx.temp = 30.0
+	print("RXTEST RUN on hot core ok: ", rx.set_mode(2))
+	rx.power = 0.01
+	rx.toggle_breaker()
+	print("RXTEST weak-steam sync trips: ", not rx.breaker and rx.trip_t > 0.0)
+	rx.power = 0.8
+	rx.toggle_breaker()
+	print("RXTEST good sync closes: ", rx.breaker)
+	rx.do_scram()
+	print("RXTEST scram: ", rx._scram and rx.rods_target == 1.0 and not rx.breaker)
 
 ## Headless: one grenade, one point-blank furnace, one furnace at 5m,
 ## one bystander. Count the casualties.

@@ -1,0 +1,272 @@
+class_name ReactorUI
+extends CanvasLayer
+## The reactor CONTROL ROOM. Not a right-click menu -- a panel, with
+## everything a licensed operator expects: a mode keyswitch with real
+## permissive interlocks, fine and coarse rod control, primary loop
+## flow, a turbine breaker you can trip by syncing too early, a
+## GUARDED pressure vent (arm it first, like the switch covers say),
+## an annunciator lamp grid, live instrumentation, and one big SCRAM.
+
+const AMBER := Color("#ffb347")
+const GREEN := Color("#5aff8a")
+const RED := Color("#ff4040")
+const DARKL := Color("#3a3126")
+
+var rx = null   # the NuclearReactor being operated
+var _read: Label
+var _lamps := {}
+var _arm_t := 0.0
+var _vent_b: Button
+var _mode_btns: Array = []
+
+func open(reactor) -> void:
+	rx = reactor
+
+func _ready() -> void:
+	layer = 19
+	add_to_group("reactor_ui")
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var root := Panel.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color("#1c1d20")
+	st.border_color = AMBER.darkened(0.5)
+	st.set_border_width_all(2)
+	root.add_theme_stylebox_override("panel", st)
+	add_child(root)
+	var title := Label.new()
+	title.text = "☢  REACTOR CONTROL — UNIT 1"
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", AMBER)
+	title.position = Vector2(28, 14)
+	root.add_child(title)
+	var sub := Label.new()
+	sub.text = "ESC closes the panel. the core does not pause with you."
+	sub.add_theme_font_size_override("font_size", 13)
+	sub.add_theme_color_override("font_color", Color("#8a8d90"))
+	sub.position = Vector2(30, 50)
+	root.add_child(sub)
+	var x := Button.new()
+	x.text = "✕"
+	x.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	x.position = Vector2(-60, 14)
+	x.custom_minimum_size = Vector2(46, 46)
+	x.pressed.connect(close)
+	root.add_child(x)
+
+	# LEFT: annunciator grid. lamps you learn to fear.
+	var lam := GridContainer.new()
+	lam.columns = 2
+	lam.anchor_left = 0.03
+	lam.anchor_top = 0.14
+	lam.anchor_right = 0.3
+	lam.anchor_bottom = 0.6
+	root.add_child(lam)
+	for key in ["HI TEMP", "HI PRESS", "LO COOLANT", "XENON PEAK",
+			"ρ POSITIVE", "TURB TRIP", "FUEL LOW", "SCRAM"]:
+		var cell := Panel.new()
+		cell.custom_minimum_size = Vector2(150, 44)
+		var cs := StyleBoxFlat.new()
+		cs.bg_color = DARKL
+		cs.set_border_width_all(1)
+		cs.border_color = Color("#000")
+		cell.add_theme_stylebox_override("panel", cs)
+		var cl := Label.new()
+		cl.text = key
+		cl.set_anchors_preset(Control.PRESET_CENTER)
+		cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cl.add_theme_font_size_override("font_size", 14)
+		cl.add_theme_color_override("font_color", Color("#6a6255"))
+		cell.add_child(cl)
+		lam.add_child(cell)
+		_lamps[key] = {"cell": cell, "style": cs, "label": cl}
+
+	# MIDDLE: instrumentation
+	_read = Label.new()
+	_read.anchor_left = 0.33
+	_read.anchor_top = 0.14
+	_read.add_theme_font_size_override("font_size", 17)
+	_read.add_theme_color_override("font_color", GREEN)
+	root.add_child(_read)
+
+	# RIGHT: the controls
+	var col := VBoxContainer.new()
+	col.anchor_left = 0.62
+	col.anchor_top = 0.12
+	col.anchor_right = 0.97
+	col.anchor_bottom = 0.97
+	col.add_theme_constant_override("separation", 6)
+	root.add_child(col)
+
+	col.add_child(_section("MODE  (permissive interlocks)"))
+	var modes := HBoxContainer.new()
+	for i in 3:
+		var mb := Button.new()
+		mb.text = ["SHUTDOWN", "STARTUP", "RUN"][i]
+		mb.custom_minimum_size = Vector2(110, 40)
+		mb.pressed.connect(_set_mode.bind(i))
+		modes.add_child(mb)
+		_mode_btns.append(mb)
+	col.add_child(modes)
+
+	col.add_child(_section("CONTROL RODS  (servo-driven)"))
+	var rodrow := HBoxContainer.new()
+	for spec in [["OUT 5%", -0.05], ["OUT 1%", -0.01], ["IN 1%", 0.01], ["IN 5%", 0.05]]:
+		var rb := Button.new()
+		rb.text = spec[0]
+		rb.custom_minimum_size = Vector2(84, 40)
+		rb.pressed.connect(_rods.bind(float(spec[1])))
+		rodrow.add_child(rb)
+	col.add_child(rodrow)
+
+	col.add_child(_section("PRIMARY LOOP / TURBINE"))
+	var prow := HBoxContainer.new()
+	var fb := Button.new()
+	fb.text = "FLOW: cycle"
+	fb.custom_minimum_size = Vector2(120, 40)
+	fb.pressed.connect(func() -> void:
+		if rx:
+			rx.flow = (rx.flow + 1) % 3
+			Sfx.play("click", -12.0))
+	prow.add_child(fb)
+	var bb := Button.new()
+	bb.text = "BREAKER"
+	bb.custom_minimum_size = Vector2(120, 40)
+	bb.pressed.connect(func() -> void:
+		if rx:
+			rx.toggle_breaker())
+	prow.add_child(bb)
+	col.add_child(prow)
+
+	col.add_child(_section("RELIEF VENT  (guarded)"))
+	var vrow := HBoxContainer.new()
+	var ab := Button.new()
+	ab.text = "ARM"
+	ab.custom_minimum_size = Vector2(84, 40)
+	ab.pressed.connect(func() -> void:
+		_arm_t = 3.0
+		Sfx.play("click", -10.0))
+	vrow.add_child(ab)
+	_vent_b = Button.new()
+	_vent_b.text = "VENT"
+	_vent_b.custom_minimum_size = Vector2(84, 40)
+	_vent_b.disabled = true
+	_vent_b.pressed.connect(func() -> void:
+		if rx and _arm_t > 0.0:
+			rx.press = maxf(0.0, rx.press - 30.0)
+			rx.coolant = maxf(0.0, rx.coolant - 12.0)
+			_arm_t = 0.0
+			Sfx.play("hurt", -16.0))
+	vrow.add_child(_vent_b)
+	col.add_child(vrow)
+
+	col.add_child(_section("FUEL"))
+	var lb := Button.new()
+	lb.text = "LOAD URANIUM ROD (from inventory)"
+	lb.custom_minimum_size = Vector2(200, 40)
+	lb.pressed.connect(func() -> void:
+		if rx and Inventory.res_count("uranium") > 0:
+			Inventory.remove_res("uranium", 1)
+			if str(rx.in_slot["id"]) == "uranium":
+				rx.in_slot["n"] = int(rx.in_slot["n"]) + 1
+			else:
+				rx.in_slot = {"id": "uranium", "n": 1}
+			Sfx.play("place")
+		else:
+			Sfx.play("denied"))
+	col.add_child(lb)
+
+	var scram := Button.new()
+	scram.text = "S C R A M"
+	scram.custom_minimum_size = Vector2(220, 64)
+	var ss := StyleBoxFlat.new()
+	ss.bg_color = Color("#7a1616")
+	ss.border_color = RED
+	ss.set_border_width_all(2)
+	ss.set_corner_radius_all(32)
+	scram.add_theme_stylebox_override("normal", ss)
+	var sh := ss.duplicate()
+	sh.bg_color = Color("#a82020")
+	scram.add_theme_stylebox_override("hover", sh)
+	scram.add_theme_stylebox_override("pressed", sh)
+	scram.add_theme_color_override("font_color", Color.WHITE)
+	scram.add_theme_font_size_override("font_size", 24)
+	scram.pressed.connect(func() -> void:
+		if rx:
+			rx.do_scram())
+	col.add_child(scram)
+
+func _section(txt: String) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.add_theme_font_size_override("font_size", 15)
+	l.add_theme_color_override("font_color", AMBER)
+	return l
+
+func _set_mode(m: int) -> void:
+	if rx == null:
+		return
+	if not rx.set_mode(m):
+		Sfx.play("denied")   # permissive not met. read the placard.
+	else:
+		Sfx.play("click", -10.0)
+
+func _rods(d: float) -> void:
+	if rx == null:
+		return
+	if not rx.order_rods(d):
+		Sfx.play("denied")
+	else:
+		Sfx.play("click", -14.0)
+
+func close() -> void:
+	queue_free()
+	if not Game.dead:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_ESCAPE:
+		close()
+		get_viewport().set_input_as_handled()
+
+func _process(delta: float) -> void:
+	if rx == null or not is_instance_valid(rx):
+		close()
+		return
+	_arm_t = maxf(0.0, _arm_t - delta)
+	if _vent_b:
+		_vent_b.disabled = _arm_t <= 0.0
+		_vent_b.text = "VENT (%.0fs)" % _arm_t if _arm_t > 0.0 else "VENT"
+	# mode button highlight
+	for i in _mode_btns.size():
+		_mode_btns[i].modulate = Color(1, 1, 1, 1.0) if rx.mode == i else Color(1, 1, 1, 0.45)
+	var rho: float = rx.rho_now()
+	_read.text = "POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" % [
+		rx.power * 100.0, rho, rx.rods * 100.0, rx.rods_target * 100.0,
+		rx.xenon * 100.0, rx.temp * 10.0, rx.press,
+		rx.coolant, ["OFF", "HALF", "FULL"][rx.flow],
+		"CLOSED (exporting)" if rx.breaker else "OPEN",
+		rx.out_eu_s(), rx.buf, rx.buf_cap,
+		("%ds" % int(rx._fuel)) if rx._fuel > 0.0 else "EMPTY  · hopper: " + str(int(rx.in_slot["n"])) + " rods" if str(rx.in_slot["id"]) == "uranium" else "EMPTY"]
+	_lamp("HI TEMP", rx.temp > 55.0, rx.temp > 80.0)
+	_lamp("HI PRESS", rx.press > 65.0, rx.press > 85.0)
+	_lamp("LO COOLANT", rx.coolant < 55.0, rx.coolant < 30.0)
+	_lamp("XENON PEAK", rx.xenon > 0.5, rx.xenon > 0.75)
+	_lamp("ρ POSITIVE", rho > 0.0, rho > 0.12)
+	_lamp("TURB TRIP", rx.trip_t > 0.0, false)
+	_lamp("FUEL LOW", rx._fuel < 15.0 and str(rx.in_slot["id"]) == "", rx._fuel <= 0.0)
+	_lamp("SCRAM", rx._scram, false)
+
+func _lamp(key: String, on: bool, urgent: bool) -> void:
+	var l: Dictionary = _lamps[key]
+	var col: Color = DARKL
+	var fcol := Color("#6a6255")
+	if urgent:
+		col = RED if int(Time.get_ticks_msec() / 250) % 2 == 0 else DARKL
+		fcol = Color.WHITE
+	elif on:
+		col = AMBER.darkened(0.15)
+		fcol = Color("#1c1d20")
+	l["style"].bg_color = col
+	l["label"].add_theme_color_override("font_color", fcol)

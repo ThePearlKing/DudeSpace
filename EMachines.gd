@@ -731,7 +731,61 @@ class NuclearReactor extends Machine:
 	var coolant: float = 100.0    # coolant inventory %
 	var flow: int = 2             # coolant flow: 0 off · 1 half · 2 full
 	var _scram: bool = false      # rods dropping under gravity, not servo
+	var mode: int = 0             # 0 SHUTDOWN · 1 STARTUP · 2 RUN (permissives)
+	var breaker: bool = false     # turbine breaker: closed = exporting
+	var trip_t: float = 0.0       # turbine trip lamp timer
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
+
+	## Reactivity as the instruments see it.
+	func rho_now() -> float:
+		if _fuel <= 0.0:
+			return -1.0
+		return (0.65 - rods) * 0.9 - xenon * 0.5 - (temp / 100.0) * 0.25
+
+	func out_eu_s() -> float:
+		return MAX_EU_S * 1.4 * power * (float(flow) * 0.5) if breaker else 0.0
+
+	## MODE keyswitch with real permissives: RUN needs a warm, critical
+	## core; STARTUP needs coolant flow. SHUTDOWN always accepts.
+	func set_mode(m: int) -> bool:
+		if m == mode:
+			return true
+		if m == 1 and flow == 0:
+			return false           # no startup without primary flow
+		if m == 2 and (power < 0.03 or temp < 15.0):
+			return false           # can't declare RUN on a cold core
+		mode = m
+		if mode == 0:
+			rods_target = 1.0      # shutdown means shutdown
+		return true
+
+	## Rod orders respect the mode: none in SHUTDOWN, limited in STARTUP.
+	func order_rods(d: float) -> bool:
+		if mode == 0:
+			return false
+		var lo := 0.45 if mode == 1 else 0.0
+		rods_target = clampf(rods_target + d, lo, 1.0)
+		return true
+
+	## Closing the breaker with weak steam TRIPS the turbine. Sync when
+	## the plant is actually making steam, like a professional.
+	func toggle_breaker() -> void:
+		if breaker:
+			breaker = false
+			Sfx.play("click", -10.0)
+			return
+		if power * float(flow) * 0.5 < 0.12:
+			trip_t = 5.0
+			Sfx.play("denied", -4.0)
+			return
+		breaker = true
+		Sfx.play("learn", -10.0)
+
+	func do_scram() -> void:
+		rods_target = 1.0
+		_scram = true
+		breaker = false
+		Sfx.play("denied", -6.0)
 	var _rod_meshes: Array = []
 	var _glow: MeshInstance3D
 	var _gauge: MeshInstance3D
@@ -811,8 +865,15 @@ class NuclearReactor extends Machine:
 		var fl := float(flow) * 0.5   # 0 / 0.5 / 1.0
 		var cooling := COOL_RATE * fl * (coolant / 100.0) + 1.5
 		temp = clampf(temp + (power * HEAT_RATE - cooling) * delta, 0.0, 100.0)
-		# electricity only flows when the coolant does: no flow, no steam
-		buf = minf(buf_cap, buf + MAX_EU_S * 1.4 * power * fl * delta)
+		trip_t = maxf(0.0, trip_t - delta)
+		# electricity flows when the coolant does AND the breaker is
+		# closed: no steam, no sync, no export
+		if breaker:
+			buf = minf(buf_cap, buf + MAX_EU_S * 1.4 * power * fl * delta)
+			if power * fl < 0.06:   # steam collapsed under load: trip
+				breaker = false
+				trip_t = 5.0
+				Sfx.play("denied", -8.0)
 		# pressure follows core temp; the relief margin is YOUR problem
 		press = clampf(press + ((temp * 0.95) - press) * delta * 0.4, 0.0, 100.0)
 		# condensers recover coolant when things are calm
@@ -893,26 +954,15 @@ class NuclearReactor extends Machine:
 	func accepts(id: String) -> bool:
 		return id == "uranium"
 
-	func actions() -> Array:
-		return [
-			["Rods OUT +5%  (servo, slow)", func() -> void:
-				rods_target = clampf(rods_target - 0.05, 0.0, 1.0)
-				Sfx.play("click", -12.0)],
-			["Rods IN +5%", func() -> void:
-				rods_target = clampf(rods_target + 0.05, 0.0, 1.0)
-				Sfx.play("click", -12.0)],
-			["Coolant flow: OFF / HALF / FULL", func() -> void:
-				flow = (flow + 1) % 3
-				Sfx.play("click", -12.0)],
-			["Vent pressure  (-30 bar, -12% coolant)", func() -> void:
-				press = maxf(0.0, press - 30.0)
-				coolant = maxf(0.0, coolant - 12.0)
-				Sfx.play("hurt", -18.0)],
-			["SCRAM (drop every rod, NOW)", func() -> void:
-				rods_target = 1.0
-				_scram = true
-				Sfx.play("denied", -6.0)],
-		]
+	## F opens the control ROOM, not a context menu. An operator's
+	## station for an operator's machine.
+	func use() -> void:
+		if get_tree().get_first_node_in_group("reactor_ui") != null:
+			return
+		var ui := ReactorUI.new()
+		ui.open(self)
+		get_tree().current_scene.add_child(ui)
+		Sfx.play("click", -14.0)
 
 	func info_text() -> String:
 		var rho := (0.65 - rods) * 0.9 - xenon * 0.5 - (temp / 100.0) * 0.25
