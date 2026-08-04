@@ -48,6 +48,7 @@ uniform float speed = 1.0;
 uniform float nscale = 5.0;
 uniform float sharp = 2.0;
 uniform float rainbow = 0.0;
+uniform float fluid = 0.0;
 float hash3(vec3 p) {
 	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
@@ -72,9 +73,15 @@ float fbm(vec3 p) {
 	return v;
 }
 void vertex() { vpos = VERTEX; }
+float fbm_fluid(vec3 p) {
+	// the FLUID noise: two soft octaves -- the smooth liquid boil
+	return vnoise(p) * 0.6 + vnoise(p * 2.3) * 0.4;
+}
 void fragment() {
 	float t = TIME * speed;
-	float sw = fbm(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
+	float sw = fluid > 0.5 \
+		? fbm_fluid(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2)) \
+		: fbm(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
 	if (rainbow > 0.5) {
 		// the PRISM ARMOR fragment, verbatim: fresnel drives the hue, so
@@ -99,7 +106,7 @@ void fragment() {
 	# the effect wears YOUR color -- no separate tint
 	m.set_shader_parameter("tint", Vector3(color.r, color.g, color.b))
 	var defs := {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-		"sharp": 2.0, "rainbow": 0.0}
+		"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0}
 	for k in defs:
 		m.set_shader_parameter(k, float(fx.get(k, defs[k])))
 	return m
