@@ -572,11 +572,29 @@ func _update_ghost() -> void:
 	if _ghost == null:
 		return
 	if _ghost_cat == "house" and _ghost_kind == "station":
-		# stations preview UNDER YOUR FEET, floating -- no surface needed
+		# stations preview UNDER YOUR FEET -- and near another station,
+		# the preview SNAPS to the docked position so you see exactly
+		# where the decks will join before you click
 		var upS := global_transform.basis.y
-		_ghost.global_transform = Transform3D(_basis_from_up(upS),
-			global_position - upS * 1.6)
-		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
+		var foot := global_position - upS * 1.6
+		var near_g: House = null
+		var ngd := 45.0
+		for h in get_tree().get_nodes_in_group("house"):
+			if h is House and h.kind == "station" and is_instance_valid(h):
+				var d: float = h.global_position.distance_to(foot)
+				if d < ngd:
+					ngd = d
+					near_g = h
+		if near_g != null:
+			var gb: Basis = near_g.global_transform.basis
+			var rel: Vector3 = gb.inverse() * (foot - near_g.global_position)
+			var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
+				if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
+			var snap: Vector3 = near_g.global_position + gb * side_v
+			_ghost.global_transform = Transform3D(gb, snap + gb.y * 0.6)
+		else:
+			_ghost.global_transform = Transform3D(_basis_from_up(upS), foot)
+			_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
 		_ghost.visible = true
 		return
 	var sp := get_world_3d().direct_space_state
