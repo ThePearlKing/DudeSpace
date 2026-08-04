@@ -228,10 +228,12 @@ func _build_studio() -> void:
 		# obviously -- sitting is for bodies)
 		var sofa := Furniture.new()
 		sofa.kind = "sofa"
-		sofa.yaw = 0.0
+		sofa.yaw = PI   # back to the wall, facing the room
 		add_child(sofa)
-		sofa.global_position = a.global_position + Vector3(0, -2.35, 0.2)
-		sofa.scale = Vector3(0.7, 0.7, 0.7)
+		# origin ON the floor top (floor slab tops out at POS.y - 2.5)
+		sofa.global_position = Vector3(a.global_position.x, POS.y - 2.5,
+			a.global_position.z + 0.1)
+		sofa.scale = Vector3(0.72, 0.72, 0.72)
 	# the TV: bezel + live screen on the back wall
 	var bez := MeshInstance3D.new()
 	var bzm := BoxMesh.new()
