@@ -992,6 +992,43 @@ const AP_HUMAN_DUMB := [
 	"they sleep through a third of their own lives. voluntarily.",
 	"a human said 'you too' to a sunset. we have it on tape."]
 
+# COMPOSITIONAL parts: sentences are assembled subject/verb/object/
+# qualifier at air time, so almost every line broadcast is new -- while
+# every part is written to make sense next to every other part.
+const AX_VERBS := ["annexed", "out-rendered", "quietly measured",
+	"re-zoned", "audited", "apologized to", "filed a complaint against",
+	"traded shadows with", "publicly doubted", "tried to rotate",
+	"sold advertising space on", "refused to acknowledge"]
+const AX_OBJS := ["an entire horizon", "the concept of corners",
+	"two of my best vertices", "the morning broadcast",
+	"a licensed eclipse", "the far side of itself", "a load-bearing angle",
+	"the intermission", "everyone's favorite meridian"]
+const AX_QUALS := ["again", "on record", "without a permit",
+	"during peak rendering hours", "and nobody stopped it",
+	"which is legal now, apparently", "for the third cycle running",
+	"in front of the interns", "citing 'vibes'"]
+const AX_HEADS := ["if you ask me,", "statistically,", "off the record,",
+	"and frankly,", "per the charter,", "as foretold by the fine print,"]
+const AX_ADJ := ["concerning", "overdue", "geometry at its finest",
+	"a fashion choice", "above my clearance", "how it starts",
+	"technically beautiful", "someone's fault", "not my department"]
+
+## One composed, sensible event sentence -- unique nearly every time.
+static func _ax_sentence(p: String, p2: String) -> String:
+	var subs: Array = [p, p2, "the sun", "the tesselation board",
+		"my producer", "the number four"]
+	var subj := str(subs[randi() % subs.size()])
+	var objs: Array = AX_OBJS.duplicate()
+	objs.append(p2 if p2 != subj else p)
+	var obj := str(objs[randi() % objs.size()])
+	if obj == subj:
+		obj = "itself"
+	return "%s %s %s %s." % [subj, _ax_fresh(AX_VERBS), obj, _ax_fresh(AX_QUALS)]
+
+## A composed opinion to hang after any event.
+static func _ax_opinion() -> String:
+	return "%s that's %s." % [_ax_fresh(AX_HEADS), _ax_fresh(AX_ADJ)]
+
 # anti-repeat memory: recently used lines and topics stay off the air
 static var _ax_recent: Array = []
 static var _ax_topics: Array = []
@@ -1028,8 +1065,9 @@ static func alien_exchange() -> Array:
 	match topic:
 		0:
 			out = [[0, "this hour: %s. what do we know?" % p],
-				[3, "%s has been %s for three cycles. the geometry is %s." % [
-					p, _ax_fresh(AP_STATES), _ax_fresh(AP_VERDICTS)]],
+				[3, "%s has been %s. also, %s" % [
+					p, _ax_fresh(AP_STATES), _ax_sentence(p, p2)]],
+				[1, _ax_opinion()],
 				[0, _ax_fresh(AP_REACT)]]
 		1:
 			out = [[0, "caller from %s, you're on the air." % p],
@@ -1038,7 +1076,9 @@ static func alien_exchange() -> Array:
 				[0, "next caller. keep it euclidean."]]
 		2:
 			out = [[1, "resolution is a right."],
-				[3, "resolution is a PRIVILEGE. %s proves it." % p],
+				[3, "resolution is a PRIVILEGE. %s proves it. after all, %s" % [
+					p, _ax_sentence(p, p2)]],
+				[1, _ax_opinion()],
 				[0, "strong words. the phones are melting."]]
 		3:
 			out = [[0, "weather across the system."],
@@ -1060,14 +1100,18 @@ static func alien_exchange() -> Array:
 				[0, "we legally had to air that."]]
 		7:
 			out = [[0, "history minute. %d cycles ago today:" % (100 + randi() % 900)],
-				[3, "%s %s %s. we still feel it." % [p,
-					["annexed", "out-rendered", "apologized to",
-						"traded shadows with", "declared war on the concept of"][randi() % 5],
-					p2 if randi() % 2 == 0 else "the number four"]]]
+				[3, "%s we still feel it." % _ax_sentence(p, p2)],
+				[2, _ax_opinion()]]
 		8:
 			# the FOURTH WALL segment: they know. they've always known.
-			var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
-			out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
+			# half scripted classics, half composed on the spot
+			if randi() % 2 == 0:
+				var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
+				out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
+			else:
+				out = [[0, "to whoever is decoding this: %s" % _ax_sentence(p, p2)],
+					[3, "write THAT down, dish person."],
+					[1, _ax_opinion()]]
 		_:
 			# HUMANS: dumb, inefficient, endlessly watchable
 			out = [[0, "let's talk about the humans again."],
