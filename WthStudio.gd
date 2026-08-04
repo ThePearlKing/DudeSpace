@@ -41,6 +41,15 @@ const ANNOY_ANGRY := ["okay. dude. get out of the studio.",
 const ANNOY_FINAL := ["GET. OUT. the show resumes without witnesses.",
 	"we have voted. unanimously. LEAVE, dude.",
 	"every orb in this room wants you gone. that includes the table."]
+# and then the OTHERS pile on, each in their own register
+const ANNOY_PILE := {
+	0: ["and cut to break. no -- don't cut. let it see itself.",
+		"this is going in the highlight reel."],
+	1: ["i am adding this to the chart. the chart is upset.",
+		"projectile behavior: logged. judged. logged again."],
+	2: ["do bullets have feelings? these ones felt aimed.",
+		"i flinched in four dimensions."],
+	3: ["called it.", "this is why we can't have a lobby."]}
 var _tv_bodies: Array = []
 var _table: MeshInstance3D = null
 var _ad_root: Node3D = null
@@ -77,14 +86,30 @@ func orb_hit(idx: int, at: Vector3) -> void:
 		var host := clampi(idx, 0, 3)
 		_cooking_callout = true
 		WorkerThreadPool.add_task(func() -> void:
+			var cooked: Array = []
 			var w = HumanVoice.render(line, RadioLib.ALIEN_HOSTS[host])
-			_callout_ready.call_deferred(host, w, line))
+			if w != null:
+				cooked.append([host, w, line])
+			# the others pile on: one or two reactions from OTHER hosts
+			var others: Array = [0, 1, 2, 3]
+			others.erase(host)
+			others.shuffle()
+			for oi in 1 + randi() % 2:
+				var oh := int(others[oi])
+				var opts: Array = ANNOY_PILE[oh]
+				var oline := str(opts[randi() % opts.size()])
+				var ow = HumanVoice.render(oline, RadioLib.ALIEN_HOSTS[oh])
+				if ow != null:
+					cooked.append([oh, ow, oline])
+			_callout_ready.call_deferred(cooked))
 
-func _callout_ready(host: int, w, line: String) -> void:
+func _callout_ready(cooked: Array) -> void:
 	_cooking_callout = false
-	if w != null:
-		_talk.stop()   # the show interrupts ITSELF to tell you off
-		_turns.push_front([host, w, line])
+	if cooked.is_empty():
+		return
+	_talk.stop()   # the show interrupts ITSELF to tell you off
+	for ci in range(cooked.size() - 1, -1, -1):
+		_turns.push_front(cooked[ci])
 
 var _ping_wav: AudioStreamWAV = null
 
