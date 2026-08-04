@@ -923,7 +923,7 @@ func _build_ports() -> void:
 		inp.global_position = c + Vector3(
 			(-sz.x * 0.25 if is_power else sz.x * 0.25) \
 				+ float(i % 3 - 1) * 1.2,
-			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 2.85)   # 2m clear of the wall
+			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 0.6)   # ON the back wall
 		_port_number(inp, i % 3 + 1)
 		_in_ports.append(inp)
 		# the pairing: outside pours into inside. no wires, no visuals,
