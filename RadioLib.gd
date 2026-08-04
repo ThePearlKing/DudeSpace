@@ -1411,6 +1411,45 @@ static func alien_exchange(in_room: bool = false) -> Array:
 	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
 	if randi() % 12 == 0:
 		out.append([2, _ax_fresh(AP_FOIL)])
+	# CROSSTALK: sometimes a host just has to react to what was said --
+	# agreement, doubt, a stray feeling -- and sometimes the original
+	# speaker claps back. capped so it stays a show, not a brawl.
+	var inserts := 0
+	var ti2 := 0
+	while ti2 < out.size() - 1 and inserts < 2:
+		if randi() % 6 == 0:
+			var spoke := int(out[ti2][0])
+			var reactor := randi() % 4
+			for attempt3 in 3:
+				if reactor != spoke:
+					break
+				reactor = randi() % 4
+			var rline := ""
+			match reactor:
+				0:
+					rline = _ax_fresh(["that's one interpretation.",
+						"we will fact-check that never.",
+						"careful. that's how segments start."])
+				1:
+					rline = _ax_fresh(["the numbers disagree, politely.",
+						"correlation, causation, chaos. pick two.",
+						"i ran the projection. don't ask."])
+				2:
+					rline = _ax_fresh(["that made me feel something. reporting it.",
+						"do you ever just... agree with things? me neither.",
+						"what if WE'RE the news?"])
+				_:
+					rline = _ax_fresh(["no.", "sure.",
+						"heard it before. it was wrong then too.",
+						"bold. wrong, but bold."])
+			out.insert(ti2 + 1, [reactor, rline])
+			inserts += 1
+			if randi() % 5 < 2:
+				out.insert(ti2 + 2, [spoke, _ax_fresh(["i stand by it.",
+					"noted and ignored.", "put THAT on a chart.",
+					"the sofa agrees with me."])])
+			ti2 += 2
+		ti2 += 1
 	# the personality pass: every line filtered through its speaker
 	for ti in out.size():
 		out[ti] = [int(out[ti][0]), _ax_voice(int(out[ti][0]), str(out[ti][1]))]
