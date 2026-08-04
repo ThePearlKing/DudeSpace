@@ -33,7 +33,7 @@ func _ready() -> void:
 	var mi := MeshInstance3D.new()
 	var lbl_y := 3.2
 	var col_size := Vector3(1.6, 2.6, 0.4)
-	if action == "":
+	if action == "" or action == "house_exit":
 		# TELEPORT PORTAL: tall glowing doorway
 		var m := BoxMesh.new()
 		m.size = Vector3(1.6, 2.6, 0.4)
@@ -65,7 +65,7 @@ func _ready() -> void:
 		mi.position = Vector3(0, 0.45, 0)
 		lbl_y = 1.6
 		col_size = Vector3(1.0, 1.0, 1.0)
-	if action == "":
+	if action == "" or action == "house_exit":
 		mi.material_override = Surfaces.portal(color)   # it MOVES now
 	else:
 		mi.material_override = Destructible.make_material(color, 2.0)
