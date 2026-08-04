@@ -154,7 +154,10 @@ func _draw_map() -> void:
 	_map.draw_circle(rp, 4.0, Color("#7bffb0"))
 	var aim2 := Vector2(radio.aim_dir.x, radio.aim_dir.z)
 	if aim2.length() > 0.05:
-		var an := aim2.normalized()
+		# the map stretches x and z by DIFFERENT amounts (widescreen fit);
+		# stretch the beam the same way or it points beside its target
+		var halfm := _map.size * 0.5
+		var an := Vector2(aim2.x * halfm.x, aim2.y * halfm.y).normalized()
 		# the BEAM: the actual ~5-degree pencil the dish can hear
 		var reach := _map.size.length()
 		var la := an.rotated(0.045)

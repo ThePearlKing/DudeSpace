@@ -1214,6 +1214,13 @@ func _use_selected() -> void:
 			Inventory.remove_res("waypoint", 1)
 			Sfx.play("place")
 		"rocket", "rocket2":
+			if Game.zone == "flat":
+				# houses and temple interiors: no launch pads in pockets
+				Sfx.play("denied")
+				var hudr = get_tree().get_first_node_in_group("hud")
+				if hudr:
+					hudr.flash("can't place rockets in here")
+				return
 			var rk := Rocket.new()
 			rk.mk2 = id == "rocket2"
 			get_parent().add_child(rk)

@@ -115,6 +115,18 @@ func _build_stations() -> void:
 	stations.append({"name": "(unlabeled)", "type": "eerie",
 		"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1), "body": null,
 		"kind": "eerie", "fixed_dir": Zones.SHADOW_POS})
+	# NO two stations share a spot on the dial: hand out evenly spaced
+	# frequencies, shuffled (seeded, so the dial is stable across runs)
+	var slots: Array = []
+	for i in stations.size():
+		slots.append(snappedf(88.5 + 19.0 * float(i) / maxf(1.0, float(stations.size() - 1)), 0.1))
+	for i in slots.size():
+		var j := rng.randi() % slots.size()
+		var tmp = slots[i]
+		slots[i] = slots[j]
+		slots[j] = tmp
+	for i in stations.size():
+		stations[i]["freq"] = slots[i]
 
 ## Where this set counts as BEING for signal purposes. A radio inside a
 ## house uses the house's spot on the planet, not the pocket void's

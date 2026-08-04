@@ -4,9 +4,16 @@ extends StaticBody3D
 ## diamond at its position from anywhere in the universe -- planets
 ## can't hide it. Can be stuck onto a rocket to track it in flight.
 
+const COLS: Array = [Color("#ffd166"), Color("#ff5964"), Color("#4dff9a"),
+	Color("#7be8ff"), Color("#b388ff")]
+
 var enabled: bool = true
+var col_i: int = 0
 var _mat: StandardMaterial3D
 var _mesh: MeshInstance3D
+
+func col() -> Color:
+	return COLS[col_i % COLS.size()]
 
 func _ready() -> void:
 	add_to_group("waypoint")
@@ -16,7 +23,7 @@ func _ready() -> void:
 	_mesh.mesh = m
 	_mesh.rotation_degrees = Vector3(45, 0, 45)   # gem cut
 	_mesh.position = Vector3(0, 0.6, 0)
-	_mat = Destructible.make_material(Color("#ffd166"), 2.5)
+	_mat = Destructible.make_material(col(), 2.5)
 	_mesh.material_override = _mat
 	add_child(_mesh)
 	var post := MeshInstance3D.new()
@@ -40,8 +47,19 @@ func _process(delta: float) -> void:
 		_mesh.rotate_y(delta * 1.5)
 	_mat.emission_energy_multiplier = 2.5 if enabled else 0.15
 
+## F cycles through the colors; one press past the last color turns the
+## marker OFF, and the next press brings it back at the first color.
 func use() -> void:
-	enabled = not enabled
+	if not enabled:
+		enabled = true
+		col_i = 0
+	else:
+		col_i += 1
+		if col_i >= COLS.size():
+			enabled = false
+			col_i = 0
+	_mat.albedo_color = col()
+	_mat.emission = col()
 	Sfx.play("click")
 
 func destroy(push_dir: Vector3) -> void:

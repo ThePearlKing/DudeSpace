@@ -50,8 +50,14 @@ class _WaypointLayer extends Control:
 			if not (w is Waypoint) or not is_instance_valid(w) or not w.enabled:
 				continue
 			var wp: Vector3 = w.global_position + Vector3(0, 0.6, 0)
+			# a waypoint inside a house/temple interior marks the EXTERIOR
+			# spot on the planet -- unless you're in there with it
+			if me.distance_to(wp) > 900.0:
+				var ext := Zones.exterior_of(wp)
+				if ext != wp:
+					wp = ext
 			var sp := _screen_pt(cam, wp)
-			var c := Color("#ffd166")
+			var c: Color = w.col()
 			var pts := PackedVector2Array([sp + Vector2(0, -9), sp + Vector2(9, 0),
 				sp + Vector2(0, 9), sp + Vector2(-9, 0)])
 			draw_colored_polygon(pts, Color(c.r, c.g, c.b, 0.85))
