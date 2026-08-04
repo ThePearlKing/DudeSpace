@@ -239,19 +239,23 @@ func _draw_spec() -> void:
 		return
 	var sz := _spec.size
 	_spec.draw_rect(Rect2(Vector2.ZERO, sz), Color("#0c0e14"))
-	# the WATERFALL background: station history rows scrolling vertically
-	# (the HD audio spectrogram lives on the dish's base screens)
+	# LAYER 1: the vertical-scrolling waterfall, pure ambience (no
+	# station lines in it) -- just the drifting noise texture
 	var cw := sz.x / 44.0
 	var rh := sz.y / 30.0
 	for r in _hist.size():
 		var row: PackedFloat32Array = _hist[r]
 		for b in 44:
 			var v := row[b]
-			if v < 0.04:
+			if v < 0.02:
 				continue
 			_spec.draw_rect(Rect2(Vector2(float(b) * cw, float(r) * rh),
 				Vector2(cw, rh)),
-				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.1 + v * 0.3))
+				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.08 + v * 0.25))
+	# LAYER 2: the HD yellow audio spectrogram riding on top
+	if radio.spec_tex != null:
+		_spec.draw_texture_rect(radio.spec_tex, Rect2(Vector2.ZERO, sz),
+			false, Color(1, 1, 1, 0.72))
 	for st in radio.stations:
 		var a: float = radio.align_for(st)
 		if a <= 0.02:
@@ -285,16 +289,7 @@ func _process(_d: float) -> void:
 		var row := PackedFloat32Array()
 		row.resize(44)
 		for b in 44:
-			row[b] = randf() * 0.06
-		for st in radio.stations:
-			var a: float = radio.align_for(st)
-			if a <= 0.02:
-				continue
-			var cbin := int((float(st["freq"]) - 88.0) / 20.0 * 44.0)
-			for off in [-1, 0, 1]:
-				var bb: int = cbin + int(off)
-				if bb >= 0 and bb < 44:
-					row[bb] = maxf(row[bb], a * (1.0 if int(off) == 0 else 0.4))
+			row[b] = randf() * 0.1
 		_hist.append(row)
 		while _hist.size() > 30:
 			_hist.pop_front()
