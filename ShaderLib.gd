@@ -74,30 +74,36 @@ float fbm(vec3 p) {
 	return v;
 }
 void vertex() { vpos = VERTEX; }
-float fbm_fluid(vec3 p) {
-	// the FLUID noise: two soft octaves -- the smooth liquid boil
-	return vnoise(p) * 0.6 + vnoise(p * 2.3) * 0.4;
-}
+// THE fluid algorithm, preserved exactly from the build the user liked:
+// a different hash entirely, two soft octaves, faint additive glow.
+float hash31(vec3 p) { p = fract(p * 0.3183 + vec3(0.1, 0.2, 0.3)); p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise31(vec3 p) { vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	float a = hash31(i), b = hash31(i + vec3(1,0,0)), c = hash31(i + vec3(0,1,0)), d = hash31(i + vec3(1,1,0));
+	float e = hash31(i + vec3(0,0,1)), g = hash31(i + vec3(1,0,1)), h = hash31(i + vec3(0,1,1)), k = hash31(i + vec3(1,1,1));
+	return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(e,g,f.x), mix(h,k,f.x), f.y), f.z); }
+float fbm31(vec3 p) { return vnoise31(p) * 0.6 + vnoise31(p * 2.3) * 0.4; }
 void fragment() {
 	float t = TIME * speed;
-	float sw = fluid > 0.5 \
-		? fbm_fluid(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2)) \
-		: fbm(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
+	vec3 drift = vec3(t * 0.5, t * 0.35, t * 0.2);
+	float sw = fluid > 0.5 ? fbm31(vpos * nscale + drift) : fbm(vpos * nscale + drift);
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
+	// fluid mode uses the ORIGINAL fluid emission formula; portal mode
+	// uses the gate formula with the seams dial on the ring layer
+	float body = fluid > 0.5
+		? (0.32 * pow(ring, sharp) + sw * 0.11) * 2.6
+		: (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7);
 	if (rainbow > 0.5) {
-		// the PRISM ARMOR fragment, verbatim: fresnel drives the hue, so
-		// whole faces sweep through the rainbow -- not noise clouds
 		float fres = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.4);
 		float hue = fract(fres * 0.9 + TIME * 0.12);
 		vec3 rb = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
 		ALBEDO = mix(vec3(1.0, 0.55, 0.92), rb, 0.7);
 		METALLIC = 0.85;
 		ROUGHNESS = 0.12;
-		EMISSION = rb * (0.25 + 0.55 * fres)
-			+ rb * (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7) * 0.33 * strength;
+		EMISSION = rb * (0.25 + 0.55 * fres) + rb * body * 0.33 * strength;
 	} else {
 		ALBEDO = tint * 0.15;
-		EMISSION = tint * (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7) * strength;
+		EMISSION = tint * body * strength;
 		ROUGHNESS = 0.4;
 	}
 }
