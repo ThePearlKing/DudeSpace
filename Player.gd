@@ -571,6 +571,14 @@ func _start_ghost(cat: String, kind: String) -> void:
 func _update_ghost() -> void:
 	if _ghost == null:
 		return
+	if _ghost_cat == "house" and _ghost_kind == "station":
+		# stations preview UNDER YOUR FEET, floating -- no surface needed
+		var upS := global_transform.basis.y
+		_ghost.global_transform = Transform3D(_basis_from_up(upS),
+			global_position - upS * 1.6)
+		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
+		_ghost.visible = true
+		return
 	var sp := get_world_3d().direct_space_state
 	var f := _camera.global_position
 	var q := PhysicsRayQueryParameters3D.create(f, f - _camera.global_transform.basis.z * 22.0)
@@ -622,10 +630,13 @@ func _confirm_ghost() -> void:
 			spos = near_st.global_position + sbasis * side_v
 		else:
 			var nb3 = Universe.nearest(base_pos)
-			if base_pos.distance_to(nb3.center) < float(nb3.radius) + 40.0:
+			# NEXT TO planets is the whole point (orbit!) -- just not
+			# inside the terrain. planet gravity still applies; the
+			# station simply adds none of its own.
+			if base_pos.distance_to(nb3.center) < float(nb3.radius) + 6.0:
 				Sfx.play("denied")
 				if hudn:
-					hudn.flash("space stations go in SPACE — fly up")
+					hudn.flash("clear the terrain first — a few meters up will do")
 				_cancel_ghost()
 				return
 			sbasis = _basis_from_up(global_transform.basis.y)
