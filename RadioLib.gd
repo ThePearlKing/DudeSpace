@@ -474,16 +474,17 @@ static func rick_song() -> AudioStreamWAV:
 				for i in mini(int(0.09 * SR), total - sn):
 					buf[sn + i] += (randf() * 2.0 - 1.0) * 0.19 * (1.0 - float(i) / (0.09 * SR))
 	# --- the voice: [syllable, pitch Hz, start beat, length beats] ---
-	# 16th-note pickup ne-ver-gon-na, then the payoff on the beat grid,
-	# high note on the verb, stepping DOWN through "you up"/"you down"
+	# 16th-note pickup ne-ver-gon-na, then the payoff spread out with a
+	# tiny breath between GIVE. YOU. UP. -- and the second line follows
+	# sooner, like the record
 	var up_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
 		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
-		["giv", 494.0, 1.0, 0.5], ["yoo", 440.0, 1.5, 0.5], ["up", 392.0, 2.0, 1.6]]
+		["giv", 494.0, 1.05, 0.42], ["yoo", 440.0, 1.65, 0.42], ["up", 392.0, 2.25, 1.5]]
 	var down_line: Array = [["neh", 294.0, 0.0, 0.25], ["vur", 330.0, 0.25, 0.25],
 		["gon", 392.0, 0.5, 0.25], ["nuh", 330.0, 0.75, 0.25],
-		["let", 440.0, 1.0, 0.5], ["yoo", 392.0, 1.5, 0.5], ["doun", 294.0, 2.0, 1.6]]
+		["let", 440.0, 1.05, 0.42], ["yoo", 392.0, 1.65, 0.42], ["doun", 294.0, 2.25, 1.5]]
 	for rep in [0.0, 4.0]:
-		for ph in [[rep, up_line], [rep + 2.0, down_line]]:
+		for ph in [[rep, up_line], [rep + 1.75, down_line]]:
 			var bar_off: float = float(ph[0])
 			for syl in ph[1]:
 				var word: String = str(syl[0])
@@ -491,7 +492,7 @@ static func rick_song() -> AudioStreamWAV:
 				var sb: float = float(syl[2])
 				var lb: float = float(syl[3])
 				var wav0: AudioStreamWAV = HumanVoice.render(word,
-					{"base": hz, "var": 0.0, "wave": "sine", "rate": 1.5,
+					{"base": hz, "var": 0.0, "wave": "sine", "rate": 1.2,
 					"artic": 1.3, "autotune": true})
 				var d0 := wav0.data
 				var n0 := d0.size() / 2
