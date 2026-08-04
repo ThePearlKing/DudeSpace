@@ -9,6 +9,8 @@ var _count_lbl: Label
 var _sliders: Dictionary = {}   # axis -> HSlider
 var _gallery: HBoxContainer
 var _save_btn: Button
+var _reset_btn: Button
+var _reset_armed := false
 var _browse_idx: int = -1   # -1 = fresh canvas
 var _files: Array = []
 
@@ -19,6 +21,7 @@ func _ready() -> void:
 	visible = false
 	add_to_group("closable_ui")
 	DirAccess.make_dir_recursive_absolute(DIR)
+	_seed_defaults(false)   # empty pool? humanity ships with faces
 
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
@@ -27,9 +30,9 @@ func _ready() -> void:
 
 	var panel := Panel.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(460, 800)
-	panel.size = Vector2(460, 800)
-	panel.position = Vector2(-230, -400)
+	panel.custom_minimum_size = Vector2(470, 870)
+	panel.size = Vector2(470, 870)
+	panel.position = Vector2(-235, -435)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color("#141414")
 	sb.border_color = Color("#e8956a")
@@ -65,6 +68,8 @@ func _ready() -> void:
 
 	_pad = CharacterCreator._Pad.new()
 	_pad.custom_minimum_size = Vector2(230, 230)
+	_pad.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_pad.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_pad.bg_color = Color("#c8996e")   # a face-ish canvas tone
 	var padrow := HBoxContainer.new()
 	padrow.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -157,16 +162,24 @@ func _ready() -> void:
 	next.custom_minimum_size = Vector2(44, 42)
 	next.pressed.connect(func() -> void: _browse(1))
 	actions.add_child(next)
+	var actions2 := HBoxContainer.new()
+	actions2.add_theme_constant_override("separation", 8)
+	col.add_child(actions2)
 	var del := Button.new()
 	del.text = "Delete"
 	del.custom_minimum_size = Vector2(90, 42)
 	del.pressed.connect(_delete_face)
-	actions.add_child(del)
+	actions2.add_child(del)
 	var upd := Button.new()
 	upd.text = "Update values"
 	upd.custom_minimum_size = Vector2(130, 42)
 	upd.pressed.connect(_update_values)
-	actions.add_child(upd)
+	actions2.add_child(upd)
+	_reset_btn = Button.new()
+	_reset_btn.text = "Reset to defaults"
+	_reset_btn.custom_minimum_size = Vector2(150, 42)
+	_reset_btn.pressed.connect(_reset_defaults)
+	actions2.add_child(_reset_btn)
 
 	_count_lbl = Label.new()
 	_count_lbl.add_theme_font_size_override("font_size", 13)
@@ -178,6 +191,50 @@ func _ready() -> void:
 	close.custom_minimum_size = Vector2(0, 40)
 	close.pressed.connect(close_ui)
 	col.add_child(close)
+	_refresh_files()
+
+## Copy the shipped default faces (res://human_faces) into the pool.
+## force=true wipes the pool first.
+func _seed_defaults(force: bool) -> void:
+	var user_d := DirAccess.open(DIR)
+	if user_d == null:
+		return
+	if force:
+		for f in user_d.get_files():
+			if f.ends_with(".png") or f.ends_with(".json"):
+				DirAccess.remove_absolute("%s/%s" % [DIR, f])
+	else:
+		for f in user_d.get_files():
+			if f.ends_with(".png"):
+				return   # pool already has faces: leave it alone
+	var src := DirAccess.open("res://human_faces")
+	if src == null:
+		return
+	for f in src.get_files():
+		if f.ends_with(".png") or f.ends_with(".json"):
+			var bytes := FileAccess.get_file_as_bytes("res://human_faces/" + f)
+			var out := FileAccess.open("%s/%s" % [DIR, f], FileAccess.WRITE)
+			if out:
+				out.store_buffer(bytes)
+				out.close()
+	EarthHuman.reload_faces()
+
+## Two presses: the first only asks. The second erases your pool and
+## restores the shipped faces.
+func _reset_defaults() -> void:
+	if not _reset_armed:
+		_reset_armed = true
+		_reset_btn.text = "Really reset? (wipes pool)"
+		_reset_btn.modulate = Color("#ff8080")
+		Sfx.play("denied", -14.0)
+		return
+	_reset_armed = false
+	_reset_btn.text = "Reset to defaults"
+	_reset_btn.modulate = Color(1, 1, 1)
+	_seed_defaults(true)
+	_browse_idx = -1
+	_pad.clear()
+	Sfx.play("explode", -16.0)
 	_refresh_files()
 
 func _refresh_files() -> void:
