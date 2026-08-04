@@ -108,8 +108,15 @@ func _build_stations() -> void:
 	stations.append({"name": "THE SAUCE", "type": "noodle",
 		"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1), "body": null,
 		"kind": "noodle"})
+	# and something out by the shadow temple that isn't music and isn't
+	# words. don't listen too long.
+	stations.append({"name": "(unlabeled)", "type": "eerie",
+		"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1), "body": null,
+		"kind": "eerie", "fixed_dir": Zones.SHADOW_POS})
 
 func station_dir(st: Dictionary) -> Vector3:
+	if st.has("fixed_dir"):
+		return (st["fixed_dir"] - global_position).normalized()
 	if st["body"] != null:
 		var bb = st["body"]
 		if global_position.distance_to(bb.center) < float(bb.radius) * 1.6:
@@ -203,6 +210,10 @@ func work(delta: float) -> void:
 		"music":
 			if not _talk.playing:
 				_talk.stream = RadioLib.music_loop(int(st["freq"] * 10.0), str(st["kind"]))
+				_talk.play()
+		"eerie":
+			if not _talk.playing:
+				_talk.stream = RadioLib.eerie_loop()
 				_talk.play()
 		_:
 			_sentence_cd -= delta

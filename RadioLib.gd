@@ -140,6 +140,40 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	_music_cache[key] = wav
 	return wav
 
+## The shadow temple's frequency: no music, no words. A slow drone,
+## detuned partials, something breathing under it. Loops seamlessly.
+static var _eerie_wav: AudioStreamWAV = null
+
+static func eerie_loop() -> AudioStreamWAV:
+	if _eerie_wav:
+		return _eerie_wav
+	var total := int(12.0 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	for i in total:
+		var t := float(i) / SR
+		var lp := float(i) / float(total) * TAU   # phase for seamless loop
+		var v := sin(TAU * 55.0 * t) * 0.22 \
+			+ sin(TAU * 55.7 * t) * 0.18 \
+			+ sin(TAU * 82.4 * t + sin(lp) * 2.0) * 0.1 \
+			+ sin(TAU * 220.0 * t) * 0.05 * (0.5 + 0.5 * sin(lp * 3.0))
+		# the breathing
+		v *= 0.6 + 0.4 * sin(lp * 2.0 + sin(lp * 5.0))
+		# occasional whisper of filtered noise
+		var wn := (randf() * 2.0 - 1.0) * 0.05 * maxf(0.0, sin(lp * 7.0) - 0.7) * 3.0
+		buf[i] = v + wn
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 22000.0))
+	_eerie_wav = AudioStreamWAV.new()
+	_eerie_wav.format = AudioStreamWAV.FORMAT_16_BITS
+	_eerie_wav.mix_rate = SR
+	_eerie_wav.data = bytes
+	_eerie_wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	_eerie_wav.loop_end = total
+	return _eerie_wav
+
 # ------------------------------------------------------------- words
 
 const NEWS_WHO := ["a Gary man", "an Accident local", "a Heliopolis elder",

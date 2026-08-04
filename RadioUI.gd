@@ -199,7 +199,7 @@ func _map_input(event: InputEvent) -> void:
 		# RIGHT: free-aim -- point the dish at the clicked spot on the map
 		var sc := _map_scale()
 		var half := _map.size * 0.5
-		var rel := (event.position - half) / half
+		var rel: Vector2 = (event.position - half) / half
 		var world := Vector3(rel.x * sc, radio.global_position.y, rel.y * sc)
 		radio.aim_dir = (world - radio.global_position).normalized()
 		Sfx.play("click", -18.0)
