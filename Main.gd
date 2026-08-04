@@ -139,6 +139,8 @@ func _ready() -> void:
 		_cage_test()
 	if OS.get_environment("CTD_TEST") == "9":
 		_sit_test()
+	if OS.get_environment("CTD_TEST") == "10":
+		_gang_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -304,6 +306,52 @@ func _cage_test() -> void:
 	# of a personality point is the same soul
 	print("CAGETEST pers ok: ",
 		absf(float(b._pers["grumpy"]) - float(box["pers"]["grumpy"])) < 0.001)
+
+## Headless: street fight between two enemies, then a gang-up rally on
+## the player. Verifies swings land, hp drops, hunt triggers, Game.hurt.
+func _gang_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var a := EarthHuman.new()
+	var b := EarthHuman.new()
+	a.setup(home)
+	b.setup(home)
+	add_child(a)
+	add_child(b)
+	a.global_position = p.global_position + Vector3(8, 0, 0)
+	b.global_position = p.global_position + Vector3(11, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	a._op_add(b.human_id, -60.0)
+	b._op_add(a.human_id, -60.0)
+	a._start_fight(b)
+	var hp_a0: float = a.hp
+	var hp_b0: float = b.hp
+	await get_tree().create_timer(6.0).timeout
+	print("GANGTEST fight: a targets b: ", is_instance_valid(a) and a._target == b,
+		"  hp lost a: ", (hp_a0 - a.hp) if is_instance_valid(a) else 99.0,
+		"  hp lost b: ", (hp_b0 - b.hp) if is_instance_valid(b) else 99.0)
+	# now the rally: c hates the player, d is c's friend who dislikes him
+	var c := EarthHuman.new()
+	var d := EarthHuman.new()
+	c.setup(home)
+	d.setup(home)
+	add_child(c)
+	add_child(d)
+	c.global_position = p.global_position + Vector3(-6, 0, 0)
+	d.global_position = p.global_position + Vector3(-8, 0, 0)
+	await get_tree().create_timer(0.3).timeout
+	c._op_add(-1, -80.0)
+	c._op_add(d.human_id, 60.0)
+	d._op_add(-1, -40.0)
+	var php0: float = Game.health
+	for i in 40:
+		await get_tree().create_timer(0.25).timeout
+		if c._hunt_t > 0.0 and Game.health < php0:
+			break
+	print("GANGTEST rally: c hunting: ", c._hunt_t > 0.0,
+		"  d hunting: ", d._hunt_t > 0.0,
+		"  player hp lost: ", php0 - Game.health)
 
 ## Headless: a human and a chair. Verify walk-to-seat, the sit, the pose.
 func _sit_test() -> void:

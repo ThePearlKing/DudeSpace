@@ -463,6 +463,14 @@ var _active: bool = true        # false = player far away, human unrendered by r
 var hp: float = 30.0
 var _dead: bool = false
 var _seat: Node3D = null        # the bench spot this human has claimed
+var _friend: EarthHuman = null  # current hangout buddy
+var _hunt_t: float = 0.0        # ganging up on the blue dude
+var _swing_cd: float = 0.0      # time between punches
+var _target: EarthHuman = null  # street-fight opponent
+var _fight_t: float = 0.0       # fight time remaining
+var _phase_t: float = 0.0       # approach/evade phase timer
+var _evading: bool = false      # backing off between swings
+var _gossip_cd: float = 0.0     # cooldown on bad-mouthing the blue dude
 var _apple: ItemDrop = null     # a spotted permadeath apple. destiny.
 var _eat_t: float = 0.0         # chewing countdown. after this, physics
 
@@ -755,6 +763,15 @@ func _pick_act() -> void:
 			var to_s: Vector3 = best.global_position - global_position
 			_dir = (to_s - up_s * to_s.dot(up_s)).normalized()
 			return
+	# a good friend somewhere out there? go stand with them. friends
+	# drift apart and find each other again. nobody knows how they know.
+	if randf() < 0.18:
+		var fr := _best_friend(120.0)
+		if fr != null:
+			_friend = fr
+			_act = "friend"
+			_act_t = randf_range(10.0, 22.0)
+			return
 	# personality leaks into behaviour: dreamers stare, the dumb spin,
 	# the confident follow you around, the anxious keep moving
 	var w := {
@@ -871,7 +888,7 @@ func take_damage(dmg: float, dir: Vector3) -> void:
 	_witness(-10.0)
 	_end_convo()
 	_op_add(-1, -25.0)   # id -1: the blue dude's page in the ledger
-	_panic_t = 5.0
+	_panic_t = 0.6 if _hunt_t > 0.0 else 5.0   # hunters shrug it off
 	_dir = (dir - _up() * dir.dot(_up())).normalized()
 	velocity += dir.normalized() * 6.0 + _up() * 3.0   # shoved, wailing
 	# the mean ones go down swinging (verbally). the rest just wail.
@@ -971,6 +988,8 @@ func _social_line() -> String:
 ## Periodic look-around: is the player awkwardly close? is a chat-able
 ## human nearby? Squared distances, staggered timers -- cities stay cheap.
 func _check_social() -> void:
+	if _target != null or _hunt_t > 0.0:
+		return   # busy. VERY busy.
 	# a permadeath apple on the ground outranks every social plan
 	if _apple == null and _eat_t <= 0.0:
 		for d in get_tree().get_nodes_in_group("itemdrop"):
@@ -982,6 +1001,20 @@ func _check_social() -> void:
 	if _partner != null:
 		return
 	var p = get_tree().get_first_node_in_group("player")
+	# the rally: hate the blue dude ENOUGH and you call your best
+	# friends -- everyone who already dislikes him comes swinging
+	if p != null and _op(-1) < -65.0 and randf() < 0.25 \
+			and global_position.distance_squared_to(p.global_position) < 900.0:
+		_hunt_t = 12.0
+		_say("GET THE BLUE DUDE.")
+		for h2 in get_tree().get_nodes_in_group("earth_human"):
+			if h2 == self or not (h2 is EarthHuman):
+				continue
+			var ally: EarthHuman = h2
+			if _op(ally.human_id) > 40.0 and ally._op(-1) < -25.0 \
+					and global_position.distance_squared_to(ally.global_position) < 2500.0:
+				ally._hunt_t = 12.0
+		return
 	if p and _greet_cd <= 0.0 \
 			and global_position.distance_squared_to(p.global_position) < 6.8:
 		# a human who watched you hurt humans does not say hi
@@ -1002,7 +1035,22 @@ func _check_social() -> void:
 			continue
 		if hh._ptalk_t > 0.0 and not _interrupts():
 			continue   # they're busy with the player. manners.
-		if global_position.distance_squared_to(hh.global_position) < 12.25:
+		var d2h := global_position.distance_squared_to(hh.global_position)
+		# an ENEMY in range? sometimes it just kicks off. street rules.
+		if _op(hh.human_id) < -45.0 and hh._target == null and d2h < 64.0 \
+				and randf() < 0.3:
+			_start_fight(hh)
+			return
+		# bad blood travels: humans who hate the blue dude tell OTHERS
+		if d2h < 16.0 and _op(-1) < -40.0 and _gossip_cd <= 0.0:
+			_gossip_cd = randf_range(20.0, 40.0)
+			hh._op_add(-1, -randf_range(8.0, 15.0))
+			var ga: Array = INSULTS["generic"]["adj"]
+			var gn: Array = INSULTS["generic"]["noun"]
+			_say("the blue dude is a %s %s. pass it on." % [
+				ga[randi() % ga.size()], gn[randi() % gn.size()]])
+			return
+		if d2h < 12.25:
 			if randf() < 0.35:
 				_start_convo(hh)
 			return
@@ -1105,6 +1153,67 @@ func hear(from: EarthHuman, kind: String) -> void:
 			return
 	if _partner == from:
 		_convo_wait = randf_range(1.8, 2.8)
+
+## Best friend in range: highest mutual regard wins. Friendship is a
+## ledger that went POSITIVE, which on this planet is remarkable.
+func _best_friend(maxd: float) -> EarthHuman:
+	var best: EarthHuman = null
+	var bop := 40.0
+	for h in get_tree().get_nodes_in_group("earth_human"):
+		if h == self or not (h is EarthHuman):
+			continue
+		var hh: EarthHuman = h
+		var op := _op(hh.human_id)
+		if op > bop and hh._op(human_id) > 25.0 \
+				and global_position.distance_to(hh.global_position) < maxd:
+			bop = op
+			best = hh
+	return best
+
+func _start_fight(o: EarthHuman) -> void:
+	_end_convo()
+	o._end_convo()
+	_release_seat()
+	_target = o
+	o._target = self
+	_fight_t = randf_range(8.0, 16.0)
+	o._fight_t = _fight_t
+	_evading = false
+	o._evading = false
+	_phase_t = 0.0
+	o._phase_t = 0.4
+	_say(_insult_line(o.human_name))
+
+## A fight punch: lighter than murder, heavier than words. Friends who
+## see it may pile in -- and that's how gang fights are born.
+func take_fight_hit(from: EarthHuman, dir: Vector3) -> void:
+	_release_seat()
+	hp -= randf_range(2.0, 4.0)
+	if hp <= 0.0:
+		_die(dir)   # fights CAN end badly. meat happens.
+		return
+	_op_add(from.human_id, -8.0)
+	velocity += dir * 3.0 + _up() * 1.5
+	Sfx.play("hurt", -22.0)
+	if _target == null:   # sucker-punched: now it's a fight
+		_target = from
+		_fight_t = randf_range(6.0, 12.0)
+		_evading = true
+		_phase_t = randf_range(0.6, 1.2)
+	if randf() < 0.3:
+		_say(_insult_line(from.human_name))
+	if randf() < 0.35:
+		for h in get_tree().get_nodes_in_group("earth_human"):
+			if h == self or h == from or not (h is EarthHuman):
+				continue
+			var hh: EarthHuman = h
+			if hh._target == null and hh._hunt_t <= 0.0 \
+					and hh._op(human_id) > 40.0 \
+					and hh.global_position.distance_squared_to(global_position) < 400.0:
+				hh._target = from
+				hh._fight_t = randf_range(6.0, 10.0)
+				hh._say(hh._insult_line(from.human_name))
+				break
 
 ## Escalation, physical. The universal language.
 func _punch_human(t: EarthHuman) -> void:
@@ -1291,6 +1400,7 @@ func _physics_process(delta: float) -> void:
 	_social_cd -= delta
 	_greet_cd -= delta
 	_ptalk_t -= delta
+	_gossip_cd -= delta
 	if _partner != null and not is_instance_valid(_partner):
 		_partner = null
 	if _panic_t <= 0.0 and _eat_t <= 0.0:
@@ -1320,6 +1430,53 @@ func _physics_process(delta: float) -> void:
 				_eat_apple()
 			else:
 				speed = WALK_SPEED * 1.25
+	elif _hunt_t > 0.0:
+		# the gang-up: bad reputation has consequences with fists
+		_hunt_t -= delta
+		_swing_cd -= delta
+		var hp2 = get_tree().get_first_node_in_group("player")
+		if hp2 == null or Game.dead or Game.mode != Game.Mode.ON_FOOT:
+			_hunt_t = 0.0
+		else:
+			var to_p2: Vector3 = hp2.global_position - global_position
+			_dir = (to_p2 - up * to_p2.dot(up)).normalized()
+			if to_p2.length() > 1.7:
+				speed = PANIC_SPEED * 0.85
+			elif _swing_cd <= 0.0:
+				_swing_cd = 1.1
+				Game.hurt(4.0)
+				Sfx.play("hurt", -14.0)
+				if randf() < 0.4:
+					_say(_insult_line())
+	elif _target != null:
+		# street fight: swing, back off, talk trash, swing again
+		if not is_instance_valid(_target) or _target._dead or _fight_t <= 0.0:
+			if _target != null and is_instance_valid(_target) and _target._target == self:
+				_target._target = null
+				_target._fight_t = 0.0
+			_target = null
+		else:
+			_fight_t -= delta
+			_phase_t -= delta
+			_swing_cd -= delta
+			var to_t: Vector3 = _target.global_position - global_position
+			var flat := (to_t - up * to_t.dot(up)).normalized()
+			if _evading:
+				_dir = -flat
+				speed = WALK_SPEED * 1.5
+				if _phase_t <= 0.0:
+					_evading = false
+					if randf() < 0.45:
+						_say(_insult_line(_target.human_name))
+			else:
+				_dir = flat
+				if to_t.length() > 1.5:
+					speed = PANIC_SPEED * 0.8
+				elif _swing_cd <= 0.0:
+					_swing_cd = 0.9
+					_target.take_fight_hit(self, flat)
+					_evading = true
+					_phase_t = randf_range(0.8, 1.8)
 	elif _partner != null:
 		# conversation stance: feet still, eyes locked, every word meant
 		var to_p: Vector3 = _partner.global_position - global_position
@@ -1346,6 +1503,15 @@ func _physics_process(delta: float) -> void:
 						speed = WALK_SPEED
 				else:
 					speed = WALK_SPEED   # "following" nothing. still counts.
+			"friend":
+				if _friend == null or not is_instance_valid(_friend):
+					_pick_act()
+				else:
+					var to_f: Vector3 = _friend.global_position - global_position
+					_dir = (to_f - up * to_f.dot(up)).normalized()
+					if to_f.length() > 2.2:
+						speed = WALK_SPEED * 1.1
+					# close enough: stand together. chats start on their own
 			"goseat":
 				if _seat == null or not is_instance_valid(_seat):
 					_pick_act()
@@ -1365,7 +1531,8 @@ func _physics_process(delta: float) -> void:
 
 	# planted on a seat: physics is paused. the universe can wait.
 	if _act == "sit":
-		if _panic_t > 0.0 or _apple != null or _seat == null \
+		if _panic_t > 0.0 or _apple != null or _target != null \
+				or _hunt_t > 0.0 or _seat == null \
 				or not is_instance_valid(_seat):
 			_release_seat()
 		else:
