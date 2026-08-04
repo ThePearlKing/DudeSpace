@@ -136,8 +136,14 @@ func refresh_tag() -> void:
 
 static var _next_slot := 0
 
-func room_center() -> Vector3:
+var room_offset: Vector3 = Vector3.ZERO   # pocket-space shift after door-merges
+var links: Array = []                     # slots of houses docked to this one
+
+func base_center() -> Vector3:
 	return BASE + Vector3(float(slot) * SLOT_SPACING, 0, 0)
+
+func room_center() -> Vector3:
+	return base_center() + room_offset
 
 func interior_spawn() -> Vector3:
 	return room_center() + Vector3(0, -room_size().y * 0.5 + 1.5, room_size().z * 0.5 - 3.0)
@@ -1191,6 +1197,261 @@ func furnish_for(pers: Dictionary) -> void:
 			randf_range(-sz.x * 0.3, sz.x * 0.3),
 			-sz.y * 0.5 + 0.55,
 			randf_range(-sz.z * 0.3, sz.z * 0.3))
+
+# ------------------------------------------------- door-merge machinery
+
+## Every unlinked doorframe standing inside this house's rooms.
+func my_frames() -> Array:
+	var out: Array = []
+	var c := room_center()
+	var r := room_size().length()
+	for f in get_tree().get_nodes_in_group("doorframe"):
+		if f is Furniture and is_instance_valid(f) \
+				and not bool(f.get_meta("linked", false)) \
+				and f.global_position.distance_to(c) < r:
+			out.append(f)
+	return out
+
+## Move this house's ENTIRE interior world (rooms, ports, furniture,
+## machines, humans, players) by a pocket-space delta.
+func shift_rooms(delta: Vector3) -> void:
+	var c := room_center()
+	var r := room_size().length() + 6.0
+	room_offset += delta
+	if _iroot and is_instance_valid(_iroot):
+		for ch in _iroot.get_children():
+			if ch is Node3D:
+				ch.global_position += delta
+	for prt in _in_ports:
+		if is_instance_valid(prt):
+			prt.global_position += delta
+	for grp in ["machine", "chest", "bench", "itemdrop", "earth_human",
+			"doorframe", "seat", "player"]:
+		for n in get_tree().get_nodes_in_group(grp):
+			if n is Node3D and is_instance_valid(n) \
+					and n.global_position.distance_to(c) < r \
+					and not (_iroot and n.get_parent() == _iroot):
+				n.global_position += delta
+
+## The whole docked complex this house belongs to (BFS over links).
+func complex() -> Array:
+	var seen := {slot: self}
+	var queue := [self]
+	while not queue.is_empty():
+		var h = queue.pop_back()
+		for other in get_tree().get_nodes_in_group("house"):
+			if other is House and is_instance_valid(other) \
+					and not seen.has(other.slot) and other.slot in h.links:
+				seen[other.slot] = other
+				queue.append(other)
+	return seen.values()
+
+## Would the moved cluster collide with any house OUTSIDE the moving set?
+func _area_free(delta: Vector3, moving: Array) -> bool:
+	for h in moving:
+		var c: Vector3 = h.room_center() + delta
+		var r: float = maxf(h.room_size().x, h.room_size().z) * 0.5 + 0.2
+		for other in get_tree().get_nodes_in_group("house"):
+			if other is House and is_instance_valid(other) and not moving.has(other):
+				var orr: float = maxf(other.room_size().x, other.room_size().z) * 0.5 + 0.2
+				# docked neighbours are SUPPOSED to touch: skip linked pairs
+				if other.slot in h.links:
+					continue
+				if c.distance_to(other.room_center()) < r + orr:
+					return false
+	return true
+
+## Cut a doorway through the wall nearest the frame: the wall body is
+## replaced by three segments leaving a walkable gap.
+func cut_doorway(frame: Node3D) -> void:
+	var best: StaticBody3D = null
+	var bd := 4.5
+	if _iroot == null or not is_instance_valid(_iroot):
+		return
+	for ch in _iroot.get_children():
+		if ch is StaticBody3D and ch.get_child_count() >= 2:
+			# walls only (tall boxes), ranked by how close the frame
+			# stands to the wall's PLANE, not its center
+			var cc2: CollisionShape3D = null
+			for k in ch.get_children():
+				if k is CollisionShape3D:
+					cc2 = k
+			if cc2 == null or not (cc2.shape is BoxShape3D):
+				continue
+			var bsz: Vector3 = cc2.shape.size
+			if bsz.y < 2.0 or (bsz.x < 2.0 and bsz.z < 2.0):
+				continue
+			var rel: Vector3 = frame.global_position - ch.global_position
+			var plane_d: float = absf(rel.z) if bsz.x > bsz.z else absf(rel.x)
+			if plane_d < bd and absf(rel.y) < bsz.y:
+				bd = plane_d
+				best = ch
+	if best == null:
+		return
+	var col: CollisionShape3D = null
+	for cc in best.get_children():
+		if cc is CollisionShape3D:
+			col = cc
+	if col == null or not (col.shape is BoxShape3D):
+		return
+	var wsz: Vector3 = col.shape.size
+	var wpos := best.global_position
+	var mat: Material = null
+	for mm in best.get_children():
+		if mm is MeshInstance3D:
+			mat = mm.material_override
+	best.queue_free()
+	# the wall runs along its LONG horizontal axis; the gap is centered
+	# on the frame's position along that axis
+	var along_x := wsz.x > wsz.z
+	var gapw := 2.0
+	var gaph := 2.7
+	var fl: float = (frame.global_position.x - wpos.x) if along_x \
+		else (frame.global_position.z - wpos.z)
+	var span: float = wsz.x if along_x else wsz.z
+	var lw: float = span * 0.5 + fl - gapw * 0.5
+	var rw: float = span * 0.5 - fl - gapw * 0.5
+	var yb: float = wpos.y - wsz.y * 0.5
+	for seg in [
+		[lw, (-span * 0.5 + lw * 0.5), 0.0, wsz.y, wpos.y],
+		[rw, (span * 0.5 - rw * 0.5), 0.0, wsz.y, wpos.y],
+		[gapw, fl, 0.0, wsz.y - gaph, yb + gaph + (wsz.y - gaph) * 0.5],
+	]:
+		if seg[0] < 0.15 or seg[3] < 0.15:
+			continue
+		var b2 := StaticBody3D.new()
+		var mi := MeshInstance3D.new()
+		var m2 := BoxMesh.new()
+		m2.size = Vector3(seg[0], seg[3], wsz.z) if along_x \
+			else Vector3(wsz.x, seg[3], seg[0])
+		mi.mesh = m2
+		mi.material_override = mat
+		b2.add_child(mi)
+		var c2 := CollisionShape3D.new()
+		var bs2 := BoxShape3D.new()
+		bs2.size = m2.size
+		c2.shape = bs2
+		b2.add_child(c2)
+		_iroot.add_child(b2)
+		b2.global_position = Vector3(wpos.x + seg[1], seg[4], wpos.z) if along_x \
+			else Vector3(wpos.x, seg[4], wpos.z + seg[1])
+
+## The little hallway between two cut walls, plus the outside tunnel.
+func build_link_visuals(other) -> void:
+	var fa_p := Vector3.ZERO
+	var fb_p := Vector3.ZERO
+	# nearest pair of frames between the two houses
+	var bd := 1e9
+	for fa in get_tree().get_nodes_in_group("doorframe"):
+		if not (fa is Node3D) or fa.global_position.distance_to(room_center()) > room_size().length():
+			continue
+		for fb in get_tree().get_nodes_in_group("doorframe"):
+			if not (fb is Node3D) or fb.global_position.distance_to(other.room_center()) > other.room_size().length():
+				continue
+			var d: float = fa.global_position.distance_to(fb.global_position)
+			if d < bd:
+				bd = d
+				fa_p = fa.global_position
+				fb_p = fb.global_position
+	if bd > 12.0:
+		return
+	var mid := (fa_p + fb_p) * 0.5 + Vector3(0, 1.35, 0)
+	var dirv := (fb_p - fa_p)
+	dirv.y = 0.0
+	var L := dirv.length() + 1.6
+	if dirv.length() < 0.1:
+		return
+	dirv = dirv.normalized()
+	var xr := dirv.cross(Vector3.UP).normalized()
+	var gray := Surfaces.metal(Color("#8a9098"))
+	# interior hallway: floor, ceiling, two sides
+	for spec in [
+		[Vector3(2.4, 0.3, L), Vector3(0, -1.35, 0)],
+		[Vector3(2.4, 0.3, L), Vector3(0, 1.5, 0)],
+		[Vector3(0.3, 3.0, L), Vector3(-1.2, 0, 0)],
+		[Vector3(0.3, 3.0, L), Vector3(1.2, 0, 0)],
+	]:
+		var b3 := StaticBody3D.new()
+		var mi3 := MeshInstance3D.new()
+		var m3 := BoxMesh.new()
+		m3.size = spec[0]
+		mi3.mesh = m3
+		mi3.material_override = gray
+		b3.add_child(mi3)
+		var c3 := CollisionShape3D.new()
+		var bs3 := BoxShape3D.new()
+		bs3.size = spec[0]
+		c3.shape = bs3
+		b3.add_child(c3)
+		_iroot.add_child(b3)
+		b3.global_transform = Transform3D(
+			Basis(xr, Vector3.UP, dirv).orthonormalized(), mid) \
+			* Transform3D(Basis(), spec[1])
+	# the outside: a skewed connector between the two shells
+	if is_instance_valid(other):
+		var a_out := global_position + global_transform.basis.y * 1.4
+		var b_out: Vector3 = other.global_position + other.global_transform.basis.y * 1.4
+		var seg2 := b_out - a_out
+		if seg2.length() > 1.0:
+			var tube := MeshInstance3D.new()
+			var tm := BoxMesh.new()
+			tm.size = Vector3(1.6, 1.6, seg2.length() - 3.0)
+			tube.mesh = tm
+			tube.material_override = Surfaces.metal(Color("#9aa0a8"))
+			get_tree().current_scene.add_child(tube)
+			tube.global_position = (a_out + b_out) * 0.5
+			var fz := seg2.normalized()
+			var fx := fz.cross(global_transform.basis.y)
+			if fx.length() < 0.05:
+				fx = fz.cross(Vector3.RIGHT)
+			fx = fx.normalized()
+			tube.global_transform.basis = Basis(fx, fx.cross(fz).normalized() * -1.0, fz).orthonormalized()
+			tube.global_position = (a_out + b_out) * 0.5
+
+## THE MERGE: dock `other`'s complex so its frame faces ours across a
+## short hallway. Everything inside moves with it. Everything.
+func connect_house(other) -> bool:
+	if other == self or other == null or not is_instance_valid(other):
+		return false
+	if other.slot in links:
+		return false
+	var mine := my_frames()
+	var theirs: Array = other.my_frames()
+	if mine.is_empty() or theirs.is_empty():
+		return false
+	var fa: Node3D = mine[0]
+	var fb: Node3D = theirs[0]
+	# frames face out their local -Z; dock fb 3.0m in front of fa
+	var fwd_a: Vector3 = -fa.global_transform.basis.z
+	fwd_a.y = 0.0
+	if fwd_a.length() < 0.1:
+		fwd_a = Vector3.FORWARD
+	fwd_a = fwd_a.normalized()
+	var target_fb := fa.global_position + fwd_a * 3.0
+	var delta := target_fb - fb.global_position
+	delta.y = fa.global_position.y - fb.global_position.y
+	var moving: Array = other.complex()
+	if moving.has(self):
+		return false
+	if not _area_free(delta, moving):
+		return false
+	for h in moving:
+		h.shift_rooms(delta)
+	links.append(other.slot)
+	other.links.append(slot)
+	fa.set_meta("linked", true)
+	fb.set_meta("linked", true)
+	var sh := fa.get_node_or_null("shimmer")
+	if sh:
+		sh.queue_free()
+	var sh2 := fb.get_node_or_null("shimmer")
+	if sh2:
+		sh2.queue_free()
+	cut_doorway(fa)
+	other.cut_doorway(fb)
+	build_link_visuals(other)
+	Sfx.play("learn", -6.0)
+	return true
 
 func _exit_tree() -> void:
 	if _iroot and is_instance_valid(_iroot):

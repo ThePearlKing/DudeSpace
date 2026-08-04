@@ -247,6 +247,34 @@ var _ghost: Node3D = null   # placement preview hologram
 var _ghost_cat := ""        # "house" | "furn"
 var _ghost_kind := ""
 var _ghost_yaw := 0.0
+var _door_a = null   # first house selected by the Door tool
+
+## The Door tool: OUTSIDE, pick house A (with a free frame), then
+## house B. They dock into one build, hallway and all.
+func _door_tool() -> void:
+	if Game.zone != "":
+		Sfx.play("denied")   # doors are decided from the street
+		return
+	var target = _nearest_in("house", 14.0)
+	if target == null or not (target is House):
+		Sfx.play("denied")
+		_door_a = null
+		return
+	if target.my_frames().is_empty() and _door_a == null:
+		Sfx.play("denied")   # no frame inside, nothing to connect
+		return
+	if _door_a == null or not is_instance_valid(_door_a):
+		_door_a = target
+		Sfx.play("click", -10.0)   # house A armed. now go touch house B
+		return
+	if target == _door_a:
+		Sfx.play("click", -18.0)
+		return
+	if _door_a.connect_house(target):
+		_door_a = null
+	else:
+		Sfx.play("denied")
+		_door_a = null
 
 func _start_ghost(cat: String, kind: String) -> void:
 	if cat == "house" and Game.zone != "":
@@ -285,6 +313,8 @@ func _start_ghost(cat: String, kind: String) -> void:
 				bm.size = Vector3(3.0, 2.3, 2.0)
 			"moonbase":
 				bm.size = Vector3(7.0, 3.5, 7.0)
+			"doorframe":
+				bm.size = Vector3(2.1, 2.8, 0.4)
 			_:
 				bm.size = Vector3(0.7, 1.1, 0.7)
 	_ghost.mesh = bm
@@ -331,8 +361,8 @@ func _confirm_ghost() -> void:
 			Inventory.remove_res("housekit", 1)
 		Sfx.play("place")
 	else:
-		if _ghost_kind == "catwalk" and Game.zone == "":
-			Sfx.play("denied")   # catwalks are an INDOOR philosophy
+		if _ghost_kind in ["catwalk", "doorframe"] and Game.zone == "":
+			Sfx.play("denied")   # indoor equipment. read the label.
 			_cancel_ghost()
 			return
 		if not Game.creative:
@@ -1289,10 +1319,17 @@ func _use_selected() -> void:
 		"furnkit":
 			var fopts: Array = []
 			for k2 in Furniture.KINDS:
-				fopts.append({"id": k2, "label": k2.capitalize()})
+				var lbl2: String = k2.capitalize()
+				if k2 == "doorframe":
+					lbl2 = "Door Frame (place INSIDE, on a wall)"
+				fopts.append({"id": k2, "label": lbl2})
+			fopts.append({"id": "door", "label": "Door (OUTSIDE: link two framed houses)"})
 			var pui2 := PickUI.new().configure("FURNITURE (2 plantfiber)", fopts,
 				func(kind: String) -> void:
-					_start_ghost("furn", kind))
+					if kind == "door":
+						_door_tool()
+					else:
+						_start_ghost("furn", kind))
 			get_tree().current_scene.add_child(pui2)
 		"grenade":
 			var gr := Grenade.new()

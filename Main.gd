@@ -159,6 +159,8 @@ func _ready() -> void:
 		_winshot_test()
 	if OS.get_environment("CTD_TEST") == "18":
 		_hole_test()
+	if OS.get_environment("CTD_TEST") == "19":
+		_door_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -480,6 +482,55 @@ func _repopulate() -> void:
 	add_child(hm)
 	hm.global_transform = Transform3D(_basis_from_up(cd),
 		b.center + cd * (float(b.radius) + 1.2))
+
+## Headless: two houses, a doorframe in each, one Door connect. Verify
+## the rooms docked, the walls opened, and the link persisted.
+func _door_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var ha := House.new()
+	ha.kind = "small"
+	add_child(ha)
+	ha.global_transform = Transform3D(_basis_from_up(up), home.center + up * home.radius)
+	var hb := House.new()
+	hb.kind = "box"
+	add_child(hb)
+	hb.global_transform = Transform3D(_basis_from_up(up),
+		home.center + up * home.radius + Vector3(15, 0, 0))
+	await get_tree().create_timer(1.5).timeout
+	# a frame against the +Z inner wall of each room, facing +Z (-Z out)
+	var fa := Furniture.new()
+	fa.kind = "doorframe"
+	fa.yaw = 0.0
+	add_child(fa)
+	fa.global_position = ha.room_center() + Vector3(0,
+		-ha.room_size().y * 0.5 + 0.3, ha.room_size().z * 0.5 - 0.9)
+	fa.rotation_degrees.y = 180.0   # -Z (its "through") points at the wall
+	var fb := Furniture.new()
+	fb.kind = "doorframe"
+	fb.yaw = 0.0
+	add_child(fb)
+	fb.global_position = hb.room_center() + Vector3(0,
+		-hb.room_size().y * 0.5 + 0.3, -hb.room_size().z * 0.5 + 0.9)
+	await get_tree().create_timer(0.4).timeout
+	print("DOORTEST frames seen: ", ha.my_frames().size(), "/", hb.my_frames().size())
+	var b_before: Vector3 = hb.room_center()
+	var okc: bool = ha.connect_house(hb)
+	await get_tree().create_timer(0.5).timeout
+	print("DOORTEST connected: ", okc, "  b moved: %.1f" % b_before.distance_to(hb.room_center()),
+		"  links: ", ha.links, "/", hb.links)
+	# walk-through probe: horizontal ray from A's room through the cut
+	var space := get_tree().root.world_3d.direct_space_state
+	var from := ha.room_center() + Vector3(0, -ha.room_size().y * 0.5 + 1.2,
+		ha.room_size().z * 0.5 - 1.1)   # past the exit gate, at the wall
+	var q := PhysicsRayQueryParameters3D.create(from,
+		from + Vector3(0, 0, 6.0))
+	var hit := space.intersect_ray(q)
+	var reach: float = (hit.position.z - from.z) if hit else 99.0
+	print("DOORTEST doorway open: ", reach > 1.6,
+		"  (ray travelled %.1f past the wall line)" % reach)
 
 ## Headless: raycast down through the basement stairwell hole. If the
 ## ray stops at the ground floor, the hole is a lie.
@@ -3617,6 +3668,8 @@ func collect_world() -> Array:
 			e["howner"] = n.owner_uid
 			e["howner_n"] = n.owner_name
 			e["hroom_n"] = n.roommate_name
+			e["hoff"] = [n.room_offset.x, n.room_offset.y, n.room_offset.z]
+			e["hlinks"] = n.links.duplicate()
 		if n is Furniture:
 			e["fkind"] = n.kind
 		if n is Rocket:
@@ -3674,6 +3727,10 @@ func restore_world() -> void:
 			n.owner_uid = int(e.get("howner", 0))
 			n.owner_name = str(e.get("howner_n", ""))
 			n.roommate_name = str(e.get("hroom_n", ""))
+			var ho = e.get("hoff", [0, 0, 0])
+			n.room_offset = Vector3(float(ho[0]), float(ho[1]), float(ho[2]))
+			for lv in e.get("hlinks", []):
+				n.links.append(int(lv))
 		if n is Furniture:
 			n.kind = str(e.get("fkind", "bench"))
 		add_child(n)

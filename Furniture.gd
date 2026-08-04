@@ -4,7 +4,7 @@ extends StaticBody3D
 ## Placer tool, usable by every human (and the player, F). A carpet is
 ## furniture with no ambitions. A bed is a seat you take lying down.
 
-const KINDS := ["bench", "chair", "sofa", "carpet", "bed", "catwalk"]
+const KINDS := ["bench", "chair", "sofa", "carpet", "bed", "catwalk", "doorframe"]
 
 var kind: String = "bench"
 var yaw: float = -1.0
@@ -38,6 +38,30 @@ func _ready() -> void:
 			_m(Vector3(4.2, 0.05, 3.0), Vector3(0, 0.03, 0), cloth)
 			_m(Vector3(4.4, 0.04, 3.2), Vector3(0, 0.015, 0),
 				Destructible.make_material(cloth.albedo_color.darkened(0.3), 0.03))
+		"doorframe":
+			# a doorway waiting for a door: jambs, lintel, and a faint
+			# shimmer where the wall will stop existing. place it against
+			# an interior wall; connect two of them with the Door tool
+			# from OUTSIDE and the houses become one build.
+			var jamb: Material = Surfaces.wood(Color("#5a4428"))
+			for jx in [-0.95, 0.95]:
+				_m(Vector3(0.18, 2.6, 0.18), Vector3(jx, 1.3, 0), jamb)
+			_m(Vector3(2.1, 0.2, 0.2), Vector3(0, 2.7, 0), jamb)
+			var shim := MeshInstance3D.new()
+			var shm := BoxMesh.new()
+			shm.size = Vector3(1.7, 2.5, 0.05)
+			shim.mesh = shm
+			shim.position = Vector3(0, 1.3, 0)
+			shim.material_override = Surfaces.portal(Color("#8ab8ff"))
+			shim.name = "shimmer"
+			add_child(shim)
+			# hitboxes on the JAMBS and lintel only: a doorframe you
+			# can't walk through is a wall with delusions
+			_hitbox(Vector3(0.2, 2.6, 0.2), Vector3(-0.95, 1.3, 0))
+			_hitbox(Vector3(0.2, 2.6, 0.2), Vector3(0.95, 1.3, 0))
+			_hitbox(Vector3(2.1, 0.2, 0.2), Vector3(0, 2.7, 0))
+			add_to_group("doorframe")
+			set_meta("linked", false)
 		"catwalk":
 			# industrial platform: legs, deck, rails. machines welcome
 			# on top. house-interior use only, per the placer.
