@@ -17,6 +17,59 @@ extends StaticBody3D
 ## A generator indoors fills the room with smoke. Read a book instead.
 
 const KINDS := ["small", "two_story", "box", "basement", "factory", "tower"]
+
+## A wall port: a light-gray socket box, barely proud of the wall,
+## little square panels on every face. NOT an extender -- a PORTAL:
+## whatever lands in it (power or items) teleports to its twin in the
+## exact home it belongs to.
+class Port extends Machine:
+	var twin = null
+	var is_power := true
+	var home_label := ""
+
+	func _init() -> void:
+		title = "HOUSE PORT"
+		box_color = Color("#c8cbd0")
+		box_size = Vector3(0.52, 0.52, 0.24)
+		buf_cap = 200.0
+		shows_out = false
+
+	func _ready() -> void:
+		super._ready()
+		# inset squares on all sides, like it was stamped, not built
+		var sq := BoxMesh.new()
+		sq.size = Vector3(0.24, 0.24, 0.035)
+		var scol := Color("#8ecf9f") if is_power else Color("#e0a860")
+		part(sq, Vector3(0, 0.26, 0.11), scol, 0.5)
+		part(sq, Vector3(0, 0.26, -0.11), scol, 0.5)
+		var sq2 := BoxMesh.new()
+		sq2.size = Vector3(0.035, 0.24, 0.1)
+		part(sq2, Vector3(0.25, 0.26, 0), scol, 0.5)
+		part(sq2, Vector3(-0.25, 0.26, 0), scol, 0.5)
+		var sq3 := BoxMesh.new()
+		sq3.size = Vector3(0.24, 0.035, 0.1)
+		part(sq3, Vector3(0, 0.51, 0), scol, 0.5)
+
+	func work(delta: float) -> void:
+		if twin == null or not is_instance_valid(twin):
+			return
+		if is_power:
+			# energy steps through the wall like it isn't there
+			var t: float = minf(buf, 80.0 * delta)
+			if t > 0.0 and twin.buf < twin.buf_cap:
+				t = minf(t, twin.buf_cap - twin.buf)
+				buf -= t
+				twin.buf += t
+		else:
+			if str(in_slot["id"]) != "" and str(twin.out_slot["id"]) == "":
+				twin.out_slot = in_slot.duplicate()
+				in_slot = {"id": "", "n": 0}
+
+	func accepts(id: String) -> bool:
+		return not is_power
+
+	func info_text() -> String:
+		return "%s PORTAL\n→ %s" % ["POWER" if is_power else "ITEM", home_label]
 const BASE := Vector3(60000, 24000, -60000)   # pocket-interior estate
 const SLOT_SPACING := 800.0
 
@@ -24,6 +77,8 @@ var kind: String = "small"
 var slot: int = -1              # which pocket lot this house owns
 var human_home: bool = false    # town house: humans only, no dudes
 var owner_uid: int = 0          # claiming human's id (human homes)
+var owner_name: String = ""     # claiming human's NAME (for the sign)
+var roommate_name: String = ""  # a friend who moved in. rent is emotional
 
 var _iroot: Node3D              # interior nodes live under here
 var _in_ports: Array = []       # interior port machines
@@ -39,6 +94,22 @@ var _rad := false
 var _smoke := false
 var _smoke_node: GPUParticles3D
 var _door_pos := Vector3.ZERO   # local door spot (exterior)
+var _tag: Label3D
+
+## What this home is called, on the sign and on every portal.
+func display_name() -> String:
+	if human_home:
+		if owner_name == "":
+			return "Nobody's house"
+		if roommate_name != "":
+			return "%s & %s's house" % [owner_name, roommate_name]
+		return "%s's house" % owner_name
+	return "%s #%d" % [kind.capitalize().replace("_", "-"), slot]
+
+func refresh_tag() -> void:
+	if _tag == null:
+		return
+	_tag.text = display_name() + ("" if human_home else "  [F]")
 
 static var _next_slot := 0
 
@@ -148,14 +219,14 @@ func _build_exterior() -> void:
 	# door (dark inset) on -Z face
 	_door_pos = Vector3(0, 1.1, -w * 0.5 - 0.05)
 	_box(self, Vector3(1.2, 2.2, 0.12), _door_pos, Color("#3a2c20"), 0.02)
-	var tag := Label3D.new()
-	tag.text = ("HOUSE  [F]" if not human_home else "someone's home")
-	tag.font_size = 16
-	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	tag.position = Vector3(0, h + 1.6, 0)
-	tag.modulate = Color(1, 1, 1, 0.75)
-	tag.outline_size = 5
-	add_child(tag)
+	_tag = Label3D.new()
+	_tag.font_size = 16
+	_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_tag.position = Vector3(0, h + 1.6, 0)
+	_tag.modulate = Color(1, 1, 1, 0.75)
+	_tag.outline_size = 5
+	add_child(_tag)
+	refresh_tag()
 	# collider for the shell (also the interact hitbox)
 	var col := CollisionShape3D.new()
 	var cs := BoxShape3D.new()
@@ -269,7 +340,9 @@ func _build_ports() -> void:
 	var sz := room_size()
 	for i in 6:
 		var is_power := i < 3
-		var outp := EMachines.Extender.new()
+		var outp := Port.new()
+		outp.is_power = is_power
+		outp.home_label = display_name()
 		outp.set_meta("house_port", true)
 		get_tree().current_scene.add_child(outp)
 		var side := -1.0 if i % 2 == 0 else 1.0
@@ -279,32 +352,23 @@ func _build_ports() -> void:
 		if kind == "box":
 			w = 3.4
 		outp.global_transform = global_transform
+		# barely proud of the wall: a socket, not a shed
 		outp.global_position = global_position \
-			+ global_transform.basis.x * (side * (w * 0.5 + 0.45)) \
-			+ global_transform.basis.y * (0.7 + float(i / 2) * 1.1)
-		outp.scale = Vector3(0.45, 0.45, 0.45)
+			+ global_transform.basis.x * (side * (w * 0.5 + 0.08)) \
+			+ global_transform.basis.y * (0.7 + float(i / 2) * 0.85)
+		outp.rotate_object_local(Vector3.UP, PI * 0.5 * side)
 		_out_ports.append(outp)
-		var inp := EMachines.Extender.new()
+		var inp := Port.new()
+		inp.is_power = is_power
+		inp.home_label = display_name() + " (inside)"
 		inp.set_meta("house_port", true)
 		get_tree().current_scene.add_child(inp)
 		inp.global_position = c + Vector3(-sz.x * 0.5 + 1.0 + float(i) * 1.4,
-			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 1.0)
-		inp.scale = Vector3(0.6, 0.6, 0.6)
+			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 0.35)
 		_in_ports.append(inp)
-		# the umbilical: outside twin feeds inside twin
-		if outp.has_method("connect_wire"):
-			if is_power:
-				outp.connect_wire(inp, "power", 0)
-			else:
-				outp.connect_wire(inp, "item", 2)
-			# the umbilical is METAPHYSICAL: without this, the wire
-			# visual draws a line from your lawn to a pocket dimension
-			# 60km past everything (observed. memorable. wrong.)
-			for entry in outp._conn_vis:
-				for nd in entry["nodes"]:
-					if is_instance_valid(nd):
-						nd.queue_free()
-			outp._conn_vis.clear()
+		# the pairing: outside pours into inside. no wires, no visuals,
+		# no lines to the far side of the solar system
+		outp.twin = inp
 
 # ------------------------------------------------------------- windows
 

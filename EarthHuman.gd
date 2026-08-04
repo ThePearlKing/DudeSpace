@@ -888,6 +888,18 @@ func _pick_act() -> void:
 				if hn is House and hn.human_home and hn.owner_uid == human_id:
 					my_house = hn
 					break
+			# roommates: a good enough friend with a place beats
+			# house-hunting. rent is emotional support
+			if my_house == null:
+				var fr4 := _best_friend(150.0)
+				if fr4 != null and fr4.my_house != null \
+						and is_instance_valid(fr4.my_house) \
+						and fr4.my_house.roommate_name == "" \
+						and fr4.my_house.owner_uid != 0 \
+						and _op(fr4.human_id) > 55.0:
+					my_house = fr4.my_house
+					my_house.roommate_name = human_name
+					my_house.refresh_tag()
 			if my_house == null:
 				var bhd := 3600.0
 				var cand = null
@@ -900,6 +912,8 @@ func _pick_act() -> void:
 				if cand != null:
 					my_house = cand
 					my_house.owner_uid = human_id
+					my_house.owner_name = human_name
+					my_house.refresh_tag()
 					my_house.furnish_for(_pers)
 		if my_house != null and randf() < 0.08:
 			_goal_house = my_house

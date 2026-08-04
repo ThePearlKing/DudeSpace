@@ -1939,23 +1939,19 @@ func _populate(b) -> void:
 			# the country. dudes can't enter; humans move in, furnish
 			# them to taste, and have people over
 			for ti in 2:
-				# hamlets belong in the middle of NOWHERE: keep rolling
-				# until the spot is far from every city
-				var tc := Vector3.ZERO
-				var lonely := false
-				var tries := 0
-				while not lonely and tries < 60:
-					tries += 1
-					tc = Vector3.ZERO
-					while tc.length() < 0.1:
-						tc = Vector3(crng.randf_range(-1, 1), crng.randf_range(-1, 1),
-							crng.randf_range(-1, 1))
-					tc = tc.normalized()
-					lonely = true
-					for cty in Game.earth_cities:
-						if tc.angle_to(cty["dir"]) * float(b.radius) < 100.0:
-							lonely = false
-							break
+				# hamlets sit in the countryside JUST outside a city:
+				# close enough to visit, far enough to not overlap it
+				var cty2: Dictionary = Game.earth_cities[crng.randi() % Game.earth_cities.size()]
+				var cdir: Vector3 = cty2["dir"]
+				var ring_r := crng.randf_range(55.0, 95.0) / float(b.radius)
+				var ring_a := crng.randf() * TAU
+				var t1 := cdir.cross(Vector3.UP)
+				if t1.length() < 0.01:
+					t1 = cdir.cross(Vector3.RIGHT)
+				t1 = t1.normalized()
+				var t2 := cdir.cross(t1).normalized()
+				var tc := (cdir + (t1 * cos(ring_a) + t2 * sin(ring_a)) \
+					* tan(ring_r)).normalized()
 				for hi in 3:
 					var hd3 := (tc + Vector3(crng.randf_range(-0.05, 0.05),
 						crng.randf_range(-0.05, 0.05), crng.randf_range(-0.05, 0.05))).normalized()
@@ -3479,6 +3475,8 @@ func collect_world() -> Array:
 			e["hslot"] = n.slot
 			e["hh"] = n.human_home
 			e["howner"] = n.owner_uid
+			e["howner_n"] = n.owner_name
+			e["hroom_n"] = n.roommate_name
 		if n is Furniture:
 			e["fkind"] = n.kind
 		if n is Rocket:
@@ -3534,6 +3532,8 @@ func restore_world() -> void:
 			n.slot = int(e.get("hslot", -1))
 			n.human_home = bool(e.get("hh", false))
 			n.owner_uid = int(e.get("howner", 0))
+			n.owner_name = str(e.get("howner_n", ""))
+			n.roommate_name = str(e.get("hroom_n", ""))
 		if n is Furniture:
 			n.kind = str(e.get("fkind", "bench"))
 		add_child(n)
