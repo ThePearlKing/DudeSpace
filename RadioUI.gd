@@ -126,6 +126,7 @@ func _ready() -> void:
 	_spec.draw.connect(_draw_spec)
 	left.add_child(_spec)
 	var right := VBoxContainer.new()
+	right.custom_minimum_size = Vector2(210, 0)
 	col.add_child(right)
 	var ah := Label.new()
 	ah.text = "ACTIVITY"
@@ -387,4 +388,8 @@ func _process(_d: float) -> void:
 		if radio.align_for(st) > 0.4 and absf(radio.freq - float(st["freq"])) > 0.3:
 			var l := Label.new()
 			l.text = "%.1f MHz — %s" % [float(st["freq"]), str(st["name"])]
+			# long station names WRAP inside a fixed column instead of
+			# stretching the whole strip layout
+			l.custom_minimum_size = Vector2(210, 0)
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_act_box.add_child(l)
