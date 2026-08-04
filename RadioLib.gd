@@ -776,7 +776,7 @@ static func _euclid_loop(seed_v: int) -> AudioStreamWAV:
 # a field once. He is not going to describe it properly, and he knows
 # more than he will ever admit. Plays ONCE per world session; after the
 # last line it's just the hole again.
-const EH_END := 265.0
+const EH_END := 282.0
 const EH_LOG: Array = [
 	[13.0, "there it is again. the sound. people call it a howl. it isn't. a howl wants something. this is the sound of a thing that already has it."],
 	[15.0, "i used to think you listened to a place like this to feel small. no. you listen to check whether it remembers you."],
@@ -809,7 +809,9 @@ const EH_LOG: Array = [
 	[238.0, "and down it goes. slow as a sunset. the dirt just... accepts it. grass folding over like a page."],
 	[247.0, "you'd never know. that's the point, i think. you were never supposed to know. i wasn't either. i just happened to be in the field."],
 	[256.0, "anyway. the sky out here is very good tonight."],
-	[263.0, ""]]
+	[263.0, "...you hear it, don't you. this sound. the one you tuned in for."],
+	[270.0, "that's what the field sounded like. the exact moment it showed me. i've been coming out here to listen to it ever since."],
+	[280.0, ""]]
 
 static func eh_line(t: float) -> String:
 	var out := ""
