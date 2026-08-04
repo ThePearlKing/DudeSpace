@@ -340,7 +340,7 @@ func _process(_d: float) -> void:
 	var live: bool = Game.playtime < radio.now_line_until
 	var saucey: bool = live and radio.now_line.begins_with("⊙")
 	if _subs != null:
-		var want := radio.now_line if (live and not saucey) else ""
+		var want: String = radio.now_line if (live and not saucey) else ""
 		if _subs.text != want:
 			_subs.text = want
 		if _last_sub_col != radio.now_line_col:
