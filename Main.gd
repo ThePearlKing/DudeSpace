@@ -465,6 +465,18 @@ func _map_pick_test() -> void:
 		print("MAPTEST after direct call, cb still set: ", m.select_cb.is_valid())
 		print("MAPTEST body_at says: ", m.body_at(ev.position))
 
+func _unhandled_key_input(event: InputEvent) -> void:
+	# F12: screenshot into user://screenshots, timestamped
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F12:
+		DirAccess.make_dir_recursive_absolute("user://screenshots")
+		var img := get_viewport().get_texture().get_image()
+		var fn := "user://screenshots/shot_%s.png" % \
+			Time.get_datetime_string_from_system().replace(":", "-")
+		img.save_png(fn)
+		Sfx.play("click", -20.0)
+		print("screenshot: ", ProjectSettings.globalize_path(fn))
+
 ## Headless regression test: build a small base, save-cycle it, count.
 func _self_test() -> void:
 	await get_tree().create_timer(1.0).timeout
@@ -1575,33 +1587,43 @@ func _populate(b) -> void:
 				var hd := _surface_dir()
 				hum.global_transform = Transform3D(_basis_from_up(hd),
 					b.center + hd * (b.radius + 1.2))
-			# two cities: towers with lit windows, and the crowds that
-			# come with towers. humanity clusters. it always has.
-			# city LAYOUT gets its OWN world-seeded dice: the shared
-			# stream drifts with density settings and everything rolled
-			# before this line, but a city is an address. it stays put.
+			# FOUR cities, each with its own vibe, linked by a railway
+			# ring. city LAYOUT gets its OWN world-seeded dice: the
+			# shared stream drifts with density settings, but a city is
+			# an address. it stays put.
 			var crng := RandomNumberGenerator.new()
 			crng.seed = hash(str(Game.world_seed) + "::cities")
-			for ci in 2:
+			Game.earth_body = b
+			Game.earth_cities = []
+			var vibes: Array = [
+				{"vibe": "goofy", "name": "Honkton", "tint": Color("#ffb347")},
+				{"vibe": "grumpy", "name": "Grumbleburg", "tint": Color("#50505a")},
+				{"vibe": "dreamy", "name": "Driftwood", "tint": Color("#9ad0ff")},
+				{"vibe": "confident", "name": "Peak City", "tint": Color("#ffd166")},
+			]
+			for ci in 4:
 				var centre := Vector3.ZERO
 				while centre.length() < 0.1:
 					centre = Vector3(crng.randf_range(-1, 1),
 						crng.randf_range(-1, 1), crng.randf_range(-1, 1))
 				centre = centre.normalized()
-				for i in _n(10):
+				Game.earth_cities.append({"dir": centre,
+					"vibe": vibes[ci]["vibe"], "name": vibes[ci]["name"],
+					"tint": vibes[ci]["tint"]})
+				for i in _n(8):
 					var bd := (centre + Vector3(crng.randf_range(-0.16, 0.16),
 						crng.randf_range(-0.16, 0.16), crng.randf_range(-0.16, 0.16))).normalized()
-					_city_building(b, bd)
-				for i in _n(14):
+					_city_building(b, bd, vibes[ci]["tint"])
+				for i in _n(10):
 					var ch := EarthHuman.new()
 					ch.setup(b)
+					ch.home_city = ci
 					add_child(ch)
 					var cd := (centre + Vector3(crng.randf_range(-0.2, 0.2),
 						crng.randf_range(-0.2, 0.2), crng.randf_range(-0.2, 0.2))).normalized()
 					ch.global_transform = Transform3D(_basis_from_up(cd),
 						b.center + cd * (b.radius + 1.2))
 				# street furniture: benches and the odd lone chair.
-				# the sitting economy.
 				for i in 4:
 					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18),
@@ -1610,6 +1632,10 @@ func _populate(b) -> void:
 					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18))).normalized(), crng, false)
+			# the railway ring: every city linked to the next one over
+			for ci in 4:
+				_rail(b, Game.earth_cities[ci]["dir"],
+					Game.earth_cities[(ci + 1) % 4]["dir"])
 			for i in _n(8):
 				_earth_mountain(b, _surface_dir())
 			_add_shell(b, Color.WHITE, 1.06, true)   # drifting cloud deck
@@ -1690,51 +1716,46 @@ func _populate(b) -> void:
 		_:
 			pass
 
+## A railway between two city centres: plank segments laid along the
+## great-circle line, sleepers every few ties. Humans ride it standing,
+## because trains are a state of mind.
+func _rail(b, d1: Vector3, d2: Vector3) -> void:
+	var ang := acos(clampf(d1.dot(d2), -1.0, 1.0))
+	if ang < 0.01:
+		return
+	var steps := maxi(2, int(ang * b.radius / 3.0))
+	var dark := Destructible.make_material(Color("#3c3430"), 0.03)
+	var light := Destructible.make_material(Color("#6a5a40"), 0.05)
+	for i in steps:
+		var dir := d1.slerp(d2, float(i) / steps).normalized()
+		var nxt := d1.slerp(d2, float(i + 1) / steps).normalized()
+		var p0: Vector3 = b.center + dir * (b.radius + 0.12)
+		var p1: Vector3 = b.center + nxt * (b.radius + 0.12)
+		var seg := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(1.3, 0.1, p0.distance_to(p1) + 0.3)
+		seg.mesh = bm
+		seg.material_override = light if i % 3 == 0 else dark
+		add_child(seg)
+		var upr := dir
+		var fwd := (p1 - p0).normalized()
+		fwd = (fwd - upr * fwd.dot(upr)).normalized()
+		var xr := upr.cross(fwd).normalized()
+		seg.global_transform = Transform3D(Basis(xr, upr, -fwd).orthonormalized(),
+			(p0 + p1) * 0.5)
+
 ## Somewhere to sit: a park bench (two seats) or a lone chair (one).
 ## Humans find these on their own. It is very important to them.
 func _seat_prop(b, dir: Vector3, rng: RandomNumberGenerator, bench: bool) -> void:
-	var root := Node3D.new()
+	var root := Bench.new()
+	root.is_bench = bench
+	root.yaw = rng.randf() * TAU
 	add_child(root)
-	var wood := Destructible.make_material(Color("#7a5a34"), 0.05)
-	var dark := Destructible.make_material(Color("#3a3a3e"), 0.02)
-	var w := 1.8 if bench else 0.6
-	var seat := MeshInstance3D.new()
-	var sm := BoxMesh.new()
-	sm.size = Vector3(w, 0.08, 0.55)
-	seat.mesh = sm
-	seat.position = Vector3(0, 0.55, 0)
-	seat.material_override = wood
-	root.add_child(seat)
-	var back := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(w, 0.5, 0.08)
-	back.mesh = bm
-	back.position = Vector3(0, 0.85, 0.28)
-	back.material_override = wood
-	root.add_child(back)
-	for lx in [-w * 0.45, w * 0.45]:
-		for lz in [-0.22, 0.22]:
-			var leg := MeshInstance3D.new()
-			var lm := BoxMesh.new()
-			lm.size = Vector3(0.07, 0.55, 0.07)
-			leg.mesh = lm
-			leg.position = Vector3(lx, 0.27, lz)
-			leg.material_override = dark
-			root.add_child(leg)
-	# seat markers: the points humans actually claim
-	var offs: Array = [-0.45, 0.45] if bench else [0.0]
-	for ox in offs:
-		var s := Node3D.new()
-		s.position = Vector3(ox, 0.55, 0)
-		s.add_to_group("seat")
-		s.set_meta("taken", false)
-		root.add_child(s)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
-	root.rotate_object_local(Vector3.UP, rng.randf() * TAU)
 
 ## A city tower: concrete box, lit windows scattered up its faces, roof
 ## lip. Humanity's whole architectural output, honestly.
-func _city_building(b, dir: Vector3) -> void:
+func _city_building(b, dir: Vector3, tint: Color = Color(0.5, 0.5, 0.5)) -> void:
 	var root := Node3D.new()
 	add_child(root)
 	var h := randf_range(5.0, 15.0)
@@ -1746,7 +1767,8 @@ func _city_building(b, dir: Vector3) -> void:
 	tm.size = Vector3(w, h, d)
 	tower.mesh = tm
 	tower.position = Vector3(0, h * 0.5 - 0.3, 0)
-	tower.material_override = Destructible.make_material(Color(tone, tone, tone * 1.04), 0.03)
+	tower.material_override = Destructible.make_material(
+		Color(tone, tone, tone * 1.04).lerp(tint, 0.25), 0.03)
 	root.add_child(tower)
 	var lip := MeshInstance3D.new()
 	var lm := BoxMesh.new()
@@ -2832,7 +2854,7 @@ func net_break(pos: Vector3) -> void:
 ## graph (as indices into this same list).
 func collect_world() -> Array:
 	var nodes: Array = []
-	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop"]:
+	for grp in ["machine", "chest", "spawn", "autominer", "rocket", "waypoint", "itemdrop", "bench"]:
 		for n in get_tree().get_nodes_in_group(grp):
 			if is_instance_valid(n) and (n.has_meta("placed_id") or n is ItemDrop) and not nodes.has(n):
 				if n is Rocket and n.piloted:
@@ -2988,6 +3010,13 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"elight": return EMachines.ELight.new()
 		"switch": return EMachines.Switch.new()
 		"lightbox": return EMachines.LightBox.new()
+		"bench":
+			var bn := Bench.new()
+			return bn
+		"chairseat":
+			var cn := Bench.new()
+			cn.is_bench = false
+			return cn
 		"nreactor": return EMachines.NuclearReactor.new()
 		"rocket": return Rocket.new()
 		"rocket2":

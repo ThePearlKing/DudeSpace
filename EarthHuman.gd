@@ -516,6 +516,13 @@ var _fight_t: float = 0.0       # fight time remaining
 var _phase_t: float = 0.0       # approach/evade phase timer
 var _evading: bool = false      # backing off between swings
 var _gossip_cd: float = 0.0     # cooldown on bad-mouthing the blue dude
+var _los_t: float = 0.0         # sight-check throttle while hunting
+var _lost_t: float = 0.0        # how long the prey has been out of sight
+
+var home_city: int = -1         # index into Game.earth_cities. -2 = rural
+var _moved: bool = false        # already relocated once: settled now
+var _travel_to: int = -1        # riding the rail toward this city
+var _away_t: float = 0.0        # visiting: time left before homesickness
 var _apple: ItemDrop = null     # a spotted permadeath apple. destiny.
 var _eat_t: float = 0.0         # chewing countdown. after this, physics
 
@@ -550,6 +557,8 @@ func capture() -> Dictionary:
 	saved["pers"] = _pers.duplicate()
 	saved["op"] = _opinion.duplicate()
 	saved["hp"] = hp
+	saved["home_city"] = home_city
+	saved["moved"] = _moved
 	return saved.duplicate()
 
 func _ready() -> void:
@@ -560,6 +569,8 @@ func _ready() -> void:
 	hp = float(_rv("hp", 30.0))
 	# grudges survive the cage. JSON turns int keys into strings; turn
 	# them back or every old enemy becomes a stranger
+	home_city = int(saved.get("home_city", -1))
+	_moved = bool(saved.get("moved", false))
 	var rop: Dictionary = saved.get("op", {})
 	for k in rop:
 		_opinion[int(k)] = float(rop[k])
@@ -698,9 +709,9 @@ func _dress_human() -> void:
 
 	# the front of the shirt: plain / weird design / slogan
 	var roll := float(_rv("shirt_roll", randf()))
-	if roll < 0.15:
+	if roll < 0.05:
 		pass   # basic. a classic. says nothing, means nothing.
-	elif roll < 0.35 and is_instance_valid(_body._torso):
+	elif roll < 0.15 and is_instance_valid(_body._torso):
 		# "design": abstract shapes a machine thought were fashion
 		for i in randi_range(2, 4):
 			var shp := MeshInstance3D.new()
@@ -805,6 +816,26 @@ func _pick_act() -> void:
 			var to_s: Vector3 = best.global_position - global_position
 			_dir = (to_s - up_s * to_s.dot(up_s)).normalized()
 			return
+	# city life: home leash and the occasional rail trip. dreamers and
+	# goofballs wander more; everyone comes home eventually.
+	if _home == Game.earth_body and not Game.earth_cities.is_empty():
+		if home_city == -1:
+			home_city = _nearest_city()
+		if home_city >= 0 and _travel_to < 0 and _away_t <= 0.0:
+			var wl := 0.02 + float(_pers.get("dreamy", 25.0)) * 0.0008 \
+				+ float(_pers.get("goofy", 25.0)) * 0.0004
+			if randf() < wl:
+				var other := randi() % Game.earth_cities.size()
+				if other != home_city:
+					_travel_to = other
+					_away_t = randf_range(45.0, 90.0)
+					return
+			# drifted out of town with no trip planned: head home
+			var cur3: Vector3 = (global_position - _home.center).normalized()
+			var hd: Vector3 = Game.earth_cities[home_city]["dir"]
+			if cur3.angle_to(hd) * float(_home.radius) > 55.0:
+				_travel_to = home_city
+				return
 	# a good friend somewhere out there? go stand with them. friends
 	# drift apart and find each other again. nobody knows how they know.
 	if randf() < 0.18:
@@ -1053,12 +1084,19 @@ func _check_social() -> void:
 				return
 	if _partner != null:
 		return
+	# standing with a cross-city friend: sometimes the Conversation
+	if _act == "friend" and _friend != null and is_instance_valid(_friend) \
+			and global_position.distance_squared_to(_friend.global_position) < 9.0 \
+			and randf() < 0.15:
+		_maybe_negotiate_move()
 	var p = get_tree().get_first_node_in_group("player")
 	# the rally: hate the blue dude ENOUGH and you call your best
 	# friends -- everyone who already dislikes him comes swinging
 	if p != null and _op(-1) < -65.0 and randf() < 0.25 \
-			and global_position.distance_squared_to(p.global_position) < 900.0:
+			and global_position.distance_squared_to(p.global_position) < 900.0 \
+			and _can_see(p):
 		_hunt_t = 12.0
+		_lost_t = 0.0
 		_say(_rally_line())
 		for h2 in get_tree().get_nodes_in_group("earth_human"):
 			if h2 == self or not (h2 is EarthHuman):
@@ -1203,6 +1241,70 @@ func hear(from: EarthHuman, kind: String) -> void:
 			return
 	if _partner == from:
 		_convo_wait = randf_range(1.8, 2.8)
+
+## Eyes: a straight ray to the target, blocked by anything solid --
+## terrain, hills, the planet's own horizon.
+func _can_see(p: Node3D) -> bool:
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(
+		global_position + _up() * 0.7,
+		p.global_position + _up() * 0.5)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	return hit.is_empty() or hit.get("collider") == p
+
+## Which city is this, then. -2 means the countryside: no city within
+## ~80m of surface arc, no leash, no civic duties.
+func _nearest_city() -> int:
+	if _home == null or Game.earth_cities.is_empty():
+		return -2
+	var cur: Vector3 = (global_position - _home.center).normalized()
+	var best := -2
+	var bd: float = 80.0 / float(_home.radius)
+	for i in Game.earth_cities.size():
+		var a: float = cur.angle_to(Game.earth_cities[i]["dir"])
+		if a < bd:
+			bd = a
+			best = i
+	return best
+
+## Stepping off the rail somewhere new: if this city's whole VIBE is
+## your dominant axis, maybe it was always home. One move per life.
+func _maybe_adopt_city() -> void:
+	if home_city < 0 or _moved:
+		return
+	var idx := _nearest_city()
+	if idx < 0 or idx == home_city:
+		return
+	var city: Dictionary = Game.earth_cities[idx]
+	if float(_pers.get(str(city["vibe"]), 25.0)) > 60.0 and randf() < 0.5:
+		home_city = idx
+		_moved = true
+		_away_t = 0.0
+		_say("this is my city now. it always was.")
+
+## Two friends, two cities, one conversation every friendship has
+## eventually. The stubborn one (confident + grumpy) stays put; the
+## flexible one packs up. Once you've moved, you're SETTLED.
+func _maybe_negotiate_move() -> void:
+	if _friend == null or not is_instance_valid(_friend):
+		return
+	if home_city < 0 or _friend.home_city < 0 or _friend.home_city == home_city:
+		return
+	if _moved and _friend._moved:
+		return
+	var stay_me := float(_pers.get("confident", 25.0)) \
+		+ float(_pers.get("grumpy", 25.0)) + (60.0 if _moved else 0.0)
+	var stay_them := float(_friend._pers.get("confident", 25.0)) \
+		+ float(_friend._pers.get("grumpy", 25.0)) + (60.0 if _friend._moved else 0.0)
+	var mover: EarthHuman = self if stay_me < stay_them else _friend
+	var stayer: EarthHuman = _friend if mover == self else self
+	mover.home_city = stayer.home_city
+	mover._moved = true
+	mover._away_t = 0.0
+	var cn := str(Game.earth_cities[stayer.home_city]["name"])
+	mover._say("fine. %s has better benches anyway. I'm in." % cn)
+	stayer._say("correct choice. %s improves everyone." % cn)
 
 ## Best friend in range: highest mutual regard wins. Friendship is a
 ## ledger that went POSITIVE, which on this planet is remarkable.
@@ -1412,6 +1514,39 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	var up := _up()
+
+	# riding the rail: glide the great-circle line to the destination.
+	# commuters stand. it's the law.
+	if _travel_to >= 0:
+		if _travel_to >= Game.earth_cities.size():
+			_travel_to = -1
+		else:
+			var tgt: Vector3 = Game.earth_cities[_travel_to]["dir"]
+			var cur: Vector3 = (global_position - _home.center).normalized()
+			var ang: float = cur.angle_to(tgt)
+			if ang < 0.02:
+				_travel_to = -1
+				velocity = Vector3.ZERO
+				_maybe_adopt_city()
+			else:
+				var step: float = clampf((16.0 * delta) / (float(_home.radius) * ang), 0.0, 1.0)
+				var nd: Vector3 = cur.slerp(tgt, step).normalized()
+				global_position = _home.center + nd * (_home.radius + 1.15)
+				var fwd := nd - cur
+				fwd = (fwd - nd * fwd.dot(nd))
+				if fwd.length() > 0.0001:
+					fwd = fwd.normalized()
+					var xr := nd.cross(fwd).normalized()
+					global_transform.basis = Basis(xr, nd, -fwd).orthonormalized()
+				if _body:
+					_body.animate(0.0, true, delta)
+			return
+
+	# visiting another city: the clock ticks toward homesickness
+	if _away_t > 0.0:
+		_away_t -= delta
+		if _away_t <= 0.0 and home_city >= 0:
+			_travel_to = home_city   # every time. no exceptions.
 	var g := Universe.gravity_at(global_position)
 
 	# thought bubble fades like the thought itself. the OUTLINE fades in
@@ -1489,15 +1624,31 @@ func _physics_process(delta: float) -> void:
 			_hunt_t = 0.0
 		else:
 			var to_p2: Vector3 = hp2.global_position - global_position
-			_dir = (to_p2 - up * to_p2.dot(up)).normalized()
-			if to_p2.length() > 1.7:
-				speed = PANIC_SPEED * 0.85
-			elif _swing_cd <= 0.0:
-				_swing_cd = 1.1
-				Game.hurt(4.0)
-				Sfx.play("hurt", -14.0)
-				if randf() < 0.4:
-					_say(_insult_line())
+			# they have to SEE you to keep chasing. duck behind terrain
+			# (or the planet's own curve) and stay gone -- they give up.
+			_los_t -= delta
+			if _los_t <= 0.0:
+				_los_t = 0.3
+				if _can_see(hp2):
+					_lost_t = 0.0
+				else:
+					_lost_t += 0.3
+			if _lost_t > 2.0 or to_p2.length() > 40.0:
+				_hunt_t = 0.0
+				_lost_t = 0.0
+				_say(["where'd he GO.", "he's GONE. typical.",
+					"I'll remember this, blue dude.",
+					"cowardice. NOTED."][randi() % 4])
+			else:
+				_dir = (to_p2 - up * to_p2.dot(up)).normalized()
+				if to_p2.length() > 1.7:
+					speed = PANIC_SPEED * 0.85
+				elif _swing_cd <= 0.0:
+					_swing_cd = 1.1
+					Game.hurt(4.0)
+					Sfx.play("hurt", -14.0)
+					if randf() < 0.4:
+						_say(_insult_line())
 	elif _target != null:
 		# street fight: swing, back off, talk trash, swing again
 		if not is_instance_valid(_target) or _target._dead or _fight_t <= 0.0:
@@ -1559,7 +1710,11 @@ func _physics_process(delta: float) -> void:
 				else:
 					var to_f: Vector3 = _friend.global_position - global_position
 					_dir = (to_f - up * to_f.dot(up)).normalized()
-					if to_f.length() > 2.2:
+					if to_f.length() > 80.0 and _friend.home_city >= 0:
+						# different city: that's a rail trip, not a walk
+						_travel_to = _friend.home_city
+						_away_t = randf_range(40.0, 70.0)
+					elif to_f.length() > 2.2:
 						speed = WALK_SPEED * 1.1
 					# close enough: stand together. chats start on their own
 			"goseat":

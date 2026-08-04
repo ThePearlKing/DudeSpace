@@ -229,9 +229,33 @@ func _unhandled_input(event: InputEvent) -> void:
 func jetting() -> bool:
 	return _jetting
 
+var seated: Node3D = null   # bench seat marker we're parked on
+
+func sit_on(seat: Node3D) -> void:
+	seated = seat
+	seat.set_meta("taken", true)
+	velocity = Vector3.ZERO
+
 func _physics_process(delta: float) -> void:
 	if Game.mode != Game.Mode.ON_FOOT:
 		return
+	# parked on a bench: pinned until a movement key. the humans sit on
+	# their side, you sit on yours. equality.
+	if seated != null:
+		if not is_instance_valid(seated):
+			seated = null
+		elif Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_A) \
+				or Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_D) \
+				or Input.is_key_pressed(KEY_SPACE):
+			seated.set_meta("taken", false)
+			var su := (global_position - Universe.nearest(global_position).center).normalized()
+			global_position += su * 0.4
+			seated = null
+		else:
+			var su2: Vector3 = seated.global_transform.basis.y
+			global_position = seated.global_position + su2 * 0.6
+			velocity = Vector3.ZERO
+			return
 	# passenger seat: glued to the pilot's synced rocket, no physics of ours
 	if riding_peer != -1:
 		if not Net.active or not Net.player_pos.has(riding_peer):
@@ -908,7 +932,7 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender":
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench":
 			var n: Node3D
 			match id:
 				"chest": n = Chest.new()
@@ -932,6 +956,7 @@ func _use_selected() -> void:
 				"elight": n = EMachines.ELight.new()
 				"lightbox": n = EMachines.LightBox.new()
 				"switch": n = EMachines.Switch.new()
+				"bench": n = Bench.new()
 				"teleporter": n = EMachines.Teleporter.new()
 				"extender": n = EMachines.Extender.new()
 			get_parent().add_child(n)

@@ -248,6 +248,11 @@ func complete_transform() -> void:
 
 var _hurt_sfx_t: float = 0.0
 
+## Earth's four cities: [{dir, vibe, name, tint}]. Filled by worldgen,
+## read by every human deciding where home is.
+var earth_cities: Array = []
+var earth_body = null
+
 func hurt(d: float, vaporize: bool = false) -> void:
 	if dead or godmode:
 		return
