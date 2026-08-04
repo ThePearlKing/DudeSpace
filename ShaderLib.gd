@@ -76,14 +76,22 @@ void fragment() {
 	float t = TIME * speed;
 	float sw = fbm(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
-	vec3 base2 = tint;
 	if (rainbow > 0.5) {
-		float hue = fract(sw + t * 0.05);
-		base2 = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+		// the PRISM ARMOR fragment, verbatim: fresnel drives the hue, so
+		// whole faces sweep through the rainbow -- not noise clouds
+		float fres = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.4);
+		float hue = fract(fres * 0.9 + TIME * 0.12);
+		vec3 rb = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+		ALBEDO = mix(vec3(1.0, 0.55, 0.92), rb, 0.7);
+		METALLIC = 0.85;
+		ROUGHNESS = 0.12;
+		EMISSION = rb * (0.25 + 0.55 * fres)
+			+ rb * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * 0.33 * strength;
+	} else {
+		ALBEDO = tint * 0.15;
+		EMISSION = tint * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
+		ROUGHNESS = 0.4;
 	}
-	ALBEDO = base2 * 0.15;
-	EMISSION = base2 * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
-	ROUGHNESS = 0.4;
 }
 """
 	var m := ShaderMaterial.new()

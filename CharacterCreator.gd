@@ -157,7 +157,7 @@ func _ready() -> void:
 	_fx_box.add_child(prow)
 	for pr in [["Ultima glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
 				"sharp": 2.0, "rainbow": 0.0}],
-			["Prism glow", {"strength": 0.4, "speed": 1.0, "nscale": 5.0,
+			["Prism glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
 				"sharp": 2.0, "rainbow": 1.0}],
 			["Fluid", {"strength": 0.7, "speed": 0.5, "nscale": 2.0,
 				"sharp": 1.0, "rainbow": 0.0}]]:
