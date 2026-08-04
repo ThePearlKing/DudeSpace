@@ -261,7 +261,7 @@ const TIPS := [
 	"tip: crafting, furniture and houses can pull materials straight from your backpack.",
 	"tip: F5 changes camera. G strikes a pose. combine responsibly.",
 	"tip: dying on a sun vaporizes your items. there is no going back for them.",
-	"tip: a control coil on a power extender is a valve. valves in a row are an AND gate.",
+	"tip: a coil on a power extender IS an AND gate (control input x power input). chain them for many ANDs.",
 	"tip: coils lose charge in under a second. that's a feature -- it makes logic snappy.",
 	"tip: the Rocket 2.0's bubble seats a friend. press F on it while they fly.",
 	"tip: Sanus spits lava at visitors. the ultima is real though.",
