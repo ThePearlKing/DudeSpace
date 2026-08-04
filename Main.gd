@@ -2080,13 +2080,22 @@ func _populate(b) -> void:
 					_seat_prop(b, (centre + Vector3(crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18),
 						crng.randf_range(-0.18, 0.18))).normalized(), crng, false)
-				# the welcome sign, in the city's own architectural accent
-				_city_sign(b, (centre + Vector3(0.13, 0.02, 0.13)).normalized(),
-					str(vibes[ci]["name"]), str(vibes[ci]["arch"]))
 			# the railway ring: every city linked to the next one over
 			for ci in 4:
 				_rail(b, Game.earth_cities[ci]["dir"],
 					Game.earth_cities[(ci + 1) % 4]["dir"])
+			# welcome signs: TWO per city, standing right where each
+			# railway leaves town -- on the outskirts, never inside a
+			# building (the old fixed offset could land in one)
+			for ci in 4:
+				var cdir: Vector3 = Game.earth_cities[ci]["dir"]
+				for nb in [(ci + 1) % 4, (ci + 3) % 4]:
+					var ndir: Vector3 = Game.earth_cities[int(nb)]["dir"]
+					var saxis := cdir.cross(ndir)
+					if saxis.length() < 0.001:
+						continue
+					var sdir := cdir.rotated(saxis.normalized(), 0.22)
+					_city_sign(b, sdir, str(vibes[ci]["name"]), str(vibes[ci]["arch"]))
 			# hamlets: little clusters of unclaimed human houses out in
 			# the country. dudes can't enter; humans move in, furnish
 			# them to taste, and have people over
