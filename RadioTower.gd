@@ -178,9 +178,6 @@ func _build_stations() -> void:
 				stations.append({"name": "EARTH2", "type": "music",
 					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
 					"body": b, "kind": "earth"})
-				stations.append({"name": "EARTH3", "type": "rick",
-					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
-					"body": b, "kind": "rick"})
 			"Wth":
 				st = {"name": "??? (shader system)", "type": "alien"}
 			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol", "Venus", "Xero":
