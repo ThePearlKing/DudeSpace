@@ -22,6 +22,8 @@ var _hiss: AudioStreamPlayer3D  # static bed
 var _cur_station: int = -1
 var _sentence_cd: float = 0.0
 var powered: bool = false
+var _specmat: ShaderMaterial = null
+var _last_sig: float = 0.0
 # audio synthesis is EXPENSIVE GDScript: cook streams on worker threads
 # and hand them to the player when done -- never hitch the game
 var _cooking: bool = false
@@ -70,6 +72,39 @@ func _ready() -> void:
 	fmi.position = Vector3(0, 0, -0.4)
 	fmi.material_override = Surfaces.metal(Color("#8a9098"))
 	_dish_pivot.add_child(fmi)
+	# little SPECTROGRAM screens on the base: scrolling waterfall with a
+	# bright line riding wherever the dial is
+	_specmat = ShaderMaterial.new()
+	var ssh := Shader.new()
+	ssh.code = """
+shader_type spatial;
+render_mode unshaded;
+uniform float freq_x = 0.5;
+uniform float sig = 0.2;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment() {
+	vec2 uv = UV;
+	float colt = floor((uv.x + TIME * 0.1) * 36.0);
+	float band = h21(vec2(colt, floor(uv.y * 20.0)));
+	float v = band * band * 0.45;
+	v += smoothstep(0.07, 0.0, abs(uv.y - freq_x)) * (0.35 + sig * 0.6);
+	vec3 c = mix(vec3(0.0, 0.04, 0.09), vec3(0.1, 0.85, 1.0), clamp(v, 0.0, 1.0));
+	c += vec3(1.0, 0.85, 0.3) * smoothstep(0.025, 0.0, abs(uv.y - freq_x)) * sig;
+	ALBEDO = vec3(0.0);
+	EMISSION = c * 1.4;
+}
+"""
+	_specmat.shader = ssh
+	for sxs in [-1.0, 1.0]:
+		var scr := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.62, 0.4)
+		scr.mesh = qm
+		scr.position = Vector3(sxs * (box_size.x * 0.5 + 0.02), 0.62, 0)
+		scr.rotation_degrees.y = 90.0 * sxs
+		scr.material_override = _specmat
+		scr.extra_cull_margin = 2.0
+		add_child(scr)
 	_talk = AudioStreamPlayer3D.new()
 	# loud beside it, NORMAL across your whole base, quiet only when
 	# you're genuinely far (other-side-of-the-planet territory)
@@ -277,6 +312,7 @@ func work(delta: float) -> void:
 		# The SAUCE and the unlabeled thing transmit at cosmic power.
 		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 140000.0, 0.0, 1.0)
 		clear = bs * (1.0 - 0.9 * pow(far, 1.3))
+	_last_sig = clear
 	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	# HYSTERESIS: the tuned station keeps the receiver unless something
@@ -329,8 +365,9 @@ func work(delta: float) -> void:
 								{"base": 185.0, "var": 0.42, "wave": "sine",
 								"rate": 1.35, "artic": 1.6})
 						"alien":
-							return HumanVoice.render(RadioLib.alien_line(),
-								RadioLib.alien_profile())
+							# WTH runs a TALK SHOW: recurring hosts,
+							# call-ins, planet news, weather, markets
+							return RadioLib.alien_broadcast()
 						"noodle":
 							# the god does not talk. it PERFORMS.
 							return RadioLib.noodle_broadcast()
@@ -365,6 +402,9 @@ func _deliver(wav: AudioStreamWAV, idx: int) -> void:
 func _process(d: float) -> void:
 	super._process(d)
 	_site_t -= d
+	if _specmat != null:
+		_specmat.set_shader_parameter("freq_x", clampf((freq - 88.0) / 20.0, 0.0, 1.0))
+		_specmat.set_shader_parameter("sig", _last_sig if powered else 0.0)
 	# a locked dish TRACKS its target as it moves
 	if track_node != null and is_instance_valid(track_node):
 		aim_dir = (track_node.global_position - _site()).normalized()
