@@ -18,7 +18,7 @@ var _shader: String = "none"
 var _pad: _Pad
 var _shaders := ["none", "pixel", "wth", "wireframe", "contrast", "effect"]
 var _fx := {"strength": 1.0, "speed": 1.0, "nscale": 5.0, "sharp": 2.0,
-	"rainbow": 0.0, "tint": "#7df9ff"}
+	"rainbow": 0.0}
 var _fx_box: VBoxContainer
 var _fx_sliders := {}
 var _mode_opt: OptionButton
@@ -149,15 +149,6 @@ func _ready() -> void:
 		_rebuild())
 	_fx_sliders["rainbow"] = rb
 	_fx_box.add_child(rb)
-	var tpick := ColorPickerButton.new()
-	tpick.text = "Effect Tint"
-	tpick.custom_minimum_size = Vector2(0, 34)
-	tpick.color = Color.html(str(_fx["tint"]))
-	tpick.color_changed.connect(func(c: Color) -> void:
-		_fx["tint"] = c.to_html(false)
-		_rebuild())
-	_fx_sliders["tint"] = tpick
-	_fx_box.add_child(tpick)
 	var pl2 := Label.new()
 	pl2.text = "EFFECT PRESETS"
 	_fx_box.add_child(pl2)
@@ -165,11 +156,11 @@ func _ready() -> void:
 	prow.add_theme_constant_override("separation", 6)
 	_fx_box.add_child(prow)
 	for pr in [["Ultima glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-				"sharp": 2.0, "rainbow": 0.0, "tint": "#7df9ff"}],
+				"sharp": 2.0, "rainbow": 0.0}],
 			["Prism glow", {"strength": 0.4, "speed": 1.0, "nscale": 5.0,
-				"sharp": 2.0, "rainbow": 1.0, "tint": "#ff7ce9"}],
-			["Fluid", {"strength": 0.7, "speed": 0.5, "nscale": 4.0,
-				"sharp": 1.0, "rainbow": 0.0, "tint": "#33ff99"}]]:
+				"sharp": 2.0, "rainbow": 1.0}],
+			["Fluid", {"strength": 0.7, "speed": 0.5, "nscale": 2.0,
+				"sharp": 1.0, "rainbow": 0.0}]]:
 		var pb := Button.new()
 		pb.text = str(pr[0])
 		var preset: Dictionary = pr[1]
@@ -339,8 +330,6 @@ func _sync_fx_ui() -> void:
 			_fx_sliders[k].set_value_no_signal(float(_fx[k]))
 	if _fx_sliders.has("rainbow"):
 		_fx_sliders["rainbow"].set_pressed_no_signal(float(_fx["rainbow"]) > 0.5)
-	if _fx_sliders.has("tint"):
-		_fx_sliders["tint"].color = Color.html(str(_fx["tint"]))
 
 func _process(delta: float) -> void:
 	if _pivot:

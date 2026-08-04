@@ -48,32 +48,48 @@ uniform float speed = 1.0;
 uniform float nscale = 5.0;
 uniform float sharp = 2.0;
 uniform float rainbow = 0.0;
-float hash31(vec3 p) { p = fract(p * 0.3183 + vec3(0.1, 0.2, 0.3)); p *= 17.0;
-	return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float vnoise(vec3 p) { vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
-	float a = hash31(i), b = hash31(i + vec3(1,0,0)), c = hash31(i + vec3(0,1,0)), d = hash31(i + vec3(1,1,0));
-	float e = hash31(i + vec3(0,0,1)), g = hash31(i + vec3(1,0,1)), h = hash31(i + vec3(0,1,1)), k = hash31(i + vec3(1,1,1));
-	return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(e,g,f.x), mix(h,k,f.x), f.y), f.z); }
-float fbm3(vec3 p) { return vnoise(p) * 0.6 + vnoise(p * 2.3) * 0.4; }
+float hash3(vec3 p) {
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+float vnoise(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x);
+	float b = mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x);
+	float c = mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x);
+	float d = mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x);
+	return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
+}
+float fbm(vec3 p) {
+	float v = 0.0;
+	float amp = 0.55;
+	for (int i = 0; i < 4; i++) {
+		v += vnoise(p) * amp;
+		p *= 2.1;
+		amp *= 0.5;
+	}
+	return v;
+}
 void vertex() { vpos = VERTEX; }
 void fragment() {
 	float t = TIME * speed;
-	float sw = fbm3(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
+	float sw = fbm(vpos * nscale + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
-	vec3 base = tint;
+	vec3 base2 = tint;
 	if (rainbow > 0.5) {
 		float hue = fract(sw + t * 0.05);
-		base = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+		base2 = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
 	}
-	ALBEDO = base * 0.2;
-	EMISSION = base * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
-	ROUGHNESS = 0.35;
+	ALBEDO = base2 * 0.15;
+	EMISSION = base2 * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
+	ROUGHNESS = 0.4;
 }
 """
 	var m := ShaderMaterial.new()
 	m.shader = _fx_shader
-	var tintc := Color.html(str(fx.get("tint", "#7df9ff")))
-	m.set_shader_parameter("tint", Vector3(tintc.r, tintc.g, tintc.b))
+	# the effect wears YOUR color -- no separate tint
+	m.set_shader_parameter("tint", Vector3(color.r, color.g, color.b))
 	var defs := {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
 		"sharp": 2.0, "rainbow": 0.0}
 	for k in defs:
