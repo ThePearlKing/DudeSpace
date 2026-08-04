@@ -727,10 +727,11 @@ func _build_interior() -> void:
 	if not human_home:
 		# the red button: owner-only, press twice, house becomes a kit
 		var dem := Gate.new().configure({
-			"action": "house_demolish", "label": "DEMOLISH", "color": Color("#a82020")})
+			"action": "house_demolish", "label": "DEMOLISH",
+			"color": Color("#a82020"), "wall_button": true})
 		_iroot.add_child(dem)
-		dem.global_position = c + Vector3(-sz.x * 0.5 + 1.3, fy - c.y + 0.55,
-			sz.z * 0.5 - 1.4)
+		dem.global_position = c + Vector3(-sz.x * 0.5 + 1.6, fy - c.y,
+			sz.z * 0.5 - 0.58)
 		dem.set_meta("house", self)
 
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop

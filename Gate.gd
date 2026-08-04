@@ -10,6 +10,7 @@ var zone_g: float = 9.0
 var label_text: String = "GATE"
 var color: Color = Color("#7cf9ff")
 var action: String = ""        # "", "recipe", "mindcore", "artifact", "terminal"
+var wall_button: bool = false  # flat panel ON a wall, not a floor block
 var requires: String = ""      # "", "door_open", "mindcore"
 var warn_jetpack: bool = false
 var flash_msg: String = ""
@@ -23,6 +24,7 @@ func configure(cfg: Dictionary) -> Gate:
 	action = cfg.get("action", "")
 	requires = cfg.get("requires", "")
 	warn_jetpack = cfg.get("warn_jetpack", false)
+	wall_button = cfg.get("wall_button", false)
 	flash_msg = cfg.get("msg", "")
 	return self
 
@@ -37,6 +39,24 @@ func _ready() -> void:
 		m.size = Vector3(1.6, 2.6, 0.4)
 		mi.mesh = m
 		mi.position = Vector3(0, 1.3, 0)
+	elif wall_button:
+		# a PANEL on the wall with a fat round button. industrial. honest.
+		var m3 := BoxMesh.new()
+		m3.size = Vector3(0.55, 0.55, 0.09)
+		mi.mesh = m3
+		mi.position = Vector3(0, 1.25, 0)
+		lbl_y = 1.75
+		col_size = Vector3(0.6, 0.6, 0.3)
+		var btn := MeshInstance3D.new()
+		var bm2 := CylinderMesh.new()
+		bm2.top_radius = 0.14
+		bm2.bottom_radius = 0.16
+		bm2.height = 0.09
+		btn.mesh = bm2
+		btn.rotation_degrees.x = 90.0
+		btn.position = Vector3(0, 1.25, -0.08)
+		btn.material_override = Destructible.make_material(color.lightened(0.2), 1.6)
+		add_child(btn)
 	else:
 		# BUTTON / TABLET: small block -- clearly NOT a portal
 		var m2 := BoxMesh.new()
@@ -60,6 +80,8 @@ func _ready() -> void:
 	var col := CollisionShape3D.new()
 	var cs := BoxShape3D.new()
 	cs.size = col_size
+	if wall_button:
+		col.position = Vector3(0, 1.25, 0)
 	col.shape = cs
 	col.position = Vector3(0, col_size.y * 0.5, 0)
 	add_child(col)
