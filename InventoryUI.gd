@@ -489,11 +489,19 @@ class _EquipSlot extends Panel:
 			if id == "":
 				Sfx.play("denied", -20.0)
 				return
-			if not Inventory.any_space():
-				Sfx.play("denied")
-				return
 			Inventory.equip[slot_name] = ""
-			Inventory.give(id, 1)
+			if Inventory.any_space():
+				Inventory.give(id, 1)
+			else:
+				# bags full: the piece hits the floor at your feet
+				var p = get_tree().get_first_node_in_group("player")
+				if p != null and p is Node3D:
+					var d := ItemDrop.new()
+					d.id = id
+					d.count = 1
+					p.get_parent().add_child(d)
+					d.global_position = p.global_position \
+						+ Vector3(0, 0.5, 0) - p.global_transform.basis.z * 1.2
 			Sfx.play("click", -12.0)
 			Inventory.changed.emit()
 
