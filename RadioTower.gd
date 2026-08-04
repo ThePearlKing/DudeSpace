@@ -42,6 +42,7 @@ var now_line_col: Color = Color("#ffd166")
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _sauce_pos: float = 0.0     # where the tape was when the signal dropped
 var _sauce_seen: float = -99.0
+var _good_t: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
 var _unpow_t: float = 99.0   # how long the buffer has been empty
 var _warn_cd: float = 0.0
@@ -411,6 +412,15 @@ func work(delta: float) -> void:
 		if cur_s > bs - 0.12 and cur_s > 0.22:
 			best = _cur_station
 			bs = cur_s
+	# SIGNAL MEMORY: a station that was strong in the last 5s rides
+	# through wobble (the god drifting, the dish lagging) instead of
+	# stuttering drop-resume loops
+	if best >= 0 and bs > 0.4:
+		_good_t = Game.playtime
+	elif _cur_station >= 0 and _cur_station < stations.size() \
+			and bs < 0.35 and Game.playtime - _good_t < 5.0:
+		best = _cur_station
+		bs = maxf(bs, 0.4)
 	if best != _cur_station:
 		_cur_station = best
 		_talk.stop()

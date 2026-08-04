@@ -504,17 +504,25 @@ func _radio_test() -> void:
 		" fxidx=", AudioServer.get_bus_index("RadioFX"),
 		" talkbus=", r._talk.bus, " stations=", r.stations.size())
 	r.buf = 300.0
-	if r.stations.size() > 0:
-		var st = r.stations[0]
-		r.freq = float(st["freq"])
-		r.aim_dir = r.station_dir(st)
-		print("RADIOTEST aimed at ", st["name"], " f=", st["freq"])
-	for w8 in 12:
+	var pick = r.stations[0]
+	for st0 in r.stations:
+		if str(st0["type"]) == "noodle":
+			pick = st0
+	r.freq = float(pick["freq"])
+	var wgod = get_tree().get_first_node_in_group("noodle_watcher")
+	if wgod != null:
+		r.track_node = wgod
+	print("RADIOTEST aimed at ", pick["name"], " f=", pick["freq"])
+	var lastpos := -1.0
+	for w8 in 80:
 		r.buf = 300.0
 		await get_tree().create_timer(0.5).timeout
-		print("RADIOTEST t=%.1f powered=%s hiss=%s talk=%s cur=%d cook=%s hv=%.1f hm=%.1f" % [
-			float(w8) * 0.5, r.powered, r._hiss.playing, r._talk.playing,
-			r._cur_station, r._cooking, r._hiss.volume_db, r._hiss.max_db])
+		var pos := r._talk.get_playback_position() if r._talk.playing else -1.0
+		var jumped := pos >= 0.0 and lastpos >= 0.0 and pos < lastpos - 1.0
+		print("RADIOTEST t=%.1f talk=%s cur=%d pos=%.2f%s" % [
+			float(w8) * 0.5, r._talk.playing, r._cur_station, pos,
+			"  <-- RESTART/JUMP" if jumped else ""])
+		lastpos = pos
 
 func _door_test() -> void:
 	await get_tree().create_timer(2.0).timeout

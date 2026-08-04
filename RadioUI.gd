@@ -162,8 +162,13 @@ func _draw_sauce_sub() -> void:
 			var stretch := 2.2 + 1.6 * sin(float(i) * 1.31 + t * 0.9)
 			var wob := sin(t * 2.6 + float(i) * 0.73) * 0.22
 			var drift := sin(t * 1.4 + float(i) * 2.1) * 5.0
+			if i < 2:
+				# the eye itself doesn't spaghettify. it just watches,
+				# wobbling slightly. the WORDS suffer, not the ⊙
+				stretch = 1.0
+				drift *= 0.4
 			_sauce_sub.draw_set_transform(Vector2(x, base_y + drift),
-				wob, Vector2(0.55, maxf(stretch, 1.4)))
+				wob, Vector2(0.55 if i >= 2 else 1.0, maxf(stretch, 1.4) if i >= 2 else 1.0))
 			_sauce_sub.draw_string(font, Vector2.ZERO, c,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Color("#ffd166"))
 		x += adv
