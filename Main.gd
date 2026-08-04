@@ -591,6 +591,10 @@ func _winshot_test() -> void:
 		# stand over the stairwell corner, look down the hole
 		cam.global_position = c + Vector3(0.5, 0.5, -1.5)
 		cam.look_at(c + Vector3(4.0, -sz.y, 3.0), Vector3.UP)
+	elif hs.kind == "moonbase":
+		# from the hub floor, look UP at the dome roof
+		cam.global_position = c + Vector3(0, -sz.y * 0.5 + 1.2, 3.0)
+		cam.look_at(c + Vector3(0, sz.y * 0.5 + 2.0, 0), Vector3.FORWARD)
 	else:
 		cam.global_position = c + Vector3(0, 0, 2.0)
 		cam.look_at(c + Vector3(0, 0.6, -sz.z * 0.5), Vector3.UP)

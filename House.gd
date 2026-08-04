@@ -513,8 +513,14 @@ func _build_interior() -> void:
 		[0] if kind == "basement" else ([1] if kind == "moonbase" else []))
 	var fy := c.y - sz.y * 0.5
 	# every home: a visible ceiling light fixture and a wall trim band
-	_deco(c + Vector3(0, sz.y * 0.5 - 0.35, 0), Vector3(1.4, 0.12, 1.4),
-		Color("#fff2c8"), 1.8)
+	# (moonbase hub is open dome overhead -- its lights hang in the wings)
+	if kind == "moonbase":
+		for lx in [-9.0, 9.0]:
+			_deco(c + Vector3(lx, sz.y * 0.5 - 0.55, 0), Vector3(1.2, 0.12, 1.2),
+				Color("#fff2c8"), 1.8)
+	else:
+		_deco(c + Vector3(0, sz.y * 0.5 - 0.35, 0), Vector3(1.4, 0.12, 1.4),
+			Color("#fff2c8"), 1.8)
 	_deco(c + Vector3(0, fy - c.y + 1.1, sz.z * 0.5 - 0.45),
 		Vector3(sz.x - 0.8, 0.14, 0.06), warm.darkened(0.3))
 	match kind:
