@@ -310,8 +310,7 @@ func work(delta: float) -> void:
 							RadioLib.alien_profile())
 					"noodle":
 						# not a deep voice. an ARRIVAL of one. full sermons.
-						wav = RadioLib.eldritch(HumanVoice.render(
-							RadioLib.noodle_sermon(), RadioLib.noodle_profile()))
+						wav = RadioLib.noodle_broadcast()
 				if wav != null:
 					_talk.stream = wav
 					_talk.play()

@@ -535,18 +535,31 @@ static func noodle_line() -> String:
 
 const ELDRITCH_WORDS := ["zholgoth", "vraxulemn", "othrunquay", "melgrahz"]
 
-## A full transmission: a LONG sermon -- eight-plus pronouncements with
-## the god's four untranslatable words dropped in between them.
-static func noodle_sermon() -> String:
+## A full transmission: each pronouncement rendered and eldritch-processed
+## SEPARATELY, then spaced apart with silence. One long render let the
+## time-stretched shadow layers of later words play over earlier ones --
+## a whole crowd talking at once. One line, one voice, one echo tail.
+static func noodle_broadcast() -> AudioStreamWAV:
 	var words := ELDRITCH_WORDS.duplicate()
 	words.shuffle()
-	var out := ""
+	var parts: Array = []
 	var n := 8 + randi() % 4
 	for i in n:
-		out += NOODLE_BITS[randi() % NOODLE_BITS.size()] + " "
+		parts.append(NOODLE_BITS[randi() % NOODLE_BITS.size()])
 		if i % 2 == 1 and not words.is_empty():
-			out += str(words.pop_back()) + ". "
-	return out.strip_edges()
+			parts.append(str(words.pop_back()) + ".")
+	var bytes := PackedByteArray()
+	var gap := PackedByteArray()
+	gap.resize(int(SR * 1.1) * 2)   # zero-filled silence between lines
+	for ptxt in parts:
+		var w := eldritch(HumanVoice.render(str(ptxt), noodle_profile()))
+		bytes.append_array(w.data)
+		bytes.append_array(gap)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	return wav
 
 static func noodle_profile() -> Dictionary:
 	return {"base": 85.0, "var": 0.25, "wave": "saw", "rate": 0.62, "artic": 1.1}
@@ -584,10 +597,10 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 	# way wherever the god is actually speaking
 	var env := PackedFloat32Array()
 	env.resize(total)
-	var e := 0.0
+	var epk := 0.0
 	for i in total:
-		e = maxf(e * 0.9995, absf(buf[i]))
-		env[i] = e
+		epk = maxf(epk * 0.9995, absf(buf[i]))
+		env[i] = epk
 	var bstep := int(SR * 1.4)
 	var bi := 0
 	while bi * bstep < total:
