@@ -108,7 +108,13 @@ static func _magic_e(t: String, i: int) -> bool:
 		return false
 	if t.substr(i + 2, 1) != "e":
 		return false
-	return i + 3 >= t.length() or not _is_letter(t.substr(i + 3, 1))
+	var a := t.substr(i + 3, 1) if i + 3 < t.length() else ""
+	if not _is_letter(a):
+		return true
+	if a == "s" or a == "d":   # timeS, likeD: the e still does its magic
+		var b := t.substr(i + 4, 1) if i + 4 < t.length() else ""
+		return not _is_letter(b)
+	return false
 
 static func _parse(t: String) -> Array:
 	var out: Array = []
@@ -135,6 +141,21 @@ static func _parse(t: String) -> Array:
 			wlen += 1
 			continue
 		var two := t.substr(i, 2)
+		var prevc := t.substr(i - 1, 1) if i > 0 else ""
+		# classic silent letters: KNow, WRong, duMB, thouGH
+		if wlen == 0 and (two == "kn" or two == "wr"):
+			i += 1
+			wlen += 1
+			continue
+		if c == "b" and prevc == "m" \
+				and not _is_letter(t.substr(i + 1, 1) if i + 1 < t.length() else ""):
+			i += 1
+			wlen += 1
+			continue
+		if two == "gh" and wlen > 0:   # though, through: silent. ghost: not.
+			i += 2
+			wlen += 2
+			continue
 		var vf: Array = []      # queued vowel sound(s): [f1, f2, dur]
 		var post: Array = []    # segments that follow the vowel (tion's n)
 		var adv := 1
@@ -216,10 +237,14 @@ static func _parse(t: String) -> Array:
 						vf = [[680.0, 1750.0, 0.09]]
 				"e":
 					# final silent e says nothing (like, made)...
+					var e_next2 := t.substr(i + 2, 1) if i + 2 < t.length() else ""
 					if _magic_e(t, i):   # here, these: EE
 						vf = [[270.0, 2400.0, 0.1]]
 					elif word_end and wlen >= 3:
 						pass
+					elif wlen >= 3 and (nextc == "s" or nextc == "d") \
+							and not _is_letter(e_next2):
+						pass   # times, walked: that e is scenery
 					elif word_end:
 						vf = [[270.0, 2400.0, 0.08]]   # ...but he/we say EE
 					else:

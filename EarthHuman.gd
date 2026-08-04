@@ -301,7 +301,9 @@ const INSULTS := {
 ## Compliments: also assembled. Sincerity statistically present.
 const NICE_OPEN := ["you know,", "hey,", "for the record,",
 	"not to be weird, but", "I've been meaning to say:",
-	"somebody had to tell you:"]
+	"somebody had to tell you:", "real talk:", "and I mean this:",
+	"don't let it go to your head, but", "the committee agrees:",
+	"I told the rocks about you.", "in this economy?"]
 const NICE_BIT := ["your shirt is doing great work.",
 	"you have excellent standing posture.",
 	"the planet is better with you on it. slightly. but measurably.",
@@ -309,7 +311,15 @@ const NICE_BIT := ["your shirt is doing great work.",
 	"you seem like you'd survive things.",
 	"you walk like someone with a plan. I respect the lie.",
 	"good face. solid face placement.",
-	"if I had a lawn, you could stand on it."]
+	"if I had a lawn, you could stand on it.",
+	"you've got the second-best elbows in this city.",
+	"gravity works extra hard to keep you around. flattering.",
+	"you make standing still look like a career.",
+	"your nametag suits you. few can say that.",
+	"whatever you're doing with your arms: keep it up.",
+	"I'd share a bench with you. that's the highest tier.",
+	"the sun checks on you specifically. I've seen it.",
+	"you smell like someone with savings."]
 
 ## Small talk: an opener, a topic, a take. The economy of it all.
 const ST_OPEN := ["been thinking about", "big week for", "can we talk about",
@@ -645,6 +655,7 @@ func _ready() -> void:
 	bsh.code = BUBBLE_SHADER
 	_bg_mat.shader = bsh
 	_bg_mat.set_shader_parameter("alpha", 0.0)
+	_bg_mat.render_priority = 9   # always UNDER the words, never over
 	_bg.material_override = _bg_mat
 	_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_bg)
@@ -724,10 +735,6 @@ func _dress_human() -> void:
 		slogan.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		slogan.modulate = Color.WHITE if shirt_col.get_luminance() < 0.5 else Color("#1a1a1a")
 		slogan.position = Vector3(0, 0.05, -0.3)
-		# face OUT the chest, not into it -- unrotated Label3D reads
-		# mirrored from the front. no more backwards shirts.
-		slogan.rotation_degrees.y = 180.0
-		slogan.double_sided = false
 		_body._torso.add_child(slogan)
 
 	# hair: one style from the rack, one colour from the bottle
@@ -945,14 +952,14 @@ func _say(t: String) -> void:
 		if _vp != null and is_instance_valid(_vp):
 			_vp.queue_free()
 		_vp = HumanVoice.speak(self, t, _voice)
-	# words hang around until replaced (or ~12s, whichever first) --
-	# a conversation you walk past should still be readable
-	_bubble_t = 12.0
+	# words hang around until replaced, but not forever
+	_bubble_t = 5.0
 	# size the card to the words: rough glyph math, generous padding
 	var px: float = t.length() * 11.0
 	var w: float = clampf(px + 36.0, 90.0, 440.0)
 	var lines: float = ceilf(px / 400.0)
 	_bg_mesh.size = Vector2(w, lines * 29.0 + 20.0) * 0.005
+	_bg_mat.set_shader_parameter("alpha", 1.0)   # card ON from word one
 
 ## The ledger. Positive = friend, negative = that guy. Nobody forgets.
 func _op(id: int) -> float:

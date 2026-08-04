@@ -141,6 +141,8 @@ func _ready() -> void:
 		_sit_test()
 	if OS.get_environment("CTD_TEST") == "10":
 		_gang_test()
+	if OS.get_environment("CTD_TEST") == "11":
+		_shirt_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -352,6 +354,38 @@ func _gang_test() -> void:
 	print("GANGTEST rally: c hunting: ", c._hunt_t > 0.0,
 		"  d hunting: ", d._hunt_t > 0.0,
 		"  player hp lost: ", php0 - Game.health)
+
+## Windowed: park a camera dead ahead of a slogan shirt and screenshot
+## it, so backwards-text reports can be checked with actual eyes.
+func _shirt_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var hum := EarthHuman.new()
+	hum.saved = {"shirt_roll": 0.9, "slogan": "CERTIFIED MOON NOODLE"}
+	hum.setup(home)
+	add_child(hum)
+	hum.global_position = p.global_position + Vector3(4, 0, 0)
+	await get_tree().create_timer(0.8).timeout
+	hum._act = "stare"
+	hum._act_t = 999.0
+	var cam := Camera3D.new()
+	add_child(cam)
+	var fwd: Vector3 = -hum.global_transform.basis.z
+	cam.global_position = hum.global_position + fwd * 2.4 + hum._up() * 0.2
+	cam.look_at(hum.global_position + hum._up() * 0.2, hum._up())
+	cam.current = true
+	await get_tree().create_timer(1.0).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("SHIRTTEST saved front shot")
+	# and one from behind: should show NO text at all
+	cam.global_position = hum.global_position - fwd * 2.4 + hum._up() * 0.2
+	cam.look_at(hum.global_position + hum._up() * 0.2, hum._up())
+	await get_tree().create_timer(0.6).timeout
+	var img2 := get_viewport().get_texture().get_image()
+	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_back.png"))
+	print("SHIRTTEST saved back shot")
 
 ## Headless: a human and a chair. Verify walk-to-seat, the sit, the pose.
 func _sit_test() -> void:

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_input.placeholder_text = "chat…"
 	_input.visible = false
 	_input.text_submitted.connect(_send)
+	_input.gui_input.connect(_line_key)
 	add_child(_input)
 
 func _on_chat(from_name: String, text: String) -> void:
@@ -76,6 +77,9 @@ func _process(delta: float) -> void:
 				line += "   ·   %s" % ("%.0f m" % d if d < 1000.0 else "%.1f km" % (d / 1000.0))
 			rows.append(line)
 		_tab.text = "\n".join(rows)
+	# chat open: the input owns the keyboard, no matter what got clicked
+	if _input.visible and not _input.has_focus():
+		_input.grab_focus()
 	for e in _lines:
 		if _input.visible:
 			e["label"].modulate.a = 1.0   # chat open: full log visible
@@ -98,6 +102,14 @@ func _send(text: String) -> void:
 	close_chat()
 	if text.strip_edges() != "":
 		Net.send_chat(text)
+
+## The focused LineEdit sees keys FIRST -- catch Escape right there,
+## before the pause menu or anything else can react to it.
+func _line_key(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_ESCAPE:
+		close_chat()
+		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
