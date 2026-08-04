@@ -261,6 +261,14 @@ func work(delta: float) -> void:
 		clear = bs * (1.0 - 0.6 * far)
 	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
+	# HYSTERESIS: the tuned station keeps the receiver unless something
+	# CLEARLY beats it -- a beam grazing two stations must not flap
+	if _cur_station >= 0 and best >= 0 and best != _cur_station \
+			and _cur_station < stations.size():
+		var cur_s := signal_for(stations[_cur_station])
+		if cur_s > bs - 0.12 and cur_s > 0.05:
+			best = _cur_station
+			bs = cur_s
 	if best != _cur_station:
 		_cur_station = best
 		_talk.stop()
@@ -276,16 +284,16 @@ func work(delta: float) -> void:
 		"music":
 			if not _talk.playing:
 				_talk.stream = RadioLib.music_loop(int(st["freq"] * 10.0), str(st["kind"]))
-				_talk.play()
+				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
 		"eerie":
 			if not _talk.playing:
 				_talk.stream = RadioLib.eerie_loop()
-				_talk.play()
+				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
 		"rick":
 			# RICK FM plays the hook. autotuned. with the band. forever.
 			if not _talk.playing:
 				_talk.stream = RadioLib.rick_song()
-				_talk.play()
+				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
 		_:
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
