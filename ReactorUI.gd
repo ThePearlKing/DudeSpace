@@ -271,13 +271,12 @@ func _open_manual() -> void:
 		_manual = null
 		return
 	_manual = Panel.new()
-	# the booklet lives ENTIRELY in the free left gutter (the control
-	# window starts at 20% screen width) -- it covers nothing at all
-	_manual.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	# left side, nudged DOWN past the lamp grid. that's it. that's the fix.
+	_manual.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	var vps := get_viewport().get_visible_rect().size
-	_manual.custom_minimum_size = Vector2(minf(360.0, vps.x * 0.19), vps.y - 16.0)
+	_manual.custom_minimum_size = Vector2(470, minf(620.0, vps.y - 140.0))
 	_manual.size = _manual.custom_minimum_size
-	_manual.position = Vector2(4, -_manual.size.y - 8.0)
+	_manual.position = Vector2(8, -_manual.size.y * 0.5 + 100.0)
 	var st2 := StyleBoxFlat.new()
 	st2.bg_color = Color("#26241c")
 	st2.border_color = AMBER
@@ -334,9 +333,7 @@ RULES OF NOT EXPLODING:
    xenon will make restart annoying. annoying beats glowing.
 
 (click MANUAL again to close)"""
-	t2.add_theme_font_size_override("font_size", 11)
-	t2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	t2.custom_minimum_size = Vector2(320, 0)
+	t2.add_theme_font_size_override("font_size", 12)
 	t2.add_theme_color_override("font_color", Color("#e8dcb8"))
 	msc.add_child(t2)
 	Sfx.play("click", -16.0)
