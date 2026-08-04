@@ -443,6 +443,25 @@ func _build_title() -> void:
 			Save.load_slot(id)
 			get_tree().change_scene_to_file("res://Main.tscn"))
 		row.add_child(play)
+		var ren := Button.new()
+		ren.text = "✏"
+		ren.custom_minimum_size = Vector2(50, 50)
+		ren.pressed.connect(func() -> void:
+			var dlg := AcceptDialog.new()
+			dlg.title = "Rename world"
+			var le := LineEdit.new()
+			le.text = Save.slot_name(id)
+			le.custom_minimum_size = Vector2(320, 42)
+			dlg.add_child(le)
+			dlg.register_text_enter(le)
+			dlg.confirmed.connect(func() -> void:
+				Save.rename_slot(id, le.text)
+				_refresh_title())
+			add_child(dlg)
+			dlg.popup_centered()
+			le.grab_focus()
+			le.select_all())
+		row.add_child(ren)
 		var del := Button.new()
 		del.text = "🗑"
 		del.custom_minimum_size = Vector2(50, 50)

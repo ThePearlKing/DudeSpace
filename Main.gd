@@ -1445,9 +1445,15 @@ void fragment(){
 	snow *= 0.93 + 0.07 * sin(fbm(n * 9.0 + 5.0) * 22.0);
 	float poke = smoothstep(0.55, 0.72, fbm(n * 11.0 + 7.0))
 		* (1.0 - smoothstep(0.85, 0.96, abs(n.y)));
-	vec3 capped = mix(snow, rock * 0.65, poke * 0.55);
-	// frozen sea gets flat ice instead of powder
-	if (land <= 0.52) { capped = mix(vec3(0.75, 0.85, 0.95), capped, 0.4); }
+	vec3 capped;
+	if (land > 0.52) {
+		capped = mix(snow, rock * 0.65, poke * 0.55);
+	} else {
+		// polar SEA stays a sea: open water with drifting floes,
+		// not a solid white lid
+		float floe = smoothstep(0.55, 0.72, fbm(n * 13.0 + 2.0));
+		capped = mix(col, mix(vec3(0.8, 0.88, 0.96), snow, 0.5), floe);
+	}
 	col = mix(col, capped, caps);
 	ALBEDO = col;
 	float baseR = land > 0.52 ? 0.9 : 0.25;

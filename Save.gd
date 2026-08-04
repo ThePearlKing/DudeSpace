@@ -419,6 +419,19 @@ func was_hyper() -> bool:
 func was_mk2() -> bool:
 	return bool(_progress.get("in_rocket_mk2", false))
 
+## Give a world a new name without touching anything else in it.
+func rename_slot(n: int, new_name: String) -> void:
+	new_name = new_name.strip_edges()
+	if new_name == "" or not slot_exists(n):
+		return
+	var d := _read(n)
+	d["name"] = new_name
+	var f := FileAccess.open(slot_path(n), FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(d))
+	if current_slot == n:
+		save_name = new_name
+
 func delete_slot(n: int) -> void:
 	if slot_exists(n):
 		DirAccess.remove_absolute(slot_path(n))
