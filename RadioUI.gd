@@ -222,16 +222,6 @@ func _process(_d: float) -> void:
 		c.queue_free()
 	for st in radio.stations:
 		if radio.align_for(st) > 0.4 and absf(radio.freq - float(st["freq"])) > 0.3:
-			var row := HBoxContainer.new()
 			var l := Label.new()
 			l.text = "signal near %.1f MHz" % float(st["freq"])
-			row.add_child(l)
-			var bt := Button.new()
-			bt.text = "TUNE"
-			var f2: float = float(st["freq"])
-			bt.pressed.connect(func() -> void:
-				radio.freq = f2
-				_slider.value = f2
-				Sfx.play("click", -12.0))
-			row.add_child(bt)
-			_act_box.add_child(row)
+			_act_box.add_child(l)
