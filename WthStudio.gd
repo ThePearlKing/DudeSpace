@@ -29,6 +29,7 @@ var _jitter_t := 0.0
 var _cur_text := ""
 var _bubble_linger := 0.9
 var _tv_bodies: Array = []
+var _table: MeshInstance3D = null
 
 class _AlienShell extends StaticBody3D:
 	var studio = null
@@ -176,14 +177,57 @@ func _build_studio() -> void:
 	light.omni_range = 26.0
 	add_child(light)
 	light.global_position = POS + Vector3(0, 2.2, 0)
-	# the news DESK: long curved-ish counter the anchors float behind
-	var desk := MeshInstance3D.new()
+	# the news TABLE: held up by alien floor tech, and parked well clear
+	# of the sofas so the anchors stay visible. Two emitter pads on the
+	# floor push translucent lift beams; the slab just... accepts it.
+	for px2 in [-2.6, 2.6]:
+		var pad := MeshInstance3D.new()
+		var pdm := CylinderMesh.new()
+		pdm.top_radius = 0.55
+		pdm.bottom_radius = 0.65
+		pdm.height = 0.16
+		pad.mesh = pdm
+		pad.material_override = Surfaces.metal(Color("#15332a"))
+		add_child(pad)
+		pad.global_position = POS + Vector3(px2, -2.42, -0.8)
+		var ring := MeshInstance3D.new()
+		var rgm := TorusMesh.new()
+		rgm.inner_radius = 0.38
+		rgm.outer_radius = 0.52
+		ring.mesh = rgm
+		ring.material_override = Surfaces.portal(Color("#33ff99"))
+		add_child(ring)
+		ring.global_position = POS + Vector3(px2, -2.32, -0.8)
+		var beam := MeshInstance3D.new()
+		var bmm := CylinderMesh.new()
+		bmm.top_radius = 0.16
+		bmm.bottom_radius = 0.34
+		bmm.height = 0.9
+		beam.mesh = bmm
+		var bmat := StandardMaterial3D.new()
+		bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bmat.albedo_color = Color(0.2, 1.0, 0.6, 0.22)
+		bmat.emission_enabled = true
+		bmat.emission = Color("#33ff99")
+		bmat.emission_energy_multiplier = 0.9
+		beam.material_override = bmat
+		add_child(beam)
+		beam.global_position = POS + Vector3(px2, -1.9, -0.8)
+	_table = MeshInstance3D.new()
 	var dm := BoxMesh.new()
-	dm.size = Vector3(9.0, 1.1, 1.6)
-	desk.mesh = dm
-	desk.material_override = Surfaces.metal(Color("#1c3a30"))
-	add_child(desk)
-	desk.global_position = POS + Vector3(0, -2.35, -3.0)
+	dm.size = Vector3(7.0, 0.16, 1.5)
+	_table.mesh = dm
+	_table.material_override = Surfaces.metal(Color("#1c3a30"))
+	add_child(_table)
+	_table.global_position = POS + Vector3(0, -1.42, -0.8)
+	var glowline := MeshInstance3D.new()
+	var glm := BoxMesh.new()
+	glm.size = Vector3(6.8, 0.04, 0.1)
+	glowline.mesh = glm
+	glowline.material_override = Destructible.make_material(Color("#33ff99"), 2.0)
+	add_child(glowline)
+	glowline.global_position = POS + Vector3(0, -1.5, -0.06)
 	# the ANCHORS: four floating icosahedron-ish gems, fluid-glow skins
 	for i in 4:
 		var a := MeshInstance3D.new()
@@ -327,6 +371,8 @@ func _process(delta: float) -> void:
 			_talk.pitch_scale = 1.0
 	if _beacon_mat != null:
 		_beacon_mat.emission_energy_multiplier = 3.0 if fmod(_t, 1.2) < 0.6 else 0.3
+	if _table != null:
+		_table.global_position.y = POS.y - 1.42 + sin(_t * 0.9) * 0.05
 	var p = get_tree().get_first_node_in_group("player")
 	var here: bool = p != null and p.global_position.distance_to(POS) < 40.0
 	if _tv_vp != null:
