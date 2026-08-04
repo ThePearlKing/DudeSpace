@@ -1474,17 +1474,10 @@ func goal_text() -> String:
 			if _friend != null and is_instance_valid(_friend):
 				return "going to stand with %s (friend)%s" % [_friend.human_name, extras]
 			return "looking for a friend" + extras
-		"stare":
-			return "staring at nothing in particular" + extras
-		"circle":
-			return "walking in a circle, on purpose" + extras
-		"spin":
-			return "spinning. contemplating." + extras
 		"follow":
 			return "following the blue dude around" + extras
 		_:
-			return "wandering, thinking about %s" % \
-				["lunch", "the sky", "taxes", "nothing"][absi(human_id) % 4] + extras
+			return "hanging out" + extras
 
 ## Chip command: swing at whoever's in arm's reach.
 func mind_punch() -> void:

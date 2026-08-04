@@ -736,14 +736,14 @@ func _win_pair(ext_local: Vector3, ext_rot_deg: Vector3,
 	eu.position = ext_local
 	eu.rotation_degrees = ext_rot_deg
 	if ext_rot_deg.y == -90.0 and ext_local.y > 2.0:
-		eu.rotation_degrees = Vector3(-90, 0, 0)   # the skylight lies flat
+		eu.rotation_degrees = Vector3(90, 0, 0)   # flat, glass facing UP
 	_win_frame_on(eu, ev[0].get_texture(), ext_size, cavity)
 	var iu := Node3D.new()
 	_iroot.add_child(iu)
 	iu.global_position = int_gpos
 	iu.rotation_degrees = int_rot_deg
 	if absf(in_dir.y) > 0.9:
-		iu.rotation_degrees = Vector3(90, 0, 0)    # the ceiling glass too
+		iu.rotation_degrees = Vector3(-90, 0, 0)   # ceiling glass faces DOWN
 	_win_frame_on(iu, iv[0].get_texture(), int_size, cavity)
 
 func _win_frame_on(u: Node3D, tex: Texture2D, wsize: Vector2, cavity := true) -> void:
