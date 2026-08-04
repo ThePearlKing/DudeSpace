@@ -1848,12 +1848,12 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		for i in mini(barlen, total - b2):
 			var td := float(i) / SR
 			var denv := sin(PI * float(i) / float(barlen))
-			buf[b2 + i] += (sin(TAU * f0 * td) * 0.3 \
-				+ sin(TAU * (f0 + 0.4) * td) * 0.2 \
-				+ sin(TAU * f0 * 1.5 * td) * 0.13 \
-				+ sin(TAU * f0 * 2.0 * td) * 0.17 \
-				+ sin(TAU * (f0 * 2.0 + 0.6) * td) * 0.11 \
-				+ sin(TAU * f0 * 3.0 * td) * 0.07) * denv
+			buf[b2 + i] += (sin(TAU * f0 * td) * 0.45 \
+				+ sin(TAU * (f0 + 0.4) * td) * 0.3 \
+				+ sin(TAU * f0 * 1.5 * td) * 0.2 \
+				+ sin(TAU * f0 * 2.0 * td) * 0.26 \
+				+ sin(TAU * (f0 * 2.0 + 0.6) * td) * 0.17 \
+				+ sin(TAU * f0 * 3.0 * td) * 0.11) * denv
 	var peak := 0.001
 	for i in total:
 		peak = maxf(peak, absf(buf[i]))
