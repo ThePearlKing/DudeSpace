@@ -16,7 +16,7 @@ extends StaticBody3D
 ## Reactors and RTGs make the place RADIOACTIVE (cancer is a mechanic).
 ## A generator indoors fills the room with smoke. Read a book instead.
 
-const KINDS := ["small", "two_story", "box", "basement", "factory", "tower"]
+const KINDS := ["small", "two_story", "box", "basement", "factory", "tower", "moonbase"]
 
 ## A wall port: a light-gray socket box, barely proud of the wall,
 ## little square panels on every face. NOT an extender -- a PORTAL:
@@ -154,6 +154,8 @@ func room_size() -> Vector3:
 			return Vector3(26, 9, 26)
 		"tower":
 			return Vector3(16, 20, 16)
+		"moonbase":
+			return Vector3(38, 5, 14)   # hub + hallways + pods, bounding
 		_:
 			return Vector3(13, 5.5, 13)
 
@@ -261,6 +263,8 @@ func _build_exterior() -> void:
 		# ridge beam capping the apex
 		_box(self, Vector3(w + 0.7, 0.16, 0.3), Vector3(0, h + w * 0.31, 0),
 			roofc.darkened(0.25))
+	if kind == "moonbase":
+		_moonbase_exterior(w)
 	# per-kind exterior dressing: the part that makes it look DESIGNED
 	match kind:
 		"small", "basement":
@@ -355,6 +359,69 @@ func _build_exterior() -> void:
 	col.position = Vector3(0, h * 0.5, 0)
 	add_child(col)
 
+## Moonbase shell: gray domes, orange dome windows, an airlock snout.
+func _moonbase_exterior(w: float) -> void:
+	var gray := Surfaces.metal(Color("#9aa0a8"))
+	var main_dome := MeshInstance3D.new()
+	var dm := SphereMesh.new()
+	dm.radius = w * 0.62
+	dm.height = w * 0.62
+	dm.is_hemisphere = true
+	main_dome.mesh = dm
+	main_dome.position = Vector3(0, 0.1, 0)
+	main_dome.material_override = gray
+	add_child(main_dome)
+	for sd in [[-w * 0.55, w * 0.34], [w * 0.55, 0.3 * w]]:
+		var d2 := MeshInstance3D.new()
+		var dm2 := SphereMesh.new()
+		dm2.radius = sd[1]
+		dm2.height = sd[1]
+		dm2.is_hemisphere = true
+		d2.mesh = dm2
+		d2.position = Vector3(sd[0], 0.1, 0.2)
+		d2.material_override = gray
+		add_child(d2)
+	# ORANGE dome windows: warped glass bumps, lit from within
+	var omat := StandardMaterial3D.new()
+	omat.albedo_color = Color(1.0, 0.55, 0.15, 0.55)
+	omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	omat.emission_enabled = true
+	omat.emission = Color(1.0, 0.45, 0.1)
+	omat.emission_energy_multiplier = 0.7
+	omat.roughness = 0.1
+	for ow in [[0.0, w * 0.62], [-w * 0.55, w * 0.34]]:
+		var owin := MeshInstance3D.new()
+		var owm := SphereMesh.new()
+		owm.radius = float(ow[1]) * 0.42
+		owm.height = float(ow[1]) * 0.42
+		owm.is_hemisphere = true
+		owin.mesh = owm
+		owin.position = Vector3(float(ow[0]), float(ow[1]) * 0.52, -float(ow[1]) * 0.62)
+		owin.rotation_degrees.x = -55.0
+		owin.material_override = omat
+		add_child(owin)
+	# the AIRLOCK: cylindrical snout with a round hatch, front and center
+	var snout := MeshInstance3D.new()
+	var sn := CylinderMesh.new()
+	sn.top_radius = 1.0
+	sn.bottom_radius = 1.0
+	sn.height = 1.6
+	snout.mesh = sn
+	snout.rotation_degrees.x = 90.0
+	snout.position = Vector3(0, 1.1, -w * 0.5 - 0.6)
+	snout.material_override = Surfaces.metal(Color("#7a8088"))
+	add_child(snout)
+	var hatch := MeshInstance3D.new()
+	var hm2 := CylinderMesh.new()
+	hm2.top_radius = 0.7
+	hm2.bottom_radius = 0.7
+	hm2.height = 0.12
+	hatch.mesh = hm2
+	hatch.rotation_degrees.x = 90.0
+	hatch.position = Vector3(0, 1.1, -w * 0.5 - 1.45)
+	hatch.material_override = Surfaces.portal(Color("#ffa040"))
+	add_child(hatch)
+
 # ------------------------------------------------------------- interior
 
 func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12, skip: Array = []) -> void:
@@ -429,7 +496,11 @@ func _build_interior() -> void:
 	var sz := room_size()
 	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
 	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower"] else Surfaces.PLASTER
-	_iroom(c, sz, warm)
+	if kind == "moonbase":
+		_moonbase_interior(c)
+		return
+	# the basement supplies its own floor (the one with the HOLE in it)
+	_iroom(c, sz, warm, 0.12, [0] if kind == "basement" else [])
 	var fy := c.y - sz.y * 0.5
 	# every home: a visible ceiling light fixture and a wall trim band
 	_deco(c + Vector3(0, sz.y * 0.5 - 0.35, 0), Vector3(1.4, 0.12, 1.4),
@@ -460,11 +531,11 @@ func _build_interior() -> void:
 			_wood_floor(Vector3(c.x - sz.x * 0.15, c.y + 0.21, c.z),
 				Vector2(sz.x * 0.7 - 0.2, sz.z - 1.2))
 			_counter(c + Vector3(-sz.x * 0.3, 0.26, -sz.z * 0.35), 2.4)
+			_rug(Vector3(c.x - 1.5, fy + 0.28, c.z + 1.5), Vector2(3.2, 2.4), Color("#5a8a5a"))
 			_plant(c + Vector3(-sz.x * 0.5 + 1.0, fy - c.y + 0.26, sz.z * 0.5 - 1.0))
 		"basement":
-			# ONE tall shaft: ground floor with a REAL stairwell hole,
-			# real stairs descending into a real cellar. no gates.
-			_iroom(c, sz, warm, 0.12, [0])                       # upper, no floor
+			# the cellar below (the upper room is already built,
+			# floorless, by the generic pass above)
 			_isurf = Surfaces.STONE
 			_iroom(c + Vector3(0, -sz.y, 0), sz, Color("#8a8272"), 0.06, [1])  # cellar, no ceiling
 			_isurf = Surfaces.PLASTER
@@ -510,6 +581,7 @@ func _build_interior() -> void:
 			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
 			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.2, -sz.z * 0.35), 3.0)
 			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.2, sz.z * 0.5 - 1.0))
+			_rug(Vector3(c.x - 2.0, fy + 0.28, c.z), Vector2(3.4, 2.4), Color("#8a3a3a"))
 		"tower":
 			# floors every 5 units. slabs leave a stair bay along -X;
 			# a switchback staircase LIVES in that bay and actually
@@ -585,6 +657,7 @@ func _build_interior() -> void:
 			# small house: wood floor, kitchen corner, plants, a hearth
 			_wood_floor(Vector3(c.x, fy + 0.2, c.z), Vector2(sz.x - 1.2, sz.z - 1.2))
 			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.26, -sz.z * 0.35), 3.2)
+			_rug(Vector3(c.x, fy + 0.28, c.z + 1.0), Vector2(3.6, 2.6), Color("#3a5a8a"))
 			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.26, sz.z * 0.5 - 1.0))
 			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.26, -sz.z * 0.5 + 1.0))
 			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
@@ -631,6 +704,69 @@ func _hole_floor(center: Vector3, size: Vector2, hole: Rect2, c: Color) -> void:
 	if hz1 < half.y:
 		_solid(center + Vector3((hx0 + hx1) * 0.5, 0, (hz1 + half.y) * 0.5),
 			Vector3(hx1 - hx0, 0.4, half.y - hz1), c)
+
+## Moonbase interior: gray HALLWAYS (a first), a domed hub, two pods.
+## Hub in the middle, corridors east and west, airlock spawn south.
+func _moonbase_interior(c: Vector3) -> void:
+	var gray := Color("#9aa0a8")
+	_isurf = Surfaces.METAL
+	# hub
+	_iroom(c, Vector3(10, 4.5, 10), gray, 0.1, [3, 2])   # open east+west walls
+	# corridors: floor/ceiling/front/back only -- open tubes
+	for side in [-1.0, 1.0]:
+		_iroom(c + Vector3(side * 8.0, 0, 0), Vector3(6.2, 3.2, 3.0),
+			gray.darkened(0.12), 0.08, [2, 3])
+		# pods at the ends, open toward the corridor
+		_iroom(c + Vector3(side * 14.5, 0, 0), Vector3(7, 4, 8),
+			gray.lightened(0.05), 0.1, [3] if side < 0.0 else [2])
+		# corridor light strips
+		_deco(c + Vector3(side * 8.0, 1.35, 0), Vector3(5.6, 0.06, 0.3),
+			Color("#fff2c8"), 1.4)
+	# hub wall stubs closing the gap between hub opening and corridor
+	for side2 in [-1.0, 1.0]:
+		for zs2 in [-1.0, 1.0]:
+			_solid(c + Vector3(side2 * 5.0, 0, zs2 * 3.25),
+				Vector3(1.0, 4.5, 3.5), gray)
+		_solid(c + Vector3(side2 * 5.0, 1.9, 0), Vector3(1.0, 0.8, 3.2), gray)
+		_solid(c + Vector3(side2 * 5.0, -1.9, 0), Vector3(1.0, 0.8, 3.2), gray)
+	# ORANGE dome skylight in the hub ceiling: warped, tinted, glowing
+	var odome := MeshInstance3D.new()
+	var odm := SphereMesh.new()
+	odm.radius = 2.2
+	odm.height = 2.2
+	odm.is_hemisphere = true
+	var omat2 := StandardMaterial3D.new()
+	omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.5)
+	omat2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	omat2.emission_enabled = true
+	omat2.emission = Color(1.0, 0.5, 0.12)
+	omat2.emission_energy_multiplier = 1.1
+	odome.mesh = odm
+	odome.material_override = omat2
+	_iroot.add_child(odome)
+	odome.global_position = c + Vector3(0, 2.2, 0)
+	# hub ring light + floor decal
+	_deco(c + Vector3(0, -2.2 + 0.04, 0), Vector3(6.0, 0.05, 6.0),
+		Color("#7a8088"))
+	_deco(c + Vector3(0, -2.2 + 0.08, 0), Vector3(1.6, 0.05, 1.6),
+		Color("#ffa040"), 0.8)
+	# pod dressing: bunk in one, console in the other
+	_deco(c + Vector3(-14.5, -2.0 + 0.55, 2.0), Vector3(1.1, 0.5, 2.2),
+		Color("#5a7aa0"))
+	_deco(c + Vector3(14.5, -2.0 + 0.5, -2.0), Vector3(2.2, 1.0, 0.7),
+		Color("#2a2f38"))
+	_deco(c + Vector3(14.5, -2.0 + 1.15, -2.0), Vector3(1.8, 0.5, 0.1),
+		Color("#7bffb0"), 1.3)
+
+## A soft rug: fabric, warm, zero collision. Room glue.
+func _rug(gpos: Vector3, size: Vector2, col: Color) -> void:
+	var r := MeshInstance3D.new()
+	var m := BoxMesh.new()
+	m.size = Vector3(size.x, 0.04, size.y)
+	r.mesh = m
+	r.material_override = Surfaces.fabric(col)
+	_iroot.add_child(r)
+	r.global_position = gpos + Vector3(0, 0.06, 0)
 
 ## A potted plant. Every good room has one. It knows things.
 func _plant(gpos: Vector3) -> void:

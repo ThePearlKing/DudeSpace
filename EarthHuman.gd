@@ -505,6 +505,8 @@ var _scan_t: float = 0.0        # staggered social scan timer (cheap, not laggy)
 var _lod_t: float = 0.0         # observer check timer
 var _stuck_t: float = 0.0       # walking but going nowhere (chest in face)
 var _last_pos: Vector3 = Vector3.ZERO
+var _detour_t: float = 0.0      # sidestep override while pathing around things
+var _detour: Vector3 = Vector3.ZERO
 var _active: bool = true        # false = player far away, human unrendered by reality
 
 var hp: float = 30.0
@@ -2124,6 +2126,12 @@ func _physics_process(delta: float) -> void:
 				_body.animate(0.0, true, delta)
 			return
 
+	# active detour overrides whatever the act wanted this frame
+	if _detour_t > 0.0:
+		_detour_t -= delta
+		if _dir.length() > 0.01:
+			_dir = _detour
+
 	# re-level the walk direction to the CURRENT local up every frame --
 	# a stale tangent on a sphere points slowly skyward, which had them
 	# hopping off the curvature as they strolled
@@ -2150,9 +2158,13 @@ func _physics_process(delta: float) -> void:
 	if speed > 0.5:
 		if global_position.distance_to(_last_pos) < speed * delta * 0.25:
 			_stuck_t += delta
-			if _stuck_t > 1.2:
+			if _stuck_t > 1.0:
 				_stuck_t = 0.0
-				_dir = _dir.rotated(up, deg_to_rad(randf_range(100.0, 250.0)))
+				# goal acts re-aim every frame, so a one-frame turn does
+				# nothing: hold a sidestep DETOUR for a moment instead
+				_detour = _dir.rotated(up, deg_to_rad(
+					(90.0 if randf() < 0.5 else -90.0) + randf_range(-25.0, 25.0)))
+				_detour_t = 1.1
 		else:
 			_stuck_t = 0.0
 	_last_pos = global_position

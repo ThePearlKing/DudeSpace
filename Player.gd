@@ -283,6 +283,8 @@ func _start_ghost(cat: String, kind: String) -> void:
 				bm.size = Vector3(1.3, 0.8, 2.4)
 			"catwalk":
 				bm.size = Vector3(3.0, 2.3, 2.0)
+			"moonbase":
+				bm.size = Vector3(7.0, 3.5, 7.0)
 			_:
 				bm.size = Vector3(0.7, 1.1, 0.7)
 	_ghost.mesh = bm
@@ -1279,7 +1281,7 @@ func _use_selected() -> void:
 				hopts.append({"id": k, "label": {"small": "Small House",
 					"two_story": "Two-Story House", "box": "Compact Box",
 					"basement": "House w/ Basement", "factory": "Factory House",
-					"tower": "Skyscraper"}[k]})
+					"tower": "Skyscraper", "moonbase": "Moonbase"}[k]})
 			var pui := PickUI.new().configure("HOUSE TYPE", hopts,
 				func(kind: String) -> void:
 					_start_ghost("house", kind))

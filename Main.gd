@@ -157,6 +157,8 @@ func _ready() -> void:
 		_house_test()
 	if OS.get_environment("CTD_TEST") == "17":
 		_winshot_test()
+	if OS.get_environment("CTD_TEST") == "18":
+		_hole_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -479,6 +481,35 @@ func _repopulate() -> void:
 	hm.global_transform = Transform3D(_basis_from_up(cd),
 		b.center + cd * (float(b.radius) + 1.2))
 
+## Headless: raycast down through the basement stairwell hole. If the
+## ray stops at the ground floor, the hole is a lie.
+func _hole_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var hs := House.new()
+	hs.kind = "basement"
+	add_child(hs)
+	hs.global_transform = Transform3D(_basis_from_up(up), home.center + up * home.radius)
+	await get_tree().create_timer(1.5).timeout
+	var c := hs.room_center()
+	var sz := hs.room_size()
+	var fy := c.y - sz.y * 0.5
+	var space := get_tree().root.world_3d.direct_space_state
+	for probe in [[4.0, 3.0, "HOLE CENTER"], [0.0, 0.0, "solid floor"],
+			[4.0, -3.0, "front strip"]]:
+		var from := c + Vector3(probe[0], 0.0, probe[1])
+		var q := PhysicsRayQueryParameters3D.create(from, from + Vector3(0, -12, 0))
+		var hit := space.intersect_ray(q)
+		var drop := -1.0
+		var what := "nothing"
+		if hit:
+			drop = from.y - hit.position.y
+			what = str(hit.collider) + " y=" + str(snappedf(hit.position.y, 0.01))
+		print("HOLETEST %s: dropped %.2f hit %s (floor top %.2f, c.y %.2f)" % [
+			probe[2], drop, what, fy + 0.2, c.y])
+
 ## Windowed: a player-style house; screenshot a front window from
 ## outside, then an interior window from inside.
 func _winshot_test() -> void:
@@ -487,7 +518,7 @@ func _winshot_test() -> void:
 	var home = Universe.nearest(p.global_position)
 	var up: Vector3 = (p.global_position - home.center).normalized()
 	var hs := House.new()
-	hs.kind = "small"
+	hs.kind = OS.get_environment("CTD_KIND") if OS.get_environment("CTD_KIND") != "" else "small"
 	add_child(hs)
 	hs.set_meta("placed_id", "house")
 	hs.global_transform = Transform3D(_basis_from_up(up), home.center + up * home.radius)
@@ -505,8 +536,13 @@ func _winshot_test() -> void:
 	# shot 2: inside, facing the interior front windows
 	var c := hs.room_center()
 	var sz := hs.room_size()
-	cam.global_position = c + Vector3(0, 0, 2.0)
-	cam.look_at(c + Vector3(0, 0.6, -sz.z * 0.5), Vector3.UP)
+	if hs.kind == "basement":
+		# stand over the stairwell corner, look down the hole
+		cam.global_position = c + Vector3(0.5, 0.5, -1.5)
+		cam.look_at(c + Vector3(4.0, -sz.y, 3.0), Vector3.UP)
+	else:
+		cam.global_position = c + Vector3(0, 0, 2.0)
+		cam.look_at(c + Vector3(0, 0.6, -sz.z * 0.5), Vector3.UP)
 	Game.zone = "flat"
 	p.global_position = hs.interior_spawn()
 	await get_tree().create_timer(0.8).timeout

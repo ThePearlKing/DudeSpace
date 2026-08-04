@@ -29,6 +29,14 @@ func _ready() -> void:
 	_input.position = Vector2(24, -46)
 	_input.custom_minimum_size = Vector2(620, 34)
 	_input.placeholder_text = "chat…"
+	var ist := StyleBoxFlat.new()
+	ist.bg_color = Color(0.06, 0.07, 0.09, 0.9)
+	ist.border_color = Color(0.4, 0.45, 0.5)
+	ist.set_border_width_all(1)
+	ist.set_corner_radius_all(4)
+	ist.set_content_margin_all(8)
+	_input.add_theme_stylebox_override("normal", ist)
+	_input.add_theme_stylebox_override("focus", ist)
 	_input.visible = false
 	_input.text_submitted.connect(_send)
 	_input.gui_input.connect(_line_key)
