@@ -1202,20 +1202,22 @@ static var _sauce_wav: AudioStreamWAV = null
 static var sauce_cues: Array = []   # [start_seconds, line] over the tape
 static var sauce_len: float = 1.0
 
-## SPAGHETTIFY: the event horizon does this to text. Letters stretch,
-## strands connect them, vowels get pulled long. Readable if you fight.
+## SPAGHETTIFY: what falling into TIN 618 does to a sentence. Letters
+## s t r e t c h  a p a r t  down the line (tidal forces), and the soft
+## ones elongate. Plain characters only -- renders everywhere, no lag.
 static func spaghettify(txt: String) -> String:
 	var out := ""
 	for i in txt.length():
 		var c := txt[i]
-		out += c
-		var h := (i * 31 + c.unicode_at(0)) % 10
-		if c in "aeiou" and h < 4:
-			for k in 1 + (h % 3):
-				out += c
-		if h < 5 and c != " ":
-			out += String.chr(0x035C + (h % 3))
-	return out
+		if c == " ":
+			out += "  "
+			continue
+		var h := (i * 31 + c.unicode_at(0)) % 7
+		var reps := 1 + (h % 3 if c in "aeioumnrls" else h % 2)
+		for k in reps:
+			out += c
+		out += " ".repeat(1 + mini(i / 8, 3))
+	return out.strip_edges()
 
 ## A mild single-tap echo: presence intact, space added.
 static func _light_echo(src: AudioStreamWAV) -> AudioStreamWAV:

@@ -38,6 +38,7 @@ var _cook_line: String = ""     # subtitle for the stream being cooked
 var _cooked_line: String = ""
 var now_line: String = ""       # what the dish is SAYING right now
 var now_line_until: float = 0.0
+var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _bad_t: float = 0.0   # how long the signal has been junk
 
 func _init() -> void:
@@ -368,6 +369,7 @@ func work(delta: float) -> void:
 		_talk.stop()
 		_sentence_cd = 0.15
 		now_line_until = 0.0   # new station: old subtitles vanish
+		_last_cue = ""
 	if best < 0 or bs < 0.12:
 		# GRACE: momentary blips (walking, dish jitter) must not kill the
 		# stream -- only a genuinely lost signal does
@@ -407,8 +409,12 @@ func work(delta: float) -> void:
 					if tpos >= float(cue[0]):
 						curc = str(cue[1])
 				if curc != "":
-					now_line = "⊙: " + RadioLib.spaghettify(curc)
-					now_line_until = Game.playtime + 0.6
+					if curc != _last_cue:
+						# only reshape when the LINE changes -- rebuilding
+						# every frame was the blink and the lag
+						_last_cue = curc
+						now_line = "⊙: " + RadioLib.spaghettify(curc)
+					now_line_until = Game.playtime + 1.2
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
 				var t := str(st["type"])
