@@ -35,6 +35,9 @@ func _ready() -> void:
 	add_child(_input)
 
 func _on_chat(from_name: String, text: String) -> void:
+	var m = get_tree().current_scene
+	if m and m.has_method("show_chat_bubble"):
+		m.show_chat_bubble(from_name, text)
 	var l := Label.new()
 	l.text = "<%s> %s" % [from_name, text] if from_name != "SERVER" else "· %s" % text
 	l.add_theme_font_size_override("font_size", 16)

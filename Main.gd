@@ -1889,6 +1889,7 @@ func _populate(b) -> void:
 				pr.setup(Vector3(randf_range(0.5, 0.9), ph, randf_range(0.5, 0.9)),
 					Color("#ff7ce9"), 2, 5, 4.0, 0.0, "prism", 1)
 				add_child(pr)
+				_prismify(pr)
 				var pd := _surface_dir()
 				pr.global_transform = Transform3D(_basis_from_up(pd), b.center + pd * (b.radius + ph * 0.5))
 			_spawn_enemies(b, 6, 5)   # shooters + flyers guard the shards
@@ -1927,13 +1928,13 @@ func _populate(b) -> void:
 			Game.earth_body = b
 			Game.earth_cities = []
 			var vibes: Array = [
-				{"vibe": "goofy", "name": "Springdale", "tint": Color("#ffb347"),
+				{"vibe": "goofy", "name": "Fairview", "tint": Color("#ffb347"),
 					"arch": "goofy"},
-				{"vibe": "grumpy", "name": "Ironvale", "tint": Color("#50505a"),
+				{"vibe": "grumpy", "name": "Gary", "tint": Color("#50505a"),
 					"arch": "concrete"},
-				{"vibe": "dreamy", "name": "Eldenport", "tint": Color("#9ad0ff"),
+				{"vibe": "dreamy", "name": "Providence", "tint": Color("#9ad0ff"),
 					"arch": "ancient"},
-				{"vibe": "confident", "name": "New Meridian", "tint": Color("#ffd166"),
+				{"vibe": "confident", "name": "Meridian City", "tint": Color("#ffd166"),
 					"arch": "glass"},
 			]
 			for ci in 4:
@@ -2146,6 +2147,46 @@ func _seat_prop(b, dir: Vector3, rng: RandomNumberGenerator, bench: bool) -> voi
 	root.yaw = rng.randf() * TAU
 	add_child(root)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Paint every mesh of a node with the shifting prism rainbow.
+func _prismify(n: Node) -> void:
+	(func() -> void:
+		for ch in n.get_children():
+			if ch is MeshInstance3D:
+				ch.material_override = Human._prism_material()).call_deferred()
+
+## Chat lines float over heads, human-bubble style.
+func show_chat_bubble(pname: String, text: String) -> void:
+	var target: Node3D = null
+	if pname == Net.my_name():
+		target = _player
+	else:
+		for id in Net.player_names:
+			if str(Net.player_names[id]) == pname and _remote_avatars.has(id):
+				target = _remote_avatars[id]["root"]
+				break
+	if target == null or not is_instance_valid(target):
+		return
+	var old := target.get_node_or_null("chatbubble")
+	if old:
+		old.queue_free()
+	var lbl := Label3D.new()
+	lbl.name = "chatbubble"
+	lbl.text = text
+	lbl.font_size = 22
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.render_priority = 10
+	lbl.outline_size = 8
+	lbl.width = 420
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector3(0, 3.0, 0)
+	target.add_child(lbl)
+	var tw := lbl.create_tween()
+	tw.tween_interval(5.0)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(lbl.queue_free)
 
 ## WELCOME TO <city>: a roadside sign dressed like its city.
 func _city_sign(b, dir: Vector3, cname: String, arch: String) -> void:

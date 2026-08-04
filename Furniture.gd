@@ -4,7 +4,7 @@ extends StaticBody3D
 ## Placer tool, usable by every human (and the player, F). A carpet is
 ## furniture with no ambitions. A bed is a seat you take lying down.
 
-const KINDS := ["bench", "chair", "sofa", "carpet", "bed"]
+const KINDS := ["bench", "chair", "sofa", "carpet", "bed", "catwalk"]
 
 var kind: String = "bench"
 var yaw: float = -1.0
@@ -38,6 +38,29 @@ func _ready() -> void:
 			_m(Vector3(4.2, 0.05, 3.0), Vector3(0, 0.03, 0), cloth)
 			_m(Vector3(4.4, 0.04, 3.2), Vector3(0, 0.015, 0),
 				Destructible.make_material(cloth.albedo_color.darkened(0.3), 0.03))
+		"catwalk":
+			# industrial platform: legs, deck, rails. machines welcome
+			# on top. house-interior use only, per the placer.
+			var steel: Material = Surfaces.metal(Color("#6a6f78"))
+			_m(Vector3(3.0, 0.22, 2.0), Vector3(0, 1.5, 0), steel)
+			for lx2 in [-1.3, 1.3]:
+				for lz2 in [-0.8, 0.8]:
+					_m(Vector3(0.14, 1.5, 0.14), Vector3(lx2, 0.75, lz2), steel)
+			for rz3 in [-0.95, 0.95]:
+				_m(Vector3(3.0, 0.07, 0.07), Vector3(0, 2.25, rz3), steel)
+				for px2 in [-1.3, 0.0, 1.3]:
+					_m(Vector3(0.06, 0.6, 0.06), Vector3(px2, 1.95, rz3), steel)
+			_hitbox(Vector3(3.0, 0.25, 2.0), Vector3(0, 1.5, 0))
+			# ramp up one end so you can walk onto it
+			var rmp := StaticBody3D.new()
+			var rmc := CollisionShape3D.new()
+			var rmb := BoxShape3D.new()
+			rmb.size = Vector3(1.2, 0.1, 2.6)
+			rmc.shape = rmb
+			rmp.add_child(rmc)
+			add_child(rmp)
+			rmp.position = Vector3(2.0, 0.8, 0)
+			rmp.rotation.z = atan2(1.6, 2.2)
 		"bed":
 			_m(Vector3(1.2, 0.35, 2.3), Vector3(0, 0.28, 0), wood)
 			_m(Vector3(1.1, 0.16, 2.1), Vector3(0, 0.53, 0), cloth)

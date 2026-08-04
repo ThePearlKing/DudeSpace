@@ -2078,9 +2078,9 @@ func _physics_process(delta: float) -> void:
 				if _goal_house == null or not is_instance_valid(_goal_house):
 					_pick_act()
 				else:
-					var to_h: Vector3 = _goal_house.global_position - global_position
+					var to_h: Vector3 = _goal_house.door_spot() - global_position
 					_dir = (to_h - up * to_h.dot(up)).normalized()
-					if to_h.length() < 2.8:
+					if to_h.length() < 2.0:
 						var gh = _goal_house
 						_enter_house(gh)
 						if gh == my_house and randf() < 0.5:

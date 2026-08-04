@@ -190,6 +190,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cancel_ghost()
 		get_viewport().set_input_as_handled()
 		return
+	if _ghost != null and event is InputEventKey and event.pressed and event.keycode == KEY_R:
+		_ghost_yaw += PI * 0.25   # R: rotate the hologram
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
 			and get_window().has_focus():
 		_look += event.relative
@@ -242,6 +246,7 @@ var seated: Node3D = null   # bench seat marker we're parked on
 var _ghost: Node3D = null   # placement preview hologram
 var _ghost_cat := ""        # "house" | "furn"
 var _ghost_kind := ""
+var _ghost_yaw := 0.0
 
 func _start_ghost(cat: String, kind: String) -> void:
 	if cat == "house" and Game.zone != "":
@@ -276,6 +281,8 @@ func _start_ghost(cat: String, kind: String) -> void:
 				bm.size = Vector3(2.4, 1.2, 0.9)
 			"bed":
 				bm.size = Vector3(1.3, 0.8, 2.4)
+			"catwalk":
+				bm.size = Vector3(3.0, 2.3, 2.0)
 			_:
 				bm.size = Vector3(0.7, 1.1, 0.7)
 	_ghost.mesh = bm
@@ -300,6 +307,7 @@ func _update_ghost() -> void:
 			up2 = Vector3.UP
 		_ghost.global_transform = Transform3D(_basis_from_up(up2),
 			hit.position + up2 * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4))
+		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
 		_ghost.visible = true
 	else:
 		_ghost.visible = false
@@ -321,6 +329,10 @@ func _confirm_ghost() -> void:
 			Inventory.remove_res("housekit", 1)
 		Sfx.play("place")
 	else:
+		if _ghost_kind == "catwalk" and Game.zone == "":
+			Sfx.play("denied")   # catwalks are an INDOOR philosophy
+			_cancel_ghost()
+			return
 		if not Game.creative:
 			if Inventory.res_count("plantfiber") < 2:
 				Sfx.play("denied")
@@ -346,6 +358,8 @@ func sit_on(seat: Node3D) -> void:
 	seated = seat
 	seat.set_meta("taken", true)
 	velocity = Vector3.ZERO
+	if _body and is_instance_valid(_body):
+		_body.pose = 6   # the third-person body actually SITS
 
 func _physics_process(delta: float) -> void:
 	if Game.mode != Game.Mode.ON_FOOT:
@@ -364,15 +378,18 @@ func _physics_process(delta: float) -> void:
 			var su := (global_position - Universe.nearest(global_position).center).normalized()
 			global_position += su * 0.4
 			seated = null
+			if _body and is_instance_valid(_body):
+				_body.pose = 0
+			_head.rotation.y = 0.0
 		else:
 			var su2: Vector3 = seated.global_transform.basis.y
 			global_position = seated.global_position + su2 * 0.6
 			velocity = Vector3.ZERO
-			# seated is not PARALYZED: the head still turns
+			# seated: the BODY stays put -- only the head turns
 			if not _ui_open() and not Game.dead:
 				var ssens := MOUSE_SENS * Settings.mouse_sensitivity
-				if _look.x != 0.0:
-					rotate_object_local(Vector3.UP, -_look.x * ssens)
+				_head.rotation.y = clampf(_head.rotation.y - _look.x * ssens,
+					-1.5, 1.5)
 				_pitch = clampf(_pitch - _look.y * ssens, -1.4, 1.4)
 				_head.rotation.x = _pitch
 			_look = Vector2.ZERO
@@ -1451,7 +1468,8 @@ func _tool_connect(kind: String) -> void:
 			if hud:
 				hud.flash("no Wire. craft some (Electric tab).")
 			return
-		Inventory.remove_res("wire", 1)
+		if not Game.creative:
+			Inventory.remove_res("wire", 1)
 		_wire_src.connect_wire(m, kind, _wire_port if _wire_src.port_count(kind) > 1 else 0)
 		_wire_src.set_selected(false)
 		_wire_src = null

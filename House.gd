@@ -111,6 +111,12 @@ var _rad := false
 var _smoke := false
 var _smoke_node: GPUParticles3D
 var _door_pos := Vector3.ZERO   # local door spot (exterior)
+var _w := 5.0                   # exterior footprint (set at build)
+
+## Where a polite visitor should WALK to: just outside the front door.
+func door_spot() -> Vector3:
+	return global_position - global_transform.basis.z * (_w * 0.5 + 1.3) \
+		+ global_transform.basis.y * 0.6
 var _tag: Label3D
 
 ## What this home is called, on the sign and on every portal.
@@ -205,6 +211,7 @@ func _build_exterior() -> void:
 		"box":
 			w = 3.4
 			h = 3.0
+	_w = w
 	# FOUNDATION: a deep plug so the house never floats on curvature
 	var found := _box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0),
 		wall.darkened(0.35))
@@ -465,9 +472,28 @@ func _build_interior() -> void:
 			_hole_floor(Vector3(c.x, fy, c.z), Vector2(sz.x, sz.z), hole,
 				warm.darkened(0.15))
 			_wood_floor(Vector3(c.x - 2.5, fy + 0.2, c.z), Vector2(sz.x - 6.0, sz.z - 1.0))
-			# the stair: steep, honest, cellar-grade. lands on both floors
-			_stairs(c + Vector3(4.0, -sz.y * 1.5 + 0.3, 4.6),
-				Vector3(0, 0, -0.33), 11, 5.2, Color("#6a6255"))
+			# a two-flight switchback with a mid landing: both flights
+			# under the 45-degree walkable-slope limit
+			var cellar_floor := -sz.y * 1.5 + 0.3
+			var midy := cellar_floor + 2.6
+			_stairs(c + Vector3(4.0, midy, 4.6),
+				Vector3(0, 0, -0.42), 9, 2.6, Color("#6a6255"))
+			_solid(c + Vector3(4.0, midy - 0.2, 0.2), Vector3(2.4, 0.4, 2.0),
+				Color("#6a6255"))
+			var lf := c + Vector3(4.0, cellar_floor, -0.6)
+			for st2 in 8:
+				var t3 := float(st2 + 1) / 8.0
+				_solid(lf + Vector3(-float(st2) * 0.5, 2.6 * t3 - 0.2, 0),
+					Vector3(0.85, 0.42, 2.0), Color("#6a6255"))
+			var r2 := StaticBody3D.new()
+			var rc2 := CollisionShape3D.new()
+			var rb2 := BoxShape3D.new()
+			rb2.size = Vector3(sqrt(3.5 * 3.5 + 2.6 * 2.6) + 0.8, 0.12, 2.0)
+			rc2.shape = rb2
+			r2.add_child(rc2)
+			_iroot.add_child(r2)
+			r2.global_position = lf + Vector3(-1.75, 1.64, 0)
+			r2.rotation.z = atan2(2.6, 3.5)
 			# railing around the open hole so nobody just falls in
 			_deco(c + Vector3(2.35, fy - c.y + 0.8, 3.0), Vector3(0.08, 1.1, 4.2),
 				warm.darkened(0.4))
@@ -504,6 +530,14 @@ func _build_interior() -> void:
 				_solid(c + Vector3(-sz.x * 0.5 + 2.6, base_y + 5.0,
 					sz.z * 0.5 - 1.4 - 0.72 * 9.0 - 1.1),
 					Vector3(4.4, 0.4, 2.4), Color("#7a8090"))
+			# tiled checker lobby floor, corporate as anything
+			for tz in range(0, int(sz.z - 3.0)):
+				for tx in range(0, int(sz.x - 3.0)):
+					if (tx + tz) % 2 == 0:
+						continue
+					_deco(c + Vector3(-sz.x * 0.5 + 2.0 + float(tx),
+						fy - c.y + 0.035, -sz.z * 0.5 + 2.0 + float(tz)),
+						Vector3(0.96, 0.05, 0.96), Color("#3c4452"))
 			# lobby carpet strip + a plant per landing (corporate law)
 			_deco(c + Vector3(1.5, fy - c.y + 0.22, sz.z * 0.5 - 3.0),
 				Vector3(4.0, 0.05, 2.2), Color("#7a2a2a"))
@@ -527,8 +561,24 @@ func _build_interior() -> void:
 				for cz2 in [-0.35, 0.35]:
 					_deco(c + Vector3(sz.x * cx2, 0, sz.z * cz2),
 						Vector3(0.6, sz.y - 0.6, 0.6), Color("#4a4f58"))
-			_solid(c + Vector3(0, 0.8, -sz.z * 0.5 + 1.2),
-				Vector3(sz.x - 6.0, 0.3, 1.8), Color("#6a6f78"))
+			# CATWALK NETWORK: raised grid, rails, two access stairs --
+			# a factory without catwalks is just a warehouse
+			var cw := Color("#6a6f78")
+			var cwy := 2.6
+			_solid(c + Vector3(0, cwy, -sz.z * 0.5 + 1.2),
+				Vector3(sz.x - 4.0, 0.25, 1.8), cw)
+			_solid(c + Vector3(0, cwy, sz.z * 0.5 - 1.2),
+				Vector3(sz.x - 4.0, 0.25, 1.8), cw)
+			_solid(c + Vector3(-sz.x * 0.5 + 1.2, cwy, 0),
+				Vector3(1.8, 0.25, sz.z - 4.0), cw)
+			_solid(c + Vector3(0, cwy, 0), Vector3(1.8, 0.25, sz.z - 4.0), cw)
+			for rz2 in [-sz.z * 0.5 + 0.4, sz.z * 0.5 - 0.4]:
+				_deco(c + Vector3(0, cwy + 0.6, rz2),
+					Vector3(sz.x - 4.0, 0.07, 0.07), cw.darkened(0.2))
+			_stairs(c + Vector3(sz.x * 0.35, -sz.y * 0.5 + 0.3, -sz.z * 0.5 + 2.6),
+				Vector3(0, 0, 0.6), 6, cwy + sz.y * 0.5 - 0.3, cw.darkened(0.15))
+			_stairs(c + Vector3(-sz.x * 0.35, -sz.y * 0.5 + 0.3, sz.z * 0.5 - 2.6),
+				Vector3(0, 0, -0.6), 6, cwy + sz.y * 0.5 - 0.3, cw.darkened(0.15))
 		"box":
 			pass   # a blank canvas. bring your own everything.
 		_:
@@ -621,7 +671,7 @@ func _stairs(base: Vector3, step_vec: Vector3, steps: int, rise: float,
 	rcol.shape = rbs
 	ramp.add_child(rcol)
 	_iroot.add_child(ramp)
-	ramp.global_position = base + Vector3(0, rise * 0.5 + 0.15, run * 0.5)
+	ramp.global_position = base + Vector3(0, rise * 0.5 + 0.34, run * 0.5)
 	ramp.rotation.x = atan2(rise, -run) if run < 0.0 else -atan2(rise, run)
 
 ## Cosmetic block (no collision): trim, beams, railings, clutter.
