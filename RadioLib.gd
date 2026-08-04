@@ -615,6 +615,13 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 				for i in mini(int(0.012 * SR), total - hs):
 					buf[hs + i] += (randf() * 2.0 - 1.0) * amp \
 						* (1.0 - float(i) / (0.012 * SR))
+			# part one keeps it simple: JUST a clean backbeat snare
+			for sn1 in [4, 12]:
+				var ss1: int = b0 + int(sn1) * s16
+				for i in mini(int(0.07 * SR), total - ss1):
+					buf[ss1 + i] += ((randf() * 2.0 - 1.0) * 0.7 \
+						+ sin(TAU * 195.0 * float(i) / SR) * 0.3) \
+						* exp(-float(i) / (SR * 0.018)) * 0.26
 		else:
 			# PART 2 bass: syncopated 16ths walking root/octave/fifth with
 			# chromatic approaches -- the triangle learns to funk
