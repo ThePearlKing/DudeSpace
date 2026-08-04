@@ -118,6 +118,7 @@ var spawn_up: Vector3 = Vector3.UP
 var has_saved_spawn: bool = false   # a save carried its own spawn point
 var tutorial_done: bool = false     # interactive tutorial finished/skipped
 var tutorial_session: bool = false  # throwaway tutorial world (set by Title, never saved)
+var tutorial_mode: String = "basic" # which lesson: "basic" | "reactor"
 var god_standby_until: float = -1.0 # after a death the god broods instead of acting
 var god_cycles: int = 0             # every brood it wakes STRONGER and pettier
 var world_seed: int = 0             # fixes terrain layout across reloads

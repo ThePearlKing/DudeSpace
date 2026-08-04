@@ -167,7 +167,10 @@ func _ready() -> void:
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
-		add_child(Tutorial.new())
+		if Game.tutorial_mode == "reactor":
+			add_child(ReactorTutorial.new())
+		else:
+			add_child(Tutorial.new())
 	# headless LAN test rig: CTD_NET=host opens this world to LAN (ephemeral)
 	if OS.get_environment("CTD_NET") == "host":
 		Save.ephemeral = true   # never touch real slots from a test run

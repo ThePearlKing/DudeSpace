@@ -286,10 +286,40 @@ func _roll_tip() -> void:
 ## Tutorial session: fresh throwaway world on the tutorial planet.
 ## Nothing it does is ever written to disk.
 func _start_tutorial() -> void:
-	Save.ephemeral = true
-	Game.tutorial_session = true
-	Save.new_slot(Save.next_id(), {"color": "#3aa0ff", "shader": "none"}, "TUTORIAL")
-	get_tree().change_scene_to_file("res://Main.tscn")
+	# a MENU of lessons, not a single track
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-190, -130)
+	dim.add_child(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	panel.add_child(col)
+	var title := Label.new()
+	title.text = "  WHICH TUTORIAL?  "
+	title.add_theme_font_size_override("font_size", 24)
+	col.add_child(title)
+	var mk := func(txt: String, mode: String) -> void:
+		var b := Button.new()
+		b.text = txt
+		b.custom_minimum_size = Vector2(380, 48)
+		b.pressed.connect(func() -> void:
+			Game.tutorial_mode = mode
+			Save.ephemeral = true
+			Game.tutorial_session = true
+			Save.new_slot(Save.next_id(), {"color": "#3aa0ff", "shader": "none"}, "TUTORIAL")
+			get_tree().change_scene_to_file("res://Main.tscn"))
+		col.add_child(b)
+	mk.call("BASIC SURVIVAL (mine, craft, fly)", "basic")
+	mk.call("NUCLEAR REACTOR (guided startup, safe meltdowns)", "reactor")
+	var back := Button.new()
+	back.text = "back"
+	back.custom_minimum_size = Vector2(380, 40)
+	back.pressed.connect(dim.queue_free)
+	col.add_child(back)
 
 func _process(delta: float) -> void:
 	if _bg_pivot:
