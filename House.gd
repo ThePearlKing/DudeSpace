@@ -376,6 +376,8 @@ func _build_exterior() -> void:
 ## Moonbase shell: gray domes, orange dome windows, an airlock snout.
 func _moonbase_exterior(w: float) -> void:
 	var gray := Surfaces.metal(Color("#9aa0a8"))
+	# THE dome: the whole hab is one big orange dome, like an actual
+	# moonbase. it doubles as the screen showing the inside.
 	var main_dome := MeshInstance3D.new()
 	var dm := SphereMesh.new()
 	dm.radius = w * 0.62
@@ -383,8 +385,23 @@ func _moonbase_exterior(w: float) -> void:
 	dm.is_hemisphere = true
 	main_dome.mesh = dm
 	main_dome.position = Vector3(0, 0.1, 0)
-	main_dome.material_override = gray
+	var oplace := StandardMaterial3D.new()
+	oplace.albedo_color = Color(1.0, 0.55, 0.15, 0.85)
+	oplace.emission_enabled = true
+	oplace.emission = Color(1.0, 0.45, 0.1)
+	oplace.emission_energy_multiplier = 0.5
+	main_dome.material_override = oplace
 	add_child(main_dome)
+	_mb_dome_out = main_dome
+	var ring := MeshInstance3D.new()
+	var rm2 := CylinderMesh.new()
+	rm2.top_radius = w * 0.64
+	rm2.bottom_radius = w * 0.66
+	rm2.height = 0.5
+	ring.mesh = rm2
+	ring.position = Vector3(0, 0.25, 0)
+	ring.material_override = gray
+	add_child(ring)
 	for sd in [[-w * 0.55, w * 0.34], [w * 0.55, 0.3 * w]]:
 		var d2 := MeshInstance3D.new()
 		var dm2 := SphereMesh.new()
@@ -395,27 +412,6 @@ func _moonbase_exterior(w: float) -> void:
 		d2.position = Vector3(sd[0], 0.1, 0.2)
 		d2.material_override = gray
 		add_child(d2)
-	# ORANGE dome windows: warped glass bumps, lit from within
-	var omat := StandardMaterial3D.new()
-	omat.albedo_color = Color(1.0, 0.55, 0.15, 0.55)
-	omat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	omat.emission_enabled = true
-	omat.emission = Color(1.0, 0.45, 0.1)
-	omat.emission_energy_multiplier = 0.7
-	omat.roughness = 0.1
-	for ow in [[0.0, w * 0.62], [-w * 0.55, w * 0.34]]:
-		var owin := MeshInstance3D.new()
-		var owm := SphereMesh.new()
-		owm.radius = float(ow[1]) * 0.42
-		owm.height = float(ow[1]) * 0.42
-		owm.is_hemisphere = true
-		owin.mesh = owm
-		owin.position = Vector3(float(ow[0]), float(ow[1]) * 0.52, -float(ow[1]) * 0.62)
-		owin.rotation_degrees.x = -55.0
-		owin.material_override = omat
-		add_child(owin)
-		if _mb_dome_out == null:
-			_mb_dome_out = owin   # the big one becomes a real window
 	# the AIRLOCK: cylindrical snout with a round hatch, front and center
 	var snout := MeshInstance3D.new()
 	var sn := CylinderMesh.new()
@@ -682,8 +678,8 @@ func _build_interior() -> void:
 			# ORANGE dome skylight over the hub: warped, tinted, glowing
 			var odome := MeshInstance3D.new()
 			var odm := SphereMesh.new()
-			odm.radius = 2.0
-			odm.height = 2.0
+			odm.radius = 4.6
+			odm.height = 3.4
 			odm.is_hemisphere = true
 			var omat2 := StandardMaterial3D.new()
 			omat2.albedo_color = Color(1.0, 0.55, 0.15, 0.5)
