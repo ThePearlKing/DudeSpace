@@ -691,6 +691,10 @@ func _ready() -> void:
 	_bg_mat.render_priority = 9   # always UNDER the words, never over
 	_bg.material_override = _bg_mat
 	_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# the vertex shader billboards the quad OUT of its original AABB;
+	# without a cull margin the engine clips it whenever the body isn't
+	# facing the camera -- which looked like 'most bubbles have no card'
+	_bg.extra_cull_margin = 6.0
 	add_child(_bg)
 
 	# nametag: ALWAYS above the head, clear of the biggest skulls and
