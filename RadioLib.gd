@@ -634,14 +634,14 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 			# PART 2 drums: syncopated kicks, backbeat snares with a ghost,
 			# 16th hats with velocity, an open hat pushing the turnaround
 			for kn in [0, 3, 6, 10, 14]:
-				var ks := b0 + kn * s16
+				var ks: int = b0 + int(kn) * s16
 				for i in mini(int(0.09 * SR), total - ks):
 					var tk := float(i) / SR
 					buf[ks + i] += sin(TAU * (85.0 - tk * 300.0) * tk) \
 						* exp(-tk * 32.0) * 0.5
 			for sn in [4, 12, 15]:
-				var ss := b0 + sn * s16
-				var samp := 0.3 if sn != 15 else 0.14
+				var ss: int = b0 + int(sn) * s16
+				var samp := 0.3 if int(sn) != 15 else 0.14
 				for i in mini(int(0.08 * SR), total - ss):
 					buf[ss + i] += ((randf() * 2.0 - 1.0) * 0.7 \
 						+ sin(TAU * 190.0 * float(i) / SR) * 0.3) \
