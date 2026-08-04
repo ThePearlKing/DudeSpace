@@ -507,6 +507,8 @@ var _stuck_t: float = 0.0       # walking but going nowhere (chest in face)
 var _last_pos: Vector3 = Vector3.ZERO
 var _detour_t: float = 0.0      # sidestep override while pathing around things
 var _detour: Vector3 = Vector3.ZERO
+var _detour_side: float = 1.0   # which way we last dodged
+var _redetour_t: float = 0.0    # >0 = last dodge was recent; stuck again = flip
 var _active: bool = true        # false = player far away, human unrendered by reality
 
 var hp: float = 30.0
@@ -2128,6 +2130,7 @@ func _physics_process(delta: float) -> void:
 			return
 
 	# active detour overrides whatever the act wanted this frame
+	_redetour_t = maxf(0.0, _redetour_t - delta)
 	if _detour_t > 0.0:
 		_detour_t -= delta
 		if _dir.length() > 0.01:
@@ -2162,10 +2165,18 @@ func _physics_process(delta: float) -> void:
 			if _stuck_t > 1.0:
 				_stuck_t = 0.0
 				# goal acts re-aim every frame, so a one-frame turn does
-				# nothing: hold a sidestep DETOUR for a moment instead
+				# nothing: hold a sidestep DETOUR for a moment instead.
+				# and if the LAST dodge didn't free us, dodge the OTHER
+				# way -- no more left, left, face-first into the same
+				# tilted wall forever
+				if _redetour_t > 0.0:
+					_detour_side = -_detour_side
+				else:
+					_detour_side = 1.0 if randf() < 0.5 else -1.0
 				_detour = _dir.rotated(up, deg_to_rad(
-					(90.0 if randf() < 0.5 else -90.0) + randf_range(-25.0, 25.0)))
+					90.0 * _detour_side + randf_range(-25.0, 25.0)))
 				_detour_t = 1.1
+				_redetour_t = 4.0
 		else:
 			_stuck_t = 0.0
 	_last_pos = global_position
