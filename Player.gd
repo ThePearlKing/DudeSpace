@@ -322,6 +322,25 @@ func _door_tool() -> void:
 		hud.flash("frame A still armed — click frame B" if _door_frame != null \
 			else "DOOR TOOL — click the first door frame (Esc puts it away)")
 
+var _deck_hit := Vector3.ZERO
+
+## The station platform you're aiming at, if any (12m reach).
+func _deck_under_crosshair() -> House:
+	var space := get_world_3d().direct_space_state
+	var from := _camera.global_position
+	var q := PhysicsRayQueryParameters3D.create(from,
+		from - _camera.global_transform.basis.z * 12.0)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit:
+		var n: Node = hit.collider
+		while n:
+			if n is House and n.kind == "station":
+				_deck_hit = hit.position
+				return n
+			n = n.get_parent()
+	return null
+
 func _frame_under_crosshair() -> Node3D:
 	var space := get_world_3d().direct_space_state
 	var from := _camera.global_position
@@ -627,8 +646,14 @@ func _confirm_ghost() -> void:
 		get_parent().add_child(hn)
 		hn.set_meta("placed_id", "house")
 		hn.set_meta("owner", Net.my_name())
-		hn.global_transform = Transform3D(tf.basis, base_pos)
-		hn.rotate_object_local(Vector3.UP, randf() * TAU)
+		# aiming at a station deck? the house BUILDS ON IT, aligned
+		var hdeck := _deck_under_crosshair()
+		if hdeck != null:
+			hn.global_transform = Transform3D(hdeck.global_transform.basis,
+				_deck_hit + hdeck.global_transform.basis.y * 0.6)
+		else:
+			hn.global_transform = Transform3D(tf.basis, base_pos)
+			hn.rotate_object_local(Vector3.UP, randf() * TAU)
 		if not Game.creative:
 			Inventory.remove_res("housekit", 1)
 		Sfx.play("place")
@@ -1465,8 +1490,12 @@ func _use_selected() -> void:
 	var ahead := global_position - global_transform.basis.z * 3.0
 	var up := (ahead - body.center).normalized()
 	var place := body.center + up * body.radius
-	# In flat/zero zones the surface is wherever you stand, not a planet shell.
-	if Game.zone != "":
+	# a SPACE STATION DECK under the crosshair hosts machines directly
+	var deck := _deck_under_crosshair()
+	if deck != null:
+		up = deck.global_transform.basis.y
+		place = _deck_hit + up * 0.0
+	elif Game.zone != "":
 		# indoors: machines go where you LOOK, snapped down to the
 		# floor or a catwalk deck -- never embedded in a wall
 		up = Vector3.UP
