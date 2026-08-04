@@ -200,6 +200,17 @@ func work(delta: float) -> void:
 					_talk.play()
 				_sentence_cd = randf_range(2.0, 4.5)
 
+func _process(d: float) -> void:
+	super._process(d)
+	# a discharged control coil silences the set COMPLETELY
+	if has_coil and coil_node != null and is_instance_valid(coil_node) \
+			and coil_node.buf <= 0.0:
+		if _talk.playing:
+			_talk.stop()
+		if _hiss.playing:
+			_hiss.stop()
+		_cur_station = -1
+
 func info_text() -> String:
 	var act := ""
 	for st in stations:

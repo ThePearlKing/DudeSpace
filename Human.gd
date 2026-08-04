@@ -120,6 +120,8 @@ func _bolt_on(parent: MeshInstance3D, size: Vector3, pos: Vector3, c: Color, id:
 	mi.position = pos
 	if id.begins_with("prism_"):
 		mi.material_override = _prism_material()
+	elif id.begins_with("ultima_"):
+		mi.material_override = Surfaces.portal(Color("#7df9ff"))
 	else:
 		mi.material_override = Destructible.make_material(c, 0.35)
 	parent.add_child(mi)
