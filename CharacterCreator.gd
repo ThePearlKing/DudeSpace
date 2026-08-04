@@ -150,6 +150,10 @@ func _ready() -> void:
 	col.add_child(dl)
 	_pad = _Pad.new()
 	_pad.custom_minimum_size = Vector2(220, 220)
+	# SQUARE. the canvas is square, the face is square, the pad is
+	# square. no more stretching into a rectangle inside the column.
+	_pad.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_pad.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_pad.painted.connect(_rebuild)
 	col.add_child(_pad)
 

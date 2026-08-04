@@ -68,8 +68,10 @@ class Port extends Machine:
 	func accepts(id: String) -> bool:
 		return not is_power
 
+	var num: int = 0
+
 	func info_text() -> String:
-		return "%s PORTAL\n→ %s" % ["POWER" if is_power else "ITEM", home_label]
+		return "%s PORTAL %d\n→ %s" % ["POWER" if is_power else "ITEM", num, home_label]
 const BASE := Vector3(60000, 24000, -60000)   # pocket-interior estate
 const SLOT_SPACING := 800.0
 
@@ -130,7 +132,7 @@ func room_size() -> Vector3:
 		"factory":
 			return Vector3(26, 9, 26)
 		"tower":
-			return Vector3(18, 30, 18)
+			return Vector3(16, 20, 16)
 		_:
 			return Vector3(13, 5.5, 13)
 
@@ -182,7 +184,7 @@ func _build_exterior() -> void:
 			h = 4.5
 		"tower":
 			w = 4.0
-			h = 18.0
+			h = 11.0
 		"box":
 			w = 3.4
 			h = 3.0
@@ -210,7 +212,21 @@ func _build_exterior() -> void:
 		stack.position = Vector3(w * 0.3, h + 1.5, w * 0.3)
 		stack.material_override = _wallmat(Color("#5a5f68"))
 		add_child(stack)
-	elif kind != "box":
+	elif kind == "box":
+		# it LOOKS like a machine because it basically is one: grilles,
+		# a status stripe, corner trim. no windows. boxes don't gaze.
+		var grille := Destructible.make_material(Color("#5a5f66"), 0.08)
+		for gy in [0.8, 1.4, 2.0]:
+			var gb := MeshInstance3D.new()
+			var gm := BoxMesh.new()
+			gm.size = Vector3(w * 0.7, 0.12, 0.06)
+			gb.mesh = gm
+			gb.position = Vector3(0, gy, w * 0.5 + 0.03)
+			gb.material_override = grille
+			add_child(gb)
+		_box(self, Vector3(0.6, 0.25, 0.05), Vector3(w * 0.28, 2.5, -w * 0.5 - 0.03),
+			Color("#7bffb0"), 1.4)
+	elif true:
 		# pitched roof (two slabs)
 		for sgn in [-1.0, 1.0]:
 			var slab := _box(self, Vector3(w + 0.6, 0.25, w * 0.75),
@@ -357,6 +373,7 @@ func _build_ports() -> void:
 			+ global_transform.basis.x * (side * (w * 0.5 + 0.08)) \
 			+ global_transform.basis.y * (0.7 + float(i / 2) * 0.85)
 		outp.rotate_object_local(Vector3.UP, PI * 0.5 * side)
+		_port_number(outp, i + 1)
 		_out_ports.append(outp)
 		var inp := Port.new()
 		inp.is_power = is_power
@@ -365,6 +382,7 @@ func _build_ports() -> void:
 		get_tree().current_scene.add_child(inp)
 		inp.global_position = c + Vector3(-sz.x * 0.5 + 1.0 + float(i) * 1.4,
 			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 0.35)
+		_port_number(inp, i + 1)
 		_in_ports.append(inp)
 		# the pairing: outside pours into inside. no wires, no visuals,
 		# no lines to the far side of the solar system
@@ -381,7 +399,8 @@ func _build_windows() -> void:
 		w = 4.0
 	if kind == "box":
 		w = 3.4
-	# exterior pane: shows the interior, in miniature
+	# shared screens: ONE camera looks at the interior (for every
+	# outside pane), one looks out from the wall (for every inside pane)
 	_vp_out = SubViewport.new()
 	_vp_out.size = Vector2i(256, 192)
 	_vp_out.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -392,18 +411,6 @@ func _build_windows() -> void:
 	_cam_out.fov = 65.0
 	_cam_out.global_position = c + Vector3(0, 0.5, sz.z * 0.5 - 1.0)
 	_cam_out.look_at(c + Vector3(0, -sz.y * 0.25, 0), Vector3.UP)
-	_win_out_mesh = MeshInstance3D.new()
-	var qm := QuadMesh.new()
-	qm.size = Vector2(1.6, 1.2)
-	_win_out_mesh.mesh = qm
-	var wm := StandardMaterial3D.new()
-	wm.albedo_texture = _vp_out.get_texture()
-	wm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_win_out_mesh.material_override = wm
-	_win_out_mesh.position = Vector3(1.6, 1.6, -w * 0.5 - 0.04)
-	_win_out_mesh.rotation_degrees.y = 180.0
-	add_child(_win_out_mesh)
-	# interior pane: shows the actual outside, live
 	_vp_in = SubViewport.new()
 	_vp_in.size = Vector2i(384, 288)
 	_vp_in.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -412,17 +419,96 @@ func _build_windows() -> void:
 	_cam_in = Camera3D.new()
 	_vp_in.add_child(_cam_in)
 	_cam_in.fov = 70.0
-	_win_in_mesh = MeshInstance3D.new()
-	var qm2 := QuadMesh.new()
-	qm2.size = Vector2(3.0, 2.2)
-	_win_in_mesh.mesh = qm2
-	var wm2 := StandardMaterial3D.new()
-	wm2.albedo_texture = _vp_in.get_texture()
-	wm2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_win_in_mesh.material_override = wm2
-	_iroot.add_child(_win_in_mesh)
-	_win_in_mesh.global_position = c + Vector3(sz.x * 0.5 - 0.6, 0.4, 0)
-	_win_in_mesh.rotation_degrees.y = -90.0
+	var otex := _vp_out.get_texture()
+	var itex := _vp_in.get_texture()
+	if kind == "box":
+		return   # the box is a machine. machines don't do windows.
+	# ONE window per floor, on the +X wall, inside AND outside in the
+	# same place -- floor 2's outside glass belongs to floor 2's room
+	var floors := 1
+	match kind:
+		"two_story": floors = 2
+		"tower": floors = 3
+	var ifloors := floors if kind != "tower" else int(sz.y / 5.0)
+	for f in floors:
+		var wy := 1.7 + float(f) * (3.0 if kind != "two_story" else 2.9)
+		_win_unit(self, Vector3(w * 0.5 - 0.02, wy, 0), -90.0, otex,
+			Vector2(0.9, 0.9))
+	for f2 in ifloors:
+		var fy2 := c.y - sz.y * 0.5 + 1.6 + float(f2) * 5.0
+		if kind == "two_story":
+			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f2) * (sz.y * 0.5)
+		var iu := Node3D.new()
+		_iroot.add_child(iu)
+		iu.global_position = Vector3(c.x + sz.x * 0.5 - 0.15, fy2, c.z)
+		iu.rotation_degrees.y = 90.0
+		_win_frame(iu, itex, Vector2(2.6, 1.9))
+
+## One window UNIT: recessed cavity, frame, sill -- a window with
+## actual depth, whose glass happens to be a live screen.
+func _win_unit(parent: Node3D, pos: Vector3, yaw: float, tex: Texture2D,
+		wsize: Vector2) -> void:
+	var u := Node3D.new()
+	parent.add_child(u)
+	u.position = pos
+	u.rotation_degrees.y = yaw
+	_win_frame(u, tex, wsize)
+
+func _win_frame(u: Node3D, tex: Texture2D, wsize: Vector2) -> void:
+	var frame_c := Color("#4a3c2c") if not (kind in ["tower", "factory", "box"]) \
+		else Color("#2c3038")
+	var fm := Destructible.make_material(frame_c, 0.05)
+	# the recess: a dark cavity sunk INTO the wall
+	var cav := MeshInstance3D.new()
+	var cm := BoxMesh.new()
+	cm.size = Vector3(wsize.x, wsize.y, 0.24)
+	cav.mesh = cm
+	cav.position = Vector3(0, 0, 0.08)
+	cav.material_override = Destructible.make_material(Color("#101014"), 0.02)
+	u.add_child(cav)
+	# frame borders, slightly proud of the wall
+	for spec in [
+		[Vector3(wsize.x + 0.16, 0.08, 0.12), Vector3(0, wsize.y * 0.5 + 0.04, 0)],
+		[Vector3(wsize.x + 0.16, 0.08, 0.12), Vector3(0, -wsize.y * 0.5 - 0.04, 0)],
+		[Vector3(0.08, wsize.y + 0.16, 0.12), Vector3(wsize.x * 0.5 + 0.04, 0, 0)],
+		[Vector3(0.08, wsize.y + 0.16, 0.12), Vector3(-wsize.x * 0.5 - 0.04, 0, 0)],
+	]:
+		var bar := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = spec[0]
+		bar.mesh = bm
+		bar.position = spec[1]
+		bar.material_override = fm
+		u.add_child(bar)
+	# the sill: a ledge under the glass, like windows have
+	var sill := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(wsize.x + 0.24, 0.06, 0.2)
+	sill.mesh = sm
+	sill.position = Vector3(0, -wsize.y * 0.5 - 0.1, -0.05)
+	sill.material_override = fm
+	u.add_child(sill)
+	# center mullion: the cross-bar that says "window", not "screen"
+	var mull := MeshInstance3D.new()
+	var mm := BoxMesh.new()
+	mm.size = Vector3(0.05, wsize.y, 0.05)
+	mull.mesh = mm
+	mull.position = Vector3(0, 0, -0.06)
+	mull.material_override = fm
+	u.add_child(mull)
+	# the glass, recessed into the cavity: technically a screen. shh.
+	var pane := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = wsize
+	pane.mesh = qm
+	pane.position = Vector3(0, 0, -0.04)
+	pane.rotation_degrees.y = 180.0
+	var pm := StandardMaterial3D.new()
+	pm.albedo_texture = tex
+	pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pane.material_override = pm
+	u.add_child(pane)
+
 
 # ----------------------------------------------------------- use / tick
 
@@ -520,6 +606,19 @@ func _scan_hazards() -> void:
 		_smoke_node.global_position = c
 	if _smoke_node:
 		_smoke_node.emitting = _smoke
+
+## Stamp a number on a port so outside 3 is obviously inside 3.
+func _port_number(prt: Node3D, n: int) -> void:
+	prt.num = n
+	var lbl := Label3D.new()
+	lbl.text = str(n)
+	lbl.font_size = 30
+	lbl.pixel_size = 0.006
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.position = Vector3(0, 0.72, 0)
+	lbl.modulate = Color("#e8f0e8")
+	lbl.outline_size = 6
+	prt.add_child(lbl)
 
 ## A claiming human decorates to taste. The furniture is real: their
 ## guests will sit on it, and you can watch through the window.
