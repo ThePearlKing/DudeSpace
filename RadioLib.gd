@@ -661,53 +661,139 @@ const ALIEN_HOSTS: Array = [
 const AP := ["Contrast", "Pixel", "Wireframe", "Blind", "Wobble"]
 const AP_STATES := ["rotating backwards", "hoarding vertices",
 	"refusing to render", "dimming on purpose", "growing a second pole",
-	"leaking edges into the void", "voting to become concave"]
+	"leaking edges into the void", "voting to become concave",
+	"broadcasting in a shape nobody licensed", "molting its skybox",
+	"charging admission for sunrise"]
 const AP_VERDICTS := ["stable, technically", "a fashion choice",
 	"contagious", "beautiful and wrong", "above my clearance",
-	"exactly what the tesselation predicted"]
+	"exactly what the tesselation predicted", "reversible if we hurry",
+	"someone's thesis project", "legally weather now"]
 const AP_REACT := ["remarkable.", "we warned them.", "the angles agree.",
-	"more after the static.", "stay rendered, everyone."]
+	"more after the static.", "stay rendered, everyone.",
+	"i need to sit on something flat.", "the phones are already glowing.",
+	"file that under 'yes'."]
 const AP_QUESTIONS := ["why does %s get two horizons and we get one?",
 	"my shadow left. do i water the geometry?",
 	"is it true the dude is real?",
 	"can you eat a vertex or is that illegal?",
-	"my house clipped through %s again. who do i bill?"]
+	"my house clipped through %s again. who do i bill?",
+	"my kid keeps rendering in wireframe. is that a phase?",
+	"does the sun know it's orange now? should someone tell it?",
+	"i found a corner nobody owns. can i keep it?"]
 const AP_ANSWERS := ["legally, yes. morally, the tesselation forbids it.",
 	"your shadow is on %s now. it is happier there.",
 	"the dude is real, and he is LOUD.",
 	"two horizons is a tax bracket, not a blessing.",
-	"bill %s. they clip everyone. it's a lifestyle."]
-const AP_MARKET := ["up", "down", "sideways", "unrendered", "imaginary"]
+	"bill %s. they clip everyone. it's a lifestyle.",
+	"it's a phase. all geometry is a phase.",
+	"finders keepers applies to corners. it's in the constitution.",
+	"do NOT tell the sun anything. it overreacts."]
+const AP_MARKET := ["up", "down", "sideways", "unrendered", "imaginary",
+	"clipping through the floor", "briefly two-dimensional"]
+const AP_PHENOM := ["a second sunrise", "backwards rain",
+	"a polygon shortage", "silence in the low frequencies",
+	"a brand-new corner", "seventeen missing vertices",
+	"fog with opinions", "an unlicensed eclipse"]
+const AP_PRODUCTS := ["edge polish", "horizon insurance", "vertex glue",
+	"premium darkness", "certified round corners", "artisanal shadows",
+	"low-poly comfort blankets"]
+const AP_SLOGANS := ["now with fewer dimensions.",
+	"because your geometry deserves it.", "as endorsed by the sun. allegedly.",
+	"side effects include existing.", "it just renders RIGHT."]
+const AP_SPORTS := ["the tesselation finals", "orbit racing",
+	"competitive shadow tug", "freestyle rotation"]
+const AP_FOIL := ["i am wearing the foil cone until the listening stops.",
+	"the foil cone stays ON this cycle. no debate.",
+	"foil is not fear. foil is fashion with boundaries.",
+	"i lined my studio with foil and my thoughts are MINE now."]
+const AP_FOURTH := [
+	["instruments say someone OUTSIDE the system is decoding this signal. again.",
+		"hello, decoder. we count your clicks too.",
+		"statistically it is one (1) guy with a satellite dish."],
+	["do you ever feel like the static is... reading us?",
+		"every broadcast, something out there writes our words down.",
+		"then let's give it something to write. hello, dish person."],
+	["a listener who is not from here has tuned in.",
+		"we see the beam. it comes from the little blue-adjacent rock.",
+		"wave at the sky, everyone. professionally."]]
+
+# anti-repeat memory: recently used lines and topics stay off the air
+static var _ax_recent: Array = []
+static var _ax_topics: Array = []
+
+static func _ax_fresh(arr: Array) -> String:
+	for attempt in 4:
+		var c := str(arr[randi() % arr.size()])
+		if not _ax_recent.has(c):
+			_ax_recent.append(c)
+			if _ax_recent.size() > 30:
+				_ax_recent.pop_front()
+			return c
+	return str(arr[randi() % arr.size()])
 
 ## One coherent talk-radio segment: [[voice_index, line], ...]
+## Topics rotate (no repeats back-to-back), lines assemble from parts,
+## and RARELY the hosts notice they're being decoded -- or someone just
+## quietly announces the foil cone. Unscheduled. Heartfelt.
 static func alien_exchange() -> Array:
 	var p: String = AP[randi() % AP.size()]
 	var p2: String = AP[randi() % AP.size()]
-	match randi() % 5:
+	var topic := randi() % 9
+	for attempt in 6:
+		if not _ax_topics.has(topic):
+			break
+		topic = randi() % 9
+	_ax_topics.append(topic)
+	if _ax_topics.size() > 3:
+		_ax_topics.pop_front()
+	var out: Array = []
+	match topic:
 		0:
-			return [[0, "this hour: %s. what do we know?" % p],
+			out = [[0, "this hour: %s. what do we know?" % p],
 				[3, "%s has been %s for three cycles. the geometry is %s." % [
-					p, AP_STATES[randi() % AP_STATES.size()],
-					AP_VERDICTS[randi() % AP_VERDICTS.size()]]],
-				[0, AP_REACT[randi() % AP_REACT.size()]]]
+					p, _ax_fresh(AP_STATES), _ax_fresh(AP_VERDICTS)]],
+				[0, _ax_fresh(AP_REACT)]]
 		1:
-			return [[0, "caller from %s, you're on the air." % p],
-				[2, AP_QUESTIONS[randi() % AP_QUESTIONS.size()] % p2],
-				[1, AP_ANSWERS[randi() % AP_ANSWERS.size()] % p2],
+			out = [[0, "caller from %s, you're on the air." % p],
+				[2, _ax_fresh(AP_QUESTIONS) % p2],
+				[1, _ax_fresh(AP_ANSWERS) % p2],
 				[0, "next caller. keep it euclidean."]]
 		2:
-			return [[1, "resolution is a right."],
+			out = [[1, "resolution is a right."],
 				[3, "resolution is a PRIVILEGE. %s proves it." % p],
 				[0, "strong words. the phones are melting."]]
 		3:
-			return [[0, "weather across the system."],
-				[1, "%s: aliasing overnight. %s: heavy contrast, clearing by dawn. the sun: orange again. nobody knows why." % [p, p2]]]
-		_:
-			return [[3, "vertex futures %s. edge liquidity %s. the wireframe index closed %s." % [
-					AP_MARKET[randi() % AP_MARKET.size()],
-					AP_MARKET[randi() % AP_MARKET.size()],
-					AP_MARKET[randi() % AP_MARKET.size()]]],
+			out = [[0, "weather across the system."],
+				[1, "%s: %s overnight. %s: %s by dawn. the sun: orange again. nobody asked it to be." % [
+					p, _ax_fresh(AP_PHENOM), p2, _ax_fresh(AP_PHENOM)]]]
+		4:
+			out = [[3, "vertex futures %s. edge liquidity %s. the wireframe index closed %s." % [
+					_ax_fresh(AP_MARKET), _ax_fresh(AP_MARKET), _ax_fresh(AP_MARKET)]],
 				[0, "you heard it here. probably."]]
+		5:
+			out = [[0, "sports. %s hosted %s." % [p, _ax_fresh(AP_SPORTS)]],
+				[3, "%s won by %d angles. %s demanded a re-measure." % [
+					p2, 1 + randi() % 89, p]],
+				[0, "tradition."]]
+		6:
+			out = [[0, "a word from our sponsor."],
+				[1, "%s. %s" % [_ax_fresh(AP_PRODUCTS).capitalize(),
+					_ax_fresh(AP_SLOGANS)]],
+				[0, "we legally had to air that."]]
+		7:
+			out = [[0, "history minute. %d cycles ago today:" % (100 + randi() % 900)],
+				[3, "%s %s %s. we still feel it." % [p,
+					["annexed", "out-rendered", "apologized to",
+						"traded shadows with", "declared war on the concept of"][randi() % 5],
+					p2 if randi() % 2 == 0 else "the number four"]]]
+		_:
+			# the FOURTH WALL segment: they know. they've always known.
+			var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
+			out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
+	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
+	if randi() % 12 == 0:
+		out.append([2, _ax_fresh(AP_FOIL)])
+	return out
 
 ## The whole segment as one broadcast: each voice rendered with its own
 ## stable profile, short gaps between turns, AM-station pacing.
