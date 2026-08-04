@@ -393,7 +393,7 @@ func _view_input(event: InputEvent) -> void:
 				and target is EarthHuman:
 			target.mind_punch()
 	elif event is InputEventMouseMotion and _rmb:
-		_orbit += event.relative.x * 0.01
+		_orbit -= event.relative.x * 0.01   # drag right, camera goes right
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
