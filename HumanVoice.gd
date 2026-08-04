@@ -186,7 +186,9 @@ static func _parse(t: String) -> Array:
 					if _magic_e(t, i):   # made, place: AY
 						vf = [[580.0, 1900.0, 0.055], [270.0, 2400.0, 0.065]]
 					else:
-						vf = [[800.0, 1100.0, 0.09]]
+						# the AE of apple and am -- bright and flat, not
+						# the dark AH of otter (that one lives in O)
+						vf = [[680.0, 1750.0, 0.09]]
 				"e":
 					# final silent e says nothing (like, made)...
 					if _magic_e(t, i):   # here, these: EE
