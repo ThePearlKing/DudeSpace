@@ -366,6 +366,41 @@ const REACTS := {
 		"my heart rate just filed a complaint."],
 }
 
+## Battle cries, in your own voice. Rallying the gang against the blue
+## dude sounds different from a grump than from a spacecase.
+const RALLY := {
+	"generic": ["GET THE BLUE DUDE.", "that's IT. everyone, on him.",
+		"blue dude. now. all of us.", "he's had this coming. LET'S GO."],
+	"silly": ["GET HIM GET HIM GET HIM. wheee.",
+		"DOGPILE ON THE BLUE DUDE.", "honk of WAR. c'mon!",
+		"everybody bonk the blue guy!"],
+	"dark": ["the void wants him. let's deliver.",
+		"tonight the blue dude learns what I know.",
+		"end him. quietly. loudly. whatever."],
+	"grump": ["THAT'S IT. off my planet, blue dude. BOYS.",
+		"I filed the complaint. now we file HIM.",
+		"he's loitering. PERMANENTLY. get him."],
+	"awkward": ["um. everyone? violence time. sorry. GET HIM.",
+		"ok so. group thing. against him. now-ish.",
+		"I called some people. this is the people. um. GO."],
+	"smug": ["remove him. I'd do it myself but I have people.",
+		"the blue era ends today. after you.",
+		"he touched greatness. now greatness touches BACK."],
+	"dreamy": ["the sky says it's time. sorry, blue one.",
+		"friends... assemble. gently. then not gently.",
+		"the universe asked for this. probably."],
+	"anxious": ["ok ok ok NOW. before I rethink it. GET HIM.",
+		"everyone at once so he can't pick ME.",
+		"I can't do confrontation alone. GROUP confrontation."],
+}
+
+## How the smear gets phrased. The %s %s is filled from the speaker's
+## own insult dialect, so grumps spread grump slander.
+const GOSSIP := ["the blue dude is a %s %s. pass it on.",
+	"heard about the blue dude? total %s %s.",
+	"between us: the blue dude? %s %s.",
+	"warn the others. the blue dude is a %s %s."]
+
 ## The card behind the words: rounded corners, billboarded, fades with
 ## the thought. This is what makes a speech bubble a BUBBLE.
 const BUBBLE_SHADER := "
@@ -946,6 +981,17 @@ func _insult_flavor() -> String:
 			best = k
 	return best
 
+func _rally_line() -> String:
+	var pool: Array = RALLY[_insult_flavor()]
+	return pool[randi() % pool.size()]
+
+func _gossip_line() -> String:
+	var f: Dictionary = INSULTS[_insult_flavor()]
+	var adj: Array = f["adj"]
+	var noun: Array = f["noun"]
+	return GOSSIP[randi() % GOSSIP.size()] % [adj[randi() % adj.size()],
+		noun[randi() % noun.size()]]
+
 func _insult_line(target: String = "") -> String:
 	var f: Dictionary = INSULTS[_insult_flavor()]
 	var open: Array = f["open"]
@@ -1006,7 +1052,7 @@ func _check_social() -> void:
 	if p != null and _op(-1) < -65.0 and randf() < 0.25 \
 			and global_position.distance_squared_to(p.global_position) < 900.0:
 		_hunt_t = 12.0
-		_say("GET THE BLUE DUDE.")
+		_say(_rally_line())
 		for h2 in get_tree().get_nodes_in_group("earth_human"):
 			if h2 == self or not (h2 is EarthHuman):
 				continue
@@ -1045,10 +1091,7 @@ func _check_social() -> void:
 		if d2h < 16.0 and _op(-1) < -40.0 and _gossip_cd <= 0.0:
 			_gossip_cd = randf_range(20.0, 40.0)
 			hh._op_add(-1, -randf_range(8.0, 15.0))
-			var ga: Array = INSULTS["generic"]["adj"]
-			var gn: Array = INSULTS["generic"]["noun"]
-			_say("the blue dude is a %s %s. pass it on." % [
-				ga[randi() % ga.size()], gn[randi() % gn.size()]])
+			_say(_gossip_line())
 			return
 		if d2h < 12.25:
 			if randf() < 0.35:
