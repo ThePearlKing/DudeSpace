@@ -503,6 +503,8 @@ var _social_cd: float = 0.0     # cooldown between human-to-human chats
 var _greet_cd: float = 0.0      # cooldown between greeting the player
 var _scan_t: float = 0.0        # staggered social scan timer (cheap, not laggy)
 var _lod_t: float = 0.0         # observer check timer
+var _stuck_t: float = 0.0       # walking but going nowhere (chest in face)
+var _last_pos: Vector3 = Vector3.ZERO
 var _active: bool = true        # false = player far away, human unrendered by reality
 
 var hp: float = 30.0
@@ -2143,6 +2145,17 @@ func _physics_process(delta: float) -> void:
 	up_direction = up
 	move_and_slide()
 	_grounded = is_on_floor()
+	# anti-wall-grind: trying to walk but not actually moving? there is
+	# a chest, a wall, or a life lesson in the way. turn.
+	if speed > 0.5:
+		if global_position.distance_to(_last_pos) < speed * delta * 0.25:
+			_stuck_t += delta
+			if _stuck_t > 1.2:
+				_stuck_t = 0.0
+				_dir = _dir.rotated(up, deg_to_rad(randf_range(100.0, 250.0)))
+		else:
+			_stuck_t = 0.0
+	_last_pos = global_position
 	# indoors: the visit timer. when it's up, home ejects you politely
 	if flat_house != null:
 		if not is_instance_valid(flat_house):

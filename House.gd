@@ -40,15 +40,28 @@ class Port extends Machine:
 		var sq := BoxMesh.new()
 		sq.size = Vector3(0.24, 0.24, 0.035)
 		var scol := Color("#8ecf9f") if is_power else Color("#e0a860")
-		part(sq, Vector3(0, 0.26, 0.11), scol, 0.5)
-		part(sq, Vector3(0, 0.26, -0.11), scol, 0.5)
+		var pmat := Surfaces.portal(scol)
+		for spec in [[sq, Vector3(0, 0.26, 0.11)], [sq, Vector3(0, 0.26, -0.11)]]:
+			var mi0 := MeshInstance3D.new()
+			mi0.mesh = spec[0]
+			mi0.position = spec[1]
+			mi0.material_override = pmat
+			add_child(mi0)
 		var sq2 := BoxMesh.new()
 		sq2.size = Vector3(0.035, 0.24, 0.1)
-		part(sq2, Vector3(0.25, 0.26, 0), scol, 0.5)
-		part(sq2, Vector3(-0.25, 0.26, 0), scol, 0.5)
+		for sx0 in [0.25, -0.25]:
+			var mi1 := MeshInstance3D.new()
+			mi1.mesh = sq2
+			mi1.position = Vector3(sx0, 0.26, 0)
+			mi1.material_override = pmat
+			add_child(mi1)
 		var sq3 := BoxMesh.new()
 		sq3.size = Vector3(0.24, 0.035, 0.1)
-		part(sq3, Vector3(0, 0.51, 0), scol, 0.5)
+		var mi2 := MeshInstance3D.new()
+		mi2.mesh = sq3
+		mi2.position = Vector3(0, 0.51, 0)
+		mi2.material_override = pmat
+		add_child(mi2)
 
 	func work(delta: float) -> void:
 		if twin == null or not is_instance_valid(twin):
@@ -92,6 +105,7 @@ var _out_ports: Array = []      # exterior port machines
 var _win_out_mesh: MeshInstance3D    # exterior window pane
 var _win_in_mesh: MeshInstance3D     # interior window pane
 var _views: Array = []          # every window viewport (paused when unseen)
+var _isurf: int = Surfaces.PLASTER   # this interior's wall surface
 var _haz_t := 0.0
 var _rad := false
 var _smoke := false
@@ -149,8 +163,10 @@ func _ready() -> void:
 
 # ------------------------------------------------------------- exterior
 
-func _wallmat(c: Color, e := 0.05) -> StandardMaterial3D:
-	return Destructible.make_material(c, e)
+func _wallmat(c: Color, e := 0.05, surf := Surfaces.PLASTER) -> Material:
+	if e > 0.5:
+		return Destructible.make_material(c, e)   # glowing things stay glowing
+	return Surfaces.mat(surf, c)
 
 func _box(parent: Node3D, size: Vector3, pos: Vector3, c: Color, e := 0.05) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -190,7 +206,9 @@ func _build_exterior() -> void:
 			w = 3.4
 			h = 3.0
 	# FOUNDATION: a deep plug so the house never floats on curvature
-	_box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0), wall.darkened(0.35))
+	var found := _box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0),
+		wall.darkened(0.35))
+	found.material_override = Surfaces.stone(wall.darkened(0.35))
 	# main shell
 	_box(self, Vector3(w, h, w), Vector3(0, h * 0.5, 0), wall)
 	if kind == "tower":
@@ -351,7 +369,7 @@ func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12, skip: Array = [
 		var m := BoxMesh.new()
 		m.size = wspec[0]
 		mi.mesh = m
-		mi.material_override = _wallmat(c, e)
+		mi.material_override = _wallmat(c, e, _isurf)
 		body.add_child(mi)
 		var col := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
@@ -360,6 +378,36 @@ func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12, skip: Array = [
 		body.add_child(col)
 		_iroot.add_child(body)
 		body.global_position = center + wspec[1]
+	# big flat walls are boring: baseboards, crown molding, and panel
+	# seams give them real detail (geometry, not grime)
+	var trim := Surfaces.wood(c.darkened(0.35)) if _isurf == Surfaces.PLASTER \
+		else Surfaces.metal(c.darkened(0.3))
+	for ring in [[-half.y + 0.14, 0.24], [half.y - 0.14, 0.18]]:
+		for wallside in 4:
+			var bar := MeshInstance3D.new()
+			var bm2 := BoxMesh.new()
+			var along_x := wallside < 2
+			bm2.size = Vector3(size.x - 1.0, ring[1], 0.1) if along_x \
+				else Vector3(0.1, ring[1], size.z - 1.0)
+			bar.mesh = bm2
+			bar.material_override = trim
+			_iroot.add_child(bar)
+			var off := (half.z - 0.55) if along_x else (half.x - 0.55)
+			var sgn2 := -1.0 if wallside % 2 == 0 else 1.0
+			bar.global_position = center + (Vector3(0, ring[0], sgn2 * off) \
+				if along_x else Vector3(sgn2 * off, ring[0], 0))
+	# vertical seams every few meters on the long walls
+	var nseam := int(size.x / 3.0)
+	for si in range(1, nseam):
+		for zs in [-1.0, 1.0]:
+			var seam := MeshInstance3D.new()
+			var smz := BoxMesh.new()
+			smz.size = Vector3(0.07, size.y - 0.6, 0.06)
+			seam.mesh = smz
+			seam.material_override = trim
+			_iroot.add_child(seam)
+			seam.global_position = center + Vector3(-half.x + float(si) * 3.0,
+				0, zs * (half.z - 0.53))
 	var light := OmniLight3D.new()
 	light.light_energy = 1.4
 	light.omni_range = maxf(size.x, size.z) * 1.3
@@ -373,6 +421,7 @@ func _build_interior() -> void:
 	var c := room_center()
 	var sz := room_size()
 	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
+	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower"] else Surfaces.PLASTER
 	_iroom(c, sz, warm)
 	var fy := c.y - sz.y * 0.5
 	# every home: a visible ceiling light fixture and a wall trim band
@@ -409,7 +458,9 @@ func _build_interior() -> void:
 			# ONE tall shaft: ground floor with a REAL stairwell hole,
 			# real stairs descending into a real cellar. no gates.
 			_iroom(c, sz, warm, 0.12, [0])                       # upper, no floor
+			_isurf = Surfaces.STONE
 			_iroom(c + Vector3(0, -sz.y, 0), sz, Color("#8a8272"), 0.06, [1])  # cellar, no ceiling
+			_isurf = Surfaces.PLASTER
 			var hole := Rect2(2.5, 1.0, 3.0, 4.0)                # x0,z0,w,h
 			_hole_floor(Vector3(c.x, fy, c.z), Vector2(sz.x, sz.z), hole,
 				warm.darkened(0.15))
@@ -498,8 +549,13 @@ func _build_interior() -> void:
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop
 ## looking like the inside of a shipping box.
 func _wood_floor(center: Vector3, size: Vector2) -> void:
-	_deco(center + Vector3(0, 0.03, 0), Vector3(size.x, 0.06, size.y),
-		Color("#a07848"))
+	var fl := MeshInstance3D.new()
+	var fm2 := BoxMesh.new()
+	fm2.size = Vector3(size.x, 0.06, size.y)
+	fl.mesh = fm2
+	fl.material_override = Surfaces.wood(Color("#a07848"))
+	_iroot.add_child(fl)
+	fl.global_position = center + Vector3(0, 0.03, 0)
 	var n := int(size.y / 1.2)
 	for i in n:
 		_deco(center + Vector3(0, 0.07, -size.y * 0.5 + 0.6 + float(i) * 1.2),
@@ -682,15 +738,16 @@ func _build_windows() -> void:
 		var fwd: Vector3 = -global_transform.basis.z   # house front normal
 		var back: Vector3 = global_transform.basis.z
 		# two small front windows flanking the door, exact twins inside
+		var zoff := 0.02 if kind != "tower" else -0.12   # clear of the bands
 		for fxs in [-1.0, 1.0]:
-			_win_pair(Vector3(fxs * w * 0.28, wy, -w * 0.5 + 0.02),
+			_win_pair(Vector3(fxs * w * 0.28, wy, -w * 0.5 + zoff),
 				Vector3.ZERO,
-				Vector3(c.x + fxs * sz.x * 0.28, fy2 + 0.5, c.z - (sz.z * 0.5 - 0.62)),
+				Vector3(c.x + fxs * sz.x * 0.28, fy2 + 1.4, c.z - (sz.z * 0.5 - 0.62)),
 				Vector3(0, 180, 0),
 				fwd, Vector3(0, 0, 1),
 				Vector2(1.1, 1.0), Vector2(1.8, 1.4))
 		# one wide back window
-		_win_pair(Vector3(-w * 0.18, wy, w * 0.5 - 0.02), Vector3(0, 180, 0),
+		_win_pair(Vector3(-w * 0.18, wy, w * 0.5 - zoff), Vector3(0, 180, 0),
 			Vector3(c.x - sz.x * 0.18, fy2 + 0.5, c.z + (sz.z * 0.5 - 0.62)),
 			Vector3.ZERO,
 			back, Vector3(0, 0, -1),
@@ -762,7 +819,7 @@ func _win_unit(parent: Node3D, pos: Vector3, yaw: float, tex: Texture2D,
 func _win_frame(u: Node3D, tex: Texture2D, wsize: Vector2, cavity := true) -> void:
 	var frame_c := Color("#4a3c2c") if not (kind in ["tower", "factory", "box"]) \
 		else Color("#2c3038")
-	var fm := Destructible.make_material(frame_c, 0.05)
+	var fm: Material = Surfaces.wood(frame_c)
 	# the recess: a dark cavity sunk INTO the wall (0.10..0.30 deep --
 	# every element gets its own depth plane, nothing coplanar)
 	if cavity:

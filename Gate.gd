@@ -45,7 +45,10 @@ func _ready() -> void:
 		mi.position = Vector3(0, 0.45, 0)
 		lbl_y = 1.6
 		col_size = Vector3(1.0, 1.0, 1.0)
-	mi.material_override = Destructible.make_material(color, 2.0)
+	if action == "":
+		mi.material_override = Surfaces.portal(color)   # it MOVES now
+	else:
+		mi.material_override = Destructible.make_material(color, 2.0)
 	add_child(mi)
 	if label_text != "":
 		var lbl := Label3D.new()

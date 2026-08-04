@@ -155,6 +155,8 @@ func _ready() -> void:
 		_reactor_test()
 	if OS.get_environment("CTD_TEST") == "16":
 		_house_test()
+	if OS.get_environment("CTD_TEST") == "17":
+		_winshot_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -476,6 +478,41 @@ func _repopulate() -> void:
 	add_child(hm)
 	hm.global_transform = Transform3D(_basis_from_up(cd),
 		b.center + cd * (float(b.radius) + 1.2))
+
+## Windowed: a player-style house; screenshot a front window from
+## outside, then an interior window from inside.
+func _winshot_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var hs := House.new()
+	hs.kind = "small"
+	add_child(hs)
+	hs.set_meta("placed_id", "house")
+	hs.global_transform = Transform3D(_basis_from_up(up), home.center + up * home.radius)
+	await get_tree().create_timer(1.5).timeout
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.current = true
+	# shot 1: outside, facing the front wall windows
+	var fwd: Vector3 = -hs.global_transform.basis.z
+	cam.global_position = hs.global_position + fwd * 5.0 + up * 2.0
+	cam.look_at(hs.global_position + up * 1.8, up)
+	await get_tree().create_timer(0.8).timeout
+	get_viewport().get_texture().get_image().save_png(OS.get_environment("CTD_SHOT"))
+	print("WINSHOT exterior saved")
+	# shot 2: inside, facing the interior front windows
+	var c := hs.room_center()
+	var sz := hs.room_size()
+	cam.global_position = c + Vector3(0, 0, 2.0)
+	cam.look_at(c + Vector3(0, 0.6, -sz.z * 0.5), Vector3.UP)
+	Game.zone = "flat"
+	p.global_position = hs.interior_spawn()
+	await get_tree().create_timer(0.8).timeout
+	get_viewport().get_texture().get_image().save_png(
+		OS.get_environment("CTD_SHOT").replace(".png", "_in.png"))
+	print("WINSHOT interior saved")
 
 ## Headless: place a house, walk in, count the ports, poison the air.
 func _house_test() -> void:
@@ -891,12 +928,17 @@ func _process(delta: float) -> void:
 				break
 	_rift_prev = pos
 
-	# sphere-of-influence change notice (KSP-style)
-	var soi := Universe.nearest(pos).name
-	if soi != _last_soi:
-		if _last_soi != "" and _hud:
-			_hud.flash("Leaving %s SOI  →  entering %s SOI" % [_last_soi, soi])
-		_last_soi = soi
+	# sphere-of-influence change notice (KSP-style) -- suppressed in
+	# pocket dimensions: walking into your living room is not a
+	# gravitational event
+	if Game.zone != "":
+		_last_soi = ""
+	else:
+		var soi := Universe.nearest(pos).name
+		if soi != _last_soi:
+			if _last_soi != "" and _hud:
+				_hud.flash("Leaving %s SOI  →  entering %s SOI" % [_last_soi, soi])
+			_last_soi = soi
 
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only

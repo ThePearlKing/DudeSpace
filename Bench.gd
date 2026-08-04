@@ -10,8 +10,8 @@ var yaw: float = -1.0   # < 0 = roll a random one at build time
 
 func _ready() -> void:
 	add_to_group("bench")
-	var wood := Destructible.make_material(Color("#7a5a34"), 0.05)
-	var dark := Destructible.make_material(Color("#3a3a3e"), 0.02)
+	var wood: Material = Surfaces.wood(Color("#7a5a34"))
+	var dark: Material = Surfaces.metal(Color("#3a3a3e"))
 	var w := 1.8 if is_bench else 0.6
 	var seat := MeshInstance3D.new()
 	var sm := BoxMesh.new()
