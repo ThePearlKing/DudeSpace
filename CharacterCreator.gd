@@ -38,8 +38,10 @@ func _ready() -> void:
 	add_child(bg)
 
 	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_CENTER)
-	row.position = Vector2(-420, -240)
+	# anchored high: the effect panel made the column tall enough to run
+	# off the bottom when centered
+	row.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	row.position = Vector2(-420, 24)
 	row.add_theme_constant_override("separation", 30)
 	add_child(row)
 
@@ -74,10 +76,17 @@ func _ready() -> void:
 	sv.add_child(_pivot)
 
 	# --- controls ---
+	var csc := ScrollContainer.new()
+	csc.custom_minimum_size = Vector2(390, 0)
+	csc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var vps2 := get_viewport().get_visible_rect().size
+	csc.custom_minimum_size.y = vps2.y - 60.0
+	row.add_child(csc)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 14)
 	col.custom_minimum_size = Vector2(360, 0)
-	row.add_child(col)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	csc.add_child(col)
 
 	var title := Label.new()
 	title.text = "DRESS FOR THE SERVER" if guest_mode \
