@@ -986,7 +986,7 @@ class NuclearReactor extends Machine:
 				in_slot = {"id": "", "n": 0}
 			_fuel = FUEL_SECS
 		# rod servos are SLOW. a scram is not: the rods just fall.
-		rods = move_toward(rods, rods_target, delta * (1.5 if _scram else 0.06))
+		rods = move_toward(rods, rods_target, delta * (1.5 if _scram else 0.12))
 		if _scram and rods >= 1.0:
 			_scram = false
 		# --- neutron kinetics (the real thing, pocket-sized) ---

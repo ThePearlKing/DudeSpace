@@ -283,10 +283,12 @@ STARTUP (in this order, no improvising):
  1. LOAD a uranium rod. an empty core does nothing.
  2. COOLANT FLOW to HALF or FULL. no flow, no startup mode.
  3. MODE: STARTUP. rods now move, but only down to 45%%.
- 4. Rods OUT in small steps. watch reactivity (ρ):
-    ρ negative = power falling. ρ positive = power RISING,
-    exponentially. small positive is a startup. big positive
-    is a headline.
+ 4. Rods OUT until insertion drops BELOW 65%%. that's the
+    magic number: above 65%% in, ρ stays negative and power
+    just sinks -- pulling "a little" does NOTHING. head for
+    ~55%% (startup floor is 45%%) and watch ρ flip positive.
+ 4b. ρ positive = power RISING, exponentially. small positive
+    is a startup. big positive is a headline.
  5. When POWER > 3%% and CORE is warm, MODE: RUN.
  6. Rods OUT slowly toward criticality. the hot core and the
     xenon both push ρ down -- that's the core stabilizing
@@ -334,7 +336,17 @@ func _process(delta: float) -> void:
 	for i in _mode_btns.size():
 		_mode_btns[i].modulate = Color(1, 1, 1, 1.0) if rx.mode == i else Color(1, 1, 1, 0.45)
 	var rho: float = rx.rho_now()
-	_read.text = "POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" % [
+	# the coach line: says exactly what the core is waiting for
+	var coach := ""
+	if rx._fuel <= 0.0:
+		coach = "\n>> LOAD URANIUM"
+	elif rx.mode == 1 and rho <= 0.0:
+		coach = "\n>> ρ negative: rods below 65%% before power can rise"
+	elif rx.mode == 1 and rx.power < 0.03:
+		coach = "\n>> ρ positive -- power climbing, hold on"
+	elif rx.mode == 1 and rx.temp < 15.0:
+		coach = "\n>> warming: power heats the core toward RUN (150°C)"
+	_read.text = ("POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" + coach) % [
 		rx.power * 100.0, rho, rx.rods * 100.0, rx.rods_target * 100.0,
 		rx.xenon * 100.0, rx.temp * 10.0, rx.press,
 		rx.coolant, ["OFF", "HALF", "FULL"][rx.flow],
