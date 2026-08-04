@@ -647,6 +647,85 @@ static func alien_profile() -> Dictionary:
 		"wave": ["buzz", "wobble", "square", "saw"][randi() % 4],
 		"rate": randf_range(0.45, 1.7), "artic": randf_range(1.2, 1.8)}
 
+# ---- WTH TALK RADIO: a real AM station run by aliens ------------------
+# Four RECURRING voices (stable profiles, so you learn who's who) doing
+# actual radio: news about the local planets, call-ins, debates, weather,
+# markets. Procedural, but each segment is a coherent little exchange.
+
+const ALIEN_HOSTS: Array = [
+	{"base": 320.0, "var": 0.5, "wave": "square", "rate": 1.5, "artic": 1.6},
+	{"base": 95.0, "var": 0.3, "wave": "buzz", "rate": 0.85, "artic": 1.3},
+	{"base": 210.0, "var": 0.9, "wave": "wobble", "rate": 1.2, "artic": 1.4},
+	{"base": 150.0, "var": 0.2, "wave": "saw", "rate": 1.1, "artic": 1.7}]
+
+const AP := ["Contrast", "Pixel", "Wireframe", "Blind", "Wobble"]
+const AP_STATES := ["rotating backwards", "hoarding vertices",
+	"refusing to render", "dimming on purpose", "growing a second pole",
+	"leaking edges into the void", "voting to become concave"]
+const AP_VERDICTS := ["stable, technically", "a fashion choice",
+	"contagious", "beautiful and wrong", "above my clearance",
+	"exactly what the tesselation predicted"]
+const AP_REACT := ["remarkable.", "we warned them.", "the angles agree.",
+	"more after the static.", "stay rendered, everyone."]
+const AP_QUESTIONS := ["why does %s get two horizons and we get one?",
+	"my shadow left. do i water the geometry?",
+	"is it true the dude is real?",
+	"can you eat a vertex or is that illegal?",
+	"my house clipped through %s again. who do i bill?"]
+const AP_ANSWERS := ["legally, yes. morally, the tesselation forbids it.",
+	"your shadow is on %s now. it is happier there.",
+	"the dude is real, and he is LOUD.",
+	"two horizons is a tax bracket, not a blessing.",
+	"bill %s. they clip everyone. it's a lifestyle."]
+const AP_MARKET := ["up", "down", "sideways", "unrendered", "imaginary"]
+
+## One coherent talk-radio segment: [[voice_index, line], ...]
+static func alien_exchange() -> Array:
+	var p: String = AP[randi() % AP.size()]
+	var p2: String = AP[randi() % AP.size()]
+	match randi() % 5:
+		0:
+			return [[0, "this hour: %s. what do we know?" % p],
+				[3, "%s has been %s for three cycles. the geometry is %s." % [
+					p, AP_STATES[randi() % AP_STATES.size()],
+					AP_VERDICTS[randi() % AP_VERDICTS.size()]]],
+				[0, AP_REACT[randi() % AP_REACT.size()]]]
+		1:
+			return [[0, "caller from %s, you're on the air." % p],
+				[2, AP_QUESTIONS[randi() % AP_QUESTIONS.size()] % p2],
+				[1, AP_ANSWERS[randi() % AP_ANSWERS.size()] % p2],
+				[0, "next caller. keep it euclidean."]]
+		2:
+			return [[1, "resolution is a right."],
+				[3, "resolution is a PRIVILEGE. %s proves it." % p],
+				[0, "strong words. the phones are melting."]]
+		3:
+			return [[0, "weather across the system."],
+				[1, "%s: aliasing overnight. %s: heavy contrast, clearing by dawn. the sun: orange again. nobody knows why." % [p, p2]]]
+		_:
+			return [[3, "vertex futures %s. edge liquidity %s. the wireframe index closed %s." % [
+					AP_MARKET[randi() % AP_MARKET.size()],
+					AP_MARKET[randi() % AP_MARKET.size()],
+					AP_MARKET[randi() % AP_MARKET.size()]]],
+				[0, "you heard it here. probably."]]
+
+## The whole segment as one broadcast: each voice rendered with its own
+## stable profile, short gaps between turns, AM-station pacing.
+static func alien_broadcast() -> AudioStreamWAV:
+	var bytes := PackedByteArray()
+	var gap := PackedByteArray()
+	gap.resize(int(SR * 0.45) * 2)
+	for turn in alien_exchange():
+		var w := HumanVoice.render(str(turn[1]), ALIEN_HOSTS[int(turn[0])])
+		if w != null:
+			bytes.append_array(w.data)
+			bytes.append_array(gap)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	return wav
+
 const NOODLE_BITS := ["the sauce remembers.", "every ring you take, I count.",
 	"boil. the universe is a pot.", "al dente is a covenant.",
 	"I watched you sell the semicircles.", "wrath keeps. like leftovers.",
