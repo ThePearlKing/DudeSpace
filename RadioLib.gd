@@ -776,7 +776,7 @@ static func _euclid_loop(seed_v: int) -> AudioStreamWAV:
 # a field once. He is not going to describe it properly, and he knows
 # more than he will ever admit. Plays ONCE per world session; after the
 # last line it's just the hole again.
-const EH_END := 246.0
+const EH_END := 265.0
 const EH_LOG: Array = [
 	[13.0, "there it is again. the sound. people call it a howl. it isn't. a howl wants something. this is the sound of a thing that already has it."],
 	[15.0, "i used to think you listened to a place like this to feel small. no. you listen to check whether it remembers you."],
@@ -803,10 +803,13 @@ const EH_LOG: Array = [
 	[194.0, "i brought the thing i've kept in the coffee tin since before the tin had a purpose. no, i won't say. you'd only go looking for a tin."],
 	[203.0, "it fits. of course it fits. it always fit. that was the whole problem."],
 	[211.0, "glowing now. not bright. considerate. a light that knows about neighbors."],
-	[219.0, "and down it goes. slow as a sunset. the dirt just... accepts it. grass folding over like a page."],
-	[228.0, "you'd never know. that's the point, i think. you were never supposed to know. i wasn't either. i just happened to be in the field."],
-	[237.0, "anyway. the sky out here is very good tonight."],
-	[244.0, ""]]
+	[219.0, "ah."],
+	[224.0, "so that's -- hm."],
+	[229.0, "...no. no, that part's mine. some things you get to keep just for being the one standing there. this is one of those."],
+	[238.0, "and down it goes. slow as a sunset. the dirt just... accepts it. grass folding over like a page."],
+	[247.0, "you'd never know. that's the point, i think. you were never supposed to know. i wasn't either. i just happened to be in the field."],
+	[256.0, "anyway. the sky out here is very good tonight."],
+	[263.0, ""]]
 
 static func eh_line(t: float) -> String:
 	var out := ""
