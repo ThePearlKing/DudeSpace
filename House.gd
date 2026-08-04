@@ -1501,6 +1501,11 @@ func connect_house(other) -> bool:
 	return true
 
 func _exit_tree() -> void:
+	# demolition severs every docking link so neighbours don't keep a
+	# phantom slot in their graph (a dead complex should split cleanly)
+	for other in get_tree().get_nodes_in_group("house"):
+		if other is House and other != self and is_instance_valid(other):
+			other.links.erase(slot)
 	if _iroot and is_instance_valid(_iroot):
 		_iroot.queue_free()
 	for prt in _out_ports + _in_ports:
