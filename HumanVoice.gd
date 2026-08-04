@@ -37,6 +37,10 @@ static func render(text: String, prof: Dictionary) -> AudioStreamWAV:
 	if segs.is_empty():
 		return null
 	var pitch0 := clampf(float(prof.get("base", 300.0)) * 0.55, 70.0, 280.0)
+	var tune := bool(prof.get("autotune", false))
+	if tune:
+		# AUTOTUNE: the base IS the note. no register squeeze, no drift.
+		pitch0 = clampf(float(prof.get("base", 300.0)), 70.0, 600.0)
 	var vary := float(prof.get("var", 0.4))
 	var wave := str(prof.get("wave", "sine"))
 	var rate := float(prof.get("rate", 1.0))
@@ -57,7 +61,7 @@ static func render(text: String, prof: Dictionary) -> AudioStreamWAV:
 			contour += (prog - 0.75) * 0.8 * clampf(vary * 2.5, 0.3, 1.0)
 		if sg["t"] == "sp":
 			word += 1
-		sg["pitch"] = pitch0 * contour \
+		sg["pitch"] = pitch0 if tune else pitch0 * contour \
 			* (1.0 + vary * 0.2 * sin(float(word) * 1.7 + float(idx) * 0.35))
 	# second pass: synth. voiced neighbours fuse into runs.
 	var buf := PackedFloat32Array()

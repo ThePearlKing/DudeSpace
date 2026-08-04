@@ -407,7 +407,8 @@ static func rick_song() -> AudioStreamWAV:
 				var sb: float = float(syl[2])
 				var lb: float = float(syl[3])
 				var wav0: AudioStreamWAV = HumanVoice.render(word,
-					{"base": hz, "var": 0.02, "wave": "sine", "rate": 1.5, "artic": 1.3})
+					{"base": hz, "var": 0.0, "wave": "sine", "rate": 1.5,
+					"artic": 1.3, "autotune": true})
 				var d0 := wav0.data
 				var n0 := d0.size() / 2
 				var start := int((bar_off * 4.0 + sb) * beat * SR)

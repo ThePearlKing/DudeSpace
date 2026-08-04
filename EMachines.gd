@@ -736,6 +736,8 @@ class NuclearReactor extends Machine:
 	var trip_t: float = 0.0       # turbine trip lamp timer
 	var _panel: Label3D           # the little front readout
 	var _panel_t: float = 0.0
+	var _fuel_meshes: Array = []  # the visible bundle, Cherenkov-lit
+	var _blades: Array = []       # control blades sinking between rods
 	var _fuel: float = 0.0        # seconds of burn left in the loaded rod
 
 	var _rhits: int = 0
@@ -851,17 +853,70 @@ class NuclearReactor extends Machine:
 		gmat.metallic = 0.35
 		glass.material_override = gmat
 		add_child(glass)
-		# the visible core: fuel bundle in the pool, seen through the glass
-		var core := BoxMesh.new()
-		core.size = Vector3(1.2, 1.1, 0.7)
-		_glow = part(core, Vector3(0, 1.15, box_size.z * 0.5 - 0.45), Color("#0a2a4a"), 0.2)
-		for bx in [-0.35, 0.0, 0.35]:
+		# the HOLLOW pool behind the glass: dark cavity walls, the actual
+		# fuel bundle standing in the water, control blades riding between
+		# the rods. What you see through the lead glass IS the core state.
+		var zc := box_size.z * 0.5 - 0.42
+		var cav := Color("#0a0e14")
+		var wb := BoxMesh.new()
+		wb.size = Vector3(1.5, 1.4, 0.05)
+		part(wb, Vector3(0, 1.2, zc - 0.4), cav, 0.02)
+		for sxw in [-0.76, 0.76]:
+			var sw := BoxMesh.new()
+			sw.size = Vector3(0.05, 1.4, 0.85)
+			part(sw, Vector3(sxw, 1.2, zc), cav, 0.02)
+		var fb := BoxMesh.new()
+		fb.size = Vector3(1.5, 0.05, 0.85)
+		part(fb, Vector3(0, 0.52, zc), cav, 0.02)
+		var tb := BoxMesh.new()
+		tb.size = Vector3(1.5, 0.05, 0.85)
+		part(tb, Vector3(0, 1.88, zc), cav, 0.02)
+		# the water: a translucent volume that glows Cherenkov blue
+		var wat := MeshInstance3D.new()
+		var wbm := BoxMesh.new()
+		wbm.size = Vector3(1.42, 1.3, 0.75)
+		wat.mesh = wbm
+		wat.position = Vector3(0, 1.2, zc)
+		var wmat := StandardMaterial3D.new()
+		wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.45)
+		wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		wmat.emission_enabled = true
+		wmat.emission = Color("#38c8ff")
+		wmat.emission_energy_multiplier = 0.2
+		wat.material_override = wmat
+		add_child(wat)
+		_glow = wat
+		# the bundle: five fuel rods, each with its own radiation glow
+		for bx in [-0.4, -0.2, 0.0, 0.2, 0.4]:
 			var brod := CylinderMesh.new()
-			brod.top_radius = 0.08
-			brod.bottom_radius = 0.08
-			brod.height = 1.0
-			part(brod, Vector3(bx, 1.15, box_size.z * 0.5 - 0.42), Color("#3a3f46"), 0.1)
-		# front status panel: the little numbers that matter
+			brod.top_radius = 0.05
+			brod.bottom_radius = 0.05
+			brod.height = 1.05
+			var frm := MeshInstance3D.new()
+			frm.mesh = brod
+			frm.position = Vector3(bx, 1.15, zc)
+			var fmat := StandardMaterial3D.new()
+			fmat.albedo_color = Color("#464b52")
+			fmat.emission_enabled = true
+			fmat.emission = Color("#38c8ff")
+			fmat.emission_energy_multiplier = 0.1
+			frm.material_override = fmat
+			add_child(frm)
+			_fuel_meshes.append(frm)
+		# four control blades between the rods: they SINK as you insert
+		for bx2 in [-0.3, -0.1, 0.1, 0.3]:
+			var bl := MeshInstance3D.new()
+			var blm := BoxMesh.new()
+			blm.size = Vector3(0.05, 1.05, 0.4)
+			bl.mesh = blm
+			bl.position = Vector3(bx2, 1.15, zc)
+			bl.material_override = Destructible.make_material(Color("#22262c"), 0.05)
+			add_child(bl)
+			_blades.append(bl)
+		# front status panel: a dark plate with the numbers that matter
+		var pbk := BoxMesh.new()
+		pbk.size = Vector3(1.5, 0.62, 0.04)
+		part(pbk, Vector3(0, 0.45, box_size.z * 0.5 + 0.02), Color("#10141a"), 0.05)
 		_panel = Label3D.new()
 		_panel.font_size = 26
 		_panel.pixel_size = 0.0038
@@ -945,6 +1000,14 @@ class NuclearReactor extends Machine:
 		if _glow and _glow.material_override:
 			_glow.material_override.emission_energy_multiplier = 0.2 + power * 3.2 \
 				+ (temp / 100.0) * 2.0
+		# fuel rods glow with the reaction; blades ride the rod servos
+		for fm in _fuel_meshes:
+			if fm.material_override:
+				fm.material_override.emission_energy_multiplier = \
+					0.08 + power * 4.5 + (temp / 100.0) * 1.5
+		for bl in _blades:
+			bl.position.y = lerpf(bl.position.y, 1.15 + (1.0 - rods) * 0.85,
+				delta * 5.0)
 		if _gauge and _gauge.material_override:
 			_gauge.material_override.emission = Color("#2bff5a").lerp(Color("#ff2b1a"),
 				temp / 100.0)
@@ -952,8 +1015,10 @@ class NuclearReactor extends Machine:
 		_panel_t -= delta
 		if _panel != null and _panel_t <= 0.0:
 			_panel_t = 0.3
-			_panel.text = "PWR %3.0f%%  T %3.0f°C\nP %3.0f bar  Xe %2.0f%%\n%s" % [
-				power * 100.0, temp * 10.0, press, xenon * 100.0,
+			_panel.text = "PWR %3.0f%%  T %3.0f°C  P %3.0f bar\nRODS %3.0f%%  Xe %2.0f%%  COOL %3.0f%%\nFUEL %3.0f%%  FLOW %s  %s" % [
+				power * 100.0, temp * 10.0, press,
+				rods * 100.0, xenon * 100.0, coolant,
+				_fuel / FUEL_SECS * 100.0, ["OFF", "HALF", "FULL"][flow],
 				"SCRAM" if _scram else ["SHUTDOWN", "STARTUP", "RUN"][mode]]
 		# hot core clicks at you. that clicking is a WORD, and the word is RUN
 		if temp > 70.0:
