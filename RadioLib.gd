@@ -630,29 +630,53 @@ static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
 					var tri2 := 2.0 * absf(2.0 * fmod(bf2 * t3, 1.0) - 1.0) - 1.0
 					var env3 := minf(1.0, float(i) / (SR * 0.003)) \
 						* (1.0 - float(i) / (s16 * 0.9) * 0.5)
-					buf[bs2 + i] += tri2 * 0.26 * env3
-			# PART 2 drums: syncopated kicks, backbeat snares with a ghost,
-			# 16th hats with velocity, an open hat pushing the turnaround
-			for kn in [0, 3, 6, 10, 14]:
+					buf[bs2 + i] += tri2 * 0.34 * env3
+			# PART 2 drums: a real electro-funk kit. Two alternating bar
+			# patterns, swung hats with accents and an open hat, ghost
+			# snares, and every fourth bar ends in a rising tom-snare fill.
+			var p2i := bar - 8
+			var kick_pat: Array = [0, 7, 10] if p2i % 2 == 0 else [0, 5, 10, 13]
+			var fill := p2i % 4 == 3
+			for kn in kick_pat:
 				var ks: int = b0 + int(kn) * s16
 				for i in mini(int(0.09 * SR), total - ks):
 					var tk := float(i) / SR
 					buf[ks + i] += sin(TAU * (85.0 - tk * 300.0) * tk) \
-						* exp(-tk * 32.0) * 0.5
-			for sn in [4, 12, 15]:
+						* exp(-tk * 30.0) * 0.52
+			var snare_pat: Array = [4, 12] if p2i % 2 == 0 else [4, 9, 12]
+			for sn in snare_pat:
 				var ss: int = b0 + int(sn) * s16
-				var samp := 0.3 if int(sn) != 15 else 0.14
+				var samp := 0.3 if int(sn) != 9 else 0.1   # 9 is a ghost
 				for i in mini(int(0.08 * SR), total - ss):
 					buf[ss + i] += ((randf() * 2.0 - 1.0) * 0.7 \
 						+ sin(TAU * 190.0 * float(i) / SR) * 0.3) \
 						* exp(-float(i) / (SR * 0.02)) * samp
 			for n4 in 16:
-				var hs2 := b0 + n4 * s16
-				var hamp := 0.08 if n4 % 4 == 0 else (0.05 if n4 % 2 == 0 else 0.028)
-				var hlen := 0.05 if n4 == 7 else 0.012   # the open hat
+				if fill and n4 >= 12:
+					continue   # the fill owns the last quarter
+				# SWING: odd 16ths land a third late
+				var hs2 := b0 + n4 * s16 + (int(s16 * 0.33) if n4 % 2 == 1 else 0)
+				var hamp := 0.085 if n4 % 4 == 0 else (0.05 if n4 % 2 == 0 else 0.03)
+				var hlen := 0.055 if (n4 == 7 and p2i % 2 == 1) else 0.012
 				for i in mini(int(hlen * SR), total - hs2):
 					buf[hs2 + i] += (randf() * 2.0 - 1.0) * hamp \
 						* (1.0 - float(i) / (hlen * SR))
+			if fill:
+				# rising fill: tom, tom, snare, snare -- each hotter
+				var ffreqs: Array = [140.0, 180.0, 0.0, 0.0]
+				for fslot in 4:
+					var fs: int = b0 + (12 + fslot) * s16
+					var famp := 0.22 + 0.07 * float(fslot)
+					var ffreq := float(ffreqs[fslot])
+					for i in mini(int(0.07 * SR), total - fs):
+						var tf := float(i) / SR
+						if ffreq > 0.0:
+							buf[fs + i] += sin(TAU * (ffreq - tf * 200.0) * tf) \
+								* exp(-tf * 22.0) * famp * 1.6
+						else:
+							buf[fs + i] += ((randf() * 2.0 - 1.0) * 0.75 \
+								+ sin(TAU * 200.0 * tf) * 0.25) \
+								* exp(-tf * 42.0) * famp
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:

@@ -894,11 +894,23 @@ func _build_ports() -> void:
 			w = 4.0
 		if kind == "box":
 			w = 3.4
+		if kind == "moonbase":
+			w = 7.0
 		outp.global_transform = global_transform
-		outp.global_position = global_position \
-			+ global_transform.basis.x * (side * (w * 0.5 + 0.08)) \
-			+ global_transform.basis.y * (0.7 + float(i % 3) * 0.85)
-		outp.rotate_object_local(Vector3.UP, PI * 0.5 * side)
+		if kind == "moonbase":
+			# the big orange dome (r = w*0.62) swallowed the old wall
+			# positions -- mount the trios on the FRONT of each little
+			# metal dome instead, stacked and reachable
+			outp.global_position = global_position \
+				+ global_transform.basis.x * (side * w * 0.55) \
+				+ global_transform.basis.z * (0.34 * w + 0.3) \
+				+ global_transform.basis.y * (0.7 + float(i % 3) * 0.85)
+			outp.rotate_object_local(Vector3.UP, PI)
+		else:
+			outp.global_position = global_position \
+				+ global_transform.basis.x * (side * (w * 0.5 + 0.08)) \
+				+ global_transform.basis.y * (0.7 + float(i % 3) * 0.85)
+			outp.rotate_object_local(Vector3.UP, PI * 0.5 * side)
 		_port_number(outp, i % 3 + 1)
 		_out_ports.append(outp)
 		var inp := Port.new()
