@@ -983,9 +983,20 @@ const AP_FOURTH := [
 		"we see the beam. it comes from the little blue-adjacent rock.",
 		"wave at the sky, everyone. professionally."]]
 
+const AP_HUMAN_DUMB := [
+	"a human will walk PAST a ladder to fall off a cliff.",
+	"they invented the meeting. then the meeting about meetings.",
+	"a human once traded a working rocket for a hat. we watched.",
+	"they store their food NEXT to the machine that destroys food.",
+	"one of them punched a mountain today. the mountain is fine.",
+	"they sleep through a third of their own lives. voluntarily.",
+	"a human said 'you too' to a sunset. we have it on tape."]
+
 # anti-repeat memory: recently used lines and topics stay off the air
 static var _ax_recent: Array = []
 static var _ax_topics: Array = []
+# what the last exchange was ABOUT -- the studio TV reads this
+static var last_alien_meta := {"topic": -1, "planet": ""}
 
 static func _ax_fresh(arr: Array) -> String:
 	for attempt in 4:
@@ -1004,14 +1015,15 @@ static func _ax_fresh(arr: Array) -> String:
 static func alien_exchange() -> Array:
 	var p: String = AP[randi() % AP.size()]
 	var p2: String = AP[randi() % AP.size()]
-	var topic := randi() % 9
+	var topic := randi() % 10
 	for attempt in 6:
 		if not _ax_topics.has(topic):
 			break
-		topic = randi() % 9
+		topic = randi() % 10
 	_ax_topics.append(topic)
 	if _ax_topics.size() > 3:
 		_ax_topics.pop_front()
+	last_alien_meta = {"topic": topic, "planet": p}
 	var out: Array = []
 	match topic:
 		0:
@@ -1052,10 +1064,16 @@ static func alien_exchange() -> Array:
 					["annexed", "out-rendered", "apologized to",
 						"traded shadows with", "declared war on the concept of"][randi() % 5],
 					p2 if randi() % 2 == 0 else "the number four"]]]
-		_:
+		8:
 			# the FOURTH WALL segment: they know. they've always known.
 			var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
 			out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
+		_:
+			# HUMANS: dumb, inefficient, endlessly watchable
+			out = [[0, "let's talk about the humans again."],
+				[3, _ax_fresh(AP_HUMAN_DUMB)],
+				[1, _ax_fresh(AP_HUMAN_DUMB)],
+				[0, "tragic. beautiful. more after these vertices."]]
 	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
 	if randi() % 12 == 0:
 		out.append([2, _ax_fresh(AP_FOIL)])

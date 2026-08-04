@@ -84,6 +84,7 @@ func _ready() -> void:
 
 	if not Game.tutorial_session:
 		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
+	add_child(WthStudio.new())       # the WTH station: hole, mast, studio
 
 	_hud = HUD.new()
 	add_child(_hud)
