@@ -925,6 +925,11 @@ const ALIEN_HOSTS: Array = [
 	{"base": 150.0, "var": 0.2, "wave": "saw", "rate": 1.1, "artic": 1.7}]
 
 const AP := ["Contrast", "Pixel", "Wireframe", "Blind", "Wobble"]
+# the WIDER universe: out-system subjects the desk also covers --
+# including the humans themselves as a recurring beat
+const AX_FAR := ["Earth", "Jupiter", "Venus", "Mars", "the Moon",
+	"Pi", "Euclid", "Crystalia", "Sanus", "Varnisol", "Xero", "Home",
+	"TIN 618", "the humans"]
 const AP_STATES := ["rotating backwards", "hoarding vertices",
 	"refusing to render", "dimming on purpose", "growing a second pole",
 	"leaking edges into the void", "voting to become concave",
@@ -1095,7 +1100,20 @@ const AX_DOMAINS := {
 		"event": ["was discovered by accident", "was un-discovered by committee",
 			"replicated itself out of spite", "is %d percent confirmed"],
 		"react": ["peer review is hiding.", "the lab denies having walls.",
-			"funding has been re-imagined."]}}
+			"funding has been re-imagined."]},
+	"employment": {"thing": ["the intern program", "the night shift on the dark side",
+			"middle management", "the union of unpaired vertices"],
+		"event": ["went on strike for %d minutes", "was automated, then un-automated",
+			"got a corner office. an actual corner.", "unionized with the weather"],
+		"react": ["morale is measurable and we measured it.",
+			"the suggestion box achieved escape velocity.",
+			"benefits now include a horizon."]},
+	"art": {"thing": ["an invisible mural", "a statue of the concept of waiting",
+			"minimalist skybox art", "a fountain that runs upward"],
+		"event": ["sold for %d shadows", "was critiqued into another dimension",
+			"is on loan from nobody", "vandalized itself, artistically"],
+		"react": ["the critics wept in wireframe.", "attendance is mandatory and low.",
+			"the artist remains a rumor."]}}
 const AX_TWIST := ["and now there's talk of FRAUD.",
 	"authorities suspect it was rigged from the start.",
 	"a shortage followed within the hour.",
@@ -1109,7 +1127,7 @@ static var _ax_doms: Array = []
 
 ## Subject -> domain -> optional twist -> assembled segment. No two
 ## airings share a domain back-to-back, and every sentence is composed.
-static func _ax_story(p: String, p2: String) -> Array:
+static func _ax_story(p: String, p2: String, foreign: bool = false) -> Array:
 	var keys: Array = AX_DOMAINS.keys()
 	var dom := str(keys[randi() % keys.size()])
 	for attempt in 5:
@@ -1129,6 +1147,8 @@ static func _ax_story(p: String, p2: String) -> Array:
 		ev = ev % (1 + randi() % 98)
 	var out: Array = [[0, "%s news from %s: %s %s." % [dom, p, thing, ev]],
 		[3, _ax_fresh(d["react"])]]
+	if foreign and randi() % 2 == 0:
+		out.insert(0, [0, "from the OUT-SYSTEM desk:"])
 	if randi() % 10 < 6:
 		var tw := _ax_fresh(AX_TWIST)
 		if tw.find("%s") >= 0:
@@ -1160,8 +1180,16 @@ static func _ax_fresh(arr: Array) -> String:
 ## and RARELY the hosts notice they're being decoded -- or someone just
 ## quietly announces the foil cone. Unscheduled. Heartfelt.
 static func alien_exchange() -> Array:
-	var p: String = AP[randi() % AP.size()]
-	var p2: String = AP[randi() % AP.size()]
+	# subjects: mostly the local shader system, but the desk follows the
+	# whole universe -- Earth, Jupiter, the humans, even the hole
+	var pool: Array = AP if randi() % 10 < 6 else AX_FAR
+	var p: String = pool[randi() % pool.size()]
+	var pool2: Array = AP + AX_FAR
+	var p2: String = pool2[randi() % pool2.size()]
+	for attempt in 4:
+		if p2 != p:
+			break
+		p2 = pool2[randi() % pool2.size()]
 	var topic := randi() % 10
 	for attempt in 6:
 		if not _ax_topics.has(topic):
@@ -1174,7 +1202,7 @@ static func alien_exchange() -> Array:
 	var out: Array = []
 	match topic:
 		0:
-			out = _ax_story(p, p2)
+			out = _ax_story(p, p2, not AP.has(p))
 		1:
 			out = [[0, "caller from %s, you're on the air." % p],
 				[2, _ax_fresh(AP_QUESTIONS) % p2],
@@ -1191,9 +1219,9 @@ static func alien_exchange() -> Array:
 				[1, "%s: %s overnight. %s: %s by dawn. the sun: orange again. nobody asked it to be." % [
 					p, _ax_fresh(AP_PHENOM), p2, _ax_fresh(AP_PHENOM)]]]
 		4:
-			out = _ax_story(p, p2)
+			out = _ax_story(p, p2, not AP.has(p))
 		5:
-			out = _ax_story(p, p2)
+			out = _ax_story(p, p2, not AP.has(p))
 		6:
 			out = [[0, "a word from our sponsor."],
 				[1, "%s. %s" % [_ax_fresh(AP_PRODUCTS).capitalize(),

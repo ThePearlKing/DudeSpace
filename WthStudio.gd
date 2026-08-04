@@ -444,7 +444,7 @@ func _apply_topic(meta: Dictionary) -> void:
 	var topic := int(meta.get("topic", -1))
 	_tv_planet = str(meta.get("planet", ""))
 	var p2 := str(meta.get("planet2", ""))
-	if topic == 9:
+	if topic == 9 or _tv_planet == "the humans":
 		_tv_mode = "humans"
 		_human_target = null
 	elif topic in [1, 3] and _tv_planet != "" and p2 != "" and p2 != _tv_planet:
