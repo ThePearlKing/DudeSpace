@@ -82,67 +82,173 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	pl.play()
 	return pl
 
-## Text -> rough phoneme segments. Digraphs first (th/sh/ch/ee/oo/ng),
-## then letter classes. English spelling is lies, but close enough.
-## Vowel formants deliberately EXAGGERATED so ah/ee/oh read clearly.
+## Text -> rough phoneme segments, with actual English spelling rules:
+## Y after a consonant says EE (society, happy) but glides before a
+## vowel (yes, you). Final silent e says nothing (like, made) except in
+## tiny words where it says EE (he, we). Soft c before e/i/y says S.
+## ai/ay, ou/ow, igh become real diphthongs -- two vowels glided.
+## Doubled consonants collapse. tion says shun. Each word leans on its
+## first vowel. English spelling is lies, but these are the big lies.
+static func _is_letter(c: String) -> bool:
+	return c >= "a" and c <= "z"
+
+## The magic-e rule: vowel + one consonant + word-final silent e makes
+## the vowel say its NAME. made=AY, here=EE, like=EYE, alone=OH.
+static func _magic_e(t: String, i: int) -> bool:
+	if i + 2 >= t.length():
+		return false
+	var cons := t.substr(i + 1, 1)
+	if not _is_letter(cons) or cons in ["a", "e", "i", "o", "u"]:
+		return false
+	if t.substr(i + 2, 1) != "e":
+		return false
+	return i + 3 >= t.length() or not _is_letter(t.substr(i + 3, 1))
+
 static func _parse(t: String) -> Array:
 	var out: Array = []
 	var i := 0
-	while i < t.length() and out.size() < 90:
-		var two := t.substr(i, 2)
+	var wlen := 0        # letters so far in the current word
+	var stressed := false   # has this word leaned on a vowel yet
+	while i < t.length() and out.size() < 88:
 		var c := t.substr(i, 1)
-		if two == "ee" or two == "ea":
-			out.append({"t": "v", "f": [270.0, 2400.0], "d": 0.1})
-			i += 2
-			continue
-		if two == "oo":
-			out.append({"t": "v", "f": [300.0, 750.0], "d": 0.1})
-			i += 2
-			continue
-		if two == "th":
-			out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
-			i += 2
-			continue
-		if two == "sh" or two == "ch":
-			out.append({"t": "f", "b": true, "vo": false, "d": 0.08})
-			i += 2
-			continue
-		if two == "ng":
-			out.append({"t": "n", "d": 0.07})
-			i += 2
-			continue
-		i += 1
-		match c:
-			"a":
-				out.append({"t": "v", "f": [800.0, 1100.0], "d": 0.09})
-			"e":
-				out.append({"t": "v", "f": [580.0, 1900.0], "d": 0.085})   # EH, as in bed
-			"i":
-				out.append({"t": "v", "f": [280.0, 2350.0], "d": 0.085})
-			"o":
-				out.append({"t": "v", "f": [450.0, 750.0], "d": 0.09})
-			"u":
-				out.append({"t": "v", "f": [320.0, 850.0], "d": 0.085})
-			"l", "r", "w", "y":
-				out.append({"t": "v", "f": [420.0, 1350.0], "d": 0.055})
-			"f", "h":
-				out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
-			"v":
-				out.append({"t": "f", "b": false, "vo": true, "d": 0.055})
-			"s", "x":
-				out.append({"t": "f", "b": true, "vo": false, "d": 0.07})
-			"z", "j":
-				out.append({"t": "f", "b": true, "vo": true, "d": 0.06})
-			"c", "k", "q", "t", "p":
-				out.append({"t": "p", "vo": false})
-			"b", "d", "g":
-				out.append({"t": "p", "vo": true})
-			"m", "n":
-				out.append({"t": "n", "d": 0.065})
-			" ":
+		if not _is_letter(c):
+			wlen = 0
+			stressed = false
+			if c == " ":
 				out.append({"t": "sp", "d": 0.045})
-			".", ",", "?", "!":
+			elif c == "." or c == "," or c == "?" or c == "!":
 				out.append({"t": "sp", "d": 0.1})
+			i += 1
+			continue
+		var nextc := t.substr(i + 1, 1) if i + 1 < t.length() else ""
+		# doubled consonants say themselves once
+		if c == nextc and not (c in ["a", "e", "i", "o", "u"]):
+			i += 1
+			wlen += 1
+			continue
+		var two := t.substr(i, 2)
+		var vf: Array = []      # queued vowel sound(s): [f1, f2, dur]
+		var post: Array = []    # segments that follow the vowel (tion's n)
+		var adv := 1
+		if t.substr(i, 4) == "tion":
+			out.append({"t": "f", "b": true, "vo": false, "d": 0.08})
+			vf = [[500.0, 1200.0, 0.05]]
+			post = [{"t": "n", "d": 0.065}]
+			adv = 4
+		elif t.substr(i, 3) == "igh":   # night, right: the EYE diphthong
+			vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.06]]
+			adv = 3
+		elif two == "ee" or two == "ea":
+			vf = [[270.0, 2400.0, 0.1]]
+			adv = 2
+		elif two == "oo":
+			vf = [[300.0, 750.0, 0.1]]
+			adv = 2
+		elif two == "ai" or two == "ay":   # day: EH gliding into EE
+			vf = [[580.0, 1900.0, 0.055], [270.0, 2400.0, 0.06]]
+			adv = 2
+		elif two == "ou" or two == "ow":   # out, now: AH gliding into OO
+			vf = [[800.0, 1100.0, 0.055], [300.0, 750.0, 0.06]]
+			adv = 2
+		elif two == "oa":   # boat
+			vf = [[450.0, 750.0, 0.1]]
+			adv = 2
+		elif two == "th":
+			out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
+			adv = 2
+		elif two == "sh" or two == "ch":
+			out.append({"t": "f", "b": true, "vo": false, "d": 0.08})
+			adv = 2
+		elif two == "ng":
+			out.append({"t": "n", "d": 0.07})
+			adv = 2
+		elif two == "ck":
+			out.append({"t": "p", "vo": false})
+			adv = 2
+		elif two == "ph":   # phone: f
+			out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
+			adv = 2
+		elif two == "wh":   # what: w
+			vf = [[420.0, 1350.0, 0.055]]
+			adv = 2
+		elif two == "qu":   # quick: k + w
+			out.append({"t": "p", "vo": false})
+			vf = [[420.0, 1350.0, 0.04]]
+			adv = 2
+		else:
+			var word_end := nextc == "" or not _is_letter(nextc)
+			match c:
+				"a":
+					if _magic_e(t, i):   # made, place: AY
+						vf = [[580.0, 1900.0, 0.055], [270.0, 2400.0, 0.065]]
+					else:
+						vf = [[800.0, 1100.0, 0.09]]
+				"e":
+					# final silent e says nothing (like, made)...
+					if _magic_e(t, i):   # here, these: EE
+						vf = [[270.0, 2400.0, 0.1]]
+					elif word_end and wlen >= 3:
+						pass
+					elif word_end:
+						vf = [[270.0, 2400.0, 0.08]]   # ...but he/we say EE
+					else:
+						vf = [[580.0, 1900.0, 0.085]]  # EH, as in bed
+				"i":
+					if wlen == 0 and word_end:   # the word I (and I'm): EYE
+						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
+					elif _magic_e(t, i):         # like, time: EYE
+						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]
+					else:
+						vf = [[280.0, 2350.0, 0.085]]
+				"o":
+					if _magic_e(t, i):   # alone: OH, held longer
+						vf = [[450.0, 750.0, 0.11]]
+					else:
+						vf = [[450.0, 750.0, 0.09]]
+				"u":
+					if _magic_e(t, i):   # tune: OO
+						vf = [[300.0, 750.0, 0.1]]
+					else:
+						vf = [[320.0, 850.0, 0.085]]
+				"y":
+					# society, happy: y after a consonant (or ending a
+					# word) is a vowel and says EE. yes/you: a glide.
+					if word_end or not (nextc in ["a", "e", "i", "o", "u"]):
+						vf = [[270.0, 2400.0, 0.095]]   # long enough to HEAR
+					else:
+						vf = [[420.0, 1350.0, 0.055]]
+				"l", "r", "w":
+					vf = [[420.0, 1350.0, 0.055]]
+				"c":
+					# soft c: society, city, cycle -> S. otherwise K.
+					if nextc in ["e", "i", "y"]:
+						out.append({"t": "f", "b": true, "vo": false, "d": 0.07})
+					else:
+						out.append({"t": "p", "vo": false})
+				"f", "h":
+					out.append({"t": "f", "b": false, "vo": false, "d": 0.06})
+				"v":
+					out.append({"t": "f", "b": false, "vo": true, "d": 0.055})
+				"s", "x":
+					out.append({"t": "f", "b": true, "vo": false, "d": 0.07})
+				"z", "j":
+					out.append({"t": "f", "b": true, "vo": true, "d": 0.06})
+				"k", "q", "t", "p":
+					out.append({"t": "p", "vo": false})
+				"b", "d", "g":
+					out.append({"t": "p", "vo": true})
+				"m", "n":
+					out.append({"t": "n", "d": 0.065})
+		if not vf.is_empty():
+			if not stressed:
+				vf[0][2] *= 1.3   # each word leans on its first vowel
+				stressed = true
+			for v in vf:
+				out.append({"t": "v", "f": [v[0], v[1]], "d": v[2]})
+		for pseg in post:
+			out.append(pseg)
+		wlen += adv
+		i += adv
 	return out
 
 ## One glottal cycle with the harmonics weighted by the vocal tract:
