@@ -245,19 +245,33 @@ func _build_station() -> void:
 			truss.position = Vector3(tx, -1.9, tz)
 			truss.material_override = dark
 			add_child(truss)
-	# guard rails, one node per side -- adjacent stations DROP the shared
-	# rails so decks merge into one seamless floor
-	for espec in [["z+", Vector3(26, 0.7, 0.2), Vector3(0, 0.95, 12.9)],
-			["z-", Vector3(26, 0.7, 0.2), Vector3(0, 0.95, -12.9)],
-			["x+", Vector3(0.2, 0.7, 26), Vector3(12.9, 0.95, 0)],
-			["x-", Vector3(0.2, 0.7, 26), Vector3(-12.9, 0.95, 0)]]:
-		var rail := MeshInstance3D.new()
-		var rm := BoxMesh.new()
-		rm.size = espec[1]
-		rail.mesh = rm
-		rail.position = espec[2]
-		rail.material_override = dark
+	# guard rails: ACTUAL railings -- posts every couple meters, a top
+	# bar at hip height and a mid bar. One container per side so docked
+	# neighbours can drop the shared edge and merge floors seamlessly.
+	for espec in [["z+", Vector3(0, 0, 12.9), 0.0],
+			["z-", Vector3(0, 0, -12.9), 0.0],
+			["x+", Vector3(12.9, 0, 0), 90.0],
+			["x-", Vector3(-12.9, 0, 0), 90.0]]:
+		var rail := Node3D.new()
+		rail.position = espec[1]
+		rail.rotation_degrees.y = float(espec[2])
 		add_child(rail)
+		for barspec in [[1.15, 0.09], [0.68, 0.06]]:
+			var bar := MeshInstance3D.new()
+			var bm3 := BoxMesh.new()
+			bm3.size = Vector3(26, float(barspec[1]), float(barspec[1]))
+			bar.mesh = bm3
+			bar.position = Vector3(0, float(barspec[0]), 0)
+			bar.material_override = dark
+			rail.add_child(bar)
+		for px3 in range(-5, 6):
+			var post := MeshInstance3D.new()
+			var pm3 := BoxMesh.new()
+			pm3.size = Vector3(0.08, 1.15, 0.08)
+			post.mesh = pm3
+			post.position = Vector3(float(px3) * 2.6, 0.58, 0)
+			post.material_override = dark
+			rail.add_child(post)
 		_rails[espec[0]] = rail
 	call_deferred("_merge_rails")
 	for bx in [-12.4, 12.4]:
