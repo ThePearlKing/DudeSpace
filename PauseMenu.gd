@@ -171,6 +171,13 @@ func _btn(text: String, cb: Callable) -> Button:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		# placement hologram up? Esc cancels the construction, not the game
+		var pl = get_tree().get_first_node_in_group("player")
+		if pl != null and "_ghost" in pl and pl._ghost != null:
+			pl._cancel_ghost()
+			Sfx.play("click", -18.0)
+			get_viewport().set_input_as_handled()
+			return
 		if Game.dead:
 			return
 		if _creator:
