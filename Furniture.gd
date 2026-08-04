@@ -127,13 +127,30 @@ func _snap_wall() -> void:
 	if kind != "doorframe" or not is_inside_tree() \
 			or bool(get_meta("linked", false)):
 		return
+	var outv := Vector3.ZERO
 	var hh = House.house_at(global_position)
-	if hh == null:
-		return
-	var rel: Vector3 = global_position - hh.room_center()
-	var outv := Vector3(signf(rel.x), 0, 0) if absf(rel.x) > absf(rel.z) \
-		else Vector3(0, 0, signf(rel.z))
-	global_transform.basis = Basis(Vector3.UP, atan2(-outv.x, -outv.z))
+	if hh != null:
+		var rel: Vector3 = global_position - hh.room_center()
+		outv = Vector3(signf(rel.x), 0, 0) if absf(rel.x) > absf(rel.z) \
+			else Vector3(0, 0, signf(rel.z))
+	else:
+		# no owning room found (hallways, odd spots): RAYCAST for the
+		# nearest wall and face it -- a frame is never allowed sideways
+		var space := get_world_3d().direct_space_state
+		var org := global_position + Vector3(0, 1.3, 0)
+		var best_d := 6.0
+		for dirv in [Vector3(1, 0, 0), Vector3(-1, 0, 0),
+				Vector3(0, 0, 1), Vector3(0, 0, -1)]:
+			var q := PhysicsRayQueryParameters3D.create(org, org + dirv * 6.0)
+			q.exclude = [get_rid()]
+			var hit := space.intersect_ray(q)
+			if hit:
+				var d: float = (hit.position - org).length()
+				if d < best_d:
+					best_d = d
+					outv = dirv
+	if outv != Vector3.ZERO:
+		global_transform.basis = Basis(Vector3.UP, atan2(-outv.x, -outv.z))
 
 func _m(size: Vector3, pos: Vector3, mat: Material) -> void:
 	var mi := MeshInstance3D.new()
