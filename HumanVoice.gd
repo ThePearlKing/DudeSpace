@@ -22,6 +22,8 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	var wave := str(prof.get("wave", "sine"))
 	var rate := float(prof.get("rate", 1.0))
 	var qmark := text.ends_with("?")
+	if wave == "saw":
+		pitch0 *= 0.78   # the grump register: lower than it needs to be
 	# first pass: give every segment its pitch (the sentence melody)
 	# and final duration
 	var total := segs.size()
@@ -271,6 +273,8 @@ static func _table(f1: float, f2: float, pitch: float, wave: String,
 			src *= 0.15   # hollow odd-harmonic nerd timbre
 		elif wave == "sine":
 			src = 1.0 if k == 1 else 1.0 / float(k * k)   # soft and round
+		elif wave == "saw":
+			src *= exp(-fk / 2200.0)   # dark chest voice: highs eaten by scowl
 		var amp := src * (0.06 \
 			+ 1.0 * exp(-pow((fk - f1) / 130.0, 2.0)) \
 			+ 0.95 * exp(-pow((fk - f2) / 180.0, 2.0)) \
@@ -325,6 +329,8 @@ static func _voiced_run(buf: PackedFloat32Array, run: Array, wave: String) -> vo
 				s = s * (1.0 - m) + nxt[idx % pn] * m
 			if wave == "buzz":   # wing-flutter tremolo
 				s *= 0.65 + 0.35 * sin(TAU * 26.0 * float(pos) / SR)
+			elif wave == "saw":  # the growl: low vocal-fry flutter
+				s *= 0.76 + 0.24 * sin(TAU * 52.0 * float(pos) / SR)
 			buf.append(s)
 			pos += 1
 	# envelope over the WHOLE run -- letters inside it stay joined
