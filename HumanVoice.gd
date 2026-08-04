@@ -114,11 +114,13 @@ static func _parse(t: String) -> Array:
 	var out: Array = []
 	var i := 0
 	var wlen := 0        # letters so far in the current word
+	var wvowels := 0     # vowel sounds emitted in the current word
 	var stressed := false   # has this word leaned on a vowel yet
 	while i < t.length() and out.size() < 88:
 		var c := t.substr(i, 1)
 		if not _is_letter(c):
 			wlen = 0
+			wvowels = 0
 			stressed = false
 			if c == " ":
 				out.append({"t": "sp", "d": 0.045})
@@ -136,7 +138,12 @@ static func _parse(t: String) -> Array:
 		var vf: Array = []      # queued vowel sound(s): [f1, f2, dur]
 		var post: Array = []    # segments that follow the vowel (tion's n)
 		var adv := 1
-		if t.substr(i, 4) == "tion":
+		if wlen == 0 and t.substr(i, 3) == "eye" \
+				and not _is_letter(t.substr(i + 3, 1) if i + 3 < t.length() else ""):
+			# the word "eye". it had it coming.
+			vf = [[800.0, 1100.0, 0.065], [270.0, 2400.0, 0.075]]
+			adv = 3
+		elif t.substr(i, 4) == "tion":
 			out.append({"t": "f", "b": true, "vo": false, "d": 0.08})
 			vf = [[500.0, 1200.0, 0.05]]
 			post = [{"t": "n", "d": 0.065}]
@@ -158,6 +165,9 @@ static func _parse(t: String) -> Array:
 			adv = 2
 		elif two == "oa":   # boat
 			vf = [[450.0, 750.0, 0.1]]
+			adv = 2
+		elif two == "uy":   # buy, guy: EYE
+			vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
 			adv = 2
 		elif two == "ie":
 			# die, pie, flies: EYE at the end of a word (s allowed).
@@ -219,8 +229,9 @@ static func _parse(t: String) -> Array:
 						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
 					elif _magic_e(t, i):         # like, time: EYE
 						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]
-					elif t.substr(i + 1, 2) == "nd" or t.substr(i + 1, 2) == "ld":
-						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]   # find, wild
+					elif t.substr(i + 1, 2) == "nd" or t.substr(i + 1, 2) == "ld" \
+							or t.substr(i + 1, 2) == "gn":
+						vf = [[800.0, 1100.0, 0.055], [270.0, 2400.0, 0.065]]   # find, wild, sign
 					else:
 						# IH as in bit: its own vowel, NOT a copy of EE
 						vf = [[400.0, 1900.0, 0.08]]
@@ -235,9 +246,17 @@ static func _parse(t: String) -> Array:
 					else:
 						vf = [[320.0, 850.0, 0.085]]
 				"y":
-					# society, happy: y after a consonant (or ending a
-					# word) is a vowel and says EE. yes/you: a glide.
-					if word_end or not (nextc in ["a", "e", "i", "o", "u"]):
+					# bye/dye: y+final e says EYE. my/why/try: a final y
+					# carrying the word's ONLY vowel says EYE. society,
+					# happy: y after more vowels says EE. yes/you: glide.
+					var ye_end := nextc == "e" and not _is_letter(
+						t.substr(i + 2, 1) if i + 2 < t.length() else "")
+					if ye_end:
+						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
+						adv = 2
+					elif word_end and wvowels == 0:
+						vf = [[800.0, 1100.0, 0.06], [270.0, 2400.0, 0.07]]
+					elif word_end or not (nextc in ["a", "e", "i", "o", "u"]):
 						vf = [[270.0, 2400.0, 0.095]]   # long enough to HEAR
 					else:
 						vf = [[420.0, 1350.0, 0.055]]
@@ -269,6 +288,7 @@ static func _parse(t: String) -> Array:
 				stressed = true
 			for v in vf:
 				out.append({"t": "v", "f": [v[0], v[1]], "d": v[2]})
+			wvowels += vf.size()
 		for pseg in post:
 			out.append(pseg)
 		wlen += adv
