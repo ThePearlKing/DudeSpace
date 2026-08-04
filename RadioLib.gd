@@ -980,15 +980,15 @@ const AP_FOIL := ["i am wearing the foil cone until the listening stops.",
 # fourth wall, ROOM edition: someone is physically standing in the
 # studio -- these only air for the live in-person show, never the dish
 const AP_FOURTH_ROOM := [
-	["there is a biped in the studio right now.",
-		"we see you. the sofas are for you.",
-		"statistically, you walked here on purpose."],
-	["do not adjust your eyes. it is really standing there.",
-		"hello, room guest. blink twice for geometry.",
-		"it came down the hole. they always come down the hole."],
-	["security says the visitor is unarmed. mostly.",
-		"leave the table alone. it is load-bearing. emotionally.",
-		"wave at it, everyone. professionally."]]
+	["the dude is in the studio right now.",
+		"we see you, dude. the sofas are for you.",
+		"statistically, the dude walked here on purpose."],
+	["do not adjust your eyes. the dude is really standing there.",
+		"hello, dude. blink twice for geometry.",
+		"it came down the hole. the dude always comes down the hole."],
+	["security says the dude is unarmed. mostly.",
+		"dude, leave the table alone. it is load-bearing. emotionally.",
+		"wave at the dude, everyone. professionally."]]
 
 const AP_FOURTH := [
 	["instruments say someone OUTSIDE the system is decoding this signal. again.",
@@ -1253,8 +1253,8 @@ static func alien_exchange(in_room: bool = false) -> Array:
 					var fwr: Array = AP_FOURTH_ROOM[randi() % AP_FOURTH_ROOM.size()]
 					out = [[0, str(fwr[0])], [1, str(fwr[1])], [3, str(fwr[2])]]
 				else:
-					out = [[0, "to the one standing in our studio: %s" % _ax_sentence(p, p2)],
-						[3, "yes, YOU. the one by the sofas."],
+					out = [[0, "to the dude standing in our studio: %s" % _ax_sentence(p, p2)],
+						[3, "yes, YOU, dude. the one by the sofas."],
 						[1, _ax_opinion()]]
 			elif randi() % 2 == 0:
 				var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
