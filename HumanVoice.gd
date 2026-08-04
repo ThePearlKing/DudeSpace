@@ -71,9 +71,11 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	wav.data = bytes
 	var pl := AudioStreamPlayer3D.new()
 	pl.stream = wav
-	# close-range voice: falls off fast with distance and goes fully
-	# silent past ~18m -- you hear YOUR corner of the city, not all of it
-	pl.unit_size = 3.5
+	# close-range voice: inverse-SQUARE falloff, so a few steps away is
+	# already noticeably quieter, and fully silent past ~18m -- you hear
+	# YOUR corner of the city, not all of it
+	pl.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+	pl.unit_size = 2.5
 	pl.max_distance = 18.0
 	pl.max_db = -6.0
 	pl.volume_db = -8.0
