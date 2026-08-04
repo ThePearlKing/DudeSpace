@@ -289,7 +289,8 @@ STARTUP (in this order, no improvising):
     ~55%% (startup floor is 45%%) and watch ρ flip positive.
  4b. ρ positive = power RISING, exponentially. small positive
     is a startup. big positive is a headline.
- 5. When POWER > 3%% and CORE is warm, MODE: RUN.
+ 5. When POWER > 3%% and CORE >= 150°C, MODE: RUN.
+    (both numbers are on the readout. no vibes required.)
  6. Rods OUT slowly toward criticality. the hot core and the
     xenon both push ρ down -- that's the core stabilizing
     itself. let it.
