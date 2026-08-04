@@ -16,7 +16,7 @@ extends StaticBody3D
 ## Reactors and RTGs make the place RADIOACTIVE (cancer is a mechanic).
 ## A generator indoors fills the room with smoke. Read a book instead.
 
-const KINDS := ["small", "two_story", "box", "basement", "factory", "tower", "moonbase"]
+const KINDS := ["small", "two_story", "box", "basement", "factory", "tower", "moonbase", "station"]
 
 ## A wall port: a light-gray socket box, barely proud of the wall,
 ## little square panels on every face. NOT an extender -- a PORTAL:
@@ -158,6 +158,8 @@ func room_size() -> Vector3:
 			return Vector3(12, 12, 12)
 		"basement":
 			return Vector3(14, 5.5, 14)
+		"station":
+			return Vector3(26, 1.2, 26)   # the deck IS the whole thing
 		"factory":
 			return Vector3(26, 9, 26)
 		"tower":
@@ -172,10 +174,102 @@ func _ready() -> void:
 	if slot == -1:
 		slot = _next_slot   # -1 = unassigned; deep negatives are town lots
 	_next_slot = maxi(_next_slot, slot + 1)
+	if kind == "station":
+		_build_station()
+		return
 	_build_exterior()
 	_build_interior()
 	_build_ports()
 	_build_windows()
+
+# ------------------------------------------------------------- station
+
+var _rails := {}   # side -> rail node (station kind)
+
+## Shared edges lose their rails: walk one seamless floor.
+func _merge_rails() -> void:
+	if kind != "station":
+		return
+	var sides := {"x+": Vector3(26, 0, 0), "x-": Vector3(-26, 0, 0),
+		"z+": Vector3(0, 0, 26), "z-": Vector3(0, 0, -26)}
+	var opp := {"x+": "x-", "x-": "x+", "z+": "z-", "z-": "z+"}
+	for h in get_tree().get_nodes_in_group("house"):
+		if h == self or not (h is House) or h.kind != "station" \
+				or not is_instance_valid(h):
+			continue
+		for sk in sides:
+			var expect: Vector3 = global_position + global_transform.basis * sides[sk]
+			if h.global_position.distance_to(expect) < 2.0:
+				_drop_rail(sk)
+				h._drop_rail(opp[sk])
+
+func _drop_rail(sk: String) -> void:
+	if _rails.has(sk) and is_instance_valid(_rails[sk]):
+		_rails[sk].queue_free()
+		_rails.erase(sk)
+
+## SPACE STATION PLATFORM: no interior, no gravity, no planet -- just a
+## big honest deck floating in the void. Its top face is tagged so
+## houses and machines can be built ON it.
+func _build_station() -> void:
+	var steel := Surfaces.metal(Color("#7d838c"))
+	var dark := Surfaces.metal(Color("#3a4048"))
+	var deck := MeshInstance3D.new()
+	var dm := BoxMesh.new()
+	dm.size = Vector3(26, 1.2, 26)
+	deck.mesh = dm
+	deck.material_override = steel
+	add_child(deck)
+	var col := CollisionShape3D.new()
+	var cs := BoxShape3D.new()
+	cs.size = Vector3(26, 1.2, 26)
+	col.shape = cs
+	add_child(col)
+	set_meta("station_deck", true)
+	# deck plating seams
+	for gx in range(-2, 3):
+		var seam := MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		sm.size = Vector3(0.12, 0.06, 26)
+		seam.mesh = sm
+		seam.position = Vector3(float(gx) * 5.2, 0.63, 0)
+		seam.material_override = dark
+		add_child(seam)
+	# under-trusses: it's built, not conjured
+	for tx in [-9.0, 0.0, 9.0]:
+		for tz in [-9.0, 0.0, 9.0]:
+			var truss := MeshInstance3D.new()
+			var tm := BoxMesh.new()
+			tm.size = Vector3(1.4, 2.6, 1.4)
+			truss.mesh = tm
+			truss.position = Vector3(tx, -1.9, tz)
+			truss.material_override = dark
+			add_child(truss)
+	# guard rails, one node per side -- adjacent stations DROP the shared
+	# rails so decks merge into one seamless floor
+	for espec in [["z+", Vector3(26, 0.7, 0.2), Vector3(0, 0.95, 12.9)],
+			["z-", Vector3(26, 0.7, 0.2), Vector3(0, 0.95, -12.9)],
+			["x+", Vector3(0.2, 0.7, 26), Vector3(12.9, 0.95, 0)],
+			["x-", Vector3(0.2, 0.7, 26), Vector3(-12.9, 0.95, 0)]]:
+		var rail := MeshInstance3D.new()
+		var rm := BoxMesh.new()
+		rm.size = espec[1]
+		rail.mesh = rm
+		rail.position = espec[2]
+		rail.material_override = dark
+		add_child(rail)
+		_rails[espec[0]] = rail
+	call_deferred("_merge_rails")
+	for bx in [-12.4, 12.4]:
+		for bz in [-12.4, 12.4]:
+			var bcn := MeshInstance3D.new()
+			var bm := SphereMesh.new()
+			bm.radius = 0.22
+			bm.height = 0.44
+			bcn.mesh = bm
+			bcn.position = Vector3(bx, 1.5, bz)
+			bcn.material_override = Destructible.make_material(Color("#ffcf40"), 2.2)
+			add_child(bcn)
 
 # ------------------------------------------------------------- exterior
 

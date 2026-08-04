@@ -498,6 +498,9 @@ func _start_ghost(cat: String, kind: String) -> void:
 	if cat == "house" and Game.zone != "":
 		Sfx.play("denied")   # a house inside a house is asking for trouble
 		return
+	if kind == "station" and Game.zone != "":
+		Sfx.play("denied")
+		return
 	_ghost_cat = cat
 	_ghost_kind = kind
 	_ghost = MeshInstance3D.new()
@@ -506,6 +509,9 @@ func _start_ghost(cat: String, kind: String) -> void:
 		var w := 5.0
 		var hh := 3.4
 		match kind:
+			"station":
+				w = 26.0
+				hh = 1.2
 			"two_story": hh = 6.2
 			"factory":
 				w = 8.0
@@ -576,6 +582,45 @@ func _confirm_ghost() -> void:
 		return
 	var tf := _ghost.global_transform
 	var base_pos: Vector3 = tf.origin - tf.basis.y * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4)
+	if _ghost_cat == "house" and _ghost_kind == "station":
+		# SPACE ONLY, and stations SNAP to each other edge-to-edge
+		var hudn = get_tree().get_first_node_in_group("hud")
+		var near_st: House = null
+		var nd := 45.0
+		for h in get_tree().get_nodes_in_group("house"):
+			if h is House and h.kind == "station" and is_instance_valid(h):
+				var d: float = h.global_position.distance_to(base_pos)
+				if d < nd:
+					nd = d
+					near_st = h
+		var sbasis := tf.basis
+		var spos := base_pos
+		if near_st != null:
+			sbasis = near_st.global_transform.basis
+			var rel: Vector3 = sbasis.inverse() * (base_pos - near_st.global_position)
+			var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
+				if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
+			spos = near_st.global_position + sbasis * side_v
+		else:
+			var nb3 = Universe.nearest(base_pos)
+			if base_pos.distance_to(nb3.center) < float(nb3.radius) + 40.0:
+				Sfx.play("denied")
+				if hudn:
+					hudn.flash("space stations go in SPACE — fly up")
+				_cancel_ghost()
+				return
+			sbasis = _basis_from_up(global_transform.basis.y)
+		var sn := House.new()
+		sn.kind = "station"
+		get_parent().add_child(sn)
+		sn.set_meta("placed_id", "house")
+		sn.set_meta("owner", Net.my_name())
+		sn.global_transform = Transform3D(sbasis, spos)
+		if not Game.creative:
+			Inventory.remove_res("housekit", 1)
+		Sfx.play("place")
+		_cancel_ghost()
+		return
 	if _ghost_cat == "house":
 		var hn := House.new()
 		hn.kind = _ghost_kind
@@ -1661,7 +1706,8 @@ func _use_selected() -> void:
 				hopts.append({"id": k, "label": {"small": "Small House",
 					"two_story": "Two-Story House", "box": "Compact Box",
 					"basement": "House w/ Basement", "factory": "Factory House",
-					"tower": "Skyscraper", "moonbase": "Moonbase"}[k]})
+					"tower": "Skyscraper", "moonbase": "Moonbase",
+					"station": "Space Station Platform (SPACE only)"}[k]})
 			var pui := PickUI.new().configure("HOUSE TYPE", hopts,
 				func(kind: String) -> void:
 					_start_ghost("house", kind))
