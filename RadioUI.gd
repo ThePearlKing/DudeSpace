@@ -10,7 +10,6 @@ var _map: Control
 var _spec: Control
 var _freq_lbl: Label
 var _slider: HSlider
-var _act_box: VBoxContainer
 var _subs: Label
 var _last_sub_col: Color = Color.TRANSPARENT
 var _sauce_sub: Control
@@ -131,16 +130,6 @@ func _ready() -> void:
 	_spec.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_spec.draw.connect(_draw_spec)
 	left.add_child(_spec)
-	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(210, 0)
-	col.add_child(right)
-	var ah := Label.new()
-	ah.text = "ACTIVITY"
-	ah.add_theme_font_size_override("font_size", 16)
-	ah.add_theme_color_override("font_color", Color("#ffd166"))
-	right.add_child(ah)
-	_act_box = VBoxContainer.new()
-	right.add_child(_act_box)
 
 func close() -> void:
 	queue_free()
@@ -389,15 +378,3 @@ func _process(_d: float) -> void:
 
 	_freq_lbl.text = "%.1f MHz%s" % [radio.freq,
 		"" if radio.powered else "   ·   NO POWER"]
-	# activity rows: aligned stations you aren't tuned to
-	for c in _act_box.get_children():
-		c.queue_free()
-	for st in radio.stations:
-		if radio.align_for(st) > 0.4 and absf(radio.freq - float(st["freq"])) > 0.3:
-			var l := Label.new()
-			l.text = "%.1f MHz — %s" % [float(st["freq"]), str(st["name"])]
-			# long station names WRAP inside a fixed column instead of
-			# stretching the whole strip layout
-			l.custom_minimum_size = Vector2(210, 0)
-			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			_act_box.add_child(l)
