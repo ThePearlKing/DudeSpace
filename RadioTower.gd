@@ -103,7 +103,12 @@ func _build_stations() -> void:
 
 func station_dir(st: Dictionary) -> Vector3:
 	if st["body"] != null:
-		return (st["body"].center - global_position).normalized()
+		var bb = st["body"]
+		if global_position.distance_to(bb.center) < float(bb.radius) * 1.6:
+			# standing ON the broadcaster: signal's everywhere here, so
+			# the dish points at the SKY like a sensible local antenna
+			return (global_position - bb.center).normalized()
+		return (bb.center - global_position).normalized()
 	var w = get_tree().get_first_node_in_group("noodle_watcher")
 	if w != null and w is Node3D:
 		return (w.global_position - global_position).normalized()
@@ -122,7 +127,12 @@ func align_for(st: Dictionary) -> float:
 	return clampf((aim_dir.dot(station_dir(st)) - 0.55) / 0.45, 0.0, 1.0)
 
 func aim_at(body_center: Vector3) -> void:
-	aim_dir = (body_center - global_position).normalized()
+	var nb = Universe.nearest(global_position)
+	if body_center.distance_to(nb.center) < 1.0 \
+			and global_position.distance_to(nb.center) < float(nb.radius) * 1.6:
+		aim_dir = (global_position - nb.center).normalized()   # local: aim UP
+	else:
+		aim_dir = (body_center - global_position).normalized()
 	Sfx.play("click", -16.0)
 
 func use() -> void:

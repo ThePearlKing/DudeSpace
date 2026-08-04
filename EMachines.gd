@@ -1130,6 +1130,13 @@ class Switch extends Machine:
 	var on: bool = false
 	var _lever: MeshInstance3D
 	var _lamp_mat: StandardMaterial3D
+	var _state_lbl: Label3D
+
+	func _refresh_state_lbl() -> void:
+		if _state_lbl == null:
+			return
+		_state_lbl.text = "ON" if on else "OFF"
+		_state_lbl.modulate = Color("#5aff8a") if on else Color("#ff5a5a")
 
 	func _init() -> void:
 		title = "SWITCH"
@@ -1155,6 +1162,14 @@ class Switch extends Machine:
 		sm.height = 0.24
 		lamp.mesh = sm
 		lamp.position = Vector3(0, 0.6, -box_size.z * 0.5 - 0.08)
+		_state_lbl = Label3D.new()
+		_state_lbl.font_size = 30
+		_state_lbl.pixel_size = 0.005
+		_state_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_state_lbl.outline_size = 6
+		_state_lbl.position = Vector3(0, box_size.y + 0.85, 0)
+		add_child(_state_lbl)
+		_refresh_state_lbl()
 		_lamp_mat = StandardMaterial3D.new()
 		_lamp_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_lamp_mat.emission_enabled = true
@@ -1188,6 +1203,7 @@ class Switch extends Machine:
 	## F flips it. No menu. Clunk.
 	func use() -> void:
 		on = not on
+		_refresh_state_lbl()
 		_apply_visual()
 		Sfx.play("place", -10.0)
 

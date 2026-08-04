@@ -28,7 +28,7 @@ func _ready() -> void:
 	root.add_theme_stylebox_override("panel", st)
 	add_child(root)
 	var title := Label.new()
-	title.text = "📡  DISH MAP — right-click a body to aim · ESC closes"
+	title.text = "📡  DISH MAP — click a body to aim the dish · ESC closes"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", NEON)
 	title.position = Vector2(24, 12)
@@ -154,13 +154,19 @@ func _draw_map() -> void:
 	_map.draw_circle(rp, 4.0, Color("#7bffb0"))
 	var aim2 := Vector2(radio.aim_dir.x, radio.aim_dir.z)
 	if aim2.length() > 0.05:
-		_map.draw_line(rp, rp + aim2.normalized() * 120.0, Color("#7bffb0", 0.7), 2.0)
+		var an := aim2.normalized()
+		var tip := rp + an * 200.0
+		_map.draw_line(rp, tip, Color("#7bffb0"), 2.5)
+		var perp := Vector2(-an.y, an.x)
+		_map.draw_colored_polygon(PackedVector2Array([
+			tip + an * 10.0, tip + perp * 5.0, tip - perp * 5.0]),
+			Color("#7bffb0"))
 	_map.draw_string(ThemeDB.fallback_font, rp + Vector2(6, 12), "radio",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#7bffb0"))
 
 func _map_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_RIGHT:
+			and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 		# aim at whatever body is nearest the click
 		var best = null
 		var bd := 40.0
