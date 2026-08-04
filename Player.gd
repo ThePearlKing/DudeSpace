@@ -860,7 +860,8 @@ func _physics_process(delta: float) -> void:
 	if _body:
 		var thrusting := jet_ok and (Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_C))
 		_body.set_jetpack(Inventory.has_jetpack, thrusting,
-			3 if Inventory.jet_max >= 1000.0 else 1)
+			3 if Inventory.jet_max >= 1000.0 \
+			else (2 if Inventory.jet_max >= 500.0 else 1))
 		var hspd := (velocity - up * velocity.dot(up)).length()
 		_body.animate(hspd, is_on_floor(), delta, thrusting)
 
@@ -1070,7 +1071,11 @@ func _make_held_model(id: String) -> void:
 			cm2.scale = Vector3(0.55, 0.55, 0.55)
 			_held.add_child(cm2)
 		"jetpack", "jetpack2", "jetpack3":
-			var jmat: Material = Human._prism_material() if id == "jetpack3" else null
+			var jmat: Material = null
+			if id == "jetpack3":
+				jmat = Human._prism_material()
+			elif id == "jetpack2":
+				jmat = Surfaces.portal(Color("#16394a"))   # dim portal glow
 			for fx in [-0.11, 0.11]:
 				var tk := _hm_cyl(0.09, 0.4, Vector3(fx, 0, 0), col, 0.6)
 				var tip := _hm_cyl(0.09, 0.08, Vector3(fx, 0.24, 0), col.lightened(0.3), 0.9, 0.0)

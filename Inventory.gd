@@ -614,9 +614,7 @@ func owned_unique(id: String) -> bool:
 					return true
 		return false
 	match id:
-		"jetpack": return has_jetpack
-		"jetpack2": return jet_max >= 500.0
-		"jetpack3": return jet_max >= 1000.0
+		# jetpacks: CONSUMABLE gear, always rebuyable -- no OWNED gate
 		"ward": return wrath_ward
 		"engine_mk2": return engine_mk2
 		# hyperdrive: rebuyable -- one per ship

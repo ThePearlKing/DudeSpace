@@ -210,8 +210,13 @@ func set_jetpack(on: bool, thrusting: bool = false, tier: int = 1) -> void:
 			cm.bottom_radius = 0.16
 			cm.height = 0.9
 			tank.mesh = cm
-			tank.material_override = _prism_material() if tier >= 3 \
-				else Destructible.make_material(Color("#4cc9f0"), 0.4)
+			if tier >= 3:
+				tank.material_override = _prism_material()
+			elif tier == 2:
+				# 2.0: the portal glow, dimmed -- dark base keeps it subtle
+				tank.material_override = Surfaces.portal(Color("#16394a"))
+			else:
+				tank.material_override = Destructible.make_material(Color("#4cc9f0"), 0.4)
 			tank.position = Vector3(sx, 1.5, 0.35)
 			_jet_node.add_child(tank)
 			var flame := MeshInstance3D.new()
