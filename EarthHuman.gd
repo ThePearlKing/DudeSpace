@@ -480,6 +480,7 @@ var _dir: Vector3 = Vector3.ZERO
 var _act: String = "wander"
 var _act_t: float = 0.0
 var _panic_t: float = 0.0
+var _karen_t: float = 15.0   # time until the next tiny problem
 var _bubble: Label3D
 var _bubble_t: float = 0.0
 var _bg: MeshInstance3D          # the bubble card behind the words
@@ -1080,6 +1081,49 @@ func take_damage(dmg: float, dir: Vector3) -> void:
 	Sfx.play("hurt", -16.0)
 
 ## ---- the social brain: names, grudges, conversations ----
+
+const KAREN_OPEN := ["excuse me,", "unbelievable.", "I'm sorry, but",
+	"noted. NOTED.", "oh, we're doing THIS now?", "I counted, and"]
+const KAREN_GENERIC := ["this grass is at two different heights.",
+	"the sun is louder than yesterday.", "this air was fresher on tuesday.",
+	"the horizon is crooked and nobody cares.",
+	"these clouds are completely unsupervised.",
+	"the gravity here feels off-brand.",
+	"that rock has been there for DAYS.",
+	"somebody's footsteps are still in this dirt.",
+	"the railway hums in a tone I didn't agree to."]
+const KAREN_BENCH := ["this bench faces the WRONG way.",
+	"someone sat on this bench recently. it's still warm. unacceptable.",
+	"this bench has four legs and uses all of them. show-off."]
+const KAREN_HUMAN := ["%s is standing like that on PURPOSE.",
+	"%s's shirt has energy I did not approve.",
+	"%s breathed near my property line again."]
+
+## Find the nearest tiny problem and file it verbally.
+func _karen_complain() -> void:
+	var line := ""
+	var bench_near := false
+	for bn in get_tree().get_nodes_in_group("bench"):
+		if bn is Node3D and is_instance_valid(bn) \
+				and global_position.distance_squared_to(bn.global_position) < 64.0:
+			bench_near = true
+			break
+	var victim: EarthHuman = null
+	for h in get_tree().get_nodes_in_group("earth_human"):
+		if h != self and h is EarthHuman and is_instance_valid(h) and not h._dead \
+				and global_position.distance_squared_to(h.global_position) < 64.0:
+			victim = h
+			break
+	var roll := randf()
+	if victim != null and roll < 0.4:
+		line = KAREN_HUMAN[randi() % KAREN_HUMAN.size()] % victim.human_name
+	elif bench_near and roll < 0.65:
+		line = KAREN_BENCH[randi() % KAREN_BENCH.size()]
+	else:
+		line = KAREN_GENERIC[randi() % KAREN_GENERIC.size()]
+	if randf() < 0.35:
+		line += " the manager will hear about this."
+	_say(KAREN_OPEN[randi() % KAREN_OPEN.size()] + " " + line)
 
 func _say(t: String) -> void:
 	_bubble.text = t
@@ -1948,6 +1992,13 @@ func _physics_process(delta: float) -> void:
 	_social_cd -= delta
 	_greet_cd -= delta
 	_ptalk_t -= delta
+	# KARENS: perpetually finding tiny problems. it's a calling.
+	if human_name == "Karen":
+		_karen_t -= delta
+		if _karen_t <= 0.0 and _partner == null and _target == null \
+				and _panic_t <= 0.0:
+			_karen_t = randf_range(18.0, 40.0)
+			_karen_complain()
 	_gossip_cd -= delta
 	if _partner != null and not is_instance_valid(_partner):
 		_partner = null
