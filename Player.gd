@@ -121,8 +121,10 @@ func _char_shader() -> String:
 	return Save.character.get("shader", "none")
 
 func _build_hand() -> void:
-	# First-person arm wears YOUR character skin (colour + weird shader).
-	var skin := ShaderLib.make(_char_shader(), _char_color())
+	# First-person arm wears YOUR character skin (colour + weird shader
+	# + the EFFECT parameters, fluid and all).
+	var skin := ShaderLib.make(_char_shader(), _char_color(), null,
+		Save.character.get("fx", {}))
 	_hand = Node3D.new()
 	_camera.add_child(_hand)
 	_hand.position = HAND_REST
