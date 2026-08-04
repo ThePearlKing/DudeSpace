@@ -327,16 +327,28 @@ RULES OF NOT EXPLODING:
  · PRESSURE follows temp. the guarded VENT dumps 30 bar and
    costs coolant. coolant comes back only when the core is calm.
  · XENON, in dude terms: burning fuel makes an invisible
-   ASH (xenon) that soaks up your reaction. run at power and
-   it piles up; the XENON %% on the readout is how much.
-   when power keeps sinking but RODS and FUEL look fine,
-   the ash is winning. two ways out:
-     a) pull rods further OUT (RUN mode) -- high power
-        actually burns the ash away. BUT: as it burns off,
-        the reaction speeds up on its own, so be ready to
-        push rods back IN. going hard here is the classic
-        way to die.
-     b) rods in, walk away ~2 minutes. ash fades by itself.
+   ASH (xenon) that soaks up your reaction. the XENON %% on
+   the readout is how much. it's why power sinks while RODS
+   and FUEL look fine.
+
+HOW TO NOT LET THE ASH RUIN YOUR DAY (the playbook):
+ 1. CRUISE at 50-70%% power, FLOW FULL. this is the sweet
+    spot: steady heat, and the ash levels off instead of
+    piling. 100%%+ overheats the core AND maxes the ash.
+ 2. the ash takes a few minutes to settle in. as it does,
+    expect to pull rods a few extra %% now and then to hold
+    power -- that's normal upkeep, not a malfunction.
+ 3. move rods in ~5%% steps. after each step, WAIT and watch
+    ρ. keep ρ between about -0.05 and +0.05. big pulls are
+    how headlines happen.
+ 4. do NOT shut down from high power unless it's an actual
+    emergency: the ash keeps working after shutdown, and the
+    restart will fight you.
+ 5. if you're already in the pit (power sinking, ρ negative,
+    fuel fine): EITHER rods further out in RUN and hover --
+    the ash burns off and the reaction will surge as it does,
+    so push rods back in the moment ρ goes past +0.1 --
+    OR rods full in, walk away ~2 minutes, ash fades free.
  · in doubt: SCRAM. rods fall, breaker opens, you live. the
    xenon will make restart annoying. annoying beats glowing.
 
