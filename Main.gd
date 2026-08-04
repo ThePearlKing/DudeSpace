@@ -1797,10 +1797,14 @@ func _populate(b) -> void:
 			Game.earth_body = b
 			Game.earth_cities = []
 			var vibes: Array = [
-				{"vibe": "goofy", "name": "Honkton", "tint": Color("#ffb347")},
-				{"vibe": "grumpy", "name": "Grumbleburg", "tint": Color("#50505a")},
-				{"vibe": "dreamy", "name": "Driftwood", "tint": Color("#9ad0ff")},
-				{"vibe": "confident", "name": "Peak City", "tint": Color("#ffd166")},
+				{"vibe": "goofy", "name": "Honkton", "tint": Color("#ffb347"),
+					"arch": "goofy"},
+				{"vibe": "grumpy", "name": "Grumbleburg", "tint": Color("#50505a"),
+					"arch": "concrete"},
+				{"vibe": "dreamy", "name": "Driftwood", "tint": Color("#9ad0ff"),
+					"arch": "ancient"},
+				{"vibe": "confident", "name": "Peak City", "tint": Color("#ffd166"),
+					"arch": "glass"},
 			]
 			for ci in 4:
 				var centre := Vector3.ZERO
@@ -1814,7 +1818,15 @@ func _populate(b) -> void:
 				for i in _n(8):
 					var bd := (centre + Vector3(crng.randf_range(-0.16, 0.16),
 						crng.randf_range(-0.16, 0.16), crng.randf_range(-0.16, 0.16))).normalized()
-					_city_building(b, bd, vibes[ci]["tint"])
+					match str(vibes[ci]["arch"]):
+						"glass":
+							_glass_tower(b, bd)
+						"ancient":
+							_ancient_building(b, bd)
+						"goofy":
+							_goofy_building(b, bd)
+						_:
+							_city_building(b, bd, vibes[ci]["tint"])
 				for i in _n(10):
 					var ch := EarthHuman.new()
 					ch.setup(b)
@@ -1953,6 +1965,181 @@ func _seat_prop(b, dir: Vector3, rng: RandomNumberGenerator, bench: bool) -> voi
 	root.yaw = rng.randf() * TAU
 	add_child(root)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+
+## Peak City: glass curtain-wall skyscrapers. Tall, smug, lit like a
+## quarterly report that beat expectations.
+func _glass_tower(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var h := randf_range(12.0, 26.0)
+	var w := randf_range(2.6, 4.2)
+	# dark structural core
+	var core := MeshInstance3D.new()
+	var cm := BoxMesh.new()
+	cm.size = Vector3(w, h, w)
+	core.mesh = cm
+	core.position = Vector3(0, h * 0.5 - 0.3, 0)
+	core.material_override = Destructible.make_material(Color("#1c2430"), 0.05)
+	root.add_child(core)
+	# glass curtain: four slightly-inset glowing faces
+	var glass := Destructible.make_material(Color("#6fb6dd"), 0.55)
+	for face in 4:
+		var pane := MeshInstance3D.new()
+		var pm := BoxMesh.new()
+		pm.size = Vector3(w * 0.92, h * 0.94, 0.05)
+		pane.mesh = pm
+		pane.position = Vector3(0, h * 0.5 - 0.3, 0)
+		pane.rotation_degrees.y = face * 90.0
+		pane.translate_object_local(Vector3(0, 0, w * 0.5 + 0.01))
+		pane.material_override = glass
+		root.add_child(pane)
+	# mullions: horizontal floor lines across the glass
+	var mull := Destructible.make_material(Color("#141a22"), 0.02)
+	var floors := int(h / 2.2)
+	for f2 in floors:
+		var band := MeshInstance3D.new()
+		var bm2 := BoxMesh.new()
+		bm2.size = Vector3(w + 0.12, 0.12, w + 0.12)
+		band.mesh = bm2
+		band.position = Vector3(0, 1.0 + float(f2) * 2.2, 0)
+		band.material_override = mull
+		root.add_child(band)
+	# spire. of course there's a spire.
+	var spire := MeshInstance3D.new()
+	var sm2 := CylinderMesh.new()
+	sm2.top_radius = 0.02
+	sm2.bottom_radius = 0.08
+	sm2.height = 2.4
+	spire.mesh = sm2
+	spire.position = Vector3(0, h + 0.9, 0)
+	spire.material_override = Destructible.make_material(Color("#c8ccd4"), 0.8)
+	root.add_child(spire)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, randf() * TAU)
+
+## Driftwood: ancient architecture. Sandstone cellas ringed by columns,
+## the odd dome, at least one column that gave up centuries ago.
+func _ancient_building(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var stone := Destructible.make_material(Color("#d8c49a"), 0.03)
+	var worn := Destructible.make_material(Color("#c2ab7e"), 0.02)
+	var wr := randf_range(2.2, 3.4)
+	# stepped plinth
+	for st in 2:
+		var base := MeshInstance3D.new()
+		var bm3 := BoxMesh.new()
+		bm3.size = Vector3(wr * 2.0 + 1.2 - float(st) * 0.5, 0.35,
+			wr * 2.0 + 1.2 - float(st) * 0.5)
+		base.mesh = bm3
+		base.position = Vector3(0, 0.18 + float(st) * 0.35, 0)
+		base.material_override = worn
+		root.add_child(base)
+	# inner cella
+	var cella := MeshInstance3D.new()
+	var cbm := BoxMesh.new()
+	var ch := randf_range(2.4, 3.6)
+	cbm.size = Vector3(wr * 1.1, ch, wr * 1.1)
+	cella.mesh = cbm
+	cella.position = Vector3(0, 0.7 + ch * 0.5, 0)
+	cella.material_override = stone
+	root.add_child(cella)
+	# column ring -- one of them is rubble, as is tradition
+	var ncol := 8
+	var fallen := randi() % ncol
+	for i in ncol:
+		var a := TAU * float(i) / float(ncol)
+		var cx := cos(a) * wr
+		var cz := sin(a) * wr
+		if i == fallen:
+			var stub := MeshInstance3D.new()
+			var stm := CylinderMesh.new()
+			stm.top_radius = 0.22
+			stm.bottom_radius = 0.24
+			stm.height = 0.7
+			stub.mesh = stm
+			stub.position = Vector3(cx, 1.05, cz)
+			stub.material_override = worn
+			root.add_child(stub)
+			continue
+		var colm := MeshInstance3D.new()
+		var clm := CylinderMesh.new()
+		clm.top_radius = 0.2
+		clm.bottom_radius = 0.24
+		clm.height = ch + 0.6
+		colm.mesh = clm
+		colm.position = Vector3(cx, 0.7 + (ch + 0.6) * 0.5, cz)
+		colm.material_override = stone
+		root.add_child(colm)
+	# entablature + either a dome or a pediment slab
+	var top := MeshInstance3D.new()
+	var tbm := BoxMesh.new()
+	tbm.size = Vector3(wr * 2.0 + 0.8, 0.4, wr * 2.0 + 0.8)
+	top.mesh = tbm
+	top.position = Vector3(0, 1.3 + ch + 0.35, 0)
+	top.material_override = stone
+	root.add_child(top)
+	if randf() < 0.5:
+		var dome := MeshInstance3D.new()
+		var dm := SphereMesh.new()
+		dm.radius = wr * 0.9
+		dm.height = wr * 0.9
+		dm.is_hemisphere = true
+		dome.mesh = dm
+		dome.position = Vector3(0, 1.5 + ch + 0.5, 0)
+		dome.material_override = worn
+		root.add_child(dome)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, randf() * TAU)
+
+## Honkton: architecture by committee, where the committee was geese.
+## Crooked stacked boxes in loud colors, porthole windows, party-hat
+## roofs. Structurally reviewed by nobody. Still standing. Somehow.
+func _goofy_building(b, dir: Vector3) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	var levels := randi_range(2, 4)
+	var y := -0.2
+	var pw := randf_range(2.6, 3.6)
+	for lv in levels:
+		var lw := pw * randf_range(0.75, 1.05)
+		var lh := randf_range(1.6, 2.6)
+		var box := MeshInstance3D.new()
+		var bm4 := BoxMesh.new()
+		bm4.size = Vector3(lw, lh, lw)
+		box.mesh = bm4
+		box.position = Vector3(randf_range(-0.4, 0.4), y + lh * 0.5,
+			randf_range(-0.4, 0.4))
+		box.rotation_degrees.y = randf_range(-14.0, 14.0)
+		box.material_override = Destructible.make_material(
+			Color.from_hsv(randf(), randf_range(0.55, 0.85), randf_range(0.7, 0.95)), 0.15)
+		root.add_child(box)
+		# porthole window: one glowing circle per level
+		var port := MeshInstance3D.new()
+		var pmz := CylinderMesh.new()
+		pmz.top_radius = 0.3
+		pmz.bottom_radius = 0.3
+		pmz.height = 0.06
+		port.mesh = pmz
+		port.rotation_degrees.x = 90.0
+		port.position = Vector3(0, y + lh * 0.55, -lw * 0.5 - 0.02)
+		port.material_override = Destructible.make_material(Color("#fff2a8"), 1.8)
+		box.add_child(port)
+		y += lh
+		pw = lw
+	# the party hat
+	var roof := MeshInstance3D.new()
+	var rm := CylinderMesh.new()
+	rm.top_radius = 0.0
+	rm.bottom_radius = pw * 0.75
+	rm.height = randf_range(1.4, 2.4)
+	roof.mesh = rm
+	roof.position = Vector3(0, y + rm.height * 0.5, 0)
+	roof.material_override = Destructible.make_material(
+		Color.from_hsv(randf(), 0.8, 0.95), 0.5)
+	root.add_child(roof)
+	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
+	root.rotate_object_local(Vector3.UP, randf() * TAU)
 
 ## A city tower: concrete box, lit windows scattered up its faces, roof
 ## lip. Humanity's whole architectural output, honestly.
