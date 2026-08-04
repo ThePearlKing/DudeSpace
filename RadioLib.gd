@@ -111,6 +111,14 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wave2 := _earth_loop(seed_v)
 		_music_cache[key] = wave2
 		return wave2
+	if kind == "circuit" or kind == "logic":
+		var wavq := _circuit_loop(seed_v)
+		_music_cache[key] = wavq
+		return wavq
+	if kind == "sand":
+		var wavd := _euclid_loop(seed_v)
+		_music_cache[key] = wavd
+		return wavd
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var beat := 60.0 / float(st["bpm"])
@@ -544,6 +552,147 @@ static func _earth_loop(seed_v: int) -> AudioStreamWAV:
 					var vib := 1.0 + 0.007 * sin(TAU * 5.0 * t3) * minf(1.0, t3 * 3.0)
 					buf[ms + i] += (sin(TAU * mf * vib * t3) \
 						+ 0.2 * sin(TAU * mf * 2.0 * t3)) * 0.16 * env3
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
+	return wav
+
+## CIRCUITIA: chip music with INTENT. A fixed arpeggio pattern climbing
+## and falling through minor-pentatonic, transposed per bar, over a
+## triangle-wave bass walking root and fifth. Ticky hats. No dice rolls
+## in the melody -- machines don't improvise, they iterate.
+static func _circuit_loop(seed_v: int) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var base := 392.0
+	var beat := 60.0 / 150.0
+	var bars := 4
+	var barlen := int(4.0 * beat * SR)
+	var total := barlen * bars
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	var arp: Array = [0, 3, 7, 10, 12, 10, 7, 3]
+	var trans: Array = [0, 0, -2, 3]
+	var s16 := int(beat * SR * 0.25)
+	for bar in bars:
+		var tr := int(trans[bar])
+		var b0 := bar * barlen
+		# the arp: 16ths, pattern-locked
+		for n in 16:
+			var semi := int(arp[n % arp.size()]) + tr
+			var f := base * pow(2.0, float(semi) / 12.0)
+			var ns := b0 + n * s16
+			for i in mini(int(s16 * 0.85), total - ns):
+				var t := float(i) / SR
+				var env := minf(1.0, float(i) / (SR * 0.003)) \
+					* (1.0 - float(i) / (s16 * 0.85))
+				buf[ns + i] += (0.16 if fmod(f * t, 1.0) < 0.5 else -0.16) * env
+		# triangle bass: eighths, root-root-fifth-root figure
+		for e8 in 8:
+			var bsemi := tr + (7 if e8 % 4 == 2 else 0)
+			var bf := base * 0.25 * pow(2.0, float(bsemi) / 12.0)
+			var bs := b0 + e8 * s16 * 2
+			for i in mini(int(s16 * 1.7), total - bs):
+				var t2 := float(i) / SR
+				var tri := 2.0 * absf(2.0 * fmod(bf * t2, 1.0) - 1.0) - 1.0
+				var env2 := minf(1.0, float(i) / (SR * 0.004)) \
+					* (1.0 - float(i) / (s16 * 1.7) * 0.6)
+				buf[bs + i] += tri * 0.22 * env2
+		# hats: every 16th, accents on the beat
+		for n2 in 16:
+			var hs := b0 + n2 * s16
+			var amp := 0.07 if n2 % 4 == 0 else 0.035
+			for i in mini(int(0.012 * SR), total - hs):
+				buf[hs + i] += (randf() * 2.0 - 1.0) * amp \
+					* (1.0 - float(i) / (0.012 * SR))
+	var bytes := PackedByteArray()
+	bytes.resize(total * 2)
+	for i in total:
+		bytes.encode_s16(i * 2, int(clampf(buf[i], -1.0, 1.0) * 24000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = SR
+	wav.data = bytes
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = total
+	return wav
+
+## EUCLID, composed instead of rolled: real maqam-style PHRASES over the
+## double-harmonic scale -- fixed melodic contours with grace-note
+## ornaments, long resolving tones, the tanpura drone, and a maqsum-ish
+## dum-tek drum pattern. No random walk; the desert has taste.
+static func _euclid_loop(seed_v: int) -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var base := 220.0
+	var scale: Array = [0, 1, 4, 5, 7, 8, 11, 12]
+	var beat := 60.0 / 92.0
+	var barlen := int(4.0 * beat * SR)
+	var total := barlen * 4
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# drone: root + fifth, breathing slowly
+	for i in total:
+		var t := float(i) / SR
+		buf[i] += (sin(TAU * 110.0 * t) * 0.085 + sin(TAU * 165.0 * t) * 0.04) \
+			* (0.8 + 0.2 * sin(TAU * 0.25 * t)) \
+			+ (randf() * 2.0 - 1.0) * 0.012
+	# phrases: (scale degree, beats). each bar is a composed line.
+	var phrases: Array = [
+		[[0, 0.5], [1, 0.5], [2, 1.0], [3, 0.5], [4, 1.5]],
+		[[2, 0.5], [3, 0.5], [2, 0.5], [1, 0.5], [0, 2.0]],
+		[[4, 0.75], [5, 0.75], [6, 0.5], [5, 1.0], [4, 1.0]],
+		[[3, 0.5], [2, 0.5], [1, 0.5], [2, 0.5], [0, 2.0]]]
+	for bar in 4:
+		var ph: Array = phrases[bar]
+		var b0 := bar * barlen
+		var cursor := 0.0
+		for note in ph:
+			var deg := int(note[0])
+			var dur_b := float(note[1])
+			var f := base * pow(2.0, float(scale[deg]) / 12.0)
+			var ns := b0 + int(cursor * beat * SR)
+			var nd := int(dur_b * beat * SR * 0.92)
+			# ornament: long notes get a quick upper-neighbour grace first
+			if dur_b >= 1.0 and deg + 1 < scale.size() and rng.randf() < 0.8:
+				var gf := base * pow(2.0, float(scale[deg + 1]) / 12.0)
+				for i in mini(int(0.07 * SR), total - ns):
+					var tg := float(i) / SR
+					buf[ns + i] += (sin(TAU * gf * tg) * 0.14 \
+						+ (fmod(gf * tg, 1.0) * 2.0 - 1.0) * 0.1) \
+						* minf(1.0, float(i) / (SR * 0.008))
+				ns += int(0.07 * SR)
+				nd -= int(0.07 * SR)
+			for i in mini(nd, total - ns):
+				var t2 := float(i) / SR
+				var vib := 1.0 + 0.012 * sin(TAU * 5.5 * t2) * minf(1.0, t2 * 4.0)
+				var env := minf(1.0, float(i) / (SR * 0.02)) \
+					* minf(1.0, float(nd - i) / (SR * 0.06))
+				buf[ns + i] += ((fmod(f * vib * t2, 1.0) * 2.0 - 1.0) * 0.13 \
+					+ sin(TAU * f * vib * t2) * 0.16) * env
+			cursor += dur_b
+		# maqsum-ish drum: DUM . TEK DUM . TEK . TEK across the bar
+		var pat: Array = [0, -1, 1, 0, -1, 1, -1, 1]
+		for e8 in 8:
+			var hit := int(pat[e8])
+			if hit < 0:
+				continue
+			var ds := b0 + int(float(e8) * 0.5 * beat * SR)
+			if hit == 0:
+				for i in mini(int(0.11 * SR), total - ds):
+					var td := float(i) / SR
+					buf[ds + i] += sin(TAU * 80.0 * td) * exp(-td * 24.0) * 0.42
+			else:
+				for i in mini(int(0.04 * SR), total - ds):
+					buf[ds + i] += (randf() * 2.0 - 1.0) \
+						* exp(-float(i) / (SR * 0.007)) * 0.16
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:

@@ -266,7 +266,8 @@ func _is_local(st: Dictionary) -> bool:
 func signal_for(st: Dictionary) -> float:
 	var a := align_for(st)
 	var ferr: float = absf(freq - float(st["freq"]))
-	var f := clampf(1.0 - ferr / 1.2, 0.0, 1.0)
+	# TIGHT tuning window: 0.6 MHz off = silence, not a faint ghost
+	var f := clampf(1.0 - ferr / 0.6, 0.0, 1.0)
 	return a * f
 
 ## Alignment (spectrum display: activity you COULD tune). PENCIL beam,
@@ -358,14 +359,15 @@ func work(delta: float) -> void:
 	if _cur_station >= 0 and best >= 0 and best != _cur_station \
 			and _cur_station < stations.size():
 		var cur_s := signal_for(stations[_cur_station])
-		if cur_s > bs - 0.12 and cur_s > 0.05:
+		if cur_s > bs - 0.12 and cur_s > 0.22:
 			best = _cur_station
 			bs = cur_s
 	if best != _cur_station:
 		_cur_station = best
 		_talk.stop()
 		_sentence_cd = 0.15
-	if best < 0 or bs < 0.05:
+		now_line_until = 0.0   # new station: old subtitles vanish
+	if best < 0 or bs < 0.12:
 		# GRACE: momentary blips (walking, dish jitter) must not kill the
 		# stream -- only a genuinely lost signal does
 		_bad_t += delta
