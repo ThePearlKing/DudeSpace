@@ -572,6 +572,9 @@ func _build_interior() -> void:
 			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.2, -sz.z * 0.35), 3.0)
 			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.2, sz.z * 0.5 - 1.0))
 			_rug(Vector3(c.x - 2.0, fy + 0.28, c.z), Vector2(3.4, 2.4), Color("#8a3a3a"))
+			# one barrel, IN the corner, bothering nobody
+			_deco(c + Vector3(-sz.x * 0.5 + 0.9, -sz.y * 1.5 + 1.0, -sz.z * 0.5 + 0.9),
+				Vector3(0.7, 1.4, 0.7), Color("#4a4438"))
 		"tower":
 			# floors every 5 units. slabs leave a stair bay along -X;
 			# a switchback staircase LIVES in that bay and actually
