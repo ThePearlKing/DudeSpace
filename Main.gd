@@ -1928,11 +1928,11 @@ func _populate(b) -> void:
 			Game.earth_body = b
 			Game.earth_cities = []
 			var vibes: Array = [
-				{"vibe": "goofy", "name": "Fairview", "tint": Color("#ffb347"),
+				{"vibe": "goofy", "name": "Accident", "tint": Color("#ffb347"),
 					"arch": "goofy"},
 				{"vibe": "grumpy", "name": "Gary", "tint": Color("#50505a"),
 					"arch": "concrete"},
-				{"vibe": "dreamy", "name": "Providence", "tint": Color("#9ad0ff"),
+				{"vibe": "dreamy", "name": "Alexandria", "tint": Color("#9ad0ff"),
 					"arch": "ancient"},
 				{"vibe": "confident", "name": "Meridian City", "tint": Color("#ffd166"),
 					"arch": "glass"},
