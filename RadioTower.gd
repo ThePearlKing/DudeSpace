@@ -22,6 +22,11 @@ var _hiss: AudioStreamPlayer3D  # static bed
 var _cur_station: int = -1
 var _sentence_cd: float = 0.0
 var powered: bool = false
+# audio synthesis is EXPENSIVE GDScript: cook streams on worker threads
+# and hand them to the player when done -- never hitch the game
+var _cooking: bool = false
+var _cooked: AudioStreamWAV = null
+var _cooked_for: int = -2
 
 func _init() -> void:
 	title = "RADIO"
@@ -282,39 +287,65 @@ func work(delta: float) -> void:
 	var st: Dictionary = stations[best]
 	var talk_target := linear_to_db(clampf(clear, 0.05, 1.0))
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
+	var freq_seed := int(st["freq"] * 10.0)
+	var kind := str(st["kind"])
 	match str(st["type"]):
 		"music":
 			if not _talk.playing:
-				_talk.stream = RadioLib.music_loop(int(st["freq"] * 10.0), str(st["kind"]))
-				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
+				_serve(func() -> AudioStreamWAV:
+					return RadioLib.music_loop(freq_seed, kind), true)
 		"eerie":
 			if not _talk.playing:
-				_talk.stream = RadioLib.eerie_loop()
-				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
+				_serve(func() -> AudioStreamWAV:
+					return RadioLib.eerie_loop(), true)
 		"rick":
 			# RICK FM plays the hook. autotuned. with the band. forever.
 			if not _talk.playing:
-				_talk.stream = RadioLib.rick_song()
-				_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
+				_serve(func() -> AudioStreamWAV:
+					return RadioLib.rick_song(), true)
 		_:
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
-				var wav: AudioStreamWAV = null
-				match str(st["type"]):
-					"news":
-						wav = HumanVoice.render(RadioLib.news_line(),
-							{"base": 185.0, "var": 0.42, "wave": "sine",
-							"rate": 1.35, "artic": 1.6})
-					"alien":
-						wav = HumanVoice.render(RadioLib.alien_line(),
-							RadioLib.alien_profile())
-					"noodle":
-						# not a deep voice. an ARRIVAL of one. full sermons.
-						wav = RadioLib.noodle_broadcast()
-				if wav != null:
-					_talk.stream = wav
-					_talk.play()
-				_sentence_cd = randf_range(2.0, 4.5)
+				var t := str(st["type"])
+				if _serve(func() -> AudioStreamWAV:
+					match t:
+						"news":
+							return HumanVoice.render(RadioLib.news_line(),
+								{"base": 185.0, "var": 0.42, "wave": "sine",
+								"rate": 1.35, "artic": 1.6})
+						"alien":
+							return HumanVoice.render(RadioLib.alien_line(),
+								RadioLib.alien_profile())
+						"noodle":
+							# the god does not talk. it PERFORMS.
+							return RadioLib.noodle_broadcast()
+					return null, false):
+					_sentence_cd = randf_range(2.0, 4.5)
+
+## Play a cooked stream if one is ready for this station; otherwise cook
+## it on a worker thread. Returns true the moment playback starts.
+func _serve(builder: Callable, clock_sync: bool) -> bool:
+	if _cooked != null and _cooked_for == _cur_station:
+		_talk.stream = _cooked
+		_cooked = null
+		if clock_sync:
+			_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
+		else:
+			_talk.play()
+		return true
+	if not _cooking:
+		_cooking = true
+		var idx := _cur_station
+		WorkerThreadPool.add_task(func() -> void:
+			var wav: AudioStreamWAV = builder.call()
+			_deliver.call_deferred(wav, idx))
+	return false
+
+func _deliver(wav: AudioStreamWAV, idx: int) -> void:
+	_cooking = false
+	if wav != null:
+		_cooked = wav
+		_cooked_for = idx
 
 func _process(d: float) -> void:
 	super._process(d)
