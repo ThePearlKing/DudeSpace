@@ -92,9 +92,11 @@ var _out_ports: Array = []      # exterior port machines
 var _win_out_mesh: MeshInstance3D    # exterior window pane
 var _win_in_mesh: MeshInstance3D     # interior window pane
 var _vp_out: SubViewport        # renders interior (for the outside pane)
-var _vp_in: SubViewport         # renders outside (for the inside pane)
+var _vp_in: SubViewport         # renders outside, FRONT view (front panes)
+var _vp_in2: SubViewport        # renders outside, BACK view (back pane)
 var _cam_out: Camera3D
 var _cam_in: Camera3D
+var _cam_in2: Camera3D
 var _haz_t := 0.0
 var _rad := false
 var _smoke := false
@@ -681,8 +683,17 @@ func _build_windows() -> void:
 	_cam_in = Camera3D.new()
 	_vp_in.add_child(_cam_in)
 	_cam_in.fov = 70.0
+	_vp_in2 = SubViewport.new()
+	_vp_in2.size = Vector2i(384, 288)
+	_vp_in2.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_vp_in2)
+	_vp_in2.world_3d = get_viewport().world_3d
+	_cam_in2 = Camera3D.new()
+	_vp_in2.add_child(_cam_in2)
+	_cam_in2.fov = 70.0
 	var otex := _vp_out.get_texture()
 	var itex := _vp_in.get_texture()
+	var itex2 := _vp_in2.get_texture()
 	if kind == "box":
 		# the SKYLIGHT IS the ceiling: glass roof outside showing the
 		# cube's contents, glass ceiling inside showing the sky
@@ -730,12 +741,14 @@ func _build_windows() -> void:
 					iu2.rotation_degrees.y = 180.0
 					_win_frame(iu2, itex, Vector2(1.8, 1.4))
 			else:
+				# the BACK window gets its OWN camera: a portal, not a
+				# second screen of the front yard
 				var iu := Node3D.new()
 				_iroot.add_child(iu)
 				iu.global_position = Vector3(c.x - sz.x * 0.18, fy2 + 0.5,
 					c.z + (sz.z * 0.5 - 0.62))
 				iu.rotation_degrees.y = 0.0
-				_win_frame(iu, itex, Vector2(2.8, 1.8))
+				_win_frame(iu, itex2, Vector2(2.8, 1.8))
 
 ## One window UNIT: recessed cavity, frame, sill -- a window with
 ## actual depth, whose glass happens to be a live screen.
@@ -840,9 +853,19 @@ func _physics_process(delta: float) -> void:
 		_vp_out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if nearby \
 			else SubViewport.UPDATE_DISABLED
 	if _vp_in:
-		_vp_in.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
+		var live := inside or nearby
+		_vp_in.render_target_update_mode = SubViewport.UPDATE_ALWAYS if live \
 			else SubViewport.UPDATE_DISABLED
-		if inside and _cam_in:
+		if _vp_in2:
+			_vp_in2.render_target_update_mode = _vp_in.render_target_update_mode
+		if live and _cam_in2 and kind != "box":
+			# back camera: the view off the +Z face
+			var bz: Vector3 = global_transform.basis.z
+			var by: Vector3 = global_transform.basis.y
+			var bpos: Vector3 = global_position + bz * 3.6 + by * 1.8
+			_cam_in2.global_position = bpos
+			_cam_in2.look_at(bpos + bz, by)
+		if live and _cam_in:
 			var wy: Vector3 = global_transform.basis.y
 			if kind == "box":
 				# the ceiling is glass: the view is UP
