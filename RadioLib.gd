@@ -770,6 +770,53 @@ static func _euclid_loop(seed_v: int) -> AudioStreamWAV:
 	wav.loop_end = total
 	return wav
 
+# ---- THE EVENT HORIZON LOG --------------------------------------------
+# Listen to the black hole long enough and someone's thoughts surface --
+# an old man's, unhurried, arriving in real time. He found something in
+# a field once. He is not going to describe it properly, and he knows
+# more than he will ever admit. Plays ONCE per world session; after the
+# last line it's just the hole again.
+const EH_END := 246.0
+const EH_LOG: Array = [
+	[7.0, "there it is again. the sound. people call it a howl. it isn't. a howl wants something. this is the sound of a thing that already has it."],
+	[15.0, "i used to think you listened to a place like this to feel small. no. you listen to check whether it remembers you."],
+	[23.0, "i found something once. back on earth, back when my knees were a rumor i hadn't heard yet."],
+	[31.0, "a field past the east fence line. clover, mostly. bees working it like they were paid."],
+	[39.0, "and in the middle of all that ordinary: a structure. i have spent forty years not describing it properly, and i will not start tonight."],
+	[48.0, "it had a door the way a riddle has an answer. present. unavailable."],
+	[56.0, "no hinges. i looked. of course i looked. i was young, and the young believe hinges are owed to them."],
+	[65.0, "i told exactly one person. she laughed until she saw my face, and then she never asked me about it again. good woman. better than i deserved."],
+	[74.0, "the metal -- i'll call it metal, it would be rude to call it what it was -- was warm on the north side. only the north side. in january."],
+	[83.0, ""],
+	[97.0, "hm."],
+	[103.0, "funny what a sound can shake loose. i had almost managed a decade without thinking about the latch."],
+	[111.0, "i never mentioned a latch before. forget i said latch."],
+	[119.0, ""],
+	[127.0, "these noodles are done. a man should finish his noodles before doing something foolish. that isn't wisdom, that's just order of operations."],
+	[137.0, ""],
+	[143.0, "alright. keys. coat. the good flashlight, not the honest one."],
+	[151.0, "driving now. the road out east hasn't changed. the dark still starts at the same fence post."],
+	[160.0, "i used to drive this stretch angry. now i drive it grateful. same road. the difference was never the road."],
+	[169.0, "the turn's grown over. good. things that matter should be inconvenient."],
+	[177.0, "walking now. clover's gone. the bees went wherever bees go when nobody holds the lease."],
+	[186.0, "and there it is. lower than i remember. patient things settle."],
+	[194.0, "i brought the thing i've kept in the coffee tin since before the tin had a purpose. no, i won't say. you'd only go looking for a tin."],
+	[203.0, "it fits. of course it fits. it always fit. that was the whole problem."],
+	[211.0, "glowing now. not bright. considerate. a light that knows about neighbors."],
+	[219.0, "and down it goes. slow as a sunset. the dirt just... accepts it. grass folding over like a page."],
+	[228.0, "you'd never know. that's the point, i think. you were never supposed to know. i wasn't either. i just happened to be in the field."],
+	[237.0, "anyway. the sky out here is very good tonight."],
+	[244.0, ""]]
+
+static func eh_line(t: float) -> String:
+	var out := ""
+	for e in EH_LOG:
+		if t >= float(e[0]):
+			out = str(e[1])
+		else:
+			break
+	return out
+
 ## The shadow temple's frequency: no music, no words. A slow drone,
 ## detuned partials, something breathing under it. Loops seamlessly.
 static var _eerie_wav: AudioStreamWAV = null

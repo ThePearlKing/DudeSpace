@@ -340,6 +340,7 @@ func _process(_d: float) -> void:
 	var saucey: bool = live and radio.now_line.begins_with("⊙")
 	if _subs != null:
 		_subs.text = radio.now_line if (live and not saucey) else ""
+		_subs.add_theme_color_override("font_color", radio.now_line_col)
 	if _sauce_sub != null:
 		_sauce_txt = radio.now_line if saucey else ""
 		_sauce_sub.visible = _sauce_txt != ""

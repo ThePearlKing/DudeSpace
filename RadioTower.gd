@@ -38,6 +38,7 @@ var _cook_line: String = ""     # subtitle for the stream being cooked
 var _cooked_line: String = ""
 var now_line: String = ""       # what the dish is SAYING right now
 var now_line_until: float = 0.0
+var now_line_col: Color = Color("#ffd166")
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _bad_t: float = 0.0   # how long the signal has been junk
 var _unpow_t: float = 99.0   # how long the buffer has been empty
@@ -185,7 +186,7 @@ func _build_stations() -> void:
 				st = {"name": "JUPITER", "type": "music"}
 			"TIN 618":
 				# the black hole broadcasts. nobody asked it to.
-				st = {"name": "TIN 618", "type": "music"}
+				st = {"name": "EVENT HORIZON", "type": "music"}
 			_:
 				if kind == "sun":
 					st = {"name": b.name.to_upper() + " ✶", "type": "music"}
@@ -402,6 +403,19 @@ func work(delta: float) -> void:
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
 	var freq_seed := int(st["freq"] * 10.0)
 	var kind := str(st["kind"])
+	# the EVENT HORIZON log: seven seconds of listening before the first
+	# thought surfaces. purple. once per world.
+	if kind == "blackhole" and _talk.playing and bs > 0.35 and not Game.eh_log_done:
+		Game.eh_log_t += delta
+		var el := RadioLib.eh_line(Game.eh_log_t)
+		if el != "":
+			now_line = el
+			now_line_col = Color("#b388ff")
+			now_line_until = Game.playtime + 0.8
+		if Game.eh_log_t >= RadioLib.EH_END:
+			Game.eh_log_done = true
+	elif str(st["type"]) != "noodle":
+		now_line_col = Color("#ffd166")
 	match str(st["type"]):
 		"music":
 			if not _talk.playing:
