@@ -139,8 +139,8 @@ func room_size() -> Vector3:
 
 func _ready() -> void:
 	add_to_group("house")
-	if slot < 0:
-		slot = _next_slot
+	if slot == -1:
+		slot = _next_slot   # -1 = unassigned; deep negatives are town lots
 	_next_slot = maxi(_next_slot, slot + 1)
 	_build_exterior()
 	_build_interior()

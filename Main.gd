@@ -1972,6 +1972,10 @@ func _populate(b) -> void:
 					var hh2 := House.new()
 					hh2.kind = "small"
 					hh2.human_home = true
+					# town houses live in a NEGATIVE pocket-lot band so
+					# they can never share an interior with a restored
+					# player house carrying the same saved slot number
+					hh2.slot = -(ti * 10 + hi + 1)
 					add_child(hh2)
 					hh2.global_transform = Transform3D(_basis_from_up(hd3),
 						b.center + hd3 * b.radius)
