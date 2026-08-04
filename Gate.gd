@@ -85,6 +85,11 @@ func _ready() -> void:
 	# inside the wall and F could never hit it
 	col.position = Vector3(0, 1.25, 0) if wall_button else Vector3(0, col_size.y * 0.5, 0)
 	add_child(col)
+	if action == "" or action == "house_exit":
+		# WARP PORTALS don't body-block: walk straight into the glow.
+		# Layer 2 = invisible to movement (mask 1), still hit by the
+		# F-interact ray (which queries all layers).
+		collision_layer = 2
 
 func use(player: Player) -> void:
 	var hud := get_tree().get_first_node_in_group("hud")
