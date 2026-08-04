@@ -162,6 +162,8 @@ func _ready() -> void:
 		_hole_test()
 	if OS.get_environment("CTD_TEST") == "19":
 		_door_test()
+	if OS.get_environment("CTD_TEST") == "20":
+		_radio_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -486,6 +488,31 @@ func _repopulate() -> void:
 
 ## Headless: two houses, a doorframe in each, one Door connect. Verify
 ## the rooms docked, the walls opened, and the link persisted.
+## Headless: spawn a powered radio, aim at station 0, verify sound flow.
+func _radio_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var r := RadioTower.new()
+	add_child(r)
+	r.set_meta("placed_id", "radio")
+	r.global_position = p.global_position + Vector3(3, 0, 0)
+	await get_tree().create_timer(0.5).timeout
+	print("RADIOTEST buses=", AudioServer.bus_count,
+		" fxidx=", AudioServer.get_bus_index("RadioFX"),
+		" talkbus=", r._talk.bus, " stations=", r.stations.size())
+	r.buf = 300.0
+	if r.stations.size() > 0:
+		var st = r.stations[0]
+		r.freq = float(st["freq"])
+		r.aim_dir = r.station_dir(st)
+		print("RADIOTEST aimed at ", st["name"], " f=", st["freq"])
+	for w8 in 12:
+		r.buf = 300.0
+		await get_tree().create_timer(0.5).timeout
+		print("RADIOTEST t=%.1f powered=%s hiss=%s talk=%s cur=%d cook=%s hv=%.1f hm=%.1f" % [
+			float(w8) * 0.5, r.powered, r._hiss.playing, r._talk.playing,
+			r._cur_station, r._cooking, r._hiss.volume_db, r._hiss.max_db])
+
 func _door_test() -> void:
 	await get_tree().create_timer(2.0).timeout
 	var p = get_tree().get_first_node_in_group("player")

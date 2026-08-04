@@ -313,7 +313,7 @@ func _draw_spec() -> void:
 				continue
 			_spec.draw_rect(Rect2(Vector2(float(b) * cw, float(r) * rh),
 				Vector2(cw, rh)),
-				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.08 + v * 0.25))
+				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.18 + v * 0.45))
 	# LAYER 2: the HD yellow audio spectrogram riding on top
 	if radio.spec_tex != null:
 		_spec.draw_texture_rect(radio.spec_tex, Rect2(Vector2.ZERO, sz),
@@ -380,7 +380,7 @@ func _process(_d: float) -> void:
 		var row := PackedFloat32Array()
 		row.resize(44)
 		for b in 44:
-			row[b] = randf() * 0.1
+			row[b] = randf() * 0.16
 		_hist.append(row)
 		while _hist.size() > 30:
 			_hist.pop_front()

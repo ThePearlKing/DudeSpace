@@ -532,6 +532,13 @@ func _process(d: float) -> void:
 		_spec_t = 1.0 / 15.0
 		var region := _spec_img.get_region(Rect2i(1, 0, 191, 64))
 		_spec_img.blit_rect(region, Rect2i(0, 0, 191, 64), Vector2i(0, 0))
+		if not powered:
+			# the screens SAY it: dim red column = the set has no power
+			for b0 in 64:
+				_spec_img.set_pixel(191, 63 - b0,
+					Color(0.25, 0.02, 0.02) if b0 % 8 < 4 else Color(0.05, 0.0, 0.0))
+			spec_tex.update(_spec_img)
+			return
 		for b in 64:
 			var f0 := 60.0 * pow(8000.0 / 60.0, float(b) / 64.0)
 			var f1 := 60.0 * pow(8000.0 / 60.0, float(b + 1) / 64.0)
