@@ -37,7 +37,16 @@ static func style_for(kind: String) -> Dictionary:
 	match kind:
 		"pi":
 			return {"scale": [0, 2, 4, 7, 9, 12, 14], "bpm": 150, "wave": "square",
-				"base": 330.0}   # mathy arpeggios
+				"base": 330.0, "digits": true}   # the melody IS pi
+		"earth":
+			return {"scale": [0, 2, 4, 7, 9, 12], "bpm": 96, "wave": "sine",
+				"base": 294.0}   # easy listening for a doomed species
+		"rick":
+			return {"scale": [0, 2, 4, 5, 7, 9], "bpm": 113, "wave": "square",
+				"base": 233.0}   # a suspiciously committed groove
+		"gas", "jazz":
+			return {"scale": [0, 2, 3, 5, 7, 9, 10], "bpm": 88, "wave": "sine",
+				"base": 220.0, "jazz": true}   # gas giants swing
 		"life", "varnisol":
 			return {"scale": [0, 3, 5, 7, 10, 12], "bpm": 84, "wave": "sine",
 				"base": 262.0}   # gentle pentatonic
@@ -78,17 +87,25 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	var scale: Array = st["scale"]
 	var base: float = st["base"]
 	var wave: String = st["wave"]
+	var pi_digits := "3141592653589793238462643383279"
+	var jazz: bool = bool(st.get("jazz", false))
 	var deg := 0
 	for ni in notes:
-		# melodies walk, mostly; leap sometimes; rest sometimes
-		if rng.randf() < 0.15:
-			continue   # a rest. music is the notes you don't play.
-		deg = clampi(deg + (rng.randi_range(-2, 2) if rng.randf() < 0.8
-			else rng.randi_range(-4, 4)), 0, scale.size() - 1)
+		if bool(st.get("digits", false)):
+			# THE PI STATION: the melody is literally pi, digit by digit
+			deg = int(pi_digits[ni % pi_digits.length()]) % scale.size()
+		else:
+			# melodies walk, mostly; leap sometimes; rest sometimes
+			if rng.randf() < 0.15:
+				continue   # a rest. music is the notes you don't play.
+			deg = clampi(deg + (rng.randi_range(-2, 2) if rng.randf() < 0.8
+				else rng.randi_range(-4, 4)), 0, scale.size() - 1)
 		var f := base * pow(2.0, float(scale[deg]) / 12.0)
 		if rng.randf() < 0.2:
 			f *= 0.5   # bass note drop
 		var start := int(float(ni) * beat * SR)
+		if jazz and ni % 2 == 1:
+			start += int(beat * SR * 0.16)   # the swing. essential.
 		var dur := int(beat * SR * (0.9 if rng.randf() < 0.7 else 1.8))
 		for i in mini(dur, total - start):
 			var t := float(i) / SR
@@ -105,6 +122,11 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 			var env := minf(1.0, float(i) / (SR * 0.01)) \
 				* minf(1.0, float(dur - i) / (SR * 0.08))
 			buf[start + i] += v * env
+			if jazz and ni % 4 == 0:
+				# a lush chord under the downbeats: root + 3rd + 7th
+				var t2 := float(i) / SR
+				buf[start + i] += (sin(TAU * f * 1.26 * t2)
+					+ sin(TAU * f * 1.78 * t2)) * 0.14 * env
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
@@ -179,6 +201,16 @@ const NOODLE_BITS := ["the sauce remembers.", "every ring you take, I count.",
 	"boil. the universe is a pot.", "al dente is a covenant.",
 	"I watched you sell the semicircles.", "wrath keeps. like leftovers.",
 	"the fork is coming.", "strain your deeds.", "I am the hunger above."]
+
+const RICK_BITS := ["this station will never let you down. contractually.",
+	"you tuned this in yourself. remember that.",
+	"we are committed to you. fully. forever. legally.",
+	"no other station would do this to you.",
+	"you know the rules of this frequency. so do we.",
+	"still here? incredible. so are we. always."]
+
+static func rick_line() -> String:
+	return RICK_BITS[randi() % RICK_BITS.size()]
 
 static func noodle_line() -> String:
 	return NOODLE_BITS[randi() % NOODLE_BITS.size()]

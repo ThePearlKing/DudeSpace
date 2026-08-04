@@ -28,7 +28,7 @@ func _ready() -> void:
 	root.add_theme_stylebox_override("panel", st)
 	add_child(root)
 	var title := Label.new()
-	title.text = "📡  DISH MAP — click a body to aim the dish · ESC closes"
+	title.text = "📡  DISH MAP — left-click a body to lock on · right-click to free-aim · ESC closes"
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", NEON)
 	title.position = Vector2(24, 12)
@@ -155,6 +155,15 @@ func _draw_map() -> void:
 	var aim2 := Vector2(radio.aim_dir.x, radio.aim_dir.z)
 	if aim2.length() > 0.05:
 		var an := aim2.normalized()
+		# the BEAM: the actual ~20-degree cone the dish can hear
+		var reach := _map.size.length()
+		var la := an.rotated(0.35)
+		var ra := an.rotated(-0.35)
+		_map.draw_colored_polygon(PackedVector2Array([
+			rp, rp + la * reach, rp + ra * reach]),
+			Color(0.48, 1.0, 0.69, 0.10))
+		_map.draw_line(rp, rp + la * reach, Color(0.48, 1.0, 0.69, 0.3), 1.0)
+		_map.draw_line(rp, rp + ra * reach, Color(0.48, 1.0, 0.69, 0.3), 1.0)
 		var tip := rp + an * 200.0
 		_map.draw_line(rp, tip, Color("#7bffb0"), 2.5)
 		var perp := Vector2(-an.y, an.x)
@@ -165,9 +174,10 @@ func _draw_map() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#7bffb0"))
 
 func _map_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
-		# aim at whatever body is nearest the click
+	if not (event is InputEventMouseButton and event.pressed):
+		return
+	if event.button_index == MOUSE_BUTTON_LEFT:
+		# LEFT: select a body (or the god) and lock the dish onto it
 		var best = null
 		var bd := 40.0
 		for b in Universe.bodies:
@@ -185,6 +195,14 @@ func _map_input(event: InputEvent) -> void:
 			return
 		if best != null:
 			radio.aim_at(best.center)
+	elif event.button_index == MOUSE_BUTTON_RIGHT:
+		# RIGHT: free-aim -- point the dish at the clicked spot on the map
+		var sc := _map_scale()
+		var half := _map.size * 0.5
+		var rel := (event.position - half) / half
+		var world := Vector3(rel.x * sc, radio.global_position.y, rel.y * sc)
+		radio.aim_dir = (world - radio.global_position).normalized()
+		Sfx.play("click", -18.0)
 
 # ----------------------------------------------------------- spectrum
 

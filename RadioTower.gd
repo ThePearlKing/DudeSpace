@@ -86,10 +86,18 @@ func _build_stations() -> void:
 		match b.name:
 			"Earth":
 				st = {"name": "EARTH NEWS", "type": "news"}
+				stations.append({"name": "EARTH CLASSICS", "type": "music",
+					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
+					"body": b, "kind": "earth"})
+				stations.append({"name": "RICK FM", "type": "rick",
+					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
+					"body": b, "kind": "rick"})
 			"Wth":
 				st = {"name": "??? (shader system)", "type": "alien"}
 			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol":
 				st = {"name": "%s FM" % b.name, "type": "music"}
+			"Jupiter":
+				st = {"name": "JUPITER JAZZ", "type": "music"}
 			_:
 				continue
 		st["freq"] = snappedf(rng.randf_range(88.5, 107.5), 0.1)
@@ -114,17 +122,27 @@ func station_dir(st: Dictionary) -> Vector3:
 		return (w.global_position - global_position).normalized()
 	return (global_position - Universe.nearest(global_position).center).normalized()
 
-## Signal quality 0..1: dish alignment x frequency accuracy.
+func _is_local(st: Dictionary) -> bool:
+	if st["body"] == null:
+		return false
+	return global_position.distance_to(st["body"].center) < float(st["body"].radius) * 1.6
+
+## Signal quality 0..1: dish alignment x frequency accuracy. Stations
+## on the planet you're STANDING ON are omnidirectional: only the dial
+## matters, and all of them are reachable.
 func signal_for(st: Dictionary) -> float:
-	var align := aim_dir.dot(station_dir(st))
-	var a := clampf((align - 0.55) / 0.45, 0.0, 1.0)
+	var a := align_for(st)
 	var ferr: float = absf(freq - float(st["freq"]))
 	var f := clampf(1.0 - ferr / 1.2, 0.0, 1.0)
 	return a * f
 
-## Alignment alone (for the spectrum display: activity you COULD tune).
+## Alignment (spectrum display: activity you COULD tune). NARROW beam,
+## ~20 degrees -- distant clusters bunch in angle, and a fat cone was
+## hearing three galaxies at once.
 func align_for(st: Dictionary) -> float:
-	return clampf((aim_dir.dot(station_dir(st)) - 0.55) / 0.45, 0.0, 1.0)
+	if _is_local(st):
+		return 1.0
+	return clampf((aim_dir.dot(station_dir(st)) - 0.94) / 0.06, 0.0, 1.0)
 
 func aim_at(body_center: Vector3) -> void:
 	var nb = Universe.nearest(global_position)
@@ -193,8 +211,13 @@ func work(delta: float) -> void:
 				match str(st["type"]):
 					"news":
 						wav = HumanVoice.render(RadioLib.news_line(),
-							{"base": 210.0, "var": 0.5, "wave": "sine",
-							"rate": 1.05, "artic": 1.3})
+							{"base": 185.0, "var": 0.42, "wave": "sine",
+							"rate": 1.35, "artic": 1.6})
+					"rick":
+						# the smoothest voice on the dial. suspicious.
+						wav = HumanVoice.render(RadioLib.rick_line(),
+							{"base": 150.0, "var": 0.55, "wave": "sine",
+							"rate": 1.25, "artic": 1.4})
 					"alien":
 						wav = HumanVoice.render(RadioLib.alien_line(),
 							RadioLib.alien_profile())
