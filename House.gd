@@ -297,6 +297,14 @@ func _build_ports() -> void:
 				outp.connect_wire(inp, "power", 0)
 			else:
 				outp.connect_wire(inp, "item", 2)
+			# the umbilical is METAPHYSICAL: without this, the wire
+			# visual draws a line from your lawn to a pocket dimension
+			# 60km past everything (observed. memorable. wrong.)
+			for entry in outp._conn_vis:
+				for nd in entry["nodes"]:
+					if is_instance_valid(nd):
+						nd.queue_free()
+			outp._conn_vis.clear()
 
 # ------------------------------------------------------------- windows
 

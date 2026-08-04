@@ -1939,11 +1939,23 @@ func _populate(b) -> void:
 			# the country. dudes can't enter; humans move in, furnish
 			# them to taste, and have people over
 			for ti in 2:
+				# hamlets belong in the middle of NOWHERE: keep rolling
+				# until the spot is far from every city
 				var tc := Vector3.ZERO
-				while tc.length() < 0.1:
-					tc = Vector3(crng.randf_range(-1, 1), crng.randf_range(-1, 1),
-						crng.randf_range(-1, 1))
-				tc = tc.normalized()
+				var lonely := false
+				var tries := 0
+				while not lonely and tries < 60:
+					tries += 1
+					tc = Vector3.ZERO
+					while tc.length() < 0.1:
+						tc = Vector3(crng.randf_range(-1, 1), crng.randf_range(-1, 1),
+							crng.randf_range(-1, 1))
+					tc = tc.normalized()
+					lonely = true
+					for cty in Game.earth_cities:
+						if tc.angle_to(cty["dir"]) * float(b.radius) < 100.0:
+							lonely = false
+							break
 				for hi in 3:
 					var hd3 := (tc + Vector3(crng.randf_range(-0.05, 0.05),
 						crng.randf_range(-0.05, 0.05), crng.randf_range(-0.05, 0.05))).normalized()
@@ -2355,6 +2367,7 @@ func _city_building(b, dir: Vector3, tint: Color = Color(0.5, 0.5, 0.5)) -> void
 func _earth_tree(b, dir: Vector3) -> void:
 	var root := Node3D.new()
 	add_child(root)
+	var polar := absf(dir.y) > 0.68   # up in the snow latitudes
 	var h := randf_range(3.0, 5.5)
 	var trunk := MeshInstance3D.new()
 	var tm := CylinderMesh.new()
@@ -2374,8 +2387,10 @@ func _earth_tree(b, dir: Vector3) -> void:
 		leaf.mesh = lm
 		leaf.position = Vector3(randf_range(-0.7, 0.7), h - 0.4 + randf_range(0.0, 1.0),
 			randf_range(-0.7, 0.7))
-		leaf.material_override = Destructible.make_material(
-			Color("#2f7d32").lerp(Color("#5aa53f"), randf()), 0.08)
+		var leafc := Color("#2f7d32").lerp(Color("#5aa53f"), randf())
+		if polar:
+			leafc = leafc.lerp(Color("#dfe8f0"), 0.75)   # snow-loaded canopy
+		leaf.material_override = Destructible.make_material(leafc, 0.08)
 		root.add_child(leaf)
 	root.global_transform = Transform3D(_basis_from_up(dir), b.center + dir * b.radius)
 
@@ -2653,7 +2668,9 @@ func _earth_mountain(b, dir: Vector3) -> void:
 	cm.radial_segments = 7   # jagged, not perfect
 	cone.mesh = cm
 	cone.position = Vector3(0, h * 0.5 - 0.4, 0)
-	cone.material_override = Destructible.make_material(Color("#5a564e"), 0.05)
+	# polar ranges are snowed in to the roots, not just capped
+	var rockc := Color("#dfe6ee") if absf(dir.y) > 0.68 else Color("#5a564e")
+	cone.material_override = Destructible.make_material(rockc, 0.05)
 	root.add_child(cone)
 	var snow := MeshInstance3D.new()
 	var sm2 := CylinderMesh.new()
