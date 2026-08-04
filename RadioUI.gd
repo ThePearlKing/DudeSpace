@@ -11,6 +11,7 @@ var _spec: Control
 var _freq_lbl: Label
 var _slider: HSlider
 var _act_box: VBoxContainer
+var _subs: Label
 var _hist: Array = []     # waterfall rows, oldest first
 var _hist_t: float = 0.0
 
@@ -52,6 +53,20 @@ func _ready() -> void:
 	_map.draw.connect(_draw_map)
 	_map.gui_input.connect(_map_input)
 	root.add_child(_map)
+	# SUBTITLES: what the dish is saying, overlaid on the lower map
+	_subs = Label.new()
+	_subs.anchor_left = 0.06
+	_subs.anchor_top = 0.6
+	_subs.anchor_right = 0.94
+	_subs.anchor_bottom = 0.72
+	_subs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_subs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subs.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_subs.add_theme_font_size_override("font_size", 17)
+	_subs.add_theme_color_override("font_color", Color("#ffd166"))
+	_subs.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_subs.add_theme_constant_override("outline_size", 5)
+	root.add_child(_subs)
 
 	# frequency panel ON TOP of the map, bottom strip
 	var strip := Panel.new()
@@ -282,6 +297,8 @@ func _process(_d: float) -> void:
 		return
 	_map.queue_redraw()
 	_spec.queue_redraw()
+	if _subs != null:
+		_subs.text = radio.now_line if Game.playtime < radio.now_line_until else ""
 	# sample station alignment into the waterfall ~10x a second
 	_hist_t -= _d
 	if _hist_t <= 0.0 and radio != null and is_instance_valid(radio):

@@ -34,6 +34,10 @@ var _spec_t: float = 0.0
 var _cooking: bool = false
 var _cooked: AudioStreamWAV = null
 var _cooked_for: int = -2
+var _cook_line: String = ""     # subtitle for the stream being cooked
+var _cooked_line: String = ""
+var now_line: String = ""       # what the dish is SAYING right now
+var now_line_until: float = 0.0
 var _bad_t: float = 0.0   # how long the signal has been junk
 
 func _init() -> void:
@@ -392,16 +396,29 @@ func work(delta: float) -> void:
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
 				var t := str(st["type"])
+				# roll the CONTENT up front so the subtitles know the words
+				var line := ""
+				var ex: Array = []
+				if not _cooking and (_cooked == null or _cooked_for != _cur_station):
+					match t:
+						"news":
+							line = RadioLib.news_line()
+							_cook_line = line
+						"alien":
+							ex = RadioLib.alien_exchange()
+							_cook_line = RadioLib.rune_text(ex)
+						_:
+							_cook_line = ""
 				if _serve(func() -> AudioStreamWAV:
 					match t:
 						"news":
-							return HumanVoice.render(RadioLib.news_line(),
+							return HumanVoice.render(line,
 								{"base": 185.0, "var": 0.42, "wave": "sine",
 								"rate": 1.35, "artic": 1.6})
 						"alien":
 							# WTH runs a TALK SHOW: recurring hosts,
 							# call-ins, planet news, weather, markets
-							return RadioLib.alien_broadcast()
+							return RadioLib.alien_render(ex)
 						"noodle":
 							# the god does not talk. it PERFORMS.
 							return RadioLib.noodle_broadcast()
@@ -414,6 +431,10 @@ func _serve(builder: Callable, clock_sync: bool) -> bool:
 	if _cooked != null and _cooked_for == _cur_station:
 		_talk.stream = _cooked
 		_cooked = null
+		if _cooked_line != "":
+			now_line = _cooked_line
+			now_line_until = Game.playtime + _talk.stream.get_length() + 1.5
+			_cooked_line = ""
 		if clock_sync:
 			_talk.play(fmod(Game.playtime, _talk.stream.get_length()))
 		else:
@@ -422,16 +443,18 @@ func _serve(builder: Callable, clock_sync: bool) -> bool:
 	if not _cooking:
 		_cooking = true
 		var idx := _cur_station
+		var cl := _cook_line
 		WorkerThreadPool.add_task(func() -> void:
 			var wav: AudioStreamWAV = builder.call()
-			_deliver.call_deferred(wav, idx))
+			_deliver.call_deferred(wav, idx, cl))
 	return false
 
-func _deliver(wav: AudioStreamWAV, idx: int) -> void:
+func _deliver(wav: AudioStreamWAV, idx: int, cl: String = "") -> void:
 	_cooking = false
 	if wav != null:
 		_cooked = wav
 		_cooked_for = idx
+		_cooked_line = cl
 
 func _process(d: float) -> void:
 	super._process(d)

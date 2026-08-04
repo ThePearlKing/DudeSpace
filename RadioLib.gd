@@ -712,10 +712,31 @@ static func alien_exchange() -> Array:
 ## The whole segment as one broadcast: each voice rendered with its own
 ## stable profile, short gaps between turns, AM-station pacing.
 static func alien_broadcast() -> AudioStreamWAV:
+	return alien_render(alien_exchange())
+
+const ALIEN_RUNES := "ΔΘΛΞΠΣΦΨΩЖИДЯБϞϟ"
+
+## Subtitles for the exchange -- with a share of the letters swapped for
+## alien glyphs, deterministically, like the translator is only mostly
+## working.
+static func rune_text(ex: Array) -> String:
+	var full := ""
+	for turn in ex:
+		full += "[" + str(int(turn[0]) + 1) + "] " + str(turn[1]) + "\n"
+	var out := ""
+	for i in full.length():
+		var ch := full[i]
+		if ch >= "a" and ch <= "z" and (i * 7 + ch.unicode_at(0)) % 5 < 2:
+			out += ALIEN_RUNES[(i + ch.unicode_at(0)) % ALIEN_RUNES.length()]
+		else:
+			out += ch
+	return out.strip_edges()
+
+static func alien_render(ex: Array) -> AudioStreamWAV:
 	var bytes := PackedByteArray()
 	var gap := PackedByteArray()
 	gap.resize(int(SR * 0.45) * 2)
-	for turn in alien_exchange():
+	for turn in ex:
 		var w := HumanVoice.render(str(turn[1]), ALIEN_HOSTS[int(turn[0])])
 		if w != null:
 			bytes.append_array(w.data)
