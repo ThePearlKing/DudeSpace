@@ -983,6 +983,21 @@ const AP_FOURTH := [
 		"we see the beam. it comes from the little blue-adjacent rock.",
 		"wave at the sky, everyone. professionally."]]
 
+const AX_HUM_OPEN := [
+	"the human feed is doing something again.",
+	"i watched the bipeds all cycle and i need to say words about it.",
+	"update from the blue-adjacent rock: the humans remain committed.",
+	"you will not believe what the soft ones did during the break.",
+	"my monitors flagged human activity. all of it.",
+	"the ones with the removable hats are at it again."]
+const AX_HUM_CLOSE := [
+	"tragic. beautiful. more after these vertices.",
+	"and somehow, they are winning.",
+	"we will never be done studying them.",
+	"and they OUTNUMBER their ladders.",
+	"file it with the rest. the cabinet is full.",
+	"send the anthropology drone another apology."]
+
 const AP_HUMAN_DUMB := [
 	"a human will walk PAST a ladder to fall off a cliff.",
 	"they invented the meeting. then the meeting about meetings.",
@@ -1113,11 +1128,13 @@ static func alien_exchange() -> Array:
 					[3, "write THAT down, dish person."],
 					[1, _ax_opinion()]]
 		_:
-			# HUMANS: dumb, inefficient, endlessly watchable
-			out = [[0, "let's talk about the humans again."],
+			# HUMANS: dumb, inefficient, endlessly watchable. the segment
+			# opens like a field report, not a talk-show card
+			out = [[0, _ax_fresh(AX_HUM_OPEN)],
 				[3, _ax_fresh(AP_HUMAN_DUMB)],
-				[1, _ax_fresh(AP_HUMAN_DUMB)],
-				[0, "tragic. beautiful. more after these vertices."]]
+				[1, "that's nothing. " + _ax_fresh(AP_HUMAN_DUMB)],
+				[2, _ax_opinion()],
+				[0, _ax_fresh(AX_HUM_CLOSE)]]
 	# an unscheduled THOUGHT: rarely, someone just needs the foil cone
 	if randi() % 12 == 0:
 		out.append([2, _ax_fresh(AP_FOIL)])
