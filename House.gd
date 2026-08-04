@@ -563,8 +563,15 @@ func _build_interior() -> void:
 				warm.darkened(0.4))
 			_deco(c + Vector3(4.0, fy - c.y + 0.8, 0.85), Vector3(3.4, 1.1, 0.08),
 				warm.darkened(0.4))
-			# NO dressing: the basement ships empty. Your cellar, your
-			# furniture placer, your problem.
+			# cellar dressing along the WALLS only -- nothing parked in the
+			# middle of the room to trip over. The rug has no collision, so
+			# placing things on top of it works fine.
+			_deco(c + Vector3(0, -sz.y - 0.6 + sz.y * 0.5, 0), Vector3(0.5, 0.1, 0.5),
+				Color("#fff2c8"), 1.6)
+			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
+			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.2, -sz.z * 0.35), 3.0)
+			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.2, sz.z * 0.5 - 1.0))
+			_rug(Vector3(c.x - 2.0, fy + 0.28, c.z), Vector2(3.4, 2.4), Color("#8a3a3a"))
 		"tower":
 			# floors every 5 units. slabs leave a stair bay along -X;
 			# a switchback staircase LIVES in that bay and actually
