@@ -655,6 +655,12 @@ func _ready() -> void:
 			var spike: String = AXES[randi() % AXES.size()]
 			_pers[spike] = maxf(float(_pers[spike]), randf_range(75.0, 100.0))
 		saved["pers"] = _pers
+	# Karens: born, not made. named, actually. the manager will be
+	# hearing about all of this.
+	if human_name == "Karen":
+		_pers["grumpy"] = maxf(float(_pers.get("grumpy", 25.0)), 78.0)
+		_pers["confident"] = maxf(float(_pers.get("confident", 25.0)), 85.0)
+		_pers["goofy"] = minf(float(_pers.get("goofy", 25.0)), 15.0)
 	# proportions: RANDOMIZED. most humans look normal. some rolled badly
 	# at the character screen of life and are living with it.
 	_body.scale = _v3(_rv("bscale", [randf_range(0.92, 1.04),
@@ -1161,6 +1167,11 @@ func _social_line() -> String:
 		if roll <= 0.0:
 			chosen = k
 			break
+	if human_name == "Karen" and randf() < 0.35:
+		return ["I need to speak to whoever MANAGES this planet.",
+			"I know the noodle god PERSONALLY.",
+			"this is unacceptable. all of it. everything.",
+			"I will be leaving a review."][randi() % 4]
 	var lines: Array = SOCIAL[chosen]
 	var line: String = lines[randi() % lines.size()]
 	return line.replace("{n}", human_name)

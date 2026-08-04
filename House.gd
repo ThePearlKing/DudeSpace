@@ -68,6 +68,10 @@ class Port extends Machine:
 	func accepts(id: String) -> bool:
 		return not is_power
 
+	## No machine screen, no slots UI: it's a SOCKET. Wire into it.
+	func use() -> void:
+		Sfx.play("click", -22.0)
+
 	var num: int = 0
 
 	func info_text() -> String:
@@ -126,7 +130,7 @@ func room_size() -> Vector3:
 		"two_story":
 			return Vector3(14, 10, 14)
 		"box":
-			return Vector3(8, 8, 8)
+			return Vector3(12, 12, 12)
 		"basement":
 			return Vector3(14, 5.5, 14)
 		"factory":
@@ -329,8 +333,9 @@ func _build_exterior() -> void:
 
 # ------------------------------------------------------------- interior
 
-func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12) -> void:
+func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12, skip: Array = []) -> void:
 	var half := size * 0.5
+	var wi := -1
 	for wspec in [
 		[Vector3(size.x, 1, size.z), Vector3(0, -half.y, 0)],
 		[Vector3(size.x, 1, size.z), Vector3(0, half.y, 0)],
@@ -339,6 +344,9 @@ func _iroom(center: Vector3, size: Vector3, c: Color, e := 0.12) -> void:
 		[Vector3(size.x, size.y, 1), Vector3(0, 0, -half.z)],
 		[Vector3(size.x, size.y, 1), Vector3(0, 0, half.z)],
 	]:
+		wi += 1
+		if wi in skip:
+			continue
 		var body := StaticBody3D.new()
 		var mi := MeshInstance3D.new()
 		var m := BoxMesh.new()
@@ -384,37 +392,48 @@ func _build_interior() -> void:
 			# landing bridge: from the stair top ONTO the slab edge
 			_solid(c + Vector3(sz.x * 0.35 - 0.6, 0.0, sz.z * 0.5 - 1.6 - 0.95 * 9.0 - 1.1),
 				Vector3(sz.x * 0.32, 0.4, 2.6), warm.darkened(0.15))
-			# railing along the slab's open edge
-			for rz in 5:
-				_deco(c + Vector3(sz.x * 0.2, 0.8, -sz.z * 0.45 + float(rz) * (sz.z * 0.22)),
+			# railing along the slab's open edge -- STOPPING before the
+			# landing so the stair top stays walkable
+			for rz in 4:
+				_deco(c + Vector3(sz.x * 0.2, 0.8, 0.2 + float(rz) * 1.6),
 					Vector3(0.08, 1.2, 0.08), warm.darkened(0.4))
-			_deco(c + Vector3(sz.x * 0.2, 1.4, 0), Vector3(0.1, 0.08, sz.z - 1.0),
+			_deco(c + Vector3(sz.x * 0.2, 1.4, 2.6), Vector3(0.1, 0.08, 5.2),
 				warm.darkened(0.4))
 			# fireplace on the ground floor
 			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
+			_wood_floor(Vector3(c.x, fy + 0.2, c.z), Vector2(sz.x - 1.2, sz.z - 1.2))
+			_wood_floor(Vector3(c.x - sz.x * 0.15, c.y + 0.21, c.z),
+				Vector2(sz.x * 0.7 - 0.2, sz.z - 1.2))
+			_counter(c + Vector3(-sz.x * 0.3, 0.26, -sz.z * 0.35), 2.4)
+			_plant(c + Vector3(-sz.x * 0.5 + 1.0, fy - c.y + 0.26, sz.z * 0.5 - 1.0))
 		"basement":
-			# the cellar: a real second room below, reached by a HATCH
-			# (gates, because you cannot cut a hole in a BoxMesh floor)
-			var bc := c + Vector3(0, -sz.y - 2.0, 0)
-			_iroom(bc, Vector3(sz.x - 2.0, sz.y, sz.z - 2.0), Color("#8a8272"), 0.06)
-			var down := Gate.new().configure({
-				"target": bc + Vector3(0, -sz.y * 0.5 + 1.2, 2.0),
-				"zone": "flat", "label": "CELLAR", "color": Color("#6a5434")})
-			_iroot.add_child(down)
-			down.global_position = c + Vector3(sz.x * 0.5 - 2.0, fy - c.y + 0.4,
-				-sz.z * 0.5 + 2.0)
-			var upg := Gate.new().configure({
-				"target": c + Vector3(sz.x * 0.5 - 3.5, fy - c.y + 1.2, -sz.z * 0.5 + 2.0),
-				"zone": "flat", "label": "UP", "color": Color("#c9b47e")})
-			_iroot.add_child(upg)
-			upg.global_position = bc + Vector3(0, -sz.y * 0.5 + 0.4, 3.5)
-			# cellar clutter: crates, a shelf, one suspicious barrel
+			# ONE tall shaft: ground floor with a REAL stairwell hole,
+			# real stairs descending into a real cellar. no gates.
+			_iroom(c, sz, warm, 0.12, [0])                       # upper, no floor
+			_iroom(c + Vector3(0, -sz.y, 0), sz, Color("#8a8272"), 0.06, [1])  # cellar, no ceiling
+			var hole := Rect2(2.5, 1.0, 3.0, 4.0)                # x0,z0,w,h
+			_hole_floor(Vector3(c.x, fy, c.z), Vector2(sz.x, sz.z), hole,
+				warm.darkened(0.15))
+			_wood_floor(Vector3(c.x - 2.5, fy + 0.2, c.z), Vector2(sz.x - 6.0, sz.z - 1.0))
+			# the stair: steep, honest, cellar-grade. lands on both floors
+			_stairs(c + Vector3(4.0, -sz.y * 1.5 + 0.3, 4.6),
+				Vector3(0, 0, -0.33), 11, 5.2, Color("#6a6255"))
+			# railing around the open hole so nobody just falls in
+			_deco(c + Vector3(2.35, fy - c.y + 0.8, 3.0), Vector3(0.08, 1.1, 4.2),
+				warm.darkened(0.4))
+			_deco(c + Vector3(4.0, fy - c.y + 0.8, 0.85), Vector3(3.4, 1.1, 0.08),
+				warm.darkened(0.4))
+			# cellar dressing: crates, barrel, a work light
 			for i in 3:
-				_deco(bc + Vector3(-2.0 + float(i) * 1.6, -sz.y * 0.5 + 0.55,
-					(float(sz.z) - 2.0) * 0.3), Vector3(0.9, 0.9, 0.9), Color("#6a5434"))
-			_deco(bc + Vector3(2.8, -sz.y * 0.5 + 0.7, -2.0),
+				_deco(c + Vector3(-3.0 + float(i) * 1.6, -sz.y * 1.5 + 0.75, 4.0),
+					Vector3(0.9, 0.9, 0.9), Color("#6a5434"))
+			_deco(c + Vector3(-4.5, -sz.y * 1.5 + 1.0, -3.0),
 				Vector3(0.7, 1.4, 0.7), Color("#4a4438"))
+			_deco(c + Vector3(0, -sz.y - 0.6 + sz.y * 0.5, 0), Vector3(0.5, 0.1, 0.5),
+				Color("#fff2c8"), 1.6)
 			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
+			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.2, -sz.z * 0.35), 3.0)
+			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.2, sz.z * 0.5 - 1.0))
 		"tower":
 			# floors every 5 units. slabs leave a stair bay along -X;
 			# a switchback staircase LIVES in that bay and actually
@@ -435,6 +454,12 @@ func _build_interior() -> void:
 				_solid(c + Vector3(-sz.x * 0.5 + 2.6, base_y + 5.0,
 					sz.z * 0.5 - 1.4 - 0.72 * 9.0 - 1.1),
 					Vector3(4.4, 0.4, 2.4), Color("#7a8090"))
+			# lobby carpet strip + a plant per landing (corporate law)
+			_deco(c + Vector3(1.5, fy - c.y + 0.22, sz.z * 0.5 - 3.0),
+				Vector3(4.0, 0.05, 2.2), Color("#7a2a2a"))
+			for f3 in range(1, nf):
+				_plant(c + Vector3(sz.x * 0.5 - 1.2,
+					-sz.y * 0.5 + float(f3) * 5.0 + 0.26, sz.z * 0.5 - 1.2))
 			# core columns
 			for cxz in [[-1.5, -1.5], [1.5, 1.5], [-1.5, 1.5], [1.5, -1.5]]:
 				_deco(c + Vector3(cxz[0] * 1.6, 0, cxz[1] * 1.6),
@@ -455,7 +480,11 @@ func _build_interior() -> void:
 			_solid(c + Vector3(0, 0.8, -sz.z * 0.5 + 1.2),
 				Vector3(sz.x - 6.0, 0.3, 1.8), Color("#6a6f78"))
 		_:
-			# small house: a hearth makes it a home
+			# small house: wood floor, kitchen corner, plants, a hearth
+			_wood_floor(Vector3(c.x, fy + 0.2, c.z), Vector2(sz.x - 1.2, sz.z - 1.2))
+			_counter(c + Vector3(-sz.x * 0.5 + 1.2, fy - c.y + 0.26, -sz.z * 0.35), 3.2)
+			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.26, sz.z * 0.5 - 1.0))
+			_plant(c + Vector3(sz.x * 0.5 - 1.0, fy - c.y + 0.26, -sz.z * 0.5 + 1.0))
 			_fireplace(c + Vector3(-sz.x * 0.5 + 0.7, fy - c.y + 0.9, 0))
 	# EXIT door pad, back wall
 	var out := Gate.new().configure({
@@ -465,16 +494,78 @@ func _build_interior() -> void:
 	out.global_position = c + Vector3(0, fy - c.y + 1.0, sz.z * 0.5 - 1.4)
 	out.set_meta("house", self)
 
+## A wood floor: warm overlay plus darker plank seams. Rooms stop
+## looking like the inside of a shipping box.
+func _wood_floor(center: Vector3, size: Vector2) -> void:
+	_deco(center + Vector3(0, 0.03, 0), Vector3(size.x, 0.06, size.y),
+		Color("#a07848"))
+	var n := int(size.y / 1.2)
+	for i in n:
+		_deco(center + Vector3(0, 0.07, -size.y * 0.5 + 0.6 + float(i) * 1.2),
+			Vector3(size.x, 0.012, 0.05), Color("#7a5830"))
+
+## A floor slab with a rectangular stairwell HOLE: four strips.
+## hole = (x0, z0, x1, z1) relative to center.
+func _hole_floor(center: Vector3, size: Vector2, hole: Rect2, c: Color) -> void:
+	var hx0 := hole.position.x
+	var hz0 := hole.position.y
+	var hx1 := hole.end.x
+	var hz1 := hole.end.y
+	var half := size * 0.5
+	if hx0 > -half.x:
+		_solid(center + Vector3((hx0 - half.x) * 0.5, 0, 0),
+			Vector3(hx0 + half.x, 0.4, size.y), c)
+	if hx1 < half.x:
+		_solid(center + Vector3((hx1 + half.x) * 0.5, 0, 0),
+			Vector3(half.x - hx1, 0.4, size.y), c)
+	if hz0 > -half.y:
+		_solid(center + Vector3((hx0 + hx1) * 0.5, 0, (hz0 - half.y) * 0.5),
+			Vector3(hx1 - hx0, 0.4, hz0 + half.y), c)
+	if hz1 < half.y:
+		_solid(center + Vector3((hx0 + hx1) * 0.5, 0, (hz1 + half.y) * 0.5),
+			Vector3(hx1 - hx0, 0.4, half.y - hz1), c)
+
+## A potted plant. Every good room has one. It knows things.
+func _plant(gpos: Vector3) -> void:
+	_deco(gpos, Vector3(0.34, 0.4, 0.34), Color("#8a5a34"))
+	var bush := MeshInstance3D.new()
+	var bmz := SphereMesh.new()
+	bmz.radius = 0.32
+	bmz.height = 0.55
+	bush.mesh = bmz
+	bush.material_override = _wallmat(Color("#3f7d3f"), 0.08)
+	_iroot.add_child(bush)
+	bush.global_position = gpos + Vector3(0, 0.5, 0)
+
+## A kitchen counter run: cabinets, top, a sink block.
+func _counter(gpos: Vector3, length: float) -> void:
+	_deco(gpos + Vector3(0, 0.45, 0), Vector3(length, 0.9, 0.7), Color("#6a5434"))
+	_deco(gpos + Vector3(0, 0.94, 0), Vector3(length + 0.1, 0.08, 0.8),
+		Color("#c9c4b8"))
+	_deco(gpos + Vector3(length * 0.25, 1.0, 0), Vector3(0.5, 0.1, 0.4),
+		Color("#8a8f98"))
+
 ## A real staircase: N steps climbing `rise` along `step_vec` (x,z per
 ## step), each with collision. The last step tops out AT the rise.
 func _stairs(base: Vector3, step_vec: Vector3, steps: int, rise: float,
 		col: Color) -> void:
 	for st in steps:
 		var t := float(st + 1) / float(steps)
-		_solid(base + Vector3(step_vec.x * 0.0, rise * t - 0.2,
-			step_vec.z * float(st)) + Vector3(0, 0, 0),
-			Vector3(2.2 if step_vec.x != 0.0 else 2.0, 0.42,
-				absf(step_vec.z) + 0.35 if step_vec.z != 0.0 else 1.0), col)
+		_solid(base + Vector3(0, rise * t - 0.2, step_vec.z * float(st)),
+			Vector3(2.2, 0.42, absf(step_vec.z) + 0.35), col)
+	# the part that makes them CLIMBABLE: an invisible ramp lying over
+	# the steps, so walking up is walking, not parkour
+	var run := step_vec.z * float(steps - 1)
+	var length := sqrt(run * run + rise * rise) + 0.8
+	var ramp := StaticBody3D.new()
+	var rcol := CollisionShape3D.new()
+	var rbs := BoxShape3D.new()
+	rbs.size = Vector3(2.2, 0.12, length)
+	rcol.shape = rbs
+	ramp.add_child(rcol)
+	_iroot.add_child(ramp)
+	ramp.global_position = base + Vector3(0, rise * 0.5 + 0.15, run * 0.5)
+	ramp.rotation.x = atan2(rise, -run) if run < 0.0 else -atan2(rise, run)
 
 ## Cosmetic block (no collision): trim, beams, railings, clutter.
 func _deco(gpos: Vector3, size: Vector3, c: Color, e := 0.08) -> void:
@@ -578,8 +669,8 @@ func _build_windows() -> void:
 	_cam_out = Camera3D.new()
 	_vp_out.add_child(_cam_out)
 	_cam_out.fov = 65.0
-	_cam_out.global_position = c + Vector3(0, 0.5, sz.z * 0.5 - 1.0)
-	_cam_out.look_at(c + Vector3(0, -sz.y * 0.25, 0), Vector3.UP)
+	_cam_out.global_position = c + Vector3(0, -sz.y * 0.5 + 1.7, sz.z * 0.5 - 1.2)
+	_cam_out.look_at(c + Vector3(0, -sz.y * 0.5 + 1.4, 0), Vector3.UP)
 	_vp_in = SubViewport.new()
 	_vp_in.size = Vector2i(384, 288)
 	_vp_in.render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -616,21 +707,27 @@ func _build_windows() -> void:
 	for f in floors:
 		var wy := 1.7 + float(f) * (3.0 if kind != "two_story" else 2.9)
 		# front: beside the door on floor 0, centered above
-		var fx := 1.4 if f == 0 else 0.0
+		var fx := w * 0.28 if f == 0 else 0.0
 		_win_unit(self, Vector3(fx, wy, -w * 0.5 + 0.02), 0.0, otex,
-			Vector2(1.4, 1.2))
+			Vector2(2.0, 1.5))
 		_win_unit(self, Vector3(0, wy, w * 0.5 - 0.02), 180.0, otex,
-			Vector2(1.4, 1.2))
+			Vector2(2.0, 1.5))
 	for f2 in ifloors:
 		var fy2 := c.y - sz.y * 0.5 + 1.6 + float(f2) * 5.0
 		if kind == "two_story":
 			fy2 = c.y - sz.y * 0.5 + 1.6 + float(f2) * (sz.y * 0.5)
 		for zside in [-1.0, 1.0]:
+			# same spots as outside: front window sits beside the door
+			# line, back window shifted off the exit gate
+			var ix := sz.x * 0.28 if (zside < 0.0 and f2 == 0) else -sz.x * 0.18
+			if zside < 0.0 and f2 > 0:
+				ix = 0.0
 			var iu := Node3D.new()
 			_iroot.add_child(iu)
-			iu.global_position = Vector3(c.x, fy2, c.z + zside * (sz.z * 0.5 - 0.62))
+			iu.global_position = Vector3(c.x + ix, fy2 + 0.5,
+				c.z + zside * (sz.z * 0.5 - 0.62))
 			iu.rotation_degrees.y = 0.0 if zside > 0.0 else 180.0
-			_win_frame(iu, itex, Vector2(3.2, 2.2))
+			_win_frame(iu, itex, Vector2(2.8, 1.8))
 
 ## One window UNIT: recessed cavity, frame, sill -- a window with
 ## actual depth, whose glass happens to be a live screen.
@@ -705,9 +802,8 @@ func use() -> void:
 	var p = get_tree().get_first_node_in_group("player")
 	if p == null:
 		return
-	if human_home:
-		Sfx.play("denied")   # it's SOMEONE'S. have some decency.
-		return
+	# human homes: you may VISIT (see the residents, judge the decor),
+	# you just can't claim the place
 	enter(p)
 
 func enter(p: Node3D) -> void:

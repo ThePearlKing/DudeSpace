@@ -121,6 +121,8 @@ func _ready() -> void:
 	Save.apply_progress()   # restore this slot's run (no-op on a fresh slot)
 	# deterministic world-gen: same save, same Earth, every single time
 	seed(Game.world_seed)
+	if OS.get_environment("CTD_TEST") != "":
+		Save.ephemeral = true   # test rigs NEVER touch real saves again
 	if OS.get_environment("CTD_TEST") == "1":
 		_self_test()
 	if OS.get_environment("CTD_TEST") == "2":
@@ -1952,9 +1954,18 @@ func _populate(b) -> void:
 				var t2 := cdir.cross(t1).normalized()
 				var tc := (cdir + (t1 * cos(ring_a) + t2 * sin(ring_a)) \
 					* tan(ring_r)).normalized()
+				# three houses on a little ring, ~14m apart: a hamlet,
+				# not a house pileup
+				var ht1 := tc.cross(Vector3.UP)
+				if ht1.length() < 0.01:
+					ht1 = tc.cross(Vector3.RIGHT)
+				ht1 = ht1.normalized()
+				var ht2 := tc.cross(ht1).normalized()
 				for hi in 3:
-					var hd3 := (tc + Vector3(crng.randf_range(-0.05, 0.05),
-						crng.randf_range(-0.05, 0.05), crng.randf_range(-0.05, 0.05))).normalized()
+					var ha := TAU * float(hi) / 3.0 + crng.randf_range(-0.3, 0.3)
+					var hr := 9.0 / float(b.radius)
+					var hd3 := (tc + (ht1 * cos(ha) + ht2 * sin(ha)) \
+						* tan(hr)).normalized()
 					var hh2 := House.new()
 					hh2.kind = "small"
 					hh2.human_home = true
