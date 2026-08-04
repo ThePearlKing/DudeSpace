@@ -385,7 +385,7 @@ func _process(delta: float) -> void:
 		_next_seg_t -= delta
 		if _next_seg_t <= 0.0 and not _cooking:
 			_cooking = true
-			var ex := RadioLib.alien_exchange()
+			var ex := RadioLib.alien_exchange(true)   # live: the guest is HERE
 			_apply_topic(RadioLib.last_alien_meta)
 			WorkerThreadPool.add_task(func() -> void:
 				var cooked: Array = []

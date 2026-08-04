@@ -977,6 +977,19 @@ const AP_FOIL := ["i am wearing the foil cone until the listening stops.",
 	"the foil cone stays ON this cycle. no debate.",
 	"foil is not fear. foil is fashion with boundaries.",
 	"i lined my studio with foil and my thoughts are MINE now."]
+# fourth wall, ROOM edition: someone is physically standing in the
+# studio -- these only air for the live in-person show, never the dish
+const AP_FOURTH_ROOM := [
+	["there is a biped in the studio right now.",
+		"we see you. the sofas are for you.",
+		"statistically, you walked here on purpose."],
+	["do not adjust your eyes. it is really standing there.",
+		"hello, room guest. blink twice for geometry.",
+		"it came down the hole. they always come down the hole."],
+	["security says the visitor is unarmed. mostly.",
+		"leave the table alone. it is load-bearing. emotionally.",
+		"wave at it, everyone. professionally."]]
+
 const AP_FOURTH := [
 	["instruments say someone OUTSIDE the system is decoding this signal. again.",
 		"hello, decoder. we count your clicks too.",
@@ -1179,7 +1192,7 @@ static func _ax_fresh(arr: Array) -> String:
 ## Topics rotate (no repeats back-to-back), lines assemble from parts,
 ## and RARELY the hosts notice they're being decoded -- or someone just
 ## quietly announces the foil cone. Unscheduled. Heartfelt.
-static func alien_exchange() -> Array:
+static func alien_exchange(in_room: bool = false) -> Array:
 	# subjects: mostly the local shader system, but the desk follows the
 	# whole universe -- Earth, Jupiter, the humans, even the hole
 	var pool: Array = AP if randi() % 10 < 6 else AX_FAR
@@ -1233,8 +1246,17 @@ static func alien_exchange() -> Array:
 				[2, _ax_opinion()]]
 		8:
 			# the FOURTH WALL segment: they know. they've always known.
-			# half scripted classics, half composed on the spot
-			if randi() % 2 == 0:
+			# in the ROOM, they address the person standing there; over
+			# the dish, they address the decoder. never crossed.
+			if in_room:
+				if randi() % 2 == 0:
+					var fwr: Array = AP_FOURTH_ROOM[randi() % AP_FOURTH_ROOM.size()]
+					out = [[0, str(fwr[0])], [1, str(fwr[1])], [3, str(fwr[2])]]
+				else:
+					out = [[0, "to the one standing in our studio: %s" % _ax_sentence(p, p2)],
+						[3, "yes, YOU. the one by the sofas."],
+						[1, _ax_opinion()]]
+			elif randi() % 2 == 0:
 				var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
 				out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
 			else:
