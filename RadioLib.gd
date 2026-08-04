@@ -1382,7 +1382,10 @@ static func noodle_broadcast() -> AudioStreamWAV:
 			var denv := sin(PI * float(i) / float(barlen))
 			buf[b2 + i] += (sin(TAU * f0 * td) * 0.3 \
 				+ sin(TAU * (f0 + 0.4) * td) * 0.2 \
-				+ sin(TAU * f0 * 1.5 * td) * 0.13) * denv
+				+ sin(TAU * f0 * 1.5 * td) * 0.13 \
+				+ sin(TAU * f0 * 2.0 * td) * 0.17 \
+				+ sin(TAU * (f0 * 2.0 + 0.6) * td) * 0.11 \
+				+ sin(TAU * f0 * 3.0 * td) * 0.07) * denv
 	var peak := 0.001
 	for i in total:
 		peak = maxf(peak, absf(buf[i]))
