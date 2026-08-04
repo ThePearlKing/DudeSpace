@@ -229,7 +229,8 @@ func open() -> void:
 
 func close_ui() -> void:
 	visible = false
-	if not Game.dead:
+	# only recapture the mouse in-world -- on the title screen it stays free
+	if not Game.dead and get_tree().get_first_node_in_group("player"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _unhandled_input(event: InputEvent) -> void:

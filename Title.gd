@@ -24,6 +24,7 @@ func _ready() -> void:
 	Net.leave()   # back at the title = session over
 	_build_background()
 	_build_main_menu()
+	add_child(HumanFaceEditor.new())   # F9 face editor works here too
 	# headless LAN test rig: CTD_NET=join connects to localhost as a guest
 	if OS.get_environment("CTD_NET") == "join":
 		Net.guest_name = "Tester"
