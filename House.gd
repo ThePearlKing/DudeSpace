@@ -361,28 +361,33 @@ func _build_ports() -> void:
 		outp.home_label = display_name()
 		outp.set_meta("house_port", true)
 		get_tree().current_scene.add_child(outp)
-		var side := -1.0 if i % 2 == 0 else 1.0
+		# tidy: power 1-2-3 stacked on the LEFT wall, item 1-2-3 on the
+		# RIGHT wall. no interleaving, no guessing.
+		var side := -1.0 if is_power else 1.0
 		var w := 5.0 if kind != "factory" else 8.0
 		if kind == "tower":
 			w = 4.0
 		if kind == "box":
 			w = 3.4
 		outp.global_transform = global_transform
-		# barely proud of the wall: a socket, not a shed
 		outp.global_position = global_position \
 			+ global_transform.basis.x * (side * (w * 0.5 + 0.08)) \
-			+ global_transform.basis.y * (0.7 + float(i / 2) * 0.85)
+			+ global_transform.basis.y * (0.7 + float(i % 3) * 0.85)
 		outp.rotate_object_local(Vector3.UP, PI * 0.5 * side)
-		_port_number(outp, i + 1)
+		_port_number(outp, i % 3 + 1)
 		_out_ports.append(outp)
 		var inp := Port.new()
 		inp.is_power = is_power
 		inp.home_label = display_name() + " (inside)"
 		inp.set_meta("house_port", true)
 		get_tree().current_scene.add_child(inp)
-		inp.global_position = c + Vector3(-sz.x * 0.5 + 1.0 + float(i) * 1.4,
+		# inside mirrors it: power trio left of the back wall, item trio
+		# right, numbered to match their outside twins
+		inp.global_position = c + Vector3(
+			(-sz.x * 0.25 if is_power else sz.x * 0.25) \
+				+ float(i % 3 - 1) * 1.2,
 			-sz.y * 0.5 + 1.0, -sz.z * 0.5 + 0.35)
-		_port_number(inp, i + 1)
+		_port_number(inp, i % 3 + 1)
 		_in_ports.append(inp)
 		# the pairing: outside pours into inside. no wires, no visuals,
 		# no lines to the far side of the solar system
