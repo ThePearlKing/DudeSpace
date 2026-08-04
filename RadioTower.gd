@@ -256,7 +256,9 @@ func work(delta: float) -> void:
 		_hiss.play()
 	# DISTANCE buries far stations in static: same alignment, worse SNR
 	var clear := bs
-	if best >= 0:
+	if best >= 0 and stations[best]["body"] != null:
+		# planet stations fade into static with distance. The SAUCE and
+		# the unlabeled thing don't -- they transmit at cosmic power.
 		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 45000.0, 0.0, 1.0)
 		clear = bs * (1.0 - 0.6 * far)
 	var hiss_target := linear_to_db(clampf(0.85 - clear * 0.8, 0.05, 1.0)) - 6.0

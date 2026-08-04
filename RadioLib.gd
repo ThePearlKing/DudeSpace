@@ -531,22 +531,22 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 	for i in total:
 		var v := 0.0
 		if i < n:
-			v += d.decode_s16(i * 2) / 32768.0 * 0.5
+			v += d.decode_s16(i * 2) / 32768.0 * 0.85   # the WORDS lead
 		var h := int(i * 0.5)   # the octave-down shadow, time-stretched
 		if h < n:
-			v += d.decode_s16(h * 2) / 32768.0 * 0.5
+			v += d.decode_s16(h * 2) / 32768.0 * 0.22
 		var u := int(float(i) * 1.023)   # a hair sharp: chorus of one
 		if u < n:
-			v += d.decode_s16(u * 2) / 32768.0 * 0.28
-		var r := n - 1 - int(i * 0.5)   # whispering backwards, slow
+			v += d.decode_s16(u * 2) / 32768.0 * 0.16
+		var r := n - 1 - int(i * 0.5)   # whispering backwards, quietly
 		if r >= 0 and r < n:
-			v += d.decode_s16(r * 2) / 32768.0 * 0.13
+			v += d.decode_s16(r * 2) / 32768.0 * 0.07
 		var t := float(i) / SR
-		v *= 0.68 + 0.32 * sin(TAU * 29.0 * t)      # ring-mod tremble
-		v += sin(TAU * 48.0 * t) * 0.09 + sin(TAU * 48.7 * t) * 0.07   # the pot
+		v *= 0.85 + 0.15 * sin(TAU * 29.0 * t)      # ring-mod tremble
+		v += sin(TAU * 48.0 * t) * 0.045 + sin(TAU * 48.7 * t) * 0.035   # the pot
 		buf[i] = v
 	# feedback echoes: the words keep arriving after they've stopped
-	for e in [[int(SR * 0.29), 0.4], [int(SR * 0.61), 0.22]]:
+	for e in [[int(SR * 0.29), 0.3], [int(SR * 0.61), 0.15]]:
 		var off := int(e[0])
 		var g := float(e[1])
 		for i in range(total - 1, off - 1, -1):
