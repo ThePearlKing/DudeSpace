@@ -1385,23 +1385,24 @@ func build_link_visuals(other) -> void:
 				bd = d
 				fa_p = fa.global_position
 				fb_p = fb.global_position
-	if bd > 12.0:
+	if bd > 16.0:
 		return
 	var mid := (fa_p + fb_p) * 0.5 + Vector3(0, 1.35, 0)
 	var dirv := (fb_p - fa_p)
 	dirv.y = 0.0
-	var L := dirv.length() + 1.6
+	# SEAMLESS: run the tube long enough to bite through both walls,
+	# floor top flush with the room floors
+	var L := dirv.length() + 2.8
 	if dirv.length() < 0.1:
 		return
 	dirv = dirv.normalized()
 	var xr := dirv.cross(Vector3.UP).normalized()
 	var gray := Surfaces.metal(Color("#8a9098"))
-	# interior hallway: floor, ceiling, two sides
 	for spec in [
-		[Vector3(2.4, 0.3, L), Vector3(0, -1.35, 0)],
-		[Vector3(2.4, 0.3, L), Vector3(0, 1.5, 0)],
-		[Vector3(0.3, 3.0, L), Vector3(-1.2, 0, 0)],
-		[Vector3(0.3, 3.0, L), Vector3(1.2, 0, 0)],
+		[Vector3(2.6, 0.3, L), Vector3(0, -1.3, 0)],
+		[Vector3(2.6, 0.3, L), Vector3(0, 1.55, 0)],
+		[Vector3(0.3, 3.1, L), Vector3(-1.3, 0, 0)],
+		[Vector3(0.3, 3.1, L), Vector3(1.3, 0, 0)],
 	]:
 		var b3 := StaticBody3D.new()
 		var mi3 := MeshInstance3D.new()
@@ -1459,7 +1460,7 @@ func connect_house(other) -> bool:
 	if fwd_a.length() < 0.1:
 		fwd_a = Vector3.FORWARD
 	fwd_a = fwd_a.normalized()
-	var target_fb := fa.global_position + fwd_a * 3.0
+	var target_fb := fa.global_position + fwd_a * 7.5   # a real 6m hallway
 	var delta := target_fb - fb.global_position
 	delta.y = fa.global_position.y - fb.global_position.y
 	var moving: Array = other.complex()
