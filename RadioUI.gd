@@ -11,8 +11,7 @@ var _spec: Control
 var _freq_lbl: Label
 var _slider: HSlider
 var _act_box: VBoxContainer
-var _hist: Array = []     # spectrogram rows, oldest first
-var _hist_t: float = 0.0
+
 
 const BG := Color("#14161c")
 const NEON := Color("#7be8ff")
@@ -238,19 +237,11 @@ func _draw_spec() -> void:
 		return
 	var sz := _spec.size
 	_spec.draw_rect(Rect2(Vector2.ZERO, sz), Color("#0c0e14"))
-	# the WATERFALL: recent signal history scrolling down behind the bars
-	var bins := 44
-	var cw := sz.x / float(bins)
-	var rh := sz.y / 30.0
-	for r in _hist.size():
-		var row: PackedFloat32Array = _hist[r]
-		for b in bins:
-			var v := row[b]
-			if v < 0.04:
-				continue
-			_spec.draw_rect(Rect2(Vector2(float(b) * cw, float(r) * rh),
-				Vector2(cw, rh)),
-				Color(0.05 + v * 0.2, 0.25 + v * 0.6, 0.4 + v * 0.6, 0.1 + v * 0.3))
+	# the AUDIO SPECTROGRAM: the radio's real spectrum, time scrolling
+	# horizontally, frequency up -- same texture the base screens show
+	if radio.spec_tex != null:
+		_spec.draw_texture_rect(radio.spec_tex, Rect2(Vector2.ZERO, sz),
+			false, Color(1, 1, 1, 0.55))
 	for st in radio.stations:
 		var a: float = radio.align_for(st)
 		if a <= 0.02:
@@ -277,26 +268,7 @@ func _process(_d: float) -> void:
 		return
 	_map.queue_redraw()
 	_spec.queue_redraw()
-	# sample the spectrum into the waterfall ~10x a second
-	_hist_t -= _d
-	if _hist_t <= 0.0 and radio != null and is_instance_valid(radio):
-		_hist_t = 0.1
-		var row := PackedFloat32Array()
-		row.resize(44)
-		for b in 44:
-			row[b] = randf() * 0.06
-		for st in radio.stations:
-			var a: float = radio.align_for(st)
-			if a <= 0.02:
-				continue
-			var cbin := int((float(st["freq"]) - 88.0) / 20.0 * 44.0)
-			for off in [-1, 0, 1]:
-				var bb: int = cbin + int(off)
-				if bb >= 0 and bb < 44:
-					row[bb] = maxf(row[bb], a * (1.0 if int(off) == 0 else 0.4))
-		_hist.append(row)
-		while _hist.size() > 30:
-			_hist.pop_front()
+
 	_freq_lbl.text = "%.1f MHz%s" % [radio.freq,
 		"" if radio.powered else "   ·   NO POWER"]
 	# activity rows: aligned stations you aren't tuned to

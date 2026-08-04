@@ -22,8 +22,13 @@ var _hiss: AudioStreamPlayer3D  # static bed
 var _cur_station: int = -1
 var _sentence_cd: float = 0.0
 var powered: bool = false
-var _specmat: ShaderMaterial = null
 var _last_sig: float = 0.0
+# the AUDIO spectrogram: a real spectrum analyzer on the radio's bus,
+# painted into a scrolling texture (time ->, frequency up)
+var _spec_img: Image = null
+var spec_tex: ImageTexture = null
+var _an: AudioEffectSpectrumAnalyzerInstance = null
+var _spec_t: float = 0.0
 # audio synthesis is EXPENSIVE GDScript: cook streams on worker threads
 # and hand them to the player when done -- never hitch the game
 var _cooking: bool = false
@@ -72,29 +77,20 @@ func _ready() -> void:
 	fmi.position = Vector3(0, 0, -0.4)
 	fmi.material_override = Surfaces.metal(Color("#8a9098"))
 	_dish_pivot.add_child(fmi)
-	# little SPECTROGRAM screens on the base: scrolling waterfall with a
-	# bright line riding wherever the dial is
-	_specmat = ShaderMaterial.new()
-	var ssh := Shader.new()
-	ssh.code = """
-shader_type spatial;
-render_mode unshaded;
-uniform float freq_x = 0.5;
-uniform float sig = 0.2;
-float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-void fragment() {
-	vec2 uv = UV;
-	float colt = floor((uv.x + TIME * 0.1) * 36.0);
-	float band = h21(vec2(colt, floor(uv.y * 20.0)));
-	float v = band * band * 0.45;
-	v += smoothstep(0.07, 0.0, abs(uv.y - freq_x)) * (0.35 + sig * 0.6);
-	vec3 c = mix(vec3(0.0, 0.04, 0.09), vec3(0.1, 0.85, 1.0), clamp(v, 0.0, 1.0));
-	c += vec3(1.0, 0.85, 0.3) * smoothstep(0.025, 0.0, abs(uv.y - freq_x)) * sig;
-	ALBEDO = vec3(0.0);
-	EMISSION = c * 1.4;
-}
-"""
-	_specmat.shader = ssh
+	# a dedicated analyzer bus: everything the radio plays goes through
+	# it, and the spectrogram reads the ACTUAL audio
+	var bi := AudioServer.get_bus_index("RadioFX")
+	if bi == -1:
+		AudioServer.add_bus()
+		bi = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(bi, "RadioFX")
+		AudioServer.set_bus_send(bi, "Master")
+		AudioServer.add_bus_effect(bi, AudioEffectSpectrumAnalyzer.new())
+	_an = AudioServer.get_bus_effect_instance(bi, 0)
+	_spec_img = Image.create(96, 40, false, Image.FORMAT_RGB8)
+	_spec_img.fill(Color(0.01, 0.02, 0.05))
+	spec_tex = ImageTexture.create_from_image(_spec_img)
+	# little spectrogram SCREENS on the base, fed by that texture
 	for sxs in [-1.0, 1.0]:
 		var scr := MeshInstance3D.new()
 		var qm := QuadMesh.new()
@@ -102,10 +98,17 @@ void fragment() {
 		scr.mesh = qm
 		scr.position = Vector3(sxs * (box_size.x * 0.5 + 0.02), 0.62, 0)
 		scr.rotation_degrees.y = 90.0 * sxs
-		scr.material_override = _specmat
+		var sm2 := StandardMaterial3D.new()
+		sm2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		sm2.albedo_texture = spec_tex
+		sm2.emission_enabled = true
+		sm2.emission_texture = spec_tex
+		sm2.emission_energy_multiplier = 1.3
+		scr.material_override = sm2
 		scr.extra_cull_margin = 2.0
 		add_child(scr)
 	_talk = AudioStreamPlayer3D.new()
+	_talk.bus = "RadioFX"
 	# loud beside it, NORMAL across your whole base, quiet only when
 	# you're genuinely far (other-side-of-the-planet territory)
 	_talk.unit_size = 40.0
@@ -113,6 +116,7 @@ void fragment() {
 	_talk.max_db = -1.0   # CAP: standing next to it must not blast you
 	add_child(_talk)
 	_hiss = AudioStreamPlayer3D.new()
+	_hiss.bus = "RadioFX"
 	_hiss.unit_size = 24.0
 	_hiss.max_distance = 600.0
 	_hiss.max_db = -7.0
@@ -402,9 +406,22 @@ func _deliver(wav: AudioStreamWAV, idx: int) -> void:
 func _process(d: float) -> void:
 	super._process(d)
 	_site_t -= d
-	if _specmat != null:
-		_specmat.set_shader_parameter("freq_x", clampf((freq - 88.0) / 20.0, 0.0, 1.0))
-		_specmat.set_shader_parameter("sig", _last_sig if powered else 0.0)
+	# paint the spectrogram: shift left, append the newest column
+	_spec_t -= d
+	if _spec_t <= 0.0 and _an != null and _spec_img != null:
+		_spec_t = 1.0 / 15.0
+		var region := _spec_img.get_region(Rect2i(1, 0, 95, 40))
+		_spec_img.blit_rect(region, Rect2i(0, 0, 95, 40), Vector2i(0, 0))
+		for b in 40:
+			var f0 := 60.0 * pow(8000.0 / 60.0, float(b) / 40.0)
+			var f1 := 60.0 * pow(8000.0 / 60.0, float(b + 1) / 40.0)
+			var mag: float = _an.get_magnitude_for_frequency_range(f0, f1).length()
+			var db := clampf((linear_to_db(maxf(mag, 0.00001)) + 55.0) / 55.0, 0.0, 1.0)
+			var cc := Color(0.01, 0.02, 0.05).lerp(Color(0.05, 0.75, 1.0), db)
+			if db > 0.65:
+				cc = cc.lerp(Color(1.0, 0.9, 0.3), (db - 0.65) / 0.35)
+			_spec_img.set_pixel(95, 39 - b, cc)
+		spec_tex.update(_spec_img)
 	# a locked dish TRACKS its target as it moves
 	if track_node != null and is_instance_valid(track_node):
 		aim_dir = (track_node.global_position - _site()).normalized()
