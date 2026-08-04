@@ -287,7 +287,10 @@ func align_for(st: Dictionary) -> float:
 		if dist > 1.0:
 			var ang := asin(clampf(float(st["body"].radius) * 2.5 / dist, 0.0, 0.9))
 			slack = 1.0 - cos(ang)
-	return clampf((aim_dir.dot(station_dir(st)) - (0.996 - slack)) / 0.004, 0.0, 1.0)
+	# generous INSIDE the beam, steep at the edge: anywhere in the cone
+	# hears well (no more one-pixel-off silence), the boundary still cuts
+	var a := clampf((aim_dir.dot(station_dir(st)) - (0.994 - slack)) / 0.006, 0.0, 1.0)
+	return sqrt(a)
 
 var track_body = null       # left-click lock: the dish FOLLOWS this body
 var track_node: Node3D = null   # ...or this node (the noodle god roams)
