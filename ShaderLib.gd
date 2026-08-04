@@ -49,7 +49,6 @@ uniform float nscale = 5.0;
 uniform float sharp = 2.0;
 uniform float rainbow = 0.0;
 uniform float fluid = 0.0;
-uniform float seams = 1.0;
 float hash3(vec3 p) {
 	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
@@ -88,11 +87,11 @@ void fragment() {
 	vec3 drift = vec3(t * 0.5, t * 0.35, t * 0.2);
 	float sw = fluid > 0.5 ? fbm31(vpos * nscale + drift) : fbm(vpos * nscale + drift);
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
-	// fluid mode uses the ORIGINAL fluid emission formula; portal mode
-	// uses the gate formula with the seams dial on the ring layer
+	// fluid mode: the ORIGINAL fluid emission formula. portal mode: the
+	// gate formula. same dials drive both.
 	float body = fluid > 0.5
 		? (0.32 * pow(ring, sharp) + sw * 0.11) * 2.6
-		: (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7);
+		: (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7);
 	if (rainbow > 0.5) {
 		float fres = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.4);
 		float hue = fract(fres * 0.9 + TIME * 0.12);
@@ -113,7 +112,7 @@ void fragment() {
 	# the effect wears YOUR color -- no separate tint
 	m.set_shader_parameter("tint", Vector3(color.r, color.g, color.b))
 	var defs := {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-		"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0, "seams": 1.0}
+		"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0}
 	for k in defs:
 		m.set_shader_parameter(k, float(fx.get(k, defs[k])))
 	return m

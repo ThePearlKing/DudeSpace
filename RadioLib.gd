@@ -1023,7 +1023,7 @@ static func alien_exchange() -> Array:
 	_ax_topics.append(topic)
 	if _ax_topics.size() > 3:
 		_ax_topics.pop_front()
-	last_alien_meta = {"topic": topic, "planet": p}
+	last_alien_meta = {"topic": topic, "planet": p, "planet2": p2}
 	var out: Array = []
 	match topic:
 		0:

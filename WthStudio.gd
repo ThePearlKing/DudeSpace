@@ -25,6 +25,20 @@ var _t := 0.0
 var _human_pick_t := 0.0
 var _human_target: Node3D = null
 var _next_seg_t := 2.0
+var _jitter_t := 0.0
+var _tv_bodies: Array = []
+
+class _AlienShell extends StaticBody3D:
+	var studio = null
+	func destroy(_push: Vector3) -> void:
+		if studio != null:
+			studio.jitter_voice()
+
+func jitter_voice() -> void:
+	_jitter_t = 0.05
+	if _talk != null:
+		_talk.pitch_scale = randf_range(0.55, 1.7)
+	Sfx.play("click", -16.0)   # plink. it bounces.
 
 func _ready() -> void:
 	_build_surface()
@@ -155,6 +169,24 @@ func _build_studio() -> void:
 		a.global_position = POS + Vector3(-4.5 + float(i) * 3.0, -0.6, -4.2)
 		_aliens.append({"node": a, "mat": mat,
 			"base": a.global_position, "phase": randf() * TAU})
+		# shootable, but not hurtable: bullets PLINK off and the voice
+		# jitters for a blink. they are above harm. slightly below dignity.
+		var shell := _AlienShell.new()
+		shell.studio = self
+		var scol := CollisionShape3D.new()
+		var sph := SphereShape3D.new()
+		sph.radius = 0.75
+		scol.shape = sph
+		shell.add_child(scol)
+		a.add_child(shell)
+		# a small sofa parked under each anchor (they float above it,
+		# obviously -- sitting is for bodies)
+		var sofa := Furniture.new()
+		sofa.kind = "sofa"
+		sofa.yaw = 0.0
+		add_child(sofa)
+		sofa.global_position = a.global_position + Vector3(0, -2.35, 0.2)
+		sofa.scale = Vector3(0.7, 0.7, 0.7)
 	# the TV: bezel + live screen on the back wall
 	var bez := MeshInstance3D.new()
 	var bzm := BoxMesh.new()
@@ -169,6 +201,7 @@ func _build_studio() -> void:
 	add_child(_tv_vp)
 	_tv_vp.world_3d = get_viewport().world_3d if get_viewport() else null
 	_tv_cam = Camera3D.new()
+	_tv_cam.cull_mask = 0xFFFFF & ~(1 << 9)   # the TV sees YOU, not a hand
 	_tv_vp.add_child(_tv_cam)
 	var scr := MeshInstance3D.new()
 	var sm := QuadMesh.new()
@@ -198,7 +231,7 @@ func _build_studio() -> void:
 		var dir := Vector3(0.3, 0.9, 0.2).normalized()
 		var out := Gate.new().configure({
 			"target": wth.center + dir * (float(wth.radius) + 2.0),
-			"zone": "", "label": "", "color": Color("#0a2a1e")})
+			"zone": "", "label": "EXIT", "color": Color("#0a2a1e")})
 		add_child(out)
 		out.global_position = POS + Vector3(half.x - 1.4, -2.6, half.z - 1.2)
 	_talk = AudioStreamPlayer3D.new()
@@ -241,6 +274,10 @@ void fragment() {
 ## ---- the live show ----
 func _process(delta: float) -> void:
 	_t += delta
+	if _jitter_t > 0.0:
+		_jitter_t -= delta
+		if _jitter_t <= 0.0 and _talk != null:
+			_talk.pitch_scale = 1.0
 	if _beacon_mat != null:
 		_beacon_mat.emission_energy_multiplier = 3.0 if fmod(_t, 1.2) < 0.6 else 0.3
 	var p = get_tree().get_first_node_in_group("player")
@@ -296,17 +333,26 @@ func _deliver(cooked: Array) -> void:
 func _apply_topic(meta: Dictionary) -> void:
 	var topic := int(meta.get("topic", -1))
 	_tv_planet = str(meta.get("planet", ""))
+	var p2 := str(meta.get("planet2", ""))
 	if topic == 9:
 		_tv_mode = "humans"
 		_human_target = null
-	elif topic in [0, 2, 3, 5, 7] and _tv_planet != "":
-		_tv_mode = "planet"
+	elif topic in [1, 3] and _tv_planet != "" and p2 != "" and p2 != _tv_planet:
+		# TWO planets in the conversation: frame them both, zoom each
+		var ba = Universe.body_named(_tv_planet)
+		var bb = Universe.body_named(p2)
+		if ba != null and bb != null:
+			_tv_mode = "duo"
+			_tv_bodies = [ba, bb]
+		else:
+			_tv_mode = "player"
+	elif topic in [0, 2, 5, 7] and _tv_planet != "":
 		var b = Universe.body_named(_tv_planet)
-		if b != null and _tv_cam != null:
-			var off := Vector3(1, 0.4, 0.7).normalized() * (float(b.radius) * 2.6)
-			_tv_cam.global_position = b.center + off
-			_tv_cam.look_at(b.center, Vector3.UP)
-			_tv_cam.fov = 50.0
+		if b != null:
+			_tv_mode = "planet"
+			_tv_bodies = [b]
+		else:
+			_tv_mode = "player"
 	else:
 		# markets, ads, fourth wall, nothing much: the camera is HERE,
 		# in the room, and it is looking at YOU
@@ -316,6 +362,42 @@ func _drive_tv(delta: float, p: Node3D) -> void:
 	if _tv_cam == null:
 		return
 	match _tv_mode:
+		"planet":
+			# ORBIT the subject: slow circle, breathing zoom
+			if _tv_bodies.size() >= 1:
+				var b0 = _tv_bodies[0]
+				var orb2 := _t * 0.25
+				var r0: float = float(b0.radius) * 2.6
+				_tv_cam.global_position = b0.center + Vector3(cos(orb2) * r0,
+					r0 * 0.35 * sin(_t * 0.17), sin(orb2) * r0)
+				_tv_cam.look_at(b0.center, Vector3.UP)
+				_tv_cam.fov = 44.0 + 16.0 * sin(_t * 0.4)
+		"duo":
+			# both in frame, then zoom one, then the other, forever
+			if _tv_bodies.size() >= 2:
+				var ba = _tv_bodies[0]
+				var bb = _tv_bodies[1]
+				var mid2: Vector3 = (ba.center + bb.center) * 0.5
+				var sepv: Vector3 = bb.center - ba.center
+				var phase := fmod(_t, 14.0)
+				var orb3 := _t * 0.2
+				var side := sepv.cross(Vector3.UP)
+				if side.length() < 1.0:
+					side = sepv.cross(Vector3.RIGHT)
+				side = side.normalized()
+				if phase < 6.0:
+					var wd: float = sepv.length() * 0.9 + float(ba.radius) * 3.0
+					_tv_cam.global_position = mid2 + side.rotated(sepv.normalized(),
+						orb3) * wd
+					_tv_cam.look_at(mid2, Vector3.UP)
+					_tv_cam.fov = 58.0
+				else:
+					var tgt = ba if phase < 10.0 else bb
+					var rr: float = float(tgt.radius) * 2.4
+					_tv_cam.global_position = tgt.center + Vector3(cos(orb3 * 2.0) * rr,
+						rr * 0.3, sin(orb3 * 2.0) * rr)
+					_tv_cam.look_at(tgt.center, Vector3.UP)
+					_tv_cam.fov = lerpf(_tv_cam.fov, 26.0, 0.05)
 		"humans":
 			# an Earth camera pivots onto some human and ZOOMS. rude.
 			_human_pick_t -= delta
@@ -344,4 +426,4 @@ func _drive_tv(delta: float, p: Node3D) -> void:
 				_tv_cam.look_at(p.global_position + Vector3(0, 0.8, 0), Vector3.UP)
 				_tv_cam.fov = 42.0 + 18.0 * sin(_t * 0.35)
 		_:
-			pass   # planet shot is parked where _apply_topic left it
+			pass

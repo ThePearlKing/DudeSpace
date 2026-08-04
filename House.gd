@@ -1028,6 +1028,7 @@ func _mk_view(px: Vector2i) -> Array:
 	var cam := Camera3D.new()
 	vp.add_child(cam)
 	cam.fov = 78.0
+	cam.cull_mask = 0xFFFFF & ~(1 << 9)   # windows see people, not hands
 	_views.append(vp)
 	return [vp, cam]
 

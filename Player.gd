@@ -46,8 +46,8 @@ func toggle_freecam() -> void:
 		get_tree().current_scene.add_child(_fc)
 		_fc.global_transform = _camera.global_transform
 		_fc.current = true
-		if _body:
-			_body.visible = true
+		_fc.cull_mask = 0xFFFFF & ~(1 << 9)   # face cam never sees the hand
+		_apply_body_vis()
 		if _hand:
 			_hand.visible = false
 	else:
@@ -57,8 +57,22 @@ func toggle_freecam() -> void:
 		_camera.current = true
 		if _hand:
 			_hand.visible = _view_mode == 0
-		if _body:
-			_body.visible = _view_mode != 0
+		_apply_body_vis()
+
+func _apply_body_vis() -> void:
+	# the body is ALWAYS visible -- what changes is which cameras may
+	# render it. fps: layer 11 only (your camera masks it out; windows,
+	# TVs, friends see you whole). third person: plain layer 1.
+	if _body == null:
+		return
+	_body.visible = true
+	_set_layers(_body, (1 << 10) if _view_mode == 0 else 1)
+
+func _set_layers(n: Node, mask: int) -> void:
+	if n is VisualInstance3D:
+		n.layers = mask
+	for c in n.get_children():
+		_set_layers(c, mask)
 
 func _ready() -> void:
 	add_to_group("player")
@@ -75,6 +89,9 @@ func _ready() -> void:
 	_camera = Camera3D.new()
 	_camera.current = true
 	_camera.far = 120000.0
+	# your OWN body lives on layer 11: every other camera sees it, yours
+	# doesn't -- so windows and TVs show a person, not a floating hand
+	_camera.cull_mask = 0xFFFFF & ~(1 << 10)
 	_head.add_child(_camera)
 
 	_smash_area = Area3D.new()
@@ -137,7 +154,7 @@ func _build_body() -> void:
 	_body.build(_char_color(), _char_shader(), Save.loaded_paint(),
 		Save.character.get("fx", {}))
 	_body.dress(Inventory.equip)
-	_body.visible = false
+	_apply_body_vis()
 
 ## Called after the save is applied (the save loads AFTER the player
 ## spawns, so the J-state must be re-read).
@@ -171,7 +188,7 @@ func _toggle_view() -> void:
 	if _hand:
 		_hand.visible = _view_mode == 0
 	if _body:
-		_body.visible = _view_mode != 0
+		_apply_body_vis()
 
 func camera() -> Camera3D:
 	return _camera
@@ -842,9 +859,8 @@ func _physics_process(delta: float) -> void:
 		var thrusting := jet_ok and (Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_C))
 		_body.set_jetpack(Inventory.has_jetpack, thrusting,
 			3 if Inventory.jet_max >= 1000.0 else 1)
-		if _body.visible:
-			var hspd := (velocity - up * velocity.dot(up)).length()
-			_body.animate(hspd, is_on_floor(), delta, thrusting)
+		var hspd := (velocity - up * velocity.dot(up)).length()
+		_body.animate(hspd, is_on_floor(), delta, thrusting)
 
 const HAND_REST := Vector3(0.5, -0.45, -0.95)
 const HAND_JAB := Vector3(0.26, -0.30, -1.55)
@@ -861,6 +877,10 @@ func _update_hand(delta: float) -> void:
 	_hand.position = HAND_REST.lerp(HAND_JAB, reach)
 	_hand.rotation.x = -reach * 0.5
 	_update_held()
+
+func _update_held_layers() -> void:
+	if _hand != null:
+		_set_layers(_hand, 1 << 9)
 
 func _update_held() -> void:
 	if not _held:
@@ -881,6 +901,8 @@ func _update_held() -> void:
 
 ## Build the SAME model the hand would hold, as a free-standing node.
 ## Icons and dropped items borrow it so nothing is ever a mystery cube.
+	_update_held_layers()
+
 func model_for(id: String) -> Node3D:
 	var keep := _held
 	var out := Node3D.new()
@@ -2072,7 +2094,7 @@ func respawn_at(pos: Vector3, up: Vector3) -> void:
 	if _hand:
 		_hand.visible = _view_mode == 0
 	if _body:
-		_body.visible = _view_mode != 0
+		_apply_body_vis()
 	_camera.current = true
 	global_position = pos
 	global_transform.basis = _basis_from_up(up)
