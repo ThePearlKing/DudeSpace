@@ -136,6 +136,15 @@ static func _prism_material() -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
+varying vec3 vpos;
+float hash31(vec3 p) { p = fract(p * 0.3183 + vec3(0.1, 0.2, 0.3)); p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnoise(vec3 p) { vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	float a = hash31(i), b = hash31(i + vec3(1,0,0)), c = hash31(i + vec3(0,1,0)), d = hash31(i + vec3(1,1,0));
+	float e = hash31(i + vec3(0,0,1)), g = hash31(i + vec3(1,0,1)), h = hash31(i + vec3(0,1,1)), k = hash31(i + vec3(1,1,1));
+	return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(e,g,f.x), mix(h,k,f.x), f.y), f.z); }
+float fbm3(vec3 p) { return vnoise(p) * 0.6 + vnoise(p * 2.3) * 0.4; }
+void vertex() { vpos = VERTEX; }
 void fragment() {
 	float fres = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.4);
 	float hue = fract(fres * 0.9 + TIME * 0.12);
@@ -143,12 +152,13 @@ void fragment() {
 	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
 	METALLIC = 0.85;
 	ROUGHNESS = 0.12;
-	// the warp-portal shimmer, dialed DOWN: drifting energy rings and a
-	// slow sweep riding on top of the rainbow
-	float ring = abs(fract(UV.y * 3.0 - TIME * 0.35) - 0.5) * 2.0;
-	ring = pow(1.0 - ring, 3.0);
-	float sw = 0.5 + 0.5 * sin(TIME * 2.0 + UV.x * 12.0);
-	EMISSION = rainbow * (0.25 + 0.55 * fres) + rainbow * (ring * 0.45 + sw * 0.14);
+	// the ACTUAL warp-portal glow (same boiling fbm rings as the gates),
+	// riding above the rainbow at about a quarter strength
+	float t = TIME;
+	float sw = fbm3(vpos * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
+	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
+	EMISSION = rainbow * (0.25 + 0.55 * fres)
+		+ rainbow * (0.5 * pow(ring, 2.0) + sw * 0.18);
 }
 """
 	_prism_mat = ShaderMaterial.new()
