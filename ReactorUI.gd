@@ -29,10 +29,10 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var root := Panel.new()
 	# COMPACT window, slightly transparent -- the world stays visible
-	root.anchor_left = 0.09
-	root.anchor_top = 0.05
-	root.anchor_right = 0.91
-	root.anchor_bottom = 0.95
+	root.anchor_left = 0.2
+	root.anchor_top = 0.1
+	root.anchor_right = 0.8
+	root.anchor_bottom = 0.9
 	var st := StyleBoxFlat.new()
 	st.bg_color = Color(0.11, 0.114, 0.125, 0.86)
 	st.border_color = AMBER.darkened(0.5)
@@ -41,7 +41,7 @@ func _ready() -> void:
 	add_child(root)
 	var title := Label.new()
 	title.text = "☢  REACTOR CONTROL — UNIT 1"
-	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", AMBER)
 	title.position = Vector2(28, 14)
 	root.add_child(title)
@@ -70,7 +70,7 @@ func _ready() -> void:
 	for key in ["HI TEMP", "HI PRESS", "LO COOLANT", "XENON PEAK",
 			"ρ POSITIVE", "TURB TRIP", "FUEL LOW", "SCRAM"]:
 		var cell := Panel.new()
-		cell.custom_minimum_size = Vector2(150, 44)
+		cell.custom_minimum_size = Vector2(112, 34)
 		var cs := StyleBoxFlat.new()
 		cs.bg_color = DARKL
 		cs.set_border_width_all(1)
@@ -90,7 +90,7 @@ func _ready() -> void:
 	_read = Label.new()
 	_read.anchor_left = 0.33
 	_read.anchor_top = 0.14
-	_read.add_theme_font_size_override("font_size", 17)
+	_read.add_theme_font_size_override("font_size", 14)
 	_read.add_theme_color_override("font_color", GREEN)
 	root.add_child(_read)
 	# CORE POOL PREVIEW: the bundle, live, exactly as blue as it is
@@ -116,7 +116,7 @@ func _ready() -> void:
 	for i in 3:
 		var mb := Button.new()
 		mb.text = ["SHUTDOWN", "STARTUP", "RUN"][i]
-		mb.custom_minimum_size = Vector2(110, 40)
+		mb.custom_minimum_size = Vector2(88, 34)
 		mb.pressed.connect(_set_mode.bind(i))
 		modes.add_child(mb)
 		_mode_btns.append(mb)
@@ -136,7 +136,7 @@ func _ready() -> void:
 	var prow := HBoxContainer.new()
 	var fb := Button.new()
 	fb.text = "FLOW: cycle"
-	fb.custom_minimum_size = Vector2(120, 40)
+	fb.custom_minimum_size = Vector2(96, 34)
 	fb.pressed.connect(func() -> void:
 		if rx:
 			rx.flow = (rx.flow + 1) % 3
@@ -144,7 +144,7 @@ func _ready() -> void:
 	prow.add_child(fb)
 	var bb := Button.new()
 	bb.text = "BREAKER"
-	bb.custom_minimum_size = Vector2(120, 40)
+	bb.custom_minimum_size = Vector2(96, 34)
 	bb.pressed.connect(func() -> void:
 		if rx:
 			rx.toggle_breaker())
@@ -271,11 +271,12 @@ func _open_manual() -> void:
 		_manual = null
 		return
 	_manual = Panel.new()
-	_manual.set_anchors_preset(Control.PRESET_CENTER)
+	# the booklet hangs off the LEFT edge so it never blankets the panel
+	_manual.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	var vps := get_viewport().get_visible_rect().size
-	_manual.custom_minimum_size = Vector2(600, minf(760.0, vps.y - 60.0))
+	_manual.custom_minimum_size = Vector2(470, minf(720.0, vps.y - 40.0))
 	_manual.size = _manual.custom_minimum_size
-	_manual.position = -_manual.size * 0.5
+	_manual.position = Vector2(8, -_manual.size.y * 0.5)
 	var st2 := StyleBoxFlat.new()
 	st2.bg_color = Color("#26241c")
 	st2.border_color = AMBER
@@ -332,7 +333,7 @@ RULES OF NOT EXPLODING:
    xenon will make restart annoying. annoying beats glowing.
 
 (click MANUAL again to close)"""
-	t2.add_theme_font_size_override("font_size", 14)
+	t2.add_theme_font_size_override("font_size", 12)
 	t2.add_theme_color_override("font_color", Color("#e8dcb8"))
 	msc.add_child(t2)
 	Sfx.play("click", -16.0)
