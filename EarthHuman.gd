@@ -1003,7 +1003,19 @@ func _op(id: int) -> float:
 	return float(_opinion.get(id, 0.0))
 
 func _op_add(id: int, d: float) -> void:
-	_opinion[id] = clampf(_op(id) + d, -100.0, 100.0)
+	var v := clampf(_op(id) + d, -100.0, 100.0)
+	# friendship has a CAPACITY: about three real friends. past that,
+	# no amount of compliments gets a stranger over the line -- they
+	# park at 'very pleasant acquaintance' and the roster stays full.
+	# hate has no such limit. hate scales beautifully.
+	if d > 0.0 and v > 38.0 and _op(id) <= 38.0:
+		var friends := 0
+		for k in _opinion:
+			if k != id and float(_opinion[k]) > 38.0:
+				friends += 1
+		if friends >= 3:
+			v = 38.0
+	_opinion[id] = v
 
 ## Which insult dialect you speak is who you are. Specialists (any axis
 ## past 50) insult in their own voice; everyone else gets the classics.
