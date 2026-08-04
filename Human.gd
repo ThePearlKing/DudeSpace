@@ -152,10 +152,11 @@ void fragment() {
 	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
 	METALLIC = 0.85;
 	ROUGHNESS = 0.12;
-	// the ACTUAL warp-portal glow (same boiling fbm rings as the gates),
-	// riding above the rainbow at about a quarter strength
+	// portal glow in SQUARES: the noise is sampled per blocky cell, so
+	// glowing tiles pulse across the surface instead of boiling fluid
 	float t = TIME;
-	float sw = fbm3(vpos * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
+	vec3 cell = floor(vpos * 6.0) / 6.0;
+	float sw = fbm3(cell * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
 	EMISSION = rainbow * (0.25 + 0.55 * fres)
 		+ rainbow * (0.32 * pow(ring, 2.0) + sw * 0.11);
