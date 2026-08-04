@@ -1304,11 +1304,11 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		for i in mini(int(0.16 * SR), total - b0):
 			var tb := float(i) / SR
 			var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.15, 1.0)
-			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.85 * duck
+			bbuf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 1.15 * duck
 		var toff := b0 + int(float(barlen) * 0.5)
 		for i in mini(int(0.05 * SR), total - toff):
 			var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.15, 1.0)
-			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.2 * duck2
+			bbuf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.3 * duck2
 		bi += 1
 	# the TURNAROUND: a bar-long reverse-cymbal swell that crests exactly
 	# on the loop point, sucking the song back to the top
@@ -1333,9 +1333,9 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		for i in mini(barlen, total - b2):
 			var td := float(i) / SR
 			var denv := sin(PI * float(i) / float(barlen))
-			buf[b2 + i] += (sin(TAU * f0 * td) * 0.09 \
-				+ sin(TAU * (f0 + 0.4) * td) * 0.06 \
-				+ sin(TAU * f0 * 1.5 * td) * 0.04) * denv
+			buf[b2 + i] += (sin(TAU * f0 * td) * 0.15 \
+				+ sin(TAU * (f0 + 0.4) * td) * 0.1 \
+				+ sin(TAU * f0 * 1.5 * td) * 0.065) * denv
 	var peak := 0.001
 	for i in total:
 		peak = maxf(peak, absf(buf[i]))

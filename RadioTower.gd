@@ -359,7 +359,7 @@ func work(delta: float) -> void:
 	# the anti-ear-blast cap must FOLLOW the mix: a fixed cap was clamping
 	# everything near the set to the same levels -- Sanus static and a
 	# local Earth station came out identical up close
-	_hiss.max_db = -7.0 + (hiss_target + 3.9)
+	_hiss.max_db = -2.0 + (hiss_target + 3.9)
 	# HYSTERESIS: the tuned station keeps the receiver unless something
 	# CLEARLY beats it -- a beam grazing two stations must not flap
 	if _cur_station >= 0 and best >= 0 and best != _cur_station \
@@ -385,7 +385,7 @@ func work(delta: float) -> void:
 	var st: Dictionary = stations[best]
 	# squared: off-tune signal sinks FAST, so the risen static DROWNS it
 	var talk_target := linear_to_db(clampf(clear * clear, 0.02, 1.0))
-	_talk.max_db = -1.0 + talk_target
+	_talk.max_db = 4.0 + talk_target
 	_talk.volume_db = lerpf(_talk.volume_db, talk_target, minf(1.0, delta * 14.0))
 	var freq_seed := int(st["freq"] * 10.0)
 	var kind := str(st["kind"])
