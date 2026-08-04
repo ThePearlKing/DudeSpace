@@ -12,6 +12,10 @@ var _freq_lbl: Label
 var _slider: HSlider
 var _act_box: VBoxContainer
 var _subs: Label
+var _sauce_sub: Control
+var _sauce_txt: String = ""
+var _spin_t: float = 5.0
+var _spin_prog: float = -1.0
 var _hist: Array = []     # waterfall rows, oldest first
 var _hist_t: float = 0.0
 
@@ -67,6 +71,16 @@ func _ready() -> void:
 	_subs.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_subs.add_theme_constant_override("outline_size", 5)
 	root.add_child(_subs)
+	# the SAUCE subtitle: a custom drawer that stretches every glyph into
+	# tall wobbling strands -- actual spaghettification, not text tricks
+	_sauce_sub = Control.new()
+	_sauce_sub.anchor_left = 0.1
+	_sauce_sub.anchor_top = 0.56
+	_sauce_sub.anchor_right = 0.9
+	_sauce_sub.anchor_bottom = 0.72
+	_sauce_sub.draw.connect(_draw_sauce_sub)
+	_sauce_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_sauce_sub)
 
 	# frequency panel ON TOP of the map, bottom strip
 	var strip := Panel.new()
@@ -132,6 +146,31 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 # ---------------------------------------------------------------- map
+
+## Every glyph drawn pinched-thin and pulled LONG, each strand wobbling
+## on its own phase: text as pasta. Hard to read is the point.
+func _draw_sauce_sub() -> void:
+	if _sauce_txt == "":
+		return
+	var font := ThemeDB.fallback_font
+	var t := Time.get_ticks_msec() / 1000.0
+	var fsz := 20
+	var adv := 13.0
+	var total_w := adv * float(_sauce_txt.length())
+	var x := (_sauce_sub.size.x - total_w) * 0.5
+	var base_y := _sauce_sub.size.y * 0.72
+	for i in _sauce_txt.length():
+		var c := _sauce_txt[i]
+		if c != " ":
+			var stretch := 2.2 + 1.6 * sin(float(i) * 1.31 + t * 0.9)
+			var wob := sin(t * 2.6 + float(i) * 0.73) * 0.22
+			var drift := sin(t * 1.4 + float(i) * 2.1) * 5.0
+			_sauce_sub.draw_set_transform(Vector2(x, base_y + drift),
+				wob, Vector2(0.55, maxf(stretch, 1.4)))
+			_sauce_sub.draw_string(font, Vector2.ZERO, c,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Color("#ffd166"))
+		x += adv
+	_sauce_sub.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _map_scale() -> float:
 	var m := 1000.0
@@ -297,8 +336,28 @@ func _process(_d: float) -> void:
 		return
 	_map.queue_redraw()
 	_spec.queue_redraw()
+	var live := Game.playtime < radio.now_line_until
+	var saucey: bool = live and radio.now_line.begins_with("⊙")
 	if _subs != null:
-		_subs.text = radio.now_line if Game.playtime < radio.now_line_until else ""
+		_subs.text = radio.now_line if (live and not saucey) else ""
+	if _sauce_sub != null:
+		_sauce_txt = radio.now_line if saucey else ""
+		_sauce_sub.visible = _sauce_txt != ""
+		if _sauce_sub.visible:
+			_sauce_sub.pivot_offset = _sauce_sub.size * 0.5
+			# sometimes the whole line just... rotates. the hole insists.
+			_spin_t -= _d
+			if _spin_prog >= 0.0:
+				_spin_prog += _d / 1.6
+				if _spin_prog >= 1.0:
+					_spin_prog = -1.0
+					_sauce_sub.rotation = 0.0
+				else:
+					_sauce_sub.rotation = _spin_prog * TAU
+			elif _spin_t <= 0.0:
+				_spin_t = 6.0 + randf() * 7.0
+				_spin_prog = 0.0
+			_sauce_sub.queue_redraw()
 	# sample station alignment into the waterfall ~10x a second
 	_hist_t -= _d
 	if _hist_t <= 0.0 and radio != null and is_instance_valid(radio):

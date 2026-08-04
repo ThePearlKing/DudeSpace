@@ -403,17 +403,16 @@ func work(delta: float) -> void:
 			# spaghettified, credited to the eye above
 			if str(st["type"]) == "noodle" and _talk.playing \
 					and RadioLib.sauce_cues.size() > 0:
-				var tpos := fmod(Game.playtime, RadioLib.sauce_len)
+				var tpos := fmod(_talk.get_playback_position(), RadioLib.sauce_len)
 				var curc := ""
 				for cue in RadioLib.sauce_cues:
 					if tpos >= float(cue[0]):
 						curc = str(cue[1])
 				if curc != "":
 					if curc != _last_cue:
-						# only reshape when the LINE changes -- rebuilding
-						# every frame was the blink and the lag
 						_last_cue = curc
-						now_line = "⊙: " + RadioLib.spaghettify(curc)
+						# raw text -- the dish UI stretches it VISUALLY
+						now_line = "⊙: " + curc
 					now_line_until = Game.playtime + 1.2
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
@@ -444,7 +443,7 @@ func work(delta: float) -> void:
 						"noodle":
 							# the god does not talk. it PERFORMS.
 							return RadioLib.noodle_broadcast()
-					return null, t == "noodle"):
+					return null, false):
 					_sentence_cd = randf_range(2.0, 4.5)
 
 ## Play a cooked stream if one is ready for this station; otherwise cook
