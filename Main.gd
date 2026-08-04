@@ -1932,7 +1932,7 @@ func _populate(b) -> void:
 					"arch": "goofy"},
 				{"vibe": "grumpy", "name": "Gary", "tint": Color("#50505a"),
 					"arch": "concrete"},
-				{"vibe": "dreamy", "name": "Alexandria", "tint": Color("#9ad0ff"),
+				{"vibe": "dreamy", "name": "Athens", "tint": Color("#9ad0ff"),
 					"arch": "ancient"},
 				{"vibe": "confident", "name": "Meridian City", "tint": Color("#ffd166"),
 					"arch": "glass"},
