@@ -1304,9 +1304,12 @@ static func noodle_broadcast() -> AudioStreamWAV:
 			pos += barlen   # a rest: the beat carries the bar alone
 			continue
 		sauce_cues.append([float(pos) / float(SR), str(ln)])
-		var w := eldritch(HumanVoice.render(str(ln), noodle_profile()), false)
+		# pronunciation pass: the engine's magic-e rule says "al dent";
+		# the god says "al den-tay". subtitles keep the true spelling.
+		var say := str(ln).replace("dente", "dentay")
+		var w := eldritch(HumanVoice.render(say, noodle_profile()), false)
 		# the GROWL: the god's old saw throat, kept quiet under the mix
-		var wg := HumanVoice.render(str(ln),
+		var wg := HumanVoice.render(say,
 			{"base": 118.0, "var": 0.12, "wave": "saw", "rate": 0.9, "artic": 1.7})
 		# the clear take is fully DRY -- any echo on it and the words go.
 		# hook lines get a light AUTOTUNE: pinned to a note, zero drift
@@ -1315,7 +1318,7 @@ static func noodle_broadcast() -> AudioStreamWAV:
 		if SAUCE_TUNED.has(str(ln)):
 			cprof = {"base": float(SAUCE_TUNED[str(ln)]), "var": 0.0, "wave": "sine",
 				"rate": 1.0, "artic": 1.85, "autotune": true}
-		var wc := HumanVoice.render(str(ln), cprof)
+		var wc := HumanVoice.render(say, cprof)
 		segs.append([pos, w.data, wc.data, wg.data])
 		var nlen: int = maxi(w.data.size(), maxi(wc.data.size(), wg.data.size())) / 2
 		var bars := maxi(1, int(ceil(float(nlen) / float(barlen))))
