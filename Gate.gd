@@ -33,7 +33,7 @@ func _ready() -> void:
 	var mi := MeshInstance3D.new()
 	var lbl_y := 3.2
 	var col_size := Vector3(1.6, 2.6, 0.4)
-	if action == "" or action == "house_exit":
+	if action == "":
 		# TELEPORT PORTAL: tall glowing doorway
 		var m := BoxMesh.new()
 		m.size = Vector3(1.6, 2.6, 0.4)
