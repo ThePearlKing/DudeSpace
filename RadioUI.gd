@@ -155,10 +155,10 @@ func _draw_map() -> void:
 	var aim2 := Vector2(radio.aim_dir.x, radio.aim_dir.z)
 	if aim2.length() > 0.05:
 		var an := aim2.normalized()
-		# the BEAM: the actual ~20-degree cone the dish can hear
+		# the BEAM: the actual ~5-degree pencil the dish can hear
 		var reach := _map.size.length()
-		var la := an.rotated(0.35)
-		var ra := an.rotated(-0.35)
+		var la := an.rotated(0.045)
+		var ra := an.rotated(-0.045)
 		_map.draw_colored_polygon(PackedVector2Array([
 			rp, rp + la * reach, rp + ra * reach]),
 			Color(0.48, 1.0, 0.69, 0.10))
@@ -219,6 +219,10 @@ func _draw_spec() -> void:
 		var h := a * (sz.y - 8.0)
 		var col: Color = NEON if radio.signal_for(st) > 0.3 else Color("#ffd166")
 		_spec.draw_rect(Rect2(Vector2(x - 2, sz.y - h), Vector2(4, h)), col)
+		# name the source ON the bar: know which planet is which song
+		_spec.draw_string(ThemeDB.fallback_font,
+			Vector2(clampf(x - 28.0, 2.0, sz.x - 80.0), maxf(sz.y - h - 3.0, 10.0)),
+			str(st["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
 	# the needle
 	var nx: float = (float(radio.freq) - 88.0) / 20.0 * _spec.size.x
 	_spec.draw_line(Vector2(nx, 0), Vector2(nx, sz.y), Color("#ff5964"), 2.0)
@@ -241,5 +245,5 @@ func _process(_d: float) -> void:
 	for st in radio.stations:
 		if radio.align_for(st) > 0.4 and absf(radio.freq - float(st["freq"])) > 0.3:
 			var l := Label.new()
-			l.text = "signal near %.1f MHz" % float(st["freq"])
+			l.text = "%.1f MHz — %s" % [float(st["freq"]), str(st["name"])]
 			_act_box.add_child(l)

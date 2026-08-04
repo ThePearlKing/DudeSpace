@@ -143,13 +143,13 @@ func signal_for(st: Dictionary) -> float:
 	var f := clampf(1.0 - ferr / 1.2, 0.0, 1.0)
 	return a * f
 
-## Alignment (spectrum display: activity you COULD tune). NARROW beam,
-## ~20 degrees -- distant clusters bunch in angle, and a fat cone was
-## hearing three galaxies at once.
+## Alignment (spectrum display: activity you COULD tune). PENCIL beam,
+## ~5 degrees -- it barely spreads with distance, so you hear the one
+## thing you aimed at, not every solar system stacked behind it.
 func align_for(st: Dictionary) -> float:
 	if _is_local(st):
 		return 1.0
-	return clampf((aim_dir.dot(station_dir(st)) - 0.94) / 0.06, 0.0, 1.0)
+	return clampf((aim_dir.dot(station_dir(st)) - 0.996) / 0.004, 0.0, 1.0)
 
 func aim_at(body_center: Vector3) -> void:
 	var nb = Universe.nearest(global_position)
