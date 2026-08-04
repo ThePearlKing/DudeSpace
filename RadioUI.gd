@@ -12,6 +12,7 @@ var _freq_lbl: Label
 var _slider: HSlider
 var _act_box: VBoxContainer
 var _subs: Label
+var _last_sub_col: Color = Color.TRANSPARENT
 var _sauce_sub: Control
 var _sauce_txt: String = ""
 var _spin_t: float = 5.0
@@ -339,8 +340,14 @@ func _process(_d: float) -> void:
 	var live: bool = Game.playtime < radio.now_line_until
 	var saucey: bool = live and radio.now_line.begins_with("⊙")
 	if _subs != null:
-		_subs.text = radio.now_line if (live and not saucey) else ""
-		_subs.add_theme_color_override("font_color", radio.now_line_col)
+		var want := radio.now_line if (live and not saucey) else ""
+		if _subs.text != want:
+			_subs.text = want
+		if _last_sub_col != radio.now_line_col:
+			# theme overrides force a full re-layout -- doing this every
+			# frame made long subtitle lines stutter
+			_last_sub_col = radio.now_line_col
+			_subs.add_theme_color_override("font_color", radio.now_line_col)
 	if _sauce_sub != null:
 		_sauce_txt = radio.now_line if saucey else ""
 		_sauce_sub.visible = _sauce_txt != ""

@@ -787,7 +787,7 @@ const EH_LOG: Array = [
 	[69.0, "no hinges. i looked. of course i looked. i was young, and the young believe hinges are owed to them."],
 	[79.0, "i told exactly one person. she laughed until she saw my face, and then she never asked me about it again. good woman. better than i deserved."],
 	[90.0, "the metal -- i'll call it metal, it would be rude to call it what it was -- was warm on the north side. only the north side. in january."],
-	[101.0, ""],
+	[101.0, "..."],
 	[115.0, "hm."],
 	[121.0, "funny what a sound can shake loose. i had almost managed a decade without thinking about the latch."],
 	[131.0, "i never mentioned a latch before. forget i said latch."],
