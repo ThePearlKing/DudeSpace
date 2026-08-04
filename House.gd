@@ -1454,6 +1454,27 @@ func cut_doorway(frame: Node3D) -> void:
 			var bhalf: float = maxf(bsz2.x, bsz2.z) * 0.5
 			if perp < 0.8 and along < bhalf + 1.1 \
 					and rel2.y > -0.5 and rel2.y < 3.2:
+				# SPLIT like the wall: two shorter pieces flank the
+				# opening (a piece under 0.15m isn't worth drawing)
+				var axis_is_x: bool = bsz2.x >= bsz2.z
+				var center_along: float = rel2.dot(f_along)
+				var lo: float = center_along - bhalf
+				var hi: float = center_along + bhalf
+				for seg2 in [[lo, -1.1], [1.1, hi]]:
+					var a0: float = float(seg2[0])
+					var a1: float = float(seg2[1])
+					if a1 - a0 < 0.15:
+						continue
+					var piece := MeshInstance3D.new()
+					var pbm2 := BoxMesh.new()
+					pbm2.size = Vector3(a1 - a0, bsz2.y, bsz2.z) if axis_is_x \
+						else Vector3(bsz2.x, bsz2.y, a1 - a0)
+					piece.mesh = pbm2
+					piece.material_override = ch2.material_override
+					_iroot.add_child(piece)
+					piece.global_position = frame.global_position \
+						+ f_along * ((a0 + a1) * 0.5) \
+						+ f_out * rel2.dot(f_out) + Vector3(0, rel2.y, 0)
 				ch2.queue_free()
 
 func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void:
