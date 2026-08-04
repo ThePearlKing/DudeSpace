@@ -580,6 +580,14 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 		buf[i] = v
 	# the BEAT: a slow ceremonial thump with a dry tick between, laid in
 	# BEFORE the echo pass so it smears through the same feedback
+	# SIDECHAIN: track the voice's envelope so the beat ducks OUT of the
+	# way wherever the god is actually speaking
+	var env := PackedFloat32Array()
+	env.resize(total)
+	var e := 0.0
+	for i in total:
+		e = maxf(e * 0.9995, absf(buf[i]))
+		env[i] = e
 	var bstep := int(SR * 1.4)
 	var bi := 0
 	while bi * bstep < total:
@@ -587,11 +595,13 @@ static func eldritch(src: AudioStreamWAV) -> AudioStreamWAV:
 		if bi % 2 == 0:
 			for i in mini(int(0.16 * SR), total - b0):
 				var tb := float(i) / SR
-				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.26
+				var duck := clampf(1.0 - env[b0 + i] * 4.0, 0.1, 1.0)
+				buf[b0 + i] += sin(TAU * 52.0 * tb) * exp(-tb * 14.0) * 0.22 * duck
 		else:
 			var toff := b0 + int(float(bstep) * 0.5)
 			for i in mini(int(0.05 * SR), total - toff):
-				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.06
+				var duck2 := clampf(1.0 - env[toff + i] * 4.0, 0.1, 1.0)
+				buf[toff + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.01)) * 0.05 * duck2
 		bi += 1
 	# feedback echoes: the words keep arriving after they've stopped
 	for e in [[int(SR * 0.29), 0.3], [int(SR * 0.61), 0.15]]:
