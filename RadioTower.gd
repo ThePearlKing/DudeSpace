@@ -40,6 +40,7 @@ var now_line: String = ""       # what the dish is SAYING right now
 var now_line_until: float = 0.0
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _bad_t: float = 0.0   # how long the signal has been junk
+var _unpow_t: float = 99.0   # how long the buffer has been empty
 
 func _init() -> void:
 	title = "RADIO"
@@ -315,7 +316,15 @@ func work(delta: float) -> void:
 	var p = get_tree().get_first_node_in_group("player")
 	var near: bool = p != null \
 		and p.global_position.distance_to(global_position) < HEAR_RANGE
-	powered = buf > 0.0 and near
+	# BROWNOUT GRACE: wire power arrives in bursts, and a one-frame empty
+	# buffer was hard-stopping the set (and restarting the sauce tape).
+	# Only a sustained outage kills playback.
+	var fed: bool = buf > 0.0 and near
+	if fed:
+		_unpow_t = 0.0
+	else:
+		_unpow_t += delta
+	powered = fed or _unpow_t < 1.5
 	if not powered:
 		if _talk.playing:
 			_talk.stop()
