@@ -74,7 +74,7 @@ func _ready() -> void:
 	add_child(_head)
 	_camera = Camera3D.new()
 	_camera.current = true
-	_camera.far = 80000.0
+	_camera.far = 120000.0
 	_head.add_child(_camera)
 
 	_smash_area = Area3D.new()

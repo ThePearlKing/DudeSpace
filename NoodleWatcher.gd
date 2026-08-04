@@ -8,8 +8,8 @@ extends Node3D
 ## lethal only if you let wrath max out -- then its JUDGMENT tendril
 ## descends (JudgmentFx below) and the geometry lesson begins.
 
-const DIST := 48000.0   # a proper cosmic distance
-const SCALE := 6.0      # and a proper cosmic size: farther AND bigger,
+const DIST := 60000.0   # a proper cosmic distance
+const SCALE := 9.0      # and a proper cosmic size: farther AND bigger,
 						# so parallax says "that thing is enormous"
 
 var _dir: Vector3 = Vector3(0.4, 0.55, -0.73).normalized()
@@ -118,6 +118,7 @@ func _process(delta: float) -> void:
 	# the -Z face (pupil + iris) points DEAD AT you, every frame, always
 	var up_ref := Vector3.UP if absf(d.y) < 0.95 else Vector3.RIGHT
 	look_at(p.global_position, up_ref)
+	scale = Vector3.ONE * SCALE   # look_at eats the scale: put it back
 
 	# mood on its face: gold and sleepy -> red and wide -> and then, when
 	# the grudge is old enough, the lights start going OUT. an angry god
