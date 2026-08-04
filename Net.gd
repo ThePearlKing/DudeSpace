@@ -27,6 +27,7 @@ var player_pos: Dictionary = {}      # peer id -> last known Vector3
 var player_ups: Dictionary = {}      # peer id -> last known up axis
 var host_settings: Dictionary = {}   # host's rules, mirrored to guests
 var applying_remote: bool = false    # guard: mirrored events don't re-broadcast
+var remote_owner: String = ""        # who placed the thing being mirrored
 var _blob_t: float = 5.0
 var _ident_t: float = 3.0
 var _last_equip: String = ""
@@ -220,6 +221,13 @@ func _world_snapshot(snap: Dictionary, blob: Dictionary) -> void:
 
 # ------------------------------------------- live world events (mirrored)
 
+## Grief rules: your own stuff always breaks; other people's only if
+## the host allows it.
+func can_break(owner: String) -> bool:
+	if not active or owner == "" or owner == my_name():
+		return true
+	return bool(host_settings.get("break_others", true))
+
 func broadcast_place(pid: String, pos: Vector3, up: Vector3) -> void:
 	if active and not applying_remote:
 		_ev_place.rpc(pid, pos, up)
@@ -229,6 +237,8 @@ func _ev_place(pid: String, pos: Vector3, up: Vector3) -> void:
 	var m = get_tree().current_scene
 	if m and m.has_method("net_place"):
 		applying_remote = true
+		var sender := multiplayer.get_remote_sender_id()
+		remote_owner = str(player_names.get(sender, ""))
 		m.net_place(pid, pos, up)
 		applying_remote = false
 

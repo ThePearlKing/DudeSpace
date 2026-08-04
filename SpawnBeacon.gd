@@ -83,6 +83,9 @@ func _process(delta: float) -> void:
 		p.material_override.emission_energy_multiplier = 2.0 if mine else 0.15
 
 func destroy(push_dir: Vector3) -> void:
+	if not Net.can_break(str(get_meta("owner", ""))):
+		Sfx.play("denied")
+		return
 	Net.broadcast_remove(global_position)
 	Inventory.give("spawnbeacon", 1)
 	Destructible.spawn_debris(get_parent(), global_position + Vector3(0, 0.3, 0), Vector3(1.2, 0.3, 1.2), Color("#204030"), push_dir)

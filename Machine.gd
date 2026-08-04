@@ -531,6 +531,9 @@ var _hit_reset_t: float = 0.0
 ## Machines take 3 HITS to break (no more one-tap capacitor accidents).
 ## The count forgives itself after a minute.
 func destroy(push_dir: Vector3) -> void:
+	if not Net.can_break(str(get_meta("owner", ""))):
+		Sfx.play("denied")
+		return
 	_hits += 1
 	_hit_reset_t = 60.0
 	if _hits < 3:

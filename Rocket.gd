@@ -75,6 +75,9 @@ var _hull_hp: int = 3
 func dismantle(push_dir: Vector3) -> void:
 	if piloted:
 		return
+	if not Net.can_break(str(get_meta("owner", ""))):
+		Sfx.play("denied")
+		return
 	_hull_hp -= 1
 	if _hull_hp > 0:
 		Sfx.play("hurt", -8.0)

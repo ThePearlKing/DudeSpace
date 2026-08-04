@@ -962,6 +962,7 @@ func _use_selected() -> void:
 				"extender": n = EMachines.Extender.new()
 			get_parent().add_child(n)
 			n.set_meta("placed_id", id)
+			n.set_meta("owner", Net.my_name())
 			n.global_transform = Transform3D(_basis_from_up(up), place)
 			Net.broadcast_place(id, n.global_position, up)
 			# spawn beacons place DORMANT -- press F to claim one
@@ -986,10 +987,12 @@ func _use_selected() -> void:
 			if wrk:
 				wrk.add_child(wnode)
 				wnode.set_meta("placed_id", "waypoint")
+				wnode.set_meta("owner", Net.my_name())
 				wnode.global_position = wh.position
 			else:
 				get_parent().add_child(wnode)
 				wnode.set_meta("placed_id", "waypoint")
+				wnode.set_meta("owner", Net.my_name())
 				wnode.global_transform = Transform3D(_basis_from_up(up), place)
 			Net.broadcast_place("waypoint", wnode.global_position, up)
 			Inventory.remove_res("waypoint", 1)
@@ -999,6 +1002,7 @@ func _use_selected() -> void:
 			rk.mk2 = id == "rocket2"
 			get_parent().add_child(rk)
 			rk.set_meta("placed_id", id)
+			rk.set_meta("owner", Net.my_name())
 			# deep space: park it floating right in front of you
 			var nb2 = Universe.nearest(global_position)
 			if Game.zone == "" and global_position.distance_to(nb2.center) > nb2.radius + 40.0:

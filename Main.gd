@@ -2901,6 +2901,7 @@ func net_place(pid: String, pos: Vector3, up: Vector3) -> void:
 		return
 	add_child(n)
 	n.set_meta("placed_id", pid)
+	n.set_meta("owner", Net.remote_owner)
 	if n is Rocket:
 		var z := -up
 		var x := up.cross(Vector3(0, 1, 0))
@@ -2963,6 +2964,7 @@ func collect_world() -> Array:
 			"id": str(n.get_meta("placed_id")),
 			"pos": [n.global_position.x, n.global_position.y, n.global_position.z],
 			"up": [up.x, up.y, up.z],
+			"owner": str(n.get_meta("owner", "")),
 		}
 		if n is Machine:
 			e["buf"] = n.buf
@@ -3014,6 +3016,7 @@ func restore_world() -> void:
 			n.setup(str(e.get("drop_id", "coal")), int(e.get("n", 1)))
 		add_child(n)
 		n.set_meta("placed_id", e["id"])
+		n.set_meta("owner", str(e.get("owner", "")))
 		var p = e.get("pos", [0, 0, 0])
 		var u = e.get("up", [0, 1, 0])
 		var pos := Vector3(float(p[0]), float(p[1]), float(p[2]))

@@ -132,7 +132,7 @@ func tut_can_buy(id: String) -> bool:
 # Per-world LAN hosting rules (persisted in the save; host changes stick).
 var host_cfg: Dictionary = {
 	"allow_cheats": false, "allow_chat": true, "friendly_fire": false,
-	"port": 24545,
+	"break_others": true, "port": 24545,
 }
 var trials_done: bool = false       # temple guardians dead -> maze door open
 

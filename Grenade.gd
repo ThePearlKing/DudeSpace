@@ -54,6 +54,8 @@ func _boom() -> void:
 			var d: float = pos.distance_to(n.global_position)
 			if d > DENT_R:
 				continue
+			if not Net.can_break(str(n.get_meta("owner", ""))):
+				continue   # host says other people's stuff is off-limits
 			var dmg := 3 if d <= KILL_R else 1
 			var hits := int(n.get_meta("g_dmg", 0)) + dmg
 			if hits >= 3:

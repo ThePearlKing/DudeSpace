@@ -85,6 +85,7 @@ func _open_lan() -> void:
 		["allow_cheats", "Guests may use cheats"],
 		["allow_chat", "Guests may chat"],
 		["friendly_fire", "Friendly fire"],
+		["break_others", "Players may break others' machines"],
 	]
 	for r in rules:
 		var key: String = r[0]

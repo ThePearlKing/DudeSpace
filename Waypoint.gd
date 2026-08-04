@@ -45,6 +45,9 @@ func use() -> void:
 	Sfx.play("click")
 
 func destroy(push_dir: Vector3) -> void:
+	if not Net.can_break(str(get_meta("owner", ""))):
+		Sfx.play("denied")
+		return
 	Net.broadcast_remove(global_position)
 	Inventory.give("waypoint", 1)
 	Destructible.spawn_debris(get_parent(), global_position + Vector3(0, 0.5, 0),
