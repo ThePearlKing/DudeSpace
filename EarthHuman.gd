@@ -1431,6 +1431,61 @@ func _exit_house() -> void:
 	velocity = Vector3.ZERO
 	_pick_act()
 
+## What is this human TRYING to do right now, in words. The Neuralink
+## reads intent straight off the brain stem. Privacy died in a lab.
+func goal_text() -> String:
+	if minded:
+		return "obeying the chip. (the chip is you.)"
+	if _eat_t > 0.0:
+		return "eating a permadeath apple. fully committed."
+	if _panic_t > 0.0:
+		return "fleeing for their life"
+	if _hunt_t > 0.0:
+		return "hunting the blue dude. (also you.)"
+	if _target != null and is_instance_valid(_target):
+		return "street-fighting %s" % _target.human_name
+	if _apple != null and is_instance_valid(_apple):
+		return "beelining for a permadeath apple"
+	if _travel_to >= 0 and _travel_to < Game.earth_cities.size():
+		var dest := str(Game.earth_cities[_travel_to]["name"])
+		if _leg >= 0 and _leg != _travel_to:
+			return "riding the rail to %s (via %s)" % [dest,
+				str(Game.earth_cities[_leg]["name"])]
+		return "riding the rail to %s" % dest
+	if flat_house != null and is_instance_valid(flat_house):
+		return "relaxing at %s" % flat_house.display_name()
+	if _partner != null and is_instance_valid(_partner):
+		return "deep in conversation with %s" % _partner.human_name
+	var extras := ""
+	if hp < 20.0:
+		extras = "  ·  hurt, wants food"
+	elif _away_t > 0.0:
+		extras = "  ·  visiting, will head home"
+	match _act:
+		"gohouse":
+			if _goal_house != null and is_instance_valid(_goal_house):
+				return "walking to %s%s" % [_goal_house.display_name(), extras]
+			return "walking home" + extras
+		"goseat":
+			return "heading for a nice place to sit" + extras
+		"sit":
+			return "sitting. professionally." + extras
+		"friend":
+			if _friend != null and is_instance_valid(_friend):
+				return "going to stand with %s (friend)%s" % [_friend.human_name, extras]
+			return "looking for a friend" + extras
+		"stare":
+			return "staring at nothing in particular" + extras
+		"circle":
+			return "walking in a circle, on purpose" + extras
+		"spin":
+			return "spinning. contemplating." + extras
+		"follow":
+			return "following the blue dude around" + extras
+		_:
+			return "wandering, thinking about %s" % \
+				["lunch", "the sky", "taxes", "nothing"][absi(human_id) % 4] + extras
+
 ## Chip command: swing at whoever's in arm's reach.
 func mind_punch() -> void:
 	for h in get_tree().get_nodes_in_group("earth_human"):

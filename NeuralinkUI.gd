@@ -27,6 +27,7 @@ var _hint: Label
 var _orbit := 0.0            # right-drag camera spin around the puppet
 var _rmb := false
 var _vitals: Label
+var _goal_lbl: Label
 
 const NEON := Color("#7bffb0")
 const DIM := Color("#9aa3ad")
@@ -230,6 +231,12 @@ func _build_human_brain() -> void:
 	_vitals.add_theme_font_size_override("font_size", 15)
 	_vitals.add_theme_color_override("font_color", NEON)
 	_right.add_child(_vitals)
+	_goal_lbl = Label.new()
+	_goal_lbl.add_theme_font_size_override("font_size", 15)
+	_goal_lbl.add_theme_color_override("font_color", Color("#ffd166"))
+	_goal_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_goal_lbl.custom_minimum_size = Vector2(320, 0)
+	_right.add_child(_goal_lbl)
 	_face_rect = TextureRect.new()
 	_face_rect.custom_minimum_size = Vector2(128, 128)
 	_face_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -432,6 +439,8 @@ func _process(delta: float) -> void:
 	if _vitals and target is EarthHuman:
 		_vitals.text = "VITALS   hp %.0f / 30   ·   age %.0f%% of a life" % [
 			maxf(0.0, target.hp), target.age / maxf(1.0, target.lifespan) * 100.0]
+	if _goal_lbl and target is EarthHuman:
+		_goal_lbl.text = "GOAL   " + target.goal_text()
 	# third person: hover behind and above, right-drag orbits
 	var up: Vector3 = target.global_transform.basis.y
 	var back2: Vector3 = target.global_transform.basis.z.rotated(
