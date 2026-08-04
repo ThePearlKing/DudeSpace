@@ -1684,6 +1684,11 @@ func locate(mode: int) -> void:
 			if rifts is Array:
 				for r in rifts:
 					targets.append(r)
+		7:
+			label = "NOODLE GOD"
+			var nwl = get_tree().get_first_node_in_group("noodle_watcher")
+			if nwl != null and nwl is Node3D:
+				targets = [nwl.global_position]
 	var hud = get_tree().get_first_node_in_group("hud")
 	if targets.is_empty():
 		Game.locator_until = -1.0
@@ -1693,6 +1698,9 @@ func locate(mode: int) -> void:
 		return
 	Game.locator_targets = targets
 	Game.locator_label = label
+	# the god reads FALSE: the locator insists it's 4x farther than it is.
+	# instruments agree it is enormous. instruments refuse to agree where.
+	Game.locator_lie = 4.0 if Game.locator_mode == 7 else 1.0
 	Game.locator_until = Game.playtime + 45.0
 	Sfx.play("click", -10.0)
 	if hud:

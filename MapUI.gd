@@ -164,6 +164,29 @@ class _MapView extends Control:
 		draw_polyline(PackedVector2Array([dpts[0], dpts[1], dpts[2], dpts[3], dpts[0]]), dcol, 1.5)
 		draw_string(font, stp + Vector2(10, 4), "SHADOW TEMPLE", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, dcol)
 
+		# THE NOODLE GOD: a cosmic entity on the chart. it follows you, so
+		# it's always out there in the same direction, pinned to the edge
+		# of the map, enormous, with a distance reading nobody trusts.
+		var nwd = get_tree().get_first_node_in_group("noodle_watcher")
+		if nwd != null and nwd is Node3D:
+			var gp: Vector3 = nwd.global_position
+			var gsp := c + Vector2(gp.x - origin.x, gp.z - origin.z) * scale
+			var margin := 80.0
+			var pinned := gsp.clamp(Vector2(margin, margin), vp - Vector2(margin, margin))
+			var gc := Color("#ffcf40")
+			for k in 5:   # the tangle
+				draw_arc(pinned, 30.0 + float(k) * 7.0, float(k) * 1.3,
+					float(k) * 1.3 + TAU * 0.62, 28,
+					Color(1.0, 0.81, 0.25, 0.5 - float(k) * 0.07), 2.5)
+			draw_circle(pinned, 24.0, Color(0.95, 0.9, 0.83, 0.92))   # the eye
+			draw_circle(pinned, 11.0, Color(0.06, 0.04, 0.01))
+			draw_arc(pinned, 17.0, 0, TAU, 32, Color("#c89020"), 3.0)
+			draw_string(font, pinned + Vector2(-62, 76), "THE NOODLE GOD",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, gc)
+			draw_string(font, pinned + Vector2(-46, 92),
+				"≈ %.0f km  (?)" % (me.distance_to(gp) * 4.0 / 1000.0),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 0.8, 0.3, 0.7))
+
 		var mp := c + Vector2(me.x - origin.x, me.z - origin.z) * scale
 		draw_circle(mp, 5.0, Color("#ffe066"))
 		draw_string(font, mp + Vector2(8, -6), "YOU", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#ffe066"))

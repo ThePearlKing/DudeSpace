@@ -77,7 +77,7 @@ class _WaypointLayer extends Control:
 					sp2 + Vector2(0, 13), sp2 + Vector2(-13, 0)])
 				draw_polyline(PackedVector2Array([pts2[0], pts2[1], pts2[2], pts2[3], pts2[0]]),
 					g, 2.5)
-				var d2 := me.distance_to(lp)
+				var d2 := me.distance_to(lp) * Game.locator_lie
 				var t2 := "%.0f m" % d2 if d2 < 1000.0 else "%.1f km" % (d2 / 1000.0)
 				draw_string(ThemeDB.fallback_font, sp2 + Vector2(16, 4),
 					Game.locator_label + "  " + t2,

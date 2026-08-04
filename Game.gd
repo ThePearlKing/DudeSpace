@@ -141,6 +141,7 @@ var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow tem
 var locator_targets: Array = []     # Vector3 list -- multi-ping modes fill many
 var locator_label: String = ""
 var locator_until: float = -1.0
+var locator_lie: float = 1.0   # displayed-distance multiplier (cosmic readings)
 var permadead: bool = false
 
 # --- gravity zone for interior pocket dimensions ---
