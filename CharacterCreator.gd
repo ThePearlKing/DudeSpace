@@ -18,7 +18,7 @@ var _shader: String = "none"
 var _pad: _Pad
 var _shaders := ["none", "pixel", "wth", "wireframe", "contrast", "effect"]
 var _fx := {"strength": 1.0, "speed": 1.0, "nscale": 5.0, "sharp": 2.0,
-	"rainbow": 0.0, "fluid": 0.0}
+	"rainbow": 0.0, "fluid": 0.0, "seams": 1.0}
 var _fx_box: VBoxContainer
 var _fx_sliders := {}
 var _mode_opt: OptionButton
@@ -142,13 +142,30 @@ func _ready() -> void:
 		frow.add_child(sl)
 		_fx_sliders[key] = sl
 		_fx_box.add_child(frow)
+	var rrow := HBoxContainer.new()
+	rrow.add_theme_constant_override("separation", 10)
+	_fx_box.add_child(rrow)
 	var rb := CheckBox.new()
 	rb.text = "rainbow (prism mode)"
 	rb.toggled.connect(func(v: bool) -> void:
 		_fx["rainbow"] = 1.0 if v else 0.0
 		_rebuild())
 	_fx_sliders["rainbow"] = rb
-	_fx_box.add_child(rb)
+	rrow.add_child(rb)
+	var sml := Label.new()
+	sml.text = "seams"
+	rrow.add_child(sml)
+	var smsl := HSlider.new()
+	smsl.min_value = 0.0
+	smsl.max_value = 1.5
+	smsl.step = 0.05
+	smsl.value = float(_fx["seams"])
+	smsl.custom_minimum_size = Vector2(110, 22)
+	smsl.value_changed.connect(func(v: float) -> void:
+		_fx["seams"] = v
+		_rebuild())
+	_fx_sliders["seams"] = smsl
+	rrow.add_child(smsl)
 	var fb := CheckBox.new()
 	fb.text = "fluid (smooth liquid boil)"
 	fb.toggled.connect(func(v: bool) -> void:
@@ -163,11 +180,11 @@ func _ready() -> void:
 	prow.add_theme_constant_override("separation", 6)
 	_fx_box.add_child(prow)
 	for pr in [["Ultima glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-				"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0}],
+				"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0, "seams": 1.0}],
 			["Prism glow", {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-				"sharp": 2.0, "rainbow": 1.0, "fluid": 0.0}],
+				"sharp": 2.0, "rainbow": 1.0, "fluid": 0.0, "seams": 1.0}],
 			["Fluid", {"strength": 0.7, "speed": 0.5, "nscale": 4.0,
-				"sharp": 1.0, "rainbow": 0.0, "fluid": 1.0}]]:
+				"sharp": 1.0, "rainbow": 0.0, "fluid": 1.0, "seams": 0.0}]]:
 		var pb := Button.new()
 		pb.text = str(pr[0])
 		var preset: Dictionary = pr[1]
@@ -332,9 +349,9 @@ func _ready() -> void:
 	_rebuild()
 
 func _sync_fx_ui() -> void:
-	for k in ["strength", "speed", "nscale", "sharp"]:
+	for k in ["strength", "speed", "nscale", "sharp", "seams"]:
 		if _fx_sliders.has(k):
-			_fx_sliders[k].set_value_no_signal(float(_fx[k]))
+			_fx_sliders[k].set_value_no_signal(float(_fx.get(k, 1.0)))
 	if _fx_sliders.has("rainbow"):
 		_fx_sliders["rainbow"].set_pressed_no_signal(float(_fx["rainbow"]) > 0.5)
 	if _fx_sliders.has("fluid"):

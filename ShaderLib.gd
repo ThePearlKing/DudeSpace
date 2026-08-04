@@ -49,6 +49,7 @@ uniform float nscale = 5.0;
 uniform float sharp = 2.0;
 uniform float rainbow = 0.0;
 uniform float fluid = 0.0;
+uniform float seams = 1.0;
 float hash3(vec3 p) {
 	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
@@ -93,10 +94,10 @@ void fragment() {
 		METALLIC = 0.85;
 		ROUGHNESS = 0.12;
 		EMISSION = rb * (0.25 + 0.55 * fres)
-			+ rb * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * 0.33 * strength;
+			+ rb * (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7) * 0.33 * strength;
 	} else {
 		ALBEDO = tint * 0.15;
-		EMISSION = tint * (0.35 + 1.9 * pow(ring, sharp) + sw * 0.7) * strength;
+		EMISSION = tint * (0.35 + 1.9 * pow(ring, sharp) * seams + sw * 0.7) * strength;
 		ROUGHNESS = 0.4;
 	}
 }
@@ -106,7 +107,7 @@ void fragment() {
 	# the effect wears YOUR color -- no separate tint
 	m.set_shader_parameter("tint", Vector3(color.r, color.g, color.b))
 	var defs := {"strength": 1.0, "speed": 1.0, "nscale": 5.0,
-		"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0}
+		"sharp": 2.0, "rainbow": 0.0, "fluid": 0.0, "seams": 1.0}
 	for k in defs:
 		m.set_shader_parameter(k, float(fx.get(k, defs[k])))
 	return m
