@@ -1530,7 +1530,7 @@ func _tool_connect(kind: String) -> void:
 			_wire_src = null
 			Sfx.play("explode", -18.0)
 			return
-		if Inventory.res_count("wire") < 1:
+		if not Game.creative and Inventory.res_count("wire") < 1:
 			Sfx.play("denied")
 			var hud := get_tree().get_first_node_in_group("hud")
 			if hud:
