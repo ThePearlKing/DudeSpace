@@ -138,9 +138,11 @@ static func _parse(t: String) -> Array:
 		var vf: Array = []      # queued vowel sound(s): [f1, f2, dur]
 		var post: Array = []    # segments that follow the vowel (tion's n)
 		var adv := 1
+		var _a3 := t.substr(i + 3, 1) if i + 3 < t.length() else ""
+		var _a4 := t.substr(i + 4, 1) if i + 4 < t.length() else ""
 		if wlen == 0 and t.substr(i, 3) == "eye" \
-				and not _is_letter(t.substr(i + 3, 1) if i + 3 < t.length() else ""):
-			# the word "eye". it had it coming.
+				and (not _is_letter(_a3) or (_a3 == "s" and not _is_letter(_a4))):
+			# the word "eye" (and "eyes"). it had it coming.
 			vf = [[800.0, 1100.0, 0.065], [270.0, 2400.0, 0.075]]
 			adv = 3
 		elif t.substr(i, 4) == "tion":
