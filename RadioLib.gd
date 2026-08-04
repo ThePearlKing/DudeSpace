@@ -1044,6 +1044,101 @@ static func _ax_sentence(p: String, p2: String) -> String:
 static func _ax_opinion() -> String:
 	return "%s that's %s." % [_ax_fresh(AX_HEADS), _ax_fresh(AX_ADJ)]
 
+# CONCEPT COMPOSITION: the hosts "think of" a subject, then a DOMAIN
+# (taxes, sports, crime...), then sometimes a TWIST layered on top --
+# pixel + taxes + fraud -- and the segment is assembled from the parts.
+# Each domain carries its own vocabulary so the result stays smart.
+const AX_DOMAINS := {
+	"tax": {"thing": ["the vertex levy", "shadow duty", "the horizon tithe",
+			"the rendering tax", "corner registration fees"],
+		"event": ["was raised by %d percent", "went missing entirely",
+			"was declared imaginary", "now applies to reflections",
+			"doubled overnight"],
+		"react": ["the auditors are circling.", "receipts are being invented as we speak.",
+			"the abacus caught fire."]},
+	"sports": {"thing": ["the tesselation finals", "orbit racing",
+			"competitive shadow tug", "freestyle rotation", "the angle relays"],
+		"event": ["ended %d to %d", "was cancelled mid-spin",
+			"set a record nobody can measure", "ran into overtime for a full cycle",
+			"was won by the away geometry"],
+		"react": ["fans rotated in protest.", "the referee demolecularized.",
+			"tickets are now a currency."]},
+	"crime": {"thing": ["a corner heist", "shadow smuggling",
+			"an unlicensed eclipse ring", "vertex counterfeiting"],
+		"event": ["was foiled by %d interns", "went exactly as planned",
+			"turned out to be performance art", "was an inside job"],
+		"react": ["the perimeter is a suggestion now.",
+			"witnesses report seeing nothing, beautifully.",
+			"the evidence refuses to render."]},
+	"construction": {"thing": ["a fourth horizon", "the new meridian bypass",
+			"a municipal dodecahedron", "scaffolding around the sunrise"],
+		"event": ["is %d cycles behind schedule",
+			"finished early and nobody trusts it", "is structurally smug",
+			"collapsed upward"],
+		"react": ["the permits were written in circles.",
+			"engineers blame the concept of load.",
+			"residents love it. loudly. at night."]},
+	"romance": {"thing": ["two parallel lines", "a binary star couple",
+			"the moon and someone's satellite"],
+		"event": ["finally intersected", "announced a merger",
+			"broke up over axis differences", "eloped past the skybox"],
+		"react": ["mathematically it was never going to work.",
+			"we wish them convergence.", "the tabloids are spiraling."]},
+	"cuisine": {"thing": ["boiled starlight", "crescent stew",
+			"artisanal vacuum", "deep-fried meridians"],
+		"event": ["won %d awards", "was banned at the equator",
+			"is just circles again", "achieved sentience mid-simmer"],
+		"react": ["critics called it 'food-adjacent'.", "the recipe is classified.",
+			"reservations now require coordinates."]},
+	"science": {"thing": ["a new corner", "the missing vertex cache",
+			"a frequency that tastes purple", "proof the sky is load-bearing"],
+		"event": ["was discovered by accident", "was un-discovered by committee",
+			"replicated itself out of spite", "is %d percent confirmed"],
+		"react": ["peer review is hiding.", "the lab denies having walls.",
+			"funding has been re-imagined."]}}
+const AX_TWIST := ["and now there's talk of FRAUD.",
+	"authorities suspect it was rigged from the start.",
+	"a shortage followed within the hour.",
+	"a festival has been scheduled to celebrate or mourn, depending.",
+	"it has since been banned, which made it popular.",
+	"records were broken. also furniture.",
+	"an anonymous tip blames %s.",
+	"insurance refuses to define it."]
+
+static var _ax_doms: Array = []
+
+## Subject -> domain -> optional twist -> assembled segment. No two
+## airings share a domain back-to-back, and every sentence is composed.
+static func _ax_story(p: String, p2: String) -> Array:
+	var keys: Array = AX_DOMAINS.keys()
+	var dom := str(keys[randi() % keys.size()])
+	for attempt in 5:
+		if not _ax_doms.has(dom):
+			break
+		dom = str(keys[randi() % keys.size()])
+	_ax_doms.append(dom)
+	if _ax_doms.size() > 3:
+		_ax_doms.pop_front()
+	var d: Dictionary = AX_DOMAINS[dom]
+	var thing := _ax_fresh(d["thing"])
+	var ev := _ax_fresh(d["event"])
+	var nums := ev.count("%d")
+	if nums == 2:
+		ev = ev % [1 + randi() % 98, 1 + randi() % 98]
+	elif nums == 1:
+		ev = ev % (1 + randi() % 98)
+	var out: Array = [[0, "%s news from %s: %s %s." % [dom, p, thing, ev]],
+		[3, _ax_fresh(d["react"])]]
+	if randi() % 10 < 6:
+		var tw := _ax_fresh(AX_TWIST)
+		if tw.find("%s") >= 0:
+			tw = tw % p2
+		out.append([1, tw])
+	if randi() % 2 == 0:
+		out.append([2, _ax_opinion()])
+	out.append([0, _ax_fresh(AP_REACT)])
+	return out
+
 # anti-repeat memory: recently used lines and topics stay off the air
 static var _ax_recent: Array = []
 static var _ax_topics: Array = []
@@ -1079,11 +1174,7 @@ static func alien_exchange() -> Array:
 	var out: Array = []
 	match topic:
 		0:
-			out = [[0, "this hour: %s. what do we know?" % p],
-				[3, "%s has been %s. also, %s" % [
-					p, _ax_fresh(AP_STATES), _ax_sentence(p, p2)]],
-				[1, _ax_opinion()],
-				[0, _ax_fresh(AP_REACT)]]
+			out = _ax_story(p, p2)
 		1:
 			out = [[0, "caller from %s, you're on the air." % p],
 				[2, _ax_fresh(AP_QUESTIONS) % p2],
@@ -1100,14 +1191,9 @@ static func alien_exchange() -> Array:
 				[1, "%s: %s overnight. %s: %s by dawn. the sun: orange again. nobody asked it to be." % [
 					p, _ax_fresh(AP_PHENOM), p2, _ax_fresh(AP_PHENOM)]]]
 		4:
-			out = [[3, "vertex futures %s. edge liquidity %s. the wireframe index closed %s." % [
-					_ax_fresh(AP_MARKET), _ax_fresh(AP_MARKET), _ax_fresh(AP_MARKET)]],
-				[0, "you heard it here. probably."]]
+			out = _ax_story(p, p2)
 		5:
-			out = [[0, "sports. %s hosted %s." % [p, _ax_fresh(AP_SPORTS)]],
-				[3, "%s won by %d angles. %s demanded a re-measure." % [
-					p2, 1 + randi() % 89, p]],
-				[0, "tradition."]]
+			out = _ax_story(p, p2)
 		6:
 			out = [[0, "a word from our sponsor."],
 				[1, "%s. %s" % [_ax_fresh(AP_PRODUCTS).capitalize(),
