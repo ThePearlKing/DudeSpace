@@ -1915,7 +1915,7 @@ func _populate(b) -> void:
 							_goofy_building(b, bd)
 						_:
 							_city_building(b, bd, vibes[ci]["tint"])
-				for i in _n(10):
+				for i in _n(16):
 					var ch := EarthHuman.new()
 					ch.setup(b)
 					ch.home_city = ci
@@ -1980,7 +1980,7 @@ func _populate(b) -> void:
 					hh2.global_transform = Transform3D(_basis_from_up(hd3),
 						b.center + hd3 * b.radius)
 					hh2.rotate_object_local(Vector3.UP, crng.randf() * TAU)
-				for hi2 in 2:
+				for hi2 in 3:
 					var hu4 := EarthHuman.new()
 					hu4.setup(b)
 					add_child(hu4)
