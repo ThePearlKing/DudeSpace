@@ -1544,6 +1544,12 @@ func dock_check(fa: Node3D, other, fb: Node3D) -> Dictionary:
 		return {"ok": false, "reason": "same house", "delta": Vector3.ZERO}
 	if other.slot in links:
 		return {"ok": false, "reason": "already connected", "delta": Vector3.ZERO}
+	# doors are ARCHITECTURE, not teleportation: the actual buildings
+	# must stand near each other outside
+	if global_position.distance_to(other.global_position) > 60.0:
+		return {"ok": false,
+			"reason": "houses too far apart outside (60m max) -- not a fast-travel network",
+			"delta": Vector3.ZERO}
 	var fwd_a: Vector3 = -fa.global_transform.basis.z
 	fwd_a.y = 0.0
 	if fwd_a.length() < 0.1:
