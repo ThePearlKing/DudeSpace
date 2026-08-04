@@ -1686,7 +1686,10 @@ func _physics_process(delta: float) -> void:
 	if _lod_t <= 0.0:
 		_lod_t = 0.5
 		var pl = get_tree().get_first_node_in_group("player")
-		var d2 := global_position.distance_squared_to(pl.global_position) \
+		var ppos: Vector3 = pl.global_position if pl != null else Vector3.ZERO
+		if pl != null and Game.zone != "" and Game.has_proxy:
+			ppos = Game.player_proxy   # player is indoors: count from the door
+		var d2 := global_position.distance_squared_to(ppos) \
 			if pl != null else INF
 		if pl != null and flat_house != null and is_instance_valid(flat_house):
 			d2 = minf(d2, flat_house.global_position.distance_squared_to(pl.global_position))

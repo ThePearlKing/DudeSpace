@@ -454,7 +454,10 @@ func _repopulate() -> void:
 			or _player == null or Game.earth_pop_target <= 0:
 		return
 	var b = Game.earth_body
-	if _player.global_position.distance_to(b.center) > float(b.radius) + 250.0:
+	var ppos: Vector3 = _player.global_position
+	if Game.zone != "" and Game.has_proxy:
+		ppos = Game.player_proxy   # indoors still counts as present
+	if ppos.distance_to(b.center) > float(b.radius) + 250.0:
 		return   # nobody's watching: the sim is paused, so is the stork
 	var n := 0
 	for h in get_tree().get_nodes_in_group("earth_human"):

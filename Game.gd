@@ -253,6 +253,8 @@ var _hurt_sfx_t: float = 0.0
 var earth_cities: Array = []
 var earth_body = null
 var earth_pop_target: int = 0   # census at worldgen: repopulation aims here
+var player_proxy: Vector3 = Vector3.ZERO   # where the player 'is' on the
+var has_proxy: bool = false                # planet while inside a pocket room
 
 func hurt(d: float, vaporize: bool = false) -> void:
 	if dead or godmode:

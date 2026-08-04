@@ -318,7 +318,9 @@ func _build_exterior() -> void:
 	_door_pos = Vector3(0, 1.1, -w * 0.5 - 0.05)
 	_box(self, Vector3(1.2, 2.2, 0.12), _door_pos, Color("#3a2c20"), 0.02)
 	_tag = Label3D.new()
-	_tag.font_size = 16
+	_tag.font_size = 30
+	_tag.no_depth_test = true
+	_tag.render_priority = 8
 	_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_tag.position = Vector3(0, h + 1.6, 0)
 	_tag.modulate = Color(1, 1, 1, 0.75)
@@ -848,6 +850,14 @@ func _physics_process(delta: float) -> void:
 		return
 	var inside: bool = p.global_position.distance_to(room_center()) < room_size().length()
 	var nearby: bool = p.global_position.distance_to(global_position) < 30.0
+	if inside:
+		# while you're in here, the world outside carries on around the
+		# HOUSE, not around a point 60km away in a pocket dimension
+		Game.player_proxy = global_position
+		Game.has_proxy = true
+	# the name over the roof: big, on top of everything, only nearby
+	if _tag:
+		_tag.visible = p.global_position.distance_to(global_position) < 45.0
 	# window rendering only when someone can see the glass
 	if _vp_out:
 		_vp_out.render_target_update_mode = SubViewport.UPDATE_ALWAYS if nearby \
