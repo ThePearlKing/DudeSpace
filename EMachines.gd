@@ -243,7 +243,7 @@ class PrismReactor extends Machine:
 		pm.size = Vector3(0.7, 1.1, 0.7)
 		_shard.mesh = pm
 		_smat = Destructible.make_material(Color("#ff7ce9"), 4.0)
-		_shard.material_override = _smat
+		_shard.material_override = Human._prism_material()   # actual rainbow
 		_shard.position = Vector3(0, box_size.y + 0.75, 0)
 		add_child(_shard)
 		dress_industrial(Color("#1a1028"))
@@ -296,7 +296,7 @@ class Teleporter extends Machine:
 		tm.inner_radius = 0.75
 		tm.outer_radius = 1.0
 		_ring2.mesh = tm
-		_ring2.material_override = Destructible.make_material(Color("#7cf9ff"), 2.0)
+		_ring2.material_override = Surfaces.portal(Color("#7cf9ff"))
 		_ring2.position = Vector3(0, 1.2, 0)
 		add_child(_ring2)
 		# waystone pylons at the pad corners + inlaid glowing runway ring
