@@ -892,12 +892,16 @@ func _update_held() -> void:
 		_held.visible = false
 		if _body and is_instance_valid(_body):
 			_body.set_held(null)
+			_apply_body_vis()
 		return
 	_held.visible = true
 	_make_held_model(id)
 	# mirror the model into the third-person hand
 	if _body and is_instance_valid(_body):
 		_body.set_held(_held.duplicate(), Inventory.weapons.has(id))
+		# the body's copy joins the body layer: cameras see it, YOU don't
+		# (no phantom second AK floating in first person)
+		_apply_body_vis()
 
 ## Build the SAME model the hand would hold, as a free-standing node.
 ## Icons and dropped items borrow it so nothing is ever a mystery cube.
