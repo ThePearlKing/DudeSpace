@@ -533,11 +533,19 @@ static func rick_song() -> AudioStreamWAV:
 static func noodle_line() -> String:
 	return NOODLE_BITS[randi() % NOODLE_BITS.size()]
 
-## A full transmission: two or three pronouncements strung together.
+const ELDRITCH_WORDS := ["zholgoth", "vraxulemn", "othrunquay", "melgrahz"]
+
+## A full transmission: a LONG sermon -- eight-plus pronouncements with
+## the god's four untranslatable words dropped in between them.
 static func noodle_sermon() -> String:
+	var words := ELDRITCH_WORDS.duplicate()
+	words.shuffle()
 	var out := ""
-	for i in 2 + randi() % 2:
+	var n := 8 + randi() % 4
+	for i in n:
 		out += NOODLE_BITS[randi() % NOODLE_BITS.size()] + " "
+		if i % 2 == 1 and not words.is_empty():
+			out += str(words.pop_back()) + ". "
 	return out.strip_edges()
 
 static func noodle_profile() -> Dictionary:
