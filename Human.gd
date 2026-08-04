@@ -152,11 +152,10 @@ void fragment() {
 	ALBEDO = mix(vec3(1.0, 0.55, 0.92), rainbow, 0.7);
 	METALLIC = 0.85;
 	ROUGHNESS = 0.12;
-	// portal glow in SQUARES: the noise is sampled per blocky cell, so
-	// glowing tiles pulse across the surface instead of boiling fluid
+	// the ultima portal effect verbatim -- same boiling fbm rings, same
+	// motion -- just dialed down and less shiny on top of the rainbow
 	float t = TIME;
-	vec3 cell = floor(vpos * 6.0) / 6.0;
-	float sw = fbm3(cell * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
+	float sw = fbm3(vpos * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
 	EMISSION = rainbow * (0.25 + 0.55 * fres)
 		+ rainbow * (0.32 * pow(ring, 2.0) + sw * 0.11);
@@ -175,7 +174,14 @@ func punch() -> void:
 	_punch_t = 1.0
 
 ## Show/hide the jetpack on the back (+ flames while thrusting).
-func set_jetpack(on: bool, thrusting: bool = false) -> void:
+var _jet_tier: int = 1
+
+func set_jetpack(on: bool, thrusting: bool = false, tier: int = 1) -> void:
+	if on and _jet_node != null and tier != _jet_tier:
+		_jet_node.queue_free()
+		_jet_node = null
+		_flames.clear()
+	_jet_tier = tier
 	if on and _jet_node == null:
 		_jet_node = Node3D.new()
 		add_child(_jet_node)
@@ -186,7 +192,8 @@ func set_jetpack(on: bool, thrusting: bool = false) -> void:
 			cm.bottom_radius = 0.16
 			cm.height = 0.9
 			tank.mesh = cm
-			tank.material_override = Destructible.make_material(Color("#4cc9f0"), 0.4)
+			tank.material_override = _prism_material() if tier >= 3 \
+				else Destructible.make_material(Color("#4cc9f0"), 0.4)
 			tank.position = Vector3(sx, 1.5, 0.35)
 			_jet_node.add_child(tank)
 			var flame := MeshInstance3D.new()
