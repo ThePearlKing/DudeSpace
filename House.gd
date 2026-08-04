@@ -1335,6 +1335,33 @@ func shift_rooms(delta: Vector3) -> void:
 					and not (_iroot and n.get_parent() == _iroot):
 				n.global_position += delta
 
+## Rotate this house's ENTIRE interior world (rooms, ports, furniture,
+## machines, humans, players) about a pocket-space pivot. Used by the
+## door dock to turn a complex so its frame FACES the other one.
+func rotate_rooms(pivot: Vector3, ang: float) -> void:
+	var rot := Basis(Vector3.UP, ang)
+	var c := room_center()
+	var r := room_size().length() + 6.0
+	if _iroot and is_instance_valid(_iroot):
+		for ch in _iroot.get_children():
+			if ch is Node3D:
+				ch.global_position = pivot + rot * (ch.global_position - pivot)
+				ch.global_transform.basis = rot * ch.global_transform.basis
+	for prt in _in_ports:
+		if is_instance_valid(prt):
+			prt.global_position = pivot + rot * (prt.global_position - pivot)
+			prt.global_transform.basis = rot * prt.global_transform.basis
+	for grp in ["machine", "chest", "bench", "itemdrop", "earth_human",
+			"doorframe", "player"]:
+		for n in get_tree().get_nodes_in_group(grp):
+			if n is Node3D and is_instance_valid(n) \
+					and n.global_position.distance_to(c) < r \
+					and not (_iroot and n.get_parent() == _iroot):
+				n.global_position = pivot + rot * (n.global_position - pivot)
+				n.global_transform.basis = rot * n.global_transform.basis
+	var newc := pivot + rot * (c - pivot)
+	room_offset += newc - c
+
 ## The whole docked complex this house belongs to (BFS over links).
 func complex() -> Array:
 	var seen := {slot: self}
@@ -1596,6 +1623,15 @@ func dock_check(fa: Node3D, other, fb: Node3D) -> Dictionary:
 	if fwd_a.length() < 0.1:
 		fwd_a = Vector3.FORWARD
 	fwd_a = fwd_a.normalized()
+	# ROTATION: B's whole complex turns about its frame until that frame
+	# faces ours dead-on -- mismatched door directions dock cleanly now
+	var fb_out: Vector3 = -fb.global_transform.basis.z
+	fb_out.y = 0.0
+	var ang := 0.0
+	if fb_out.length() > 0.1:
+		fb_out = fb_out.normalized()
+		var want := -fwd_a
+		ang = atan2(want.x, want.z) - atan2(fb_out.x, fb_out.z)
 	var target_fb := fa.global_position + fwd_a * 7.5   # a real 6m hallway
 	var delta := target_fb - fb.global_position
 	delta.y = fa.global_position.y - fb.global_position.y
@@ -1603,15 +1639,35 @@ func dock_check(fa: Node3D, other, fb: Node3D) -> Dictionary:
 	if moving.has(self):
 		return {"ok": false, "reason": "same complex -- that fold is non-euclidean",
 			"delta": Vector3.ZERO}
-	if not _area_free(delta, moving):
+	if not _rot_area_free(moving, fb.global_position, ang, delta):
 		return {"ok": false, "reason": "rooms would collide", "delta": delta}
-	return {"ok": true, "reason": "", "delta": delta, "moving": moving}
+	return {"ok": true, "reason": "", "delta": delta, "moving": moving,
+		"ang": ang, "pivot": fb.global_position}
+
+## Area check with B's complex rotated about the pivot, then shifted.
+func _rot_area_free(moving: Array, pivot: Vector3, ang: float, delta: Vector3) -> bool:
+	var rot := Basis(Vector3.UP, ang)
+	for h in moving:
+		var c: Vector3 = pivot + rot * (h.room_center() - pivot) + delta
+		var r: float = maxf(h.room_size().x, h.room_size().z) * 0.5 + 0.2
+		for oth in get_tree().get_nodes_in_group("house"):
+			if oth is House and is_instance_valid(oth) and not moving.has(oth):
+				if oth.slot in h.links:
+					continue
+				var orr: float = maxf(oth.room_size().x, oth.room_size().z) * 0.5 + 0.2
+				if c.distance_to(oth.room_center()) < r + orr:
+					return false
+	return true
 
 ## THE MERGE, via two specific frames (the door tool's chosen pair).
 func connect_frames(fa: Node3D, other, fb: Node3D) -> bool:
 	var ck := dock_check(fa, other, fb)
 	if not bool(ck["ok"]):
 		return false
+	var ang: float = float(ck.get("ang", 0.0))
+	if absf(ang) > 0.01:
+		for h in ck["moving"]:
+			h.rotate_rooms(ck["pivot"], ang)
 	for h in ck["moving"]:
 		h.shift_rooms(ck["delta"])
 	links.append(other.slot)
