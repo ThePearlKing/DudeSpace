@@ -1335,6 +1335,41 @@ func shift_rooms(delta: Vector3) -> void:
 					and not (_iroot and n.get_parent() == _iroot):
 				n.global_position += delta
 
+## Move a whole complex RIGIDLY: rotate about pivot, then translate --
+## touching every node EXACTLY once. Per-house moves double-shifted
+## anything sitting in two houses' scan radii (linked frames, hallway
+## furniture) and tore docked pairs apart on the second dock.
+static func move_complex(houses: Array, pivot: Vector3, ang: float, delta: Vector3) -> void:
+	var rot := Basis(Vector3.UP, ang)
+	var seen := {}
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	for h in houses:
+		if h._iroot and is_instance_valid(h._iroot):
+			for ch in h._iroot.get_children():
+				if ch is Node3D:
+					seen[ch.get_instance_id()] = ch
+		for prt in h._in_ports:
+			if is_instance_valid(prt):
+				seen[prt.get_instance_id()] = prt
+		var c: Vector3 = h.room_center()
+		var r: float = h.room_size().length() + 6.0
+		for grp in ["machine", "chest", "bench", "itemdrop", "earth_human",
+				"doorframe", "player"]:
+			for n in tree.get_nodes_in_group(grp):
+				if n is Node3D and is_instance_valid(n) \
+						and n.global_position.distance_to(c) < r \
+						and not (h._iroot and n.get_parent() == h._iroot):
+					seen[n.get_instance_id()] = n
+	for id2 in seen:
+		var n2: Node3D = seen[id2]
+		n2.global_position = pivot + rot * (n2.global_position - pivot) + delta
+		n2.global_transform.basis = rot * n2.global_transform.basis
+	for h in houses:
+		var c2: Vector3 = h.room_center()
+		h.room_offset += (pivot + rot * (c2 - pivot) + delta) - c2
+
 ## Rotate this house's ENTIRE interior world (rooms, ports, furniture,
 ## machines, humans, players) about a pocket-space pivot. Used by the
 ## door dock to turn a complex so its frame FACES the other one.
@@ -1582,6 +1617,8 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 			tm.size = Vector3(1.4, 1.4, maxf(seg2.length() - 1.0, 1.2))
 			tube.mesh = tm
 			tube.material_override = Surfaces.metal(Color("#9aa0a8"))
+			tube.add_to_group("house_link_tube")
+			tube.set_meta("link_slots", [slot, other.slot])
 			get_tree().current_scene.add_child(tube)
 			tube.global_position = (a_out + b_out) * 0.5
 			var upm: Vector3 = (global_transform.basis.y + other.global_transform.basis.y).normalized()
@@ -1604,6 +1641,65 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 			linklbl.modulate = Color(0.6, 1.0, 0.75, 0.9)
 			tube.add_child(linklbl)
 			linklbl.position = Vector3(0, 1.6, 0)
+	# PORTHOLES: little round windows down the hallway. Real rims, real
+	# glass, and the glass SHOWS THE OUTSIDE -- each pane renders from a
+	# camera mounted on the exterior connector's skin, looking out.
+	var up_h := Vector3.UP
+	for pspec in [[-1.0, -0.22], [1.0, 0.22]]:
+		var pside: float = float(pspec[0])
+		var pfrac: float = float(pspec[1])
+		var ppos: Vector3 = mid + dirv * (L * pfrac) + xr * (1.28 * pside) \
+			+ Vector3(0, 0.25, 0)
+		var pbasis := Basis(dirv, xr * pside, dirv.cross(xr * pside)).orthonormalized()
+		var rim := MeshInstance3D.new()
+		var rt := TorusMesh.new()
+		rt.inner_radius = 0.3
+		rt.outer_radius = 0.42
+		rim.mesh = rt
+		rim.material_override = Surfaces.metal(Color("#6a7078"))
+		_iroot.add_child(rim)
+		rim.global_transform = Transform3D(pbasis, ppos)
+		var pv := _mk_view(Vector2i(180, 180))
+		var pcam: Camera3D = pv[1]
+		if is_instance_valid(other):
+			var ext_mid: Vector3 = (global_position + other.global_position) * 0.5 \
+				+ global_transform.basis.y * 1.4
+			pcam.global_position = ext_mid + global_transform.basis.x * (pside * 0.9)
+			pcam.look_at(pcam.global_position \
+				+ global_transform.basis.x * pside, global_transform.basis.y)
+		var glass2 := MeshInstance3D.new()
+		var gcm := CylinderMesh.new()
+		gcm.top_radius = 0.31
+		gcm.bottom_radius = 0.31
+		gcm.height = 0.05
+		glass2.mesh = gcm
+		var gm2 := StandardMaterial3D.new()
+		gm2.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gm2.albedo_texture = (pv[0] as SubViewport).get_texture()
+		glass2.material_override = gm2
+		_iroot.add_child(glass2)
+		glass2.global_transform = Transform3D(pbasis, ppos)
+		# matching porthole on the exterior tube skin: rim + a soft
+		# portal shimmer, dimmer than the seam
+		if is_instance_valid(other):
+			var orim := MeshInstance3D.new()
+			orim.mesh = rt
+			orim.material_override = Surfaces.metal(Color("#565c64"))
+			get_tree().current_scene.add_child(orim)
+			orim.add_to_group("house_link_tube")
+			orim.set_meta("link_slots", [slot, other.slot])
+			var ext_mid2: Vector3 = (global_position + other.global_position) * 0.5 \
+				+ global_transform.basis.y * 1.4
+			var opb := Basis(global_transform.basis.z,
+				global_transform.basis.x * pside,
+				global_transform.basis.z.cross(global_transform.basis.x * pside)) \
+				.orthonormalized()
+			orim.global_transform = Transform3D(opb,
+				ext_mid2 + global_transform.basis.x * (pside * 0.72))
+			var oglass := MeshInstance3D.new()
+			oglass.mesh = gcm
+			oglass.material_override = Surfaces.portal(Color("#2a4a66"))
+			orim.add_child(oglass)
 
 ## Would docking `other` through these two frames work? Returns
 ## {ok, reason, delta, moving} -- the door tool asks BEFORE cutting.
@@ -1664,12 +1760,8 @@ func connect_frames(fa: Node3D, other, fb: Node3D) -> bool:
 	var ck := dock_check(fa, other, fb)
 	if not bool(ck["ok"]):
 		return false
-	var ang: float = float(ck.get("ang", 0.0))
-	if absf(ang) > 0.01:
-		for h in ck["moving"]:
-			h.rotate_rooms(ck["pivot"], ang)
-	for h in ck["moving"]:
-		h.shift_rooms(ck["delta"])
+	House.move_complex(ck["moving"], ck.get("pivot", fb.global_position),
+		float(ck.get("ang", 0.0)), ck["delta"])
 	links.append(other.slot)
 	other.links.append(slot)
 	fa.set_meta("linked", true)
@@ -1699,10 +1791,41 @@ func connect_house(other) -> bool:
 
 func _exit_tree() -> void:
 	# demolition severs every docking link so neighbours don't keep a
-	# phantom slot in their graph (a dead complex should split cleanly)
+	# phantom slot in their graph (a dead complex should split cleanly):
+	# their doorway gets walled back up, their frame comes down, and the
+	# exterior connector tube goes with us
 	for other in get_tree().get_nodes_in_group("house"):
 		if other is House and other != self and is_instance_valid(other):
+			if slot in other.links:
+				for fr in get_tree().get_nodes_in_group("doorframe"):
+					if fr is Node3D and is_instance_valid(fr) \
+							and bool(fr.get_meta("linked", false)) \
+							and fr.global_position.distance_to(other.room_center()) \
+								< other.room_size().length() \
+							and fr.global_position.distance_to(room_center()) < 40.0:
+						var plug := StaticBody3D.new()
+						var pm := MeshInstance3D.new()
+						var pbm := BoxMesh.new()
+						pbm.size = Vector3(2.4, 3.2, 0.5)
+						pm.mesh = pbm
+						pm.material_override = Surfaces.plaster(Color("#b8b0a0"))
+						plug.add_child(pm)
+						var pc2 := CollisionShape3D.new()
+						var ps2 := BoxShape3D.new()
+						ps2.size = Vector3(2.4, 3.2, 0.5)
+						pc2.shape = ps2
+						plug.add_child(pc2)
+						if other._iroot and is_instance_valid(other._iroot):
+							other._iroot.add_child(plug)
+							plug.global_transform = Transform3D(
+								fr.global_transform.basis,
+								fr.global_position + Vector3(0, 1.5, 0) \
+								- fr.global_transform.basis.z * 0.4)
+						fr.queue_free()
 			other.links.erase(slot)
+	for tb in get_tree().get_nodes_in_group("house_link_tube"):
+		if is_instance_valid(tb) and slot in tb.get_meta("link_slots", []):
+			tb.queue_free()
 	if _iroot and is_instance_valid(_iroot):
 		_iroot.queue_free()
 	for prt in _out_ports + _in_ports:
