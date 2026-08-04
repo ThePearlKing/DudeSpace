@@ -354,7 +354,8 @@ func work(delta: float) -> void:
 		var far := clampf(_site().distance_to(_src_pos(stations[best])) / 140000.0, 0.0, 1.0)
 		clear = bs * (1.0 - 0.9 * pow(far, 1.3))
 	_last_sig = clear
-	var hiss_target := linear_to_db(clampf(0.9 - clear * 0.78, 0.06, 1.0)) - 3.0
+	# spot-on = the hiss all but disappears; any error and it climbs fast
+	var hiss_target := linear_to_db(clampf(0.9 - clear * 0.86, 0.03, 1.0)) - 3.0
 	_hiss.volume_db = lerpf(_hiss.volume_db, hiss_target, minf(1.0, delta * 14.0))
 	# the anti-ear-blast cap must FOLLOW the mix: a fixed cap was clamping
 	# everything near the set to the same levels -- Sanus static and a
