@@ -158,7 +158,7 @@ void fragment() {
 	float sw = fbm3(vpos * 5.0 + vec3(t * 0.5, t * 0.35, t * 0.2));
 	float ring = sin(sw * 12.0 - t * 2.2) * 0.5 + 0.5;
 	EMISSION = rainbow * (0.25 + 0.55 * fres)
-		+ rainbow * (0.5 * pow(ring, 2.0) + sw * 0.18);
+		+ rainbow * (0.32 * pow(ring, 2.0) + sw * 0.11);
 }
 """
 	_prism_mat = ShaderMaterial.new()
