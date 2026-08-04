@@ -46,6 +46,8 @@ class _AlienShell extends StaticBody3D:
 ## and only if THAT orb is mid-sentence does its voice jitter.
 func orb_hit(idx: int, at: Vector3) -> void:
 	_play_ping(at)
+	if idx >= 0 and idx < _aliens.size():
+		_aliens[idx]["flash"] = 0.14   # the whole orb FLASHES at impact
 	if idx == _cur_host and _talk != null and _talk.playing:
 		_jitter_t = 0.05
 		_talk.pitch_scale = randf_range(0.55, 1.7)
@@ -468,8 +470,11 @@ func _process(delta: float) -> void:
 		if talking:
 			target_s = 1.0 + 0.35 * absf(sin(_t * 9.0)) + 0.15 * absf(sin(_t * 23.0))
 		n.scale = n.scale.lerp(Vector3.ONE * target_s, delta * 10.0)
+		var fl: float = float(a.get("flash", 0.0))
+		if fl > 0.0:
+			a["flash"] = fl - delta
 		(a["mat"] as ShaderMaterial).set_shader_parameter("amp",
-			1.6 if talking else 0.8)
+			(1.6 if talking else 0.8) + 7.0 * clampf(fl / 0.14, 0.0, 1.0))
 	_drive_tv(delta, p)
 
 func _deliver(cooked: Array) -> void:
