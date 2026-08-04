@@ -257,7 +257,6 @@ func _dress_human() -> void:
 		slogan.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		slogan.modulate = Color.WHITE if shirt_col.get_luminance() < 0.5 else Color("#1a1a1a")
 		slogan.position = Vector3(0, 0.05, -0.24)
-		slogan.rotation_degrees = Vector3(0, 180, 0)
 		_body._torso.add_child(slogan)
 
 	# hair: one style from the rack, one colour from the bottle
@@ -431,6 +430,10 @@ func _physics_process(delta: float) -> void:
 
 	var v_up := velocity.dot(up)
 	v_up += g.dot(up) * delta
+	# scared humans LEAP as they flee -- brief panicked flight, the
+	# ground leash still keeps them out of orbit
+	if _panic_t > 0.0 and _grounded and randf() < 0.09:
+		v_up = randf_range(4.5, 6.5)
 	velocity = _dir * speed + up * v_up
 	up_direction = up
 	move_and_slide()
