@@ -291,13 +291,27 @@ func align_for(st: Dictionary) -> float:
 		if dist > 1.0:
 			var ang := asin(clampf(float(st["body"].radius) * 2.5 / dist, 0.0, 0.9))
 			slack = 1.0 - cos(ang)
+	# free-aim clicks are MAP bearings (no altitude), so compare bearings:
+	# the click column catches everything above and below that spot. the
+	# old 3D compare made right-click find nothing unless a station sat
+	# exactly at the radio's own altitude.
+	var ad := aim_dir
+	var sd := station_dir(st)
+	if free_aim:
+		ad.y = 0.0
+		sd.y = 0.0
+		if ad.length() < 0.05 or sd.length() < 0.05:
+			return 0.0
+		ad = ad.normalized()
+		sd = sd.normalized()
 	# generous INSIDE the beam, steep at the edge: anywhere in the cone
 	# hears well (no more one-pixel-off silence), the boundary still cuts
-	var a := clampf((aim_dir.dot(station_dir(st)) - (0.994 - slack)) / 0.006, 0.0, 1.0)
+	var a := clampf((ad.dot(sd) - (0.994 - slack)) / 0.006, 0.0, 1.0)
 	return sqrt(a)
 
 var track_body = null       # left-click lock: the dish FOLLOWS this body
 var track_node: Node3D = null   # ...or this node (the noodle god roams)
+var free_aim: bool = false  # right-click: a MAP direction (no altitude)
 
 func _aim_toward(body_center: Vector3) -> void:
 	var sp := _site()
@@ -309,6 +323,7 @@ func _aim_toward(body_center: Vector3) -> void:
 		aim_dir = (body_center - sp).normalized()
 
 func aim_at(body_center: Vector3) -> void:
+	free_aim = false
 	_aim_toward(body_center)
 	Sfx.play("click", -16.0)
 

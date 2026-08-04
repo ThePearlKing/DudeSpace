@@ -277,6 +277,7 @@ func _map_input(event: InputEvent) -> void:
 			if np.distance_to(event.position) < maxf(bd, 46.0):
 				radio.track_body = null
 				radio.track_node = w   # the dish follows the god around
+				radio.free_aim = false
 				Sfx.play("click", -14.0)
 				return
 		if best != null:
@@ -291,6 +292,7 @@ func _map_input(event: InputEvent) -> void:
 		var world := Vector3(rel.x * sc, radio.global_position.y, rel.y * sc)
 		radio.track_body = null
 		radio.track_node = null
+		radio.free_aim = true   # a bearing, not a point: match by column
 		radio.aim_dir = (world - radio.global_position).normalized()
 		Sfx.play("click", -18.0)
 
