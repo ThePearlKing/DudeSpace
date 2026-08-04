@@ -1193,18 +1193,59 @@ static func _ax_story(p: String, p2: String, foreign: bool = false) -> Array:
 		ev = ev % [1 + randi() % 98, 1 + randi() % 98]
 	elif nums == 1:
 		ev = ev % (1 + randi() % 98)
-	var out: Array = [[0, "%s news from %s: %s %s." % [dom, p, thing, ev]],
-		[3, _ax_fresh(d["react"])]]
+	# a SECOND concept from a different domain: minds wander, and the
+	# conversation follows the wandering
+	var keys2: Array = AX_DOMAINS.keys()
+	var dom2 := str(keys2[randi() % keys2.size()])
+	for attempt2 in 4:
+		if dom2 != dom:
+			break
+		dom2 = str(keys2[randi() % keys2.size()])
+	var thing2: String = _ax_fresh(AX_DOMAINS[dom2]["thing"])
+	var out: Array = []
 	if foreign and randi() % 2 == 0:
-		out.insert(0, [0, "from the OUT-SYSTEM desk:"])
+		out.append([0, "from the OUT-SYSTEM desk:"])
+	out.append([0, "%s news from %s: %s %s." % [dom, p, thing, ev]])
+	# turn 2: a RESPONSE to the actual fact, carrying the nouns forward
+	match randi() % 4:
+		0:
+			out.append([3, "hold on. %s? the SAME %s from last cycle's news?" % [thing, thing]])
+		1:
+			out.append([3, "i was there when %s first came to %s. nobody listened then either." % [thing, p]])
+		2:
+			out.append([3, "and %s just LETS this happen to %s. of course they do." % [p, thing]])
+		_:
+			out.append([3, _ax_fresh(d["react"])])
+	# turns 3-4: someone drags the second concept in, someone connects them
 	if randi() % 10 < 6:
+		match randi() % 3:
+			0:
+				out.append([2, "question: does this affect %s?" % thing2])
+			1:
+				out.append([2, "wait. is that why %s has been weird all cycle?" % thing2])
+			_:
+				out.append([2, "my cousin works in %s. should they worry about %s?" % [dom2, thing]])
+		match randi() % 3:
+			0:
+				out.append([1, "everything affects %s. that is its whole personality." % thing2])
+			1:
+				out.append([1, "%s and %s are officially unrelated. OFFICIALLY." % [thing, thing2]])
+			_:
+				out.append([1, "if %s ever reaches %s, we go to the bunker. the round one." % [thing, thing2]])
+	# an optional twist, pinned to the thing it's about
+	if randi() % 10 < 4:
 		var tw := _ax_fresh(AX_TWIST)
 		if tw.find("%s") >= 0:
 			tw = tw % p2
-		out.append([1, tw])
-	if randi() % 2 == 0:
-		out.append([2, _ax_opinion()])
-	out.append([0, _ax_fresh(AP_REACT)])
+		out.append([3, "and regarding %s: %s" % [thing, tw]])
+	# outro recaps what was actually discussed
+	match randi() % 3:
+		0:
+			out.append([0, "%s. %s. not one apology. that's the %s report." % [p, thing, dom]])
+		1:
+			out.append([0, "keep an eye on %s. and on %s. and on everything." % [thing, thing2]])
+		_:
+			out.append([0, "we'll follow %s until it follows back." % thing])
 	return out
 
 # anti-repeat memory: recently used lines and topics stay off the air
