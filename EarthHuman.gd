@@ -818,7 +818,14 @@ func _build_voice() -> Dictionary:
 	var rate := 1.0
 	rate -= float(_pers.get("goofy", 25.0)) * 0.002 + float(_pers.get("anxious", 25.0)) * 0.002
 	rate += float(_pers.get("dreamy", 25.0)) * 0.003 + float(_pers.get("dumb", 25.0)) * 0.002
-	return {"base": base, "var": vary, "wave": wave, "rate": clampf(rate, 0.6, 1.5)}
+	# articulation: some humans PUNCH their consonants. the confident
+	# enunciate at you; nerd voices over-pronounce; a scatter of others
+	# just talk like every S is load-bearing
+	var artic := 1.0 + float(h % 7) * 0.09
+	if wave == "square" or float(_pers.get("confident", 25.0)) > 60.0:
+		artic += 0.35
+	return {"base": base, "var": vary, "wave": wave,
+		"rate": clampf(rate, 0.6, 1.5), "artic": clampf(artic, 1.0, 1.8)}
 
 ## Vacate the seat (if any) and get back on official standing business.
 func _release_seat() -> void:

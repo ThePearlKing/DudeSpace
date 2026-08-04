@@ -21,6 +21,7 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	var vary := float(prof.get("var", 0.4))
 	var wave := str(prof.get("wave", "sine"))
 	var rate := float(prof.get("rate", 1.0))
+	var artic := float(prof.get("artic", 1.0))   # consonant emphasis
 	var qmark := text.ends_with("?")
 	if wave == "saw":
 		pitch0 *= 0.78   # the grump register: lower than it needs to be
@@ -49,11 +50,12 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 				_silence(buf, float(sg["d"]))
 				i += 1
 			"f":
-				_fric(buf, bool(sg["b"]), bool(sg["vo"]), float(sg["d"]),
-					float(sg["pitch"]))
+				_fric(buf, bool(sg["b"]), bool(sg["vo"]),
+					float(sg["d"]) * (1.0 + (artic - 1.0) * 0.4),
+					float(sg["pitch"]), artic)
 				i += 1
 			"p":
-				_plosive(buf, bool(sg["vo"]), float(sg["pitch"]))
+				_plosive(buf, bool(sg["vo"]), float(sg["pitch"]), artic)
 				i += 1
 			_:
 				var run: Array = []
@@ -356,7 +358,7 @@ static func _silence(buf: PackedFloat32Array, dur: float) -> void:
 ## Fricatives: noise, shaped crudely. Bright = hissy (s/sh/ch),
 ## dull = breathy wash (f/th/h). Voiced ones hum underneath (v/z).
 static func _fric(buf: PackedFloat32Array, bright: bool, voiced: bool,
-		dur: float, pitch: float) -> void:
+		dur: float, pitch: float, artic: float = 1.0) -> void:
 	var n := int(dur * SR)
 	var prev := 0.0
 	for i in n:
@@ -369,15 +371,16 @@ static func _fric(buf: PackedFloat32Array, bright: bool, voiced: bool,
 		prev = w
 		if voiced:
 			s += sin(TAU * pitch * float(i) / SR) * 0.18
-		buf.append(s * _env(i, n, 0.008, 0.02))
+		buf.append(s * artic * _env(i, n, 0.008, 0.02))
 
 ## Plosives: a beat of closure, then the little explosion.
-static func _plosive(buf: PackedFloat32Array, voiced: bool, pitch: float) -> void:
+static func _plosive(buf: PackedFloat32Array, voiced: bool, pitch: float,
+		artic: float = 1.0) -> void:
 	_silence(buf, 0.014)
 	var n := int(0.032 * SR)
 	for i in n:
 		var fall := 1.0 - float(i) / float(n)
-		var s := (randf() * 2.0 - 1.0) * 0.5 * fall
+		var s := (randf() * 2.0 - 1.0) * 0.5 * artic * fall
 		if voiced:
 			s += sin(TAU * pitch * float(i) / SR) * 0.25 * fall
 		buf.append(s)
