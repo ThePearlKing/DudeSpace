@@ -326,9 +326,17 @@ RULES OF NOT EXPLODING:
    you are spending margin. at 1000°C you are news.
  · PRESSURE follows temp. the guarded VENT dumps 30 bar and
    costs coolant. coolant comes back only when the core is calm.
- · XENON: shut down hot and the poison peaks. pulling hard
-   against xenon, then having it burn off at power, is the
-   classic way to die. pull GENTLY near criticality.
+ · XENON, in dude terms: burning fuel makes an invisible
+   ASH (xenon) that soaks up your reaction. run at power and
+   it piles up; the XENON %% on the readout is how much.
+   when power keeps sinking but RODS and FUEL look fine,
+   the ash is winning. two ways out:
+     a) pull rods further OUT (RUN mode) -- high power
+        actually burns the ash away. BUT: as it burns off,
+        the reaction speeds up on its own, so be ready to
+        push rods back IN. going hard here is the classic
+        way to die.
+     b) rods in, walk away ~2 minutes. ash fades by itself.
  · in doubt: SCRAM. rods fall, breaker opens, you live. the
    xenon will make restart annoying. annoying beats glowing.
 
@@ -402,9 +410,10 @@ func _process(delta: float) -> void:
 		coach = "\n>> warming: power heats the core toward RUN (150°C)"
 	elif rho <= 0.0 and rx.xenon * 0.5 > (0.65 - rx.rods) * 0.9:
 		# the XENON PIT: the poison alone is out-arguing the rods
-		coach = "\n>> XENON PIT: poison built up and sank ρ. pull rods" \
-			+ "\n   further (RUN mode goes past the startup floor)," \
-			+ "\n   or idle low and let it decay. fuel is fine."
+		coach = "\n>> XENON (the ash) is smothering the reaction." \
+			+ "\n   fuel is FINE. either pull rods further out (RUN)" \
+			+ "\n   to burn the ash off -- then ease them back in --" \
+			+ "\n   or shut down ~2 min and it fades on its own."
 	_read.text = ("POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" + coach) % [
 		rx.power * 100.0, rho, rx.rods * 100.0, rx.rods_target * 100.0,
 		rx.xenon * 100.0, rx.temp * 10.0, rx.press,
