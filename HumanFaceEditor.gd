@@ -137,10 +137,16 @@ func _ready() -> void:
 	bsl.value_changed.connect(func(v: float) -> void:
 		_pad.set_brush(int(v))
 		blbl.text = "brush %d" % int(v))
-	# cyan dot marks the default (7)
+	# cyan dot marks the default (7) -- placed with the same inset math
+	# the grabber uses, so dot and grabber line up exactly at 7
 	bsl.draw.connect(func() -> void:
-		bsl.draw_circle(Vector2(bsl.size.x * (6.0 / 127.0), bsl.size.y * 0.5),
-			3.0, Color("#35e0e0")))
+		var gw := 16.0
+		var gicon := bsl.get_theme_icon("grabber", "HSlider")
+		if gicon != null:
+			gw = float(gicon.get_width())
+		var ratio := 6.0 / 127.0
+		bsl.draw_circle(Vector2(gw * 0.5 + ratio * (bsl.size.x - gw),
+			bsl.size.y * 0.5), 3.0, Color("#35e0e0")))
 	brow.add_child(bsl)
 
 	# import a face straight off one of your saved skins (or the dude
