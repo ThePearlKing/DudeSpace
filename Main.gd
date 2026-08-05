@@ -1016,9 +1016,11 @@ func _update_bgm(delta: float) -> void:
 	var radio_hot := false
 	if _player != null:
 		for r in get_tree().get_nodes_in_group("radio"):
-			if r is RadioTower and is_instance_valid(r) and r._talk != null \
-					and r._talk.playing \
-					and r.global_position.distance_to(_player.global_position) < 45.0:
+			if r is RadioTower and is_instance_valid(r) \
+					and r.global_position.distance_to(_player.global_position) < 45.0 \
+					and ((r._talk != null and r._talk.playing) \
+					or (r._hiss != null and r._hiss.playing)):
+				# ANY radio noise counts -- static hiss included
 				radio_hot = true
 				break
 	if _bgm.stream_paused:
