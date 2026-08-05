@@ -1291,7 +1291,8 @@ const AP := ["Contrast", "Pixel", "Wireframe", "Blind", "Wobble"]
 # including the humans themselves as a recurring beat
 const AX_FAR := ["Earth", "Jupiter", "Venus", "Mars", "the Moon",
 	"Pi", "Euclid", "Crystalia", "Sanus", "Varnisol", "Xero", "Home",
-	"TIN 618", "the humans"]
+	"TIN 618", "the humans", "Yorox", "Sol", "Tris", "the shader sun",
+	"Harold", "the hole in the sky"]
 const AP_STATES := ["rotating backwards", "hoarding vertices",
 	"refusing to render", "dimming on purpose", "growing a second pole",
 	"leaking edges into the void", "voting to become concave",
@@ -1327,6 +1328,54 @@ const AP_PHENOM := ["a second sunrise", "backwards rain",
 	"a polygon shortage", "silence in the low frequencies",
 	"a brand-new corner", "seventeen missing vertices",
 	"fog with opinions", "an unlicensed eclipse"]
+# --- PROCEDURAL SPONSORS: products and slogans are COMPOSED, not
+# picked. A qualifier, a geometry substance, a retail form; slogans
+# are templates with slots filled from the show's own vocabulary. ---
+const AD_QUAL := ["artisanal ", "certified ", "premium ", "low-poly ",
+	"cold-pressed ", "double-sided ", "military-grade ", "gluten-free ",
+	"", "", ""]
+const AD_MATS := ["vertex", "edge", "horizon", "shadow", "polygon",
+	"corner", "gradient", "normal", "skybox", "raycast", "lumen",
+	"occlusion", "penumbra", "quaternion"]
+const AD_FORMS := ["polish", "glue", "insurance", "butter", "spray",
+	"pillows", "tonic", "wax", "cubes", "foam", "drops", "candles",
+	"subscription", "helmets", "mulch"]
+const AD_SLOG_T := [
+	"now with %d%% fewer %ss.",
+	"because your %s deserves it.",
+	"as endorsed by %s. allegedly.",
+	"side effects include %s.",
+	"the only %s the tesselation trusts.",
+	"ask your %s if it's right for you.",
+	"%s tested. %s approved.",
+	"legal in every dimension but one.",
+	"you will notice the difference. it will notice you back.",
+	"stops your %s from %s.",
+]
+
+static func ad_product() -> String:
+	return AD_QUAL[randi() % AD_QUAL.size()] \
+		+ AD_MATS[randi() % AD_MATS.size()] + " " \
+		+ AD_FORMS[randi() % AD_FORMS.size()]
+
+static func ad_slogan() -> String:
+	var t: String = AD_SLOG_T[randi() % AD_SLOG_T.size()]
+	var c := t.count("%s")
+	if t.begins_with("now with"):
+		return t % [10 + randi() % 89, AD_MATS[randi() % AD_MATS.size()]]
+	if c == 0:
+		return t
+	var fills: Array = []
+	var pool: Array = [AD_MATS[randi() % AD_MATS.size()],
+		AX_FAR[randi() % AX_FAR.size()],
+		AP_STATES[randi() % AP_STATES.size()],
+		AP[randi() % AP.size()],
+		AD_MATS[randi() % AD_MATS.size()] + " " + AD_FORMS[randi() % AD_FORMS.size()]]
+	pool.shuffle()
+	for i in c:
+		fills.append(pool[i % pool.size()])
+	return t % fills
+
 const AP_PRODUCTS := ["edge polish", "horizon insurance", "vertex glue",
 	"premium darkness", "certified round corners", "artisanal shadows",
 	"low-poly comfort blankets"]
@@ -1730,8 +1779,8 @@ static func alien_exchange(in_room: bool = false) -> Array:
 		5:
 			out = _ax_story(p, p2, not AP.has(p))
 		6:
-			var prod := _ax_fresh(AP_PRODUCTS)
-			var slog := _ax_fresh(AP_SLOGANS)
+			var prod := ad_product()
+			var slog := ad_slogan()
 			last_alien_meta["product"] = prod
 			last_alien_meta["slogan"] = slog
 			out = [[0, _ax_fresh(AX_AD_IN)],
