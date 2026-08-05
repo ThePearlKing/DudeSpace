@@ -995,6 +995,7 @@ func _process(delta: float) -> void:
 	_regen_crates(delta)
 	_regen_ore(delta)
 	_animate_avatars(delta)
+	_update_stalkers(delta)
 	# demographics: when the census dips, someone new steps off the rail
 	# into a city. only while a player is around to live in
 	_pop_t -= delta
@@ -3513,6 +3514,34 @@ func _place_spawn_beacon() -> void:
 	bcn.activate_spawn()
 
 ## Slowly restock destroyed crates on every planet.
+var _stalker_cd := 0.0
+
+## The stalker-thulhus answer wrath. Above 40 they gather (three of
+## them, one at a time); below 25 they fold away. They only ever watch.
+func _update_stalkers(delta: float) -> void:
+	if Game.tutorial_session or Game.dead:
+		return
+	_stalker_cd -= delta
+	var live: Array = []
+	for st in get_tree().get_nodes_in_group("stalker"):
+		if is_instance_valid(st):
+			live.append(st)
+	if Game.wrath >= 40.0:
+		if live.size() < 3 and _stalker_cd <= 0.0 and _player != null:
+			_stalker_cd = 7.0
+			var stk := Stalker.new()
+			add_child(stk)
+			var up9: Vector3 = _player.global_transform.basis.y
+			var side9: Vector3 = up9.cross(Vector3(randf_range(-1, 1), randf_range(-1, 1),
+				randf_range(-1, 1))).normalized()
+			if side9.length() < 0.5:
+				side9 = up9.cross(Vector3.RIGHT).normalized()
+			stk.global_position = _player.global_position \
+				+ side9 * 45.0 + up9 * randf_range(4.0, 12.0)
+	elif Game.wrath < 25.0:
+		for st2 in live:
+			st2.depart()
+
 func _regen_crates(delta: float) -> void:
 	_regen_t -= delta
 	if _regen_t > 0.0:
@@ -4622,10 +4651,10 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 		_h_glyph(root, g, Vector3(cos(ga) * 1.65, 6.55 + sin(ga) * 1.65, 1.84))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
-## engraved bars. 0: the circle-with-a-dot and the spaghetti pouring
-## out. 1: the black hole with its ring. 2: an icosahedron down its
-## five-fold axis. 3: the triangle -- the THING. 4: the watchers that
-## stalked when the god was angry. 5: the fork.
+## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
+## black hole with its ring. 2: an icosahedron down its five-fold axis.
+## 3: the triangle -- the THING. 4: the noodle god (the eye, four
+## reaching arms). 5: the fork.
 func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 	var ink := Surfaces.stone(Color("#332a1f"))
 	var g := Node3D.new()
@@ -4651,7 +4680,8 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 		g.add_child(mi)
 	match kind:
 		0:
-			# the circle, the dot, the spaghetti
+			# the stalker-thulhus: the ring of flesh, the eye-dot, the
+			# tentacles going down
 			ring.call(0.18, 0.24, 0.0)
 			bar.call(Vector2(0.08, 0.08), Vector2.ZERO, 0.0)
 			for si in 3:
@@ -4688,8 +4718,7 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.62, 0.05), Vector2(-0.14, 0.02), 62.0)
 			bar.call(Vector2(0.62, 0.05), Vector2(0.14, 0.02), -62.0)
 		4:
-			# the watchers -- the stalkers that came when the god was angry.
-			# they are not depicted kindly.
+			# the noodle god: the eye and its four reaching arms
 			ring.call(0.16, 0.22, 0.0)
 			bar.call(Vector2(0.1, 0.1), Vector2.ZERO, 45.0)
 			for ri in 4:
