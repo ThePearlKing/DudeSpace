@@ -261,28 +261,77 @@ func _build_station() -> void:
 		pipe.rotation_degrees = Vector3(90, float(pspec[1]), 0)
 		pipe.material_override = dark
 		add_child(pipe)
-	# spherical tanks in a cluster
-	for tspec in [[Vector3(-7.5, -1.6, -7.0), 1.15], [Vector3(-5.6, -1.4, -8.2), 0.85],
-			[Vector3(-8.6, -1.3, -5.2), 0.7]]:
-		var tank := MeshInstance3D.new()
-		var tkm := SphereMesh.new()
-		tkm.radius = float(tspec[1])
-		tkm.height = float(tspec[1]) * 2.0
-		tank.mesh = tkm
-		tank.position = tspec[0]
-		tank.material_override = Surfaces.metal(Color("#8d95a2"))
-		add_child(tank)
-	# radiator fins, slightly angled, faint heat glow on the edges
-	for fspec in [[Vector3(8.5, -2.0, 8.0), 30.0], [Vector3(10.2, -2.0, 5.6), 30.0],
-			[Vector3(6.8, -2.0, 10.2), 30.0]]:
-		var fin := MeshInstance3D.new()
-		var fnm := BoxMesh.new()
-		fnm.size = Vector3(3.4, 2.2, 0.1)
-		fin.mesh = fnm
-		fin.position = fspec[0]
-		fin.rotation_degrees = Vector3(0, float(fspec[1]), 12)
-		fin.material_override = Destructible.make_material(Color("#5a2f2a"), 0.5)
-		add_child(fin)
+	# equipment modules: boxy machinery bays with vent slats and feed
+	# pipes into the deck -- reads as PLANT, not decoration
+	for espec2 in [[Vector3(-7.5, -1.35, -7.0), Vector3(4.2, 1.5, 2.6), 0.0],
+			[Vector3(8.2, -1.25, 7.6), Vector3(3.2, 1.3, 2.2), 35.0],
+			[Vector3(-8.0, -1.15, 6.5), Vector3(2.6, 1.1, 3.0), 0.0]]:
+		var bay := Node3D.new()
+		bay.position = espec2[0]
+		bay.rotation_degrees.y = float(espec2[2])
+		add_child(bay)
+		var bsz: Vector3 = espec2[1]
+		var box := MeshInstance3D.new()
+		var bxm := BoxMesh.new()
+		bxm.size = bsz
+		box.mesh = bxm
+		box.material_override = Surfaces.metal(Color("#8d95a2"))
+		bay.add_child(box)
+		# vent slats down the long face
+		for vi in 4:
+			var slat := MeshInstance3D.new()
+			var slm := BoxMesh.new()
+			slm.size = Vector3(bsz.x * 0.7, 0.1, 0.06)
+			slat.mesh = slm
+			slat.position = Vector3(0, -bsz.y * 0.28 + float(vi) * 0.22,
+				bsz.z * 0.5 + 0.02)
+			slat.material_override = dark
+			bay.add_child(slat)
+		# feed pipes up into the deck
+		for px4 in [-bsz.x * 0.3, bsz.x * 0.3]:
+			var fp := MeshInstance3D.new()
+			var fpm := CylinderMesh.new()
+			fpm.top_radius = 0.14
+			fpm.bottom_radius = 0.14
+			fpm.height = 1.0
+			fp.mesh = fpm
+			fp.position = Vector3(px4, bsz.y * 0.5 + 0.4, 0)
+			fp.material_override = dark
+			bay.add_child(fp)
+	# reaction wheel: fat spinning-mass disc in a yoke
+	var rw := MeshInstance3D.new()
+	var rwm := CylinderMesh.new()
+	rwm.top_radius = 1.3
+	rwm.bottom_radius = 1.3
+	rwm.height = 0.5
+	rw.mesh = rwm
+	rw.position = Vector3(6.5, -1.6, -7.5)
+	rw.rotation_degrees = Vector3(0, 0, 90)
+	rw.material_override = Surfaces.metal(Color("#6a7280"))
+	add_child(rw)
+	var yoke := MeshInstance3D.new()
+	var ykm := BoxMesh.new()
+	ykm.size = Vector3(0.3, 1.2, 3.0)
+	yoke.mesh = ykm
+	yoke.position = Vector3(6.5, -1.0, -7.5)
+	yoke.material_override = dark
+	add_child(yoke)
+	# ribbed conduit tray running the belly edge
+	var tray := MeshInstance3D.new()
+	var trm := BoxMesh.new()
+	trm.size = Vector3(16.0, 0.25, 0.7)
+	tray.mesh = trm
+	tray.position = Vector3(0, -0.78, 11.0)
+	tray.material_override = dark
+	add_child(tray)
+	for ri in range(-3, 4):
+		var rib := MeshInstance3D.new()
+		var rbm := BoxMesh.new()
+		rbm.size = Vector3(0.18, 0.4, 0.9)
+		rib.mesh = rbm
+		rib.position = Vector3(float(ri) * 2.4, -0.8, 11.0)
+		rib.material_override = Surfaces.metal(Color("#6a7280"))
+		add_child(rib)
 	# corner thruster pods (nozzle down: station-keeping)
 	for tx in [-10.5, 10.5]:
 		for tz in [-10.5, 10.5]:
