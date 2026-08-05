@@ -196,22 +196,31 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 				for i in mini(int(0.04 * SR), total - tk):
 					buf[tk + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.008)) * 0.16
 	if kind == "lava" or kind == "volcanic":
-		# SANUS: the fire is in the band. Low roar bed (lp-filtered noise
-		# flutter + deep pulse) with granular flame crackle over it --
-		# same DNA as the star stations' solar crackle, woodier decay.
+		# SANUS: the fire is in the band, and you can HEAR it. Roar bed
+		# (lp-filtered noise, breathing), deep 46Hz pulse, real crackle
+		# pops, and slow flame whooshes -- star-crackle DNA, hotter.
 		var frng := RandomNumberGenerator.new()
 		frng.seed = seed_v + 77
 		var lpn := 0.0
 		for i in total:
 			var t3 := float(i) / SR
-			lpn += ((frng.randf() * 2.0 - 1.0) - lpn) * 0.02
-			buf[i] += lpn * 0.42 * (0.7 + 0.3 * sin(TAU * 0.35 * t3)) \
-				+ sin(TAU * 46.0 * t3) * 0.05 * (0.6 + 0.4 * sin(TAU * 0.21 * t3 + 1.7))
-		for c2 in 340:
-			var cst := frng.randi() % (total - 160)
-			var camp := frng.randf_range(0.06, 0.2)
-			for j2 in 140:
-				buf[cst + j2] += (frng.randf() * 2.0 - 1.0) * camp * exp(-float(j2) / 22.0)
+			lpn += ((frng.randf() * 2.0 - 1.0) - lpn) * 0.06
+			buf[i] += lpn * 0.95 * (0.65 + 0.35 * sin(TAU * 0.35 * t3)) \
+				+ sin(TAU * 46.0 * t3) * 0.12 * (0.6 + 0.4 * sin(TAU * 0.21 * t3 + 1.7))
+		for c2 in 520:
+			var cst := frng.randi() % (total - 440)
+			var camp := frng.randf_range(0.12, 0.35)
+			for j2 in 400:
+				buf[cst + j2] += (frng.randf() * 2.0 - 1.0) * camp * exp(-float(j2) / 60.0)
+		# whooshes: six slow gusts of flame across the loop
+		var wlen := int(0.6 * SR)
+		for wsh in 6:
+			var wst := frng.randi() % (total - wlen)
+			var wlp := 0.0
+			for j3 in wlen:
+				wlp += ((frng.randf() * 2.0 - 1.0) - wlp) * 0.12
+				var wenv := sin(PI * float(j3) / float(wlen))
+				buf[wst + j3] += wlp * 0.5 * wenv * wenv
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:
