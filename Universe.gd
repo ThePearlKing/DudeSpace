@@ -27,10 +27,10 @@ func _process(delta: float) -> void:
 	if bh == null or gr == null:
 		return
 	_harold_ang += delta * (TAU / 1200.0)
-	# 13500m out: past the dilation influence (10 x radius = 11000), so
-	# standing on Harold does NOT slow your clock. he's seen things though
+	# 11600m out: just past the dilation influence (10 x radius = 11000),
+	# so standing on Harold does NOT slow your clock. barely. he likes it
 	gr.center = bh.center + Vector3(cos(_harold_ang),
-		0.1 * sin(_harold_ang * 2.0), sin(_harold_ang)) * 13500.0 * world_scale
+		0.1 * sin(_harold_ang * 2.0), sin(_harold_ang)) * 11600.0 * world_scale
 	if gr.node != null and is_instance_valid(gr.node):
 		gr.node.global_position = gr.center
 
@@ -74,9 +74,9 @@ func _ready() -> void:
 	# --- Crystalia: far, dangerous, alien-guarded. Ultima crystals. ---
 	_def("Crystalia",Vector3(-9000, 4000, -8000),90.0,  9.0,  "crystal",   Color("#40e0d0"))
 	# --- TIN 618: a black hole. Extreme pull, endless fall, time dilation. ---
-	_def("TIN 618",  Vector3(28000, -3000, 24000), 1100.0, 80.0, "blackhole", Color("#000000"))
+	_def("TIN 618",  Vector3(40000, -3000, 34000), 1100.0, 80.0, "blackhole", Color("#000000"))
 	# Harold: a tired old rock ORBITING the black hole. He's fine.
-	_def("Harold",   Vector3(28000 + 13500, -3000, 24000), 44.0, 6.5, "mercury", Color("#8f8377"))
+	_def("Harold",   Vector3(40000 + 11600, -3000, 34000), 44.0, 6.5, "mercury", Color("#8f8377"))
 	# --- the ACTUAL Sol system. Yes, that one. Far out in -X, long haul. ---
 	var SC := Vector3(-52000, 3000, 14000)   # Sol system centre
 	_def("Sol",      SC,                          420.0, 26.0, "sun",     Color("#fff4d6"))
