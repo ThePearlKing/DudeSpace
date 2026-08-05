@@ -546,7 +546,9 @@ func work(delta: float) -> void:
 					if cur_txt != _last_cue:
 						_last_cue = cur_txt
 						now_line = "[%d] %s" % [cur_h + 1, cur_txt]
-						now_line_col = [Color("#e8e8f0"), Color("#ffd166"),
+						# EXACT orb hues from the studio: green-cyan anchor,
+						# gold, purple, red
+						now_line_col = [Color("#33ff99"), Color("#ffcf40"),
 							Color("#b388ff"), Color("#ff6a6a")][clampi(cur_h, 0, 3)]
 					now_line_until = Game.playtime + 1.0
 			_sentence_cd -= delta
