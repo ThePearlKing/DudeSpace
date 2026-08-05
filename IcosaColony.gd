@@ -632,11 +632,11 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	for ri in 3:
 		_spawn_resident(room_c + pdir * 0.6
 			+ tang * (-4.0 + 4.0 * float(ri)), pdir)
-	# core gravity is INSANE: every low hall gets a lift home
+	# core gravity is INSANE: the lift takes you back UP to this hall's
+	# own entrance in the ring corridor -- not all the way topside
 	var lift := Gate.new().configure({
-		"target": _b.center + _mouth_dir * (float(_b.radius) + 1.5)
-			+ _mouth_e1 * 9.0, "zone": "",
-		"label": "TO SURFACE", "color": accent, "cube": true})
+		"target": C + pdir * (r2 - 1.0), "zone": "",
+		"label": "BACK UP", "color": accent, "cube": true})
 	add_child(lift)
 	lift.global_transform = Transform3D(bas, room_c)
 	lift.translate_object_local(Vector3(-6.4, -2.6, 6.4))
@@ -705,10 +705,10 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
 	_tv(body, Vector3(4.5, -0.6, 0), Vector3(0, 0, 90))
+	# back up to the story-two junction you dropped in from
 	var lift2 := Gate.new().configure({
-		"target": _b.center + _mouth_dir * (float(_b.radius) + 1.5)
-			+ _mouth_e1 * 9.0, "zone": "",
-		"label": "TO SURFACE", "color": accent, "cube": true})
+		"target": _b.center + _mouth_dir * (float(_b.radius) - 25.0), "zone": "",
+		"label": "BACK UP", "color": accent, "cube": true})
 	add_child(lift2)
 	lift2.global_transform = Transform3D(bas, room_c)
 	lift2.translate_object_local(Vector3(3.8, -2.7, -3.8))
