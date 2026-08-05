@@ -292,7 +292,7 @@ const TIPS := [
 	"tip: Q drops the selected item. clicking outside an inventory drops the held stack.",
 	"tip: mine veins grow back. no planet ever runs dry.",
 	"tip: stick a waypoint ON a rocket and it tracks it in flight.",
-	"tip: 1-9 warps time while coasting in a rocket. 0 is 10x. burning cancels it.",
+	"tip: 1-9 warps time while coasting in a rocket. 0 is 10x. double-tap 0: 20x for a burst (cooldown). burning cancels it.",
 	"tip: the electric seller pays 1.25x what the manual sell station does.",
 	"tip: armor caps at 60%. cheap pieces can hit the cap together.",
 	"tip: wire a computer output to a Light Box: instant status lamp.",

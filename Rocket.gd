@@ -191,6 +191,7 @@ func _try_exit() -> void:
 	_smash_area.monitoring = false
 	_cam.current = false
 	Game.timewarp = 1.0
+	_overdrive_until = 0.0
 	Game.board_lock = Game.playtime + 0.5   # no instant re-board
 	Sfx.engine(false)
 	Sfx.alien_engine(false)
@@ -228,12 +229,30 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()   # or the player re-boards SAME press
 			return
 		# time warp: 1-9 = 1x-9x, 0 = 10x. NEVER while the engine burns.
+		# DOUBLE-TAP 0: a 20x OVERDRIVE burst for 8s, then back to 10x.
+		# Any warp key still works during the burst (including stopping).
+		# 30s cooldown between bursts.
 		if event.keycode >= KEY_0 and event.keycode <= KEY_9:
 			if _engine_on:
 				Sfx.play("denied")
 				return
 			var n: int = event.keycode - KEY_0
-			Game.timewarp = 10.0 if n == 0 else float(n)
+			if n == 0 and Game.playtime - _warp_tap_t < 0.4:
+				if Game.playtime >= _overdrive_cd:
+					_overdrive_until = Game.playtime + 8.0
+					_overdrive_cd = Game.playtime + 38.0
+					Game.timewarp = 20.0
+					Sfx.play("warp", -10.0)
+				else:
+					Sfx.play("denied", -14.0)
+			else:
+				_overdrive_until = 0.0   # picking any warp cancels the burst
+				Game.timewarp = 10.0 if n == 0 else float(n)
+			_warp_tap_t = Game.playtime if n == 0 else -10.0
+
+var _warp_tap_t := -10.0      # last time 0 was tapped (double-tap window)
+var _overdrive_until := 0.0   # 20x burst active until this playtime
+var _overdrive_cd := 0.0      # next time a burst is allowed
 
 func _physics_process(delta: float) -> void:
 	if not piloted or Game.dead:
@@ -324,6 +343,12 @@ func _physics_process(delta: float) -> void:
 	global_position += vel * delta
 	if _engine_on and Game.timewarp > 1.0:
 		Game.timewarp = 1.0   # burning instantly kills time warp
+		_overdrive_until = 0.0
+	# overdrive burst expires back down to a plain 10x
+	if _overdrive_until > 0.0 and Game.playtime >= _overdrive_until:
+		_overdrive_until = 0.0
+		if Game.timewarp > 10.0:
+			Game.timewarp = 10.0
 		var hud := get_tree().get_first_node_in_group("hud")
 		if hud:
 			hud.flash("TIME WARP ×1 — engine burn")
