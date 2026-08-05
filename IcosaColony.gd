@@ -6,6 +6,25 @@ extends Node3D
 ## planet's interior -- lined with apartment pods. A second shaft
 ## continues DEEPER to story two: four big cafeteria halls.
 ##
+## ============================ FLOOR PLAN ============================
+## (the authority. every change checks against this.)
+## SURFACE (R): mouth + collar + rim. Shaft A: 6x6, R+1 -> r1+2.6.
+## STORY 1 (r1 = R-13): rings A (u0/e1) + B (u0/e2), tube 5.6w x 4.9h.
+##   Crossings +-u0*r1: A = full tube, 5.8m side windows; mouth crossing
+##   also has 5.2m floor+ceiling hatches (the drop). B = windowed side
+##   walls only. 4 bridge stubs seal window->B gaps per level.
+##   Apartments: alternating sides, doorway + collar + slid door.
+## THE DROP: mouth -> story1 hatches -> shaft B -> story2 ceiling hatch
+##   -> CAUGHT on story2's solid crossing floor. Nothing falls further.
+## STORY 2 (r2 = R-24): one ring (e1). Cafeterias at i 3/10/17/24:
+##   floor chute down to halls at r2-8.2 (hatched ceilings).
+## PREMIUM (r3): one penthouse under u0. Gate-entry ONLY.
+## GATES (all cube): story1 COLONY EXIT -> surface (stands in a stub,
+##   NEVER over a hatch). story2: COLONY EXIT -> surface, PENTHOUSE ->
+##   core. cafeteria BACK UP -> the NEIGHBOR segment's solid floor
+##   (never its own chute hole). penthouse BACK UP -> story2 crossing.
+## ====================================================================
+##
 ## The residents are far smarter than humans. Far smarter than the
 ## code, too: simulating their actual minds is unnecessary, because
 ## you could not tell the difference from down here. They know this.
@@ -198,7 +217,7 @@ func build(b, dir: Vector3) -> void:
 		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out)
 	out.global_transform = Transform3D(_bup(u0),
-		C + u0 * (r1 - 1.6) + (e1 + e2).normalized() * 2.1)
+		C + u0 * (r1 - 1.6) + e2 * 4.6)
 	# PREMIUM SUITES: a third, tiny ring hugging the core. Bigger rooms,
 	# gold trim, a window slab facing the exact center of the planet.
 	# location, location, location.
@@ -612,7 +631,7 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	# core gravity is INSANE: the lift takes you back UP to this hall's
 	# own entrance in the ring corridor -- not all the way topside
 	var lift := Gate.new().configure({
-		"target": C + pdir * (r2 - 1.0), "zone": "",
+		"target": C + pdir * (r2 - 1.0) + tang * 9.0, "zone": "",
 		"label": "BACK UP", "color": accent, "cube": true})
 	add_child(lift)
 	lift.global_transform = Transform3D(bas, room_c)
