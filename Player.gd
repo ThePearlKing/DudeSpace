@@ -1879,6 +1879,7 @@ func _use_selected() -> void:
 				out.setup(body2)
 				get_parent().add_child(out)
 			out.global_position = place + up * 1.0
+			out.flat_home = Game.zone == "flat"   # released indoors: floor pet
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
@@ -1899,18 +1900,6 @@ func _use_selected() -> void:
 			Inventory.clear_slot(slot)
 			Inventory.give("cage", 1)   # the cage survives
 			Sfx.play("place")
-		"nchip":
-			# the neuralink chip: a proper little implant, not a pebble --
-			# rounded disc, gold pin ring, glowing trace cross
-			var chip := _hm_cyl(0.11, 0.035, Vector3(0, 0, 0), Color("#e8ecf2"), 0.25)
-			chip.rotation_degrees = Vector3(90, 0, 0)
-			for pang in [0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0]:
-				var pin := _hm_cyl(0.008, 0.05, Vector3(cos(deg_to_rad(pang)) * 0.08,
-					0, sin(deg_to_rad(pang)) * 0.08 - 0.0), Color("#c8a030"), 0.4)
-				pin.rotation_degrees = Vector3(0, 0, 0)
-			_hm_box(Vector3(0.12, 0.012, 0.015), Vector3(0, 0.022, 0), Color("#7be8ff"), 2.0)
-			_hm_box(Vector3(0.015, 0.012, 0.12), Vector3(0, 0.022, 0), Color("#7be8ff"), 2.0)
-			_hm_box(Vector3(0.04, 0.014, 0.04), Vector3(0, 0.028, 0), Color("#2a2f38"), 0.3)
 		"housekit":
 			var hopts: Array = []
 			for k in House.KINDS:
