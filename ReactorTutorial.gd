@@ -110,7 +110,9 @@ func _spawn_reactor() -> void:
 	side = side.normalized()
 	rx = EMachines.NuclearReactor.new()
 	get_tree().current_scene.add_child(rx)
-	rx.set_meta("placed_id", "nreactor")
+	# NO placed_id: a school prop must never enter the world save --
+	# with it, dying mid-lesson restored the old reactor on respawn AND
+	# the tutorial spawned its own. two reactors, one lesson.
 	rx.set_meta("owner", Net.my_name())
 	var pos: Vector3 = b.center + (up * float(b.radius))
 	pos += side * 6.0
