@@ -153,7 +153,13 @@ func build(b, dir: Vector3) -> void:
 			# traffic walks ring A's floor for those 5.6 meters.
 			var junction := i == 0 or i == NS / 2
 			if junction and ering_v == e2:
-				continue   # ring B yields at crossings
+				# ring B's crossing: side walls with windows only -- ring
+				# A's floor and ceiling serve the shared space. Skipping
+				# this entirely left B's corridor ending in raw rock.
+				_tube_seg(C + pdir * r1, pdir, tang,
+					2.0 * PI * r1 / float(NS) + 0.8, _wallc(), accent,
+					2, true, true, 999.0)
+				continue
 			var pod_side := 0
 			if (i % 2 == 1) and not near_mouth and not junction:
 				pod_side = 1 if (i / 2) % 2 == 0 else -1
@@ -162,6 +168,14 @@ func build(b, dir: Vector3) -> void:
 				junction and i == 0, junction and i == 0)
 			if pod_side != 0:
 				_apartment(C, pdir, tang, r1, accent, pod_side)
+	# BRIDGE STUBS: ring A's side windows sit 2.8m out; ring B's first
+	# curved segment starts ~8m out. These short straight tubes seal the
+	# five raw-rock meters between them, both crossings, both directions.
+	for stub in [[u0 * r1, e2], [u0 * r1, -e2], [-u0 * r1, e2], [-u0 * r1, -e2]]:
+		var sbase: Vector3 = stub[0]
+		var sdir: Vector3 = (stub[1] as Vector3).normalized()
+		_tube_seg(C + sbase + sdir * 5.6, (sbase as Vector3).normalized(),
+			sdir, 7.0, _wallc(), accent, 0, false, false)
 	# STORY TWO: one ring, four cafeteria halls at the diagonals
 	for i in NS:
 		var ang := TAU * float(i) / float(NS)
@@ -171,8 +185,11 @@ func build(b, dir: Vector3) -> void:
 		# core chute below); cafeteria segments open their floor too --
 		# the halls are a LOWER FLOOR now, not side rooms
 		var caf_here := i in [3, 10, 17, 24]
+		# crossing keeps its ceiling hatch (the surface drop lands HERE,
+		# caught on a solid floor) but the floor is sealed: the premium
+		# level is entered through the gate, not by falling past it
 		_tube_seg(C + pdir * r2, pdir, tang, 2.0 * PI * r2 / float(NS) + 0.8,
-			_wallc().darkened(0.2), accent, 0, i == 0, i == 0 or caf_here)
+			_wallc().darkened(0.2), accent, 0, i == 0, caf_here)
 		if caf_here:
 			_cafeteria(C, pdir, tang, r2, accent)
 	# exit gate at the story-one crossing, back to the mouth's doorstep
@@ -212,6 +229,11 @@ func build(b, dir: Vector3) -> void:
 		wb3.global_transform = Transform3D(_bup(u0),
 			C + u0 * ((r2 - 2.6 + r3 + 5.4) * 0.5))
 		wb3.translate_object_local(Vector3(sspec3[1].x, 0, sspec3[1].z))
+	var pgate := Gate.new().configure({
+		"target": C + u0 * (r3 + 1.6), "zone": "",
+		"label": "PENTHOUSE", "color": Color("#ffd94a"), "cube": true})
+	add_child(pgate)
+	pgate.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.6) - e1 * 2.3)
 	var out2 := Gate.new().configure({
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
 		"label": "COLONY EXIT", "color": accent, "cube": true})
@@ -229,7 +251,7 @@ func _bup(up: Vector3) -> Basis:
 ## for pods), plus a ceiling light strip. Single body, four shapes.
 func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 		wallc: Color, accent: Color, open_side: int, open_top: bool,
-		open_floor: bool) -> void:
+		open_floor: bool, hatch: float = 5.2) -> void:
 	var bas := Basis(up.cross(along).normalized(), up, along).orthonormalized()
 	var body := StaticBody3D.new()
 	add_child(body)
@@ -238,7 +260,9 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 	var parts: Array = []
 	# open segments keep MOST of their slab: just a 5.2m hatch matching
 	# the shaft, not the whole roof missing
-	var hole := minf(5.2, ln - 2.0)
+	var hole := minf(hatch, ln - 2.0)
+	if hatch > ln:
+		hole = ln + 1.0   # fully open slab: no flanks at all
 	var flank := (ln - hole) * 0.5
 	if open_floor and flank > 0.3:
 		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, -2.2, (hole + flank) * 0.5)])
