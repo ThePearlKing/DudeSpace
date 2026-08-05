@@ -440,6 +440,29 @@ void fragment(){
 	ROUGHNESS = 0.55;
 }
 """
+		"dude":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 9.0);
+	vec3 f = fract(n * 9.0);
+	float h = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+	float tr = 0.0;
+	if (h < 0.34) { tr = step(abs(f.y - 0.5), 0.06); }
+	else if (h < 0.67) { tr = step(abs(f.x - 0.5), 0.06); }
+	else { tr = max(step(abs(f.x - 0.5), 0.06) * step(f.y, 0.5),
+		step(abs(f.y - 0.5), 0.06) * step(f.x, 0.5)); }
+	float pad = step(length(f.xy - vec2(0.5)), 0.11);
+	vec3 board = base * (0.5 + 0.25 * fbm(n * 7.0));
+	vec3 copper = vec3(0.85, 0.55, 0.2);
+	vec3 col = mix(board, copper, clamp(tr, 0.0, 1.0) * 0.9);
+	float pulse = 0.5 + 0.5 * sin(TIME * 2.0 + h * 12.0);
+	ALBEDO = col;
+	EMISSION = vec3(0.3, 1.0, 0.5) * pad * (0.5 + pulse) + copper * tr * 0.15;
+	METALLIC = tr * 0.7;
+	ROUGHNESS = 0.5;
+}
+"""
 		"rock":
 			frag = """
 void fragment(){
@@ -506,7 +529,7 @@ func _build_background() -> void:
 	# became living continents, dude-built circuit traces (two of those
 	# -- this IS the Dude system), banded dunes, candy marble.
 	for spec in [[7.0, 0.9, 0.10, Color("#2f7d32"), "cont"],
-			[11.0, 1.4, -0.06, Color("#0e3b2e"), "circuit"],
+			[11.0, 1.4, -0.06, Color("#0e3b2e"), "dude"],
 			[15.0, 0.6, 0.14, Color("#c8a557"), "dune"],
 			[19.0, 1.1, -0.04, Color("#e8a3c0"), "circuit"]]:
 		var orbit := Node3D.new()
