@@ -4582,7 +4582,7 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	for spec in [[Vector3(11.0, 2.4, 7.0), Vector3(0, 0.8, 0), 0.0],
 			[Vector3(8.0, 2.0, 5.5), Vector3(0, 2.9, 0), 0.0],
 			[Vector3(5.6, 0.7, 5.6), Vector3(0, 4.2, 0), 45.0],
-			[Vector3(5.0, 4.5, 3.6), Vector3(0, 6.35, -0.42), 0.0],
+			[Vector3(5.0, 4.5, 1.6), Vector3(0, 6.35, -1.1), 0.0],
 			[Vector3(4.2, 0.6, 4.2), Vector3(0, 8.85, 0), 45.0],
 			[Vector3(6.0, 1.6, 3.0), Vector3(0, 9.9, 0), 0.0],
 			[Vector3(3.6, 0.9, 2.4), Vector3(0, 11.1, 0), 0.0]]:
@@ -4619,7 +4619,9 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	var rt := 1.0
 	var cy := 6.35
 	var zf := 1.8
-	var zback := 1.4
+	# skirts run all the way back to the structural box, which now sits
+	# ENTIRELY behind the cavity apex -- nothing left to block the view
+	var zback := -0.28
 	var apex := Vector3(0, cy, -0.2)
 	var stC := Color(0.541, 0.498, 0.439)
 	var mouth := Color(0.2, 0.17, 0.13)
