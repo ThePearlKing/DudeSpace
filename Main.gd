@@ -85,6 +85,20 @@ func _ready() -> void:
 	if not Game.tutorial_session:
 		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
 	add_child(WthStudio.new())       # the WTH station: hole, mast, studio
+	# TIN 618 hums across space: you hear it long before you see it,
+	# and well past Harold's orbit distance
+	var bhb2 = Universe.body_named("TIN 618")
+	if bhb2 != null:
+		var bhum := AudioStreamPlayer3D.new()
+		bhum.stream = RadioLib._bh_loop()
+		bhum.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		bhum.unit_size = 2600.0
+		bhum.max_distance = 30000.0
+		bhum.max_db = 0.0
+		bhum.volume_db = -6.0
+		add_child(bhum)
+		bhum.global_position = bhb2.center
+		bhum.play()
 
 	_hud = HUD.new()
 	add_child(_hud)
@@ -1686,7 +1700,7 @@ func _planet_material(kind: String, color: Color) -> Material:
 			return ShaderLib.make(kind, color)
 		"earth":
 			return _earth_material()
-		"luna", "mercury":
+		"luna", "mercury", "harold":
 			return _rocky_material(color)
 		"ice":
 			# glacial: saturated blue with a frosty sheen
@@ -2222,6 +2236,68 @@ func _populate(b) -> void:
 			_spawn_rocks(b, 14, Color("#7d7168"))
 			_spawn_res_nodes(b, 10, "coal", 2)
 			_spawn_res_nodes(b, 5, "uranium", 1)   # sun-baked pitchblende
+		"harold":
+			# HAROLD: dusty, rocky, quietly interesting. No craters --
+			# he's had enough impacts for one lifetime.
+			_spawn_rocks(b, 22, Color("#83786c"))
+			for i in _n(14):
+				# dust drifts: soft half-buried mounds
+				var dm4 := MeshInstance3D.new()
+				var dmm := SphereMesh.new()
+				var dr := randf_range(2.0, 5.5)
+				dmm.radius = dr
+				dmm.height = dr * 0.6
+				dm4.mesh = dmm
+				dm4.material_override = Surfaces.stone(Color("#988c7d"))
+				add_child(dm4)
+				var dd := _surface_dir()
+				dm4.global_transform = Transform3D(_basis_from_up(dd),
+					b.center + dd * (b.radius - dr * 0.25))
+			for i in _n(8):
+				# hoodoos: wind-carved stacked spires
+				var hd := _surface_dir()
+				var hb := _basis_from_up(hd)
+				var hy := 0.0
+				for st9 in 3 + randi() % 3:
+					var seg := MeshInstance3D.new()
+					var sgm := BoxMesh.new()
+					var sw9 := randf_range(1.0, 2.0) * (1.0 - float(st9) * 0.16)
+					sgm.size = Vector3(sw9, randf_range(0.8, 1.6), sw9)
+					seg.mesh = sgm
+					seg.material_override = Surfaces.stone(
+						Color("#7d7266").lightened(randf() * 0.12))
+					add_child(seg)
+					seg.global_transform = Transform3D(hb,
+						b.center + hd * (b.radius + hy + sgm.size.y * 0.5))
+					seg.rotate_object_local(Vector3.UP, randf() * TAU)
+					hy += sgm.size.y * 0.92
+			for i in _n(6):
+				# windswept ridges half-buried in the dust
+				var rg := MeshInstance3D.new()
+				var rgm := BoxMesh.new()
+				rgm.size = Vector3(randf_range(6.0, 12.0), randf_range(1.0, 2.0),
+					randf_range(1.4, 2.6))
+				rg.mesh = rgm
+				rg.material_override = Surfaces.stone(Color("#6f655a"))
+				add_child(rg)
+				var rd9 := _surface_dir()
+				rg.global_transform = Transform3D(_basis_from_up(rd9),
+					b.center + rd9 * (b.radius + 0.3))
+				rg.rotate_object_local(Vector3.UP, randf() * TAU)
+			_spawn_res_nodes(b, 8, "coal", 2)
+			_spawn_res_nodes(b, 6, "raw_irid", 2)
+			# one bench, facing the black hole. he sits sometimes.
+			var bhh = Universe.body_named("TIN 618")
+			if bhh != null:
+				var bd9 := _surface_dir()
+				var bb9 := _basis_from_up(bd9)
+				var bpos: Vector3 = b.center + bd9 * b.radius
+				var bench := Bench.new()
+				bench.is_bench = true
+				var tow: Vector3 = bb9.inverse() * (bhh.center - bpos)
+				bench.yaw = atan2(tow.x, tow.z)
+				add_child(bench)
+				bench.global_transform = Transform3D(bb9, bpos)
 		"venus":
 			# the pressure-cooker: glowing fissures, sulfur crusting everything
 			for i in _n(7):
@@ -3085,140 +3161,51 @@ func _spawn_res_nodes(b, count: int, res: String, per: int,
 ## Every ore is ITS OWN THING: unique rock skin + embedded features,
 ## not a tinted cube. Ultima and prism boil with their glows; uranium is
 ## pitchblende -- near-black with sickly green veins.
+## Ore deposits are CRYSTAL FORMATIONS: clusters of angular prisms
+## growing out of the ground, tinted like the terrain they grew from.
+## You spot them by shape and a low inner glow -- not traffic-cone paint.
 func _dress_ore(nd: Node3D, res: String, s: float) -> void:
 	if not is_instance_valid(nd):
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(absf(nd.global_position.x * 13.0 + nd.global_position.z * 7.0)) + 3
-	var base_mat: Material = null
-	match res:
-		"coal":
-			base_mat = Surfaces.stone(Color("#17171a"))
-		"raw_irid":
-			base_mat = Surfaces.stone(Color("#4a4e58"))
-		"sulfur":
-			base_mat = Surfaces.stone(Color("#b8a24a"))
-		"uranium":
-			var mu := StandardMaterial3D.new()
-			mu.albedo_color = Color("#10140c")
-			mu.roughness = 0.8
-			base_mat = mu
-		"ultima":
-			base_mat = Surfaces.stone(Color("#0e2a30"))
-		"prism":
-			base_mat = Surfaces.stone(Color("#2a1030"))
-		"raw_ingot":
-			base_mat = Surfaces.stone(Color("#5a4634"))
-	if base_mat != null:
-		for ch in nd.get_children():
-			if ch is MeshInstance3D:
-				ch.material_override = base_mat
-	match res:
-		"coal":
-			# glossy black lumps half-buried in the matte rock
-			var glossy := StandardMaterial3D.new()
-			glossy.albedo_color = Color("#0a0a0c")
-			glossy.roughness = 0.12
-			glossy.metallic = 0.4
-			for i in 5:
-				var lump := MeshInstance3D.new()
-				var lm := BoxMesh.new()
-				var ls := s * rng.randf_range(0.16, 0.3)
-				lm.size = Vector3(ls, ls, ls)
-				lump.mesh = lm
-				lump.material_override = glossy
-				lump.position = Vector3(rng.randf_range(-0.4, 0.4) * s,
-					rng.randf_range(0.1, 0.6) * s, rng.randf_range(-0.4, 0.4) * s)
-				lump.rotation = Vector3(rng.randf() * TAU, rng.randf() * TAU, rng.randf() * TAU)
-				nd.add_child(lump)
-		"raw_irid", "raw_ingot":
-			# angular metallic shards jutting out
-			var met := StandardMaterial3D.new()
-			if res == "raw_irid":
-				met.albedo_color = Color("#8a5ac8")
-				met.emission_enabled = true
-				met.emission = Color("#40e0d0")
-				met.emission_energy_multiplier = 0.35
-			else:
-				met.albedo_color = Color("#b87848")
-			met.metallic = 0.95
-			met.roughness = 0.2
-			for i in 4:
-				var shard := MeshInstance3D.new()
-				var shm := BoxMesh.new()
-				shm.size = Vector3(0.12 * s, rng.randf_range(0.35, 0.6) * s, 0.16 * s)
-				shard.mesh = shm
-				shard.material_override = met
-				shard.position = Vector3(rng.randf_range(-0.35, 0.35) * s,
-					rng.randf_range(0.2, 0.6) * s, rng.randf_range(-0.35, 0.35) * s)
-				shard.rotation = Vector3(rng.randf_range(-0.6, 0.6), rng.randf() * TAU,
-					rng.randf_range(-0.6, 0.6))
-				nd.add_child(shard)
-		"sulfur":
-			# bright crusty clusters caked on top
-			var crust := StandardMaterial3D.new()
-			crust.albedo_color = Color("#ffe81a")
-			crust.roughness = 0.95
-			crust.emission_enabled = true
-			crust.emission = Color("#ffdf40")
-			crust.emission_energy_multiplier = 0.15
-			for i in 6:
-				var pod := MeshInstance3D.new()
-				var pmm := SphereMesh.new()
-				pmm.radius = s * rng.randf_range(0.09, 0.17)
-				pmm.height = pmm.radius * 1.6
-				pod.mesh = pmm
-				pod.material_override = crust
-				pod.position = Vector3(rng.randf_range(-0.38, 0.38) * s,
-					rng.randf_range(0.3, 0.62) * s, rng.randf_range(-0.38, 0.38) * s)
-				nd.add_child(pod)
-		"uranium":
-			# pitchblende veins: thin sickly-green seams wrapping the rock
-			var vein := StandardMaterial3D.new()
-			vein.albedo_color = Color("#26330e")
-			vein.emission_enabled = true
-			vein.emission = Color("#9aff2a")
-			vein.emission_energy_multiplier = 0.8
-			for i in 4:
-				var vn := MeshInstance3D.new()
-				var vm := BoxMesh.new()
-				vm.size = Vector3(s * rng.randf_range(0.7, 1.05), 0.05 * s, 0.07 * s)
-				vn.mesh = vm
-				vn.material_override = vein
-				vn.position = Vector3(0, rng.randf_range(0.15, 0.65) * s, 0)
-				vn.rotation = Vector3(rng.randf_range(-0.5, 0.5), rng.randf() * TAU,
-					rng.randf_range(-0.5, 0.5))
-				nd.add_child(vn)
-		"ultima":
-			for i in 4:
-				var spk := MeshInstance3D.new()
-				var sm2 := CylinderMesh.new()
-				sm2.top_radius = 0.0
-				sm2.bottom_radius = 0.1 * s
-				sm2.height = rng.randf_range(0.5, 0.9) * s
-				sm2.radial_segments = 5
-				spk.mesh = sm2
-				spk.material_override = Surfaces.portal(Color("#7df9ff"))
-				spk.position = Vector3(rng.randf_range(-0.3, 0.3) * s,
-					rng.randf_range(0.35, 0.6) * s, rng.randf_range(-0.3, 0.3) * s)
-				spk.rotation = Vector3(rng.randf_range(-0.5, 0.5), 0,
-					rng.randf_range(-0.5, 0.5))
-				nd.add_child(spk)
-		"prism":
-			for i in 4:
-				var spk2 := MeshInstance3D.new()
-				var sm3 := CylinderMesh.new()
-				sm3.top_radius = 0.0
-				sm3.bottom_radius = 0.09 * s
-				sm3.height = rng.randf_range(0.5, 0.85) * s
-				sm3.radial_segments = 5
-				spk2.mesh = sm3
-				spk2.material_override = Human._prism_material()
-				spk2.position = Vector3(rng.randf_range(-0.3, 0.3) * s,
-					rng.randf_range(0.35, 0.6) * s, rng.randf_range(-0.3, 0.3) * s)
-				spk2.rotation = Vector3(rng.randf_range(-0.5, 0.5), 0,
-					rng.randf_range(-0.5, 0.5))
-				nd.add_child(spk2)
+	var b = Universe.nearest(nd.global_position)
+	var surf: Color = b.color if b != null else Color("#5a5a5e")
+	var scol := surf.darkened(0.22)
+	var look: Dictionary = RES_LOOK.get(res, {"col": Color("#c0c0c0")})
+	var glow: Color = look["col"]
+	# the base rock hunkers down in terrain colors
+	var rock_mat := Surfaces.stone(scol)
+	for ch in nd.get_children():
+		if ch is MeshInstance3D:
+			ch.material_override = rock_mat
+	# shards: surface-tinted crystal prisms with a faint ore-colored
+	# inner light (ultima/prism keep their true materials -- they ARE glow)
+	var shard_mat := StandardMaterial3D.new()
+	shard_mat.albedo_color = scol.lightened(0.14)
+	shard_mat.roughness = 0.28
+	shard_mat.metallic = 0.18
+	shard_mat.emission_enabled = true
+	shard_mat.emission = glow
+	shard_mat.emission_energy_multiplier = 0.24
+	var smat: Material = shard_mat
+	if res == "ultima":
+		smat = Surfaces.portal(Color("#7df9ff"))
+	elif res == "prism":
+		smat = Human._prism_material()
+	for i in rng.randi_range(4, 7):
+		var spk := MeshInstance3D.new()
+		var pm := PrismMesh.new()
+		var hgt := s * rng.randf_range(0.7, 1.9)
+		pm.size = Vector3(s * rng.randf_range(0.2, 0.34), hgt,
+			s * rng.randf_range(0.2, 0.34))
+		spk.mesh = pm
+		spk.material_override = smat
+		spk.position = Vector3(rng.randf_range(-0.42, 0.42) * s, hgt * 0.18,
+			rng.randf_range(-0.42, 0.42) * s)
+		spk.rotation = Vector3(rng.randf_range(-0.42, 0.42), rng.randf() * TAU,
+			rng.randf_range(-0.42, 0.42))
+		nd.add_child(spk)
 
 ## Plain breakable boulders: no ore, a little pocket change, pure geology.
 func _spawn_rocks(b, count: int, col: Color) -> void:
