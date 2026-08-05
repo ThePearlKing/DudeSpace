@@ -1022,14 +1022,22 @@ func _update_bgm(delta: float) -> void:
 				radio_hot = true
 				break
 	if _bgm.playing:
-		var want_db := -40.0 if radio_hot else -8.0
+		# songs breathe: ~3s fade-in, ~4s fade-out at the natural end
+		var want_db := -8.0
+		var pos9 := _bgm.get_playback_position()
+		var len9: float = _bgm.stream.get_length() if _bgm.stream != null else 0.0
+		if pos9 < 3.0:
+			want_db = lerpf(-34.0, -8.0, pos9 / 3.0)
+		if len9 > 8.0 and len9 - pos9 < 4.0:
+			want_db = lerpf(-8.0, -40.0, clampf((4.0 - (len9 - pos9)) / 4.0, 0.0, 1.0))
+		if radio_hot:
+			want_db = -40.0
 		_bgm.volume_db = lerpf(_bgm.volume_db, want_db, minf(1.0, delta * 2.5))
 		if radio_hot and _bgm.volume_db < -38.0:
 			_bgm.stop()   # fully faded: give the track back later
 		return
 	if radio_hot:
 		return
-	_bgm.volume_db = -8.0
 	_bgm_gap -= delta
 	if _bgm_gap > 0.0:
 		return
@@ -1039,6 +1047,7 @@ func _update_bgm(delta: float) -> void:
 			_bgm_order.append(i)
 		_bgm_order.shuffle()
 	_bgm.stream = RadioLib.custom_track(int(_bgm_order.pop_back()))
+	_bgm.volume_db = -34.0   # fade-in starts from a whisper
 	_bgm.play()
 	# minecraft rules after that: songs are an EVENT, minutes apart
 	_bgm_gap = randf_range(180.0, 420.0)
