@@ -1009,8 +1009,27 @@ var _bgm_gap := 0.0
 var _bgm_order: Array = []
 
 func _update_bgm(delta: float) -> void:
-	if _bgm == null or _bgm.playing:
+	if _bgm == null:
 		return
+	# a radio playing within earshot owns the airspace: the soundtrack
+	# fades itself out and waits
+	var radio_hot := false
+	if _player != null:
+		for r in get_tree().get_nodes_in_group("radio"):
+			if r is RadioTower and is_instance_valid(r) and r._talk != null \
+					and r._talk.playing \
+					and r.global_position.distance_to(_player.global_position) < 45.0:
+				radio_hot = true
+				break
+	if _bgm.playing:
+		var want_db := -40.0 if radio_hot else -8.0
+		_bgm.volume_db = lerpf(_bgm.volume_db, want_db, minf(1.0, delta * 2.5))
+		if radio_hot and _bgm.volume_db < -38.0:
+			_bgm.stop()   # fully faded: give the track back later
+		return
+	if radio_hot:
+		return
+	_bgm.volume_db = -8.0
 	_bgm_gap -= delta
 	if _bgm_gap > 0.0:
 		return
