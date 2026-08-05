@@ -4623,9 +4623,9 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the circle-with-a-dot and the spaghetti pouring
-## out. 1: the black hole with its ring. 2: an icosahedron in flat
-## perspective (hexagon + spokes). 3: a pyramid. 4: a watching eye.
-## 5: the fork.
+## out. 1: the black hole with its ring. 2: an icosahedron down its
+## five-fold axis. 3: the triangle -- the THING. 4: the watchers that
+## stalked when the god was angry. 5: the fork.
 func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 	var ink := Surfaces.stone(Color("#332a1f"))
 	var g := Node3D.new()
@@ -4688,7 +4688,8 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.62, 0.05), Vector2(-0.14, 0.02), 62.0)
 			bar.call(Vector2(0.62, 0.05), Vector2(0.14, 0.02), -62.0)
 		4:
-			# the watching eye
+			# the watchers -- the stalkers that came when the god was angry.
+			# they are not depicted kindly.
 			ring.call(0.16, 0.22, 0.0)
 			bar.call(Vector2(0.1, 0.1), Vector2.ZERO, 45.0)
 			for ri in 4:
