@@ -2555,12 +2555,14 @@ func _populate(b) -> void:
 				_earth_lake(b, _surface_dir())
 			for i in _n(6):
 				_earth_mountain(b, _surface_dir())
-			for i in _n(8):
+			for i in _n(26):
+				# LAND animals only, and they are EVERYWHERE on the planet
 				var an := Animal.new()
-				an.setup(b, true)   # LAND animals only -- nothing verdant flies here
+				an.setup(b, true)
 				add_child(an)
 				var ad := _surface_dir()
-				an.global_position = b.center + ad * (b.radius + 1.5)
+				an.global_transform = Transform3D(_basis_from_up(ad),
+					b.center + ad * (b.radius + 1.5))
 				_varnisolify(an)
 		"crystal":
 			# ultima crystals: guarded, far, worth the trip
