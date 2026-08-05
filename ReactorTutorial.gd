@@ -10,10 +10,14 @@ var rx = null
 var _step := 0
 var _obj: Label
 var _why: Label
+var _tip: Label            # the live rho ADVISOR: numbers + exact rod call
 var _why_t := 0.0
 var _hold_t := 0.0
 var _gap := 0.0
 var _done := false
+var _neg_t := 0.0          # how long rho has been negative unattended
+var _coach_cd := 0.0       # anti-spam for the negative-rho lecture
+var _tip_t := 0.0
 
 const STEPS := ["open", "fuel", "flow", "startup", "rods", "power",
 	"warm", "run", "cruise", "breaker", "done"]
@@ -44,7 +48,51 @@ func _ready() -> void:
 	_why.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_why.add_theme_constant_override("outline_size", 5)
 	add_child(_why)
+	_tip = Label.new()
+	_tip.anchor_left = 0.14
+	_tip.anchor_right = 0.86
+	_tip.anchor_top = 0.2
+	_tip.anchor_bottom = 0.27
+	_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip.add_theme_font_size_override("font_size", 15)
+	_tip.add_theme_color_override("font_color", Color("#7de8ff"))
+	_tip.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_tip.add_theme_constant_override("outline_size", 5)
+	add_child(_tip)
 	_spawn_reactor.call_deferred()
+
+## The part the manual never does: live numbers with an exact rod call.
+## rho = rod worth - xenon tax - heat tax; the advisor solves for the
+## rod position that gives +0.05 (climb) and 0 (hold) RIGHT NOW.
+func _advise(delta: float) -> void:
+	_tip_t -= delta
+	_coach_cd -= delta
+	if rx == null or not is_instance_valid(rx) or _step < STEPS.find("rods"):
+		_tip.text = ""
+		return
+	var rho: float = rx.rho_now()
+	var xtax: float = rx.xenon * 0.5
+	var htax: float = (rx.temp / 100.0) * 0.25
+	var climb := clampf(0.65 - (0.05 + xtax + htax) / 0.9, 0.0, 1.0)
+	var hold := clampf(0.65 - (xtax + htax) / 0.9, 0.0, 1.0)
+	if _tip_t <= 0.0:
+		_tip_t = 1.0
+		_tip.text = "ρ %+.2f   rods %d%%  ·  climb: pull to ~%d%%  ·  hold: ~%d%%  ·  taxes: heat %.2f, xenon %.2f (they GROW as you run -- keep easing rods out)" \
+			% [rho, int(rx.rods_target * 100.0), int(climb * 100.0),
+			int(hold * 100.0), htax, xtax]
+	# the watchdog: rho quietly negative while the rods sit still is the
+	# classic silent stall -- power bleeds away and nothing explains it.
+	# THIS explains it, fast, with the exact fix.
+	if _step >= STEPS.find("power") and _step <= STEPS.find("cruise") \
+			and rho < -0.01 and rx.rods_target > climb + 0.01:
+		_neg_t += delta
+		if _neg_t > 2.5 and _coach_cd <= 0.0:
+			_coach_cd = 12.0
+			_say_why("ρ is NEGATIVE (%+.2f) -- that's why power is bleeding away. Not a mystery: heat tax %.2f + xenon tax %.2f grew while your rods sat at %d%%. Pull rods to ~%d%% and ρ goes positive again." \
+				% [rho, htax, xtax, int(rx.rods_target * 100.0), int(climb * 100.0)])
+	else:
+		_neg_t = 0.0
 
 func _spawn_reactor() -> void:
 	var p = get_tree().get_first_node_in_group("player")
@@ -92,6 +140,7 @@ func _process(delta: float) -> void:
 	_why_t -= delta
 	if _why_t <= 0.0:
 		_why.text = ""
+	_advise(delta)
 	if _done:
 		return
 	_gap = maxf(0.0, _gap - delta)
@@ -139,13 +188,13 @@ func _text(id: String) -> String:
 		"startup":
 			return "MODE: STARTUP. interlocks now let the rods move, down to a 45%% floor."
 		"power":
-			return "ρ is positive — power is climbing exponentially. wait for POWER ≥ 3%%."
+			return "keep ρ POSITIVE (advisor below shows the exact rod %% -- it changes as the core heats). power climbs while ρ > 0, bleeds while ρ < 0. wait for POWER ≥ 3%%."
 		"warm":
-			return "the reaction heats the core. let it reach 150°C."
+			return "the reaction heats the core -- and HEAT TAXES ρ. as temp climbs you must keep pulling rods out to stay positive (the advisor tracks it). reach 150°C."
 		"run":
 			return "MODE: RUN. the startup floor is gone — full rod authority."
 		"cruise":
-			return "steer power into 45–75%% and HOLD it 6s: rods out until ρ ≈ +0.05, ease back in as it arrives. there is no power dial — you ARE the dial."
+			return "steer power into 45–75%% and HOLD it 6s: rods toward the advisor's CLIMB number to rise, toward HOLD to level off. there is no power dial — you ARE the dial."
 		"breaker":
 			return "close the BREAKER. steam is real now: the turbine syncs and you EXPORT."
 	return ""
