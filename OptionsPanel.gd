@@ -75,7 +75,7 @@ func _ready() -> void:
 
 	# volumes: music (the soundtrack) and SFX (everything punchy)
 	for vspec in [["Music Volume", "music_vol"], ["SFX Volume", "sfx_vol"],
-			["Radio Volume", "radio_vol"]]:
+			["Radio Volume", "radio_vol"], ["Voice Volume", "voice_vol"]]:
 		var vrow := HBoxContainer.new()
 		vrow.add_theme_constant_override("separation", 12)
 		col.add_child(vrow)
@@ -95,7 +95,9 @@ func _ready() -> void:
 			if prop == "sfx_vol":
 				Sfx.play("click", -14.0)   # instant preview
 			elif prop == "radio_vol":
-				Settings.apply_radio_vol())
+				Settings.apply_radio_vol()
+			elif prop == "voice_vol":
+				Settings.apply_voice_vol())
 		vrow.add_child(vsl)
 
 	var fs := CheckBox.new()

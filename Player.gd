@@ -1062,7 +1062,13 @@ func _physics_process(delta: float) -> void:
 			if Input.is_key_pressed(KEY_SPACE): fly += global_transform.basis.y
 			if Input.is_key_pressed(Settings.key("jet_down")): fly -= global_transform.basis.y
 			if fly.length() > 0.1:
-				var spd := 8000.0 if Input.is_key_pressed(KEY_SHIFT) else 600.0
+				# three gears: SHIFT crawls (threading small gaps),
+				# plain cruises, CTRL is the old warp-speed
+				var spd := 300.0
+				if Input.is_key_pressed(KEY_SHIFT):
+					spd = 6.0
+				elif Input.is_key_pressed(KEY_CTRL):
+					spd = 8000.0
 				global_position += fly.normalized() * spd * delta
 		velocity = Vector3.ZERO
 		_update_shake(delta)

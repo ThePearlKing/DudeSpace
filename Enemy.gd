@@ -182,6 +182,13 @@ func _physics_process(delta: float) -> void:
 	_shot_cd -= delta
 
 	var p := get_tree().get_first_node_in_group("player")
+	# BELOW the surface (mine shafts, colonies) you are off the menu:
+	# surface hunters don't smell through 20 meters of planet
+	if p != null:
+		var pb = Universe.nearest(p.global_position)
+		if p.global_position.distance_to(pb.center) < float(pb.radius) - 3.0 \
+				and global_position.distance_to(pb.center) > float(pb.radius) - 2.0:
+			p = null
 	var to_p := Vector3.ZERO
 	var dist: float = 1e9
 	var engaged := p != null and Game.mode == Game.Mode.ON_FOOT and not Game.dead

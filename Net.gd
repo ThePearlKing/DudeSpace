@@ -112,7 +112,12 @@ func leave() -> void:
 func start_discovery() -> void:
 	stop_discovery()
 	_listen = PacketPeerUDP.new()
-	_listen.bind(DISCOVERY_PORT)
+	_listen.set_broadcast_enabled(true)
+	# bind on all interfaces with address reuse: a host announcing on
+	# the same machine holds this port too, and without reuse the join
+	# screen silently heard NOTHING
+	if _listen.bind(DISCOVERY_PORT, "0.0.0.0") != OK:
+		_listen.bind(DISCOVERY_PORT)
 	# multicast membership on every interface -- broadcast alone does not
 	# loop back to listeners on the SAME machine
 	for iface in IP.get_local_interfaces():

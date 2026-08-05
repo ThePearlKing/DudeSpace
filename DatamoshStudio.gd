@@ -486,6 +486,8 @@ func _build_studio() -> void:
 	_ad_root.add_child(_ad_label)
 	_ad_label.position = Vector3(0, -1.8, 0)
 	_talk = AudioStreamPlayer3D.new()
+	if AudioServer.get_bus_index("Voice") >= 0:
+		_talk.bus = "Voice"
 	_talk.unit_size = 14.0
 	_talk.max_distance = 60.0
 	add_child(_talk)

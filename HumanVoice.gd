@@ -26,6 +26,7 @@ static func speak(parent: Node3D, text: String, prof: Dictionary) -> AudioStream
 	pl.max_distance = 18.0
 	pl.max_db = -6.0
 	pl.volume_db = -8.0
+	pl.bus = "Voice" if AudioServer.get_bus_index("Voice") >= 0 else "Master"
 	parent.add_child(pl)
 	pl.finished.connect(pl.queue_free)
 	pl.play()

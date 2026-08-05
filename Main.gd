@@ -3904,6 +3904,20 @@ func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color, or
 		add_child(l)
 		l.global_position = C + dir * ly
 
+	# collar: the cut faces gape wider than the shaft -- seal the gap
+	for cspec9 in [[Vector3(14.0, 9.0, 0.6), Vector3(0, 0, 3.4)],
+			[Vector3(14.0, 9.0, 0.6), Vector3(0, 0, -3.4)],
+			[Vector3(0.6, 9.0, 14.0), Vector3(3.4, 0, 0)],
+			[Vector3(0.6, 9.0, 14.0), Vector3(-3.4, 0, 0)]]:
+		var colb := StaticBody3D.new()
+		var colcs := CollisionShape3D.new()
+		var colbs := BoxShape3D.new()
+		colbs.size = cspec9[0]
+		colcs.shape = colbs
+		colb.add_child(colcs)
+		add_child(colb)
+		colb.global_transform = Transform3D(B, C + dir * (R - 2.5))
+		colb.translate_object_local(cspec9[1])
 	var mine := {
 		"body": b, "dir": dir, "B": B, "cham_y": cham_y,
 		"group": "mine_" + str(b.name), "res": res_id, "res_n": res_n,
