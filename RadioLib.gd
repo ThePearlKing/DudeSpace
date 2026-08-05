@@ -492,6 +492,16 @@ static func bh_presence() -> AudioStreamWAV:
 			+ sin(TAU * 311.0 * t2) * 0.02 \
 			* (0.5 + 0.5 * sin(TAU * 0.21 * t2)) * (0.6 + 0.4 * sin(TAU * 5.0 * t2)) \
 			+ (randf() * 2.0 - 1.0) * 0.012
+	# the CHOIR: faint stacked shimmer way up top, each tone swelling on
+	# its own loop-locked clock -- and the whole thing breathes on one
+	# giant lung. This is the godly part.
+	for i in render:
+		var t3 := float(i) / SR
+		var lp3 := t3 / 22.0 * TAU
+		buf[i] += (sin(TAU * 349.2 * t3) * (0.5 + 0.5 * sin(lp3 * 2.0 + 1.0)) \
+			+ sin(TAU * 466.2 * t3) * (0.5 + 0.5 * sin(lp3 * 3.0 + 3.9)) \
+			+ sin(TAU * 523.3 * t3) * (0.5 + 0.5 * sin(lp3 * 5.0 + 2.2))) * 0.03
+		buf[i] *= 0.8 + 0.2 * sin(lp3 + 4.6)
 	var out := PackedFloat32Array()
 	out.resize(total)
 	var xf := render - total
