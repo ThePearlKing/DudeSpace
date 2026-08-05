@@ -2557,7 +2557,7 @@ func _populate(b) -> void:
 				_earth_mountain(b, _surface_dir())
 			for i in _n(8):
 				var an := Animal.new()
-				an.setup(b)
+				an.setup(b, true)   # LAND animals only -- nothing verdant flies here
 				add_child(an)
 				var ad := _surface_dir()
 				an.global_position = b.center + ad * (b.radius + 1.5)
@@ -5068,9 +5068,20 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 ## a glowing lantern stalk, forked antlers, or a moss pelt with
 ## bioluminescent spots. Sometimes two of those.
 func _varnisolify(an: Animal) -> void:
-	var picks: Array = [randi() % 3]
-	if randf() < 0.35:
-		picks.append((int(picks[0]) + 1 + randi() % 2) % 3)
+	# EXOTIC two-tone hide first: alternating parts in a paired palette
+	# no other planet uses. These are not verdant's animals.
+	var pals: Array = [["#3ae0c8", "#7a2a8f"], ["#e05a9a", "#2a2f6e"],
+		["#d8c84a", "#3a6a4a"], ["#ff8a3a", "#2a4a6e"], ["#b8e0e8", "#5a3a2a"]]
+	var pal: Array = pals[randi() % pals.size()]
+	var mi_i := 0
+	for c in an.find_children("*", "MeshInstance3D", true, false):
+		if c is MeshInstance3D:
+			c.material_override = Destructible.make_material(
+				Color(str(pal[mi_i % 2])), 0.3)
+			mi_i += 1
+	var picks: Array = [randi() % 5]
+	if randf() < 0.45:
+		picks.append((int(picks[0]) + 1 + randi() % 4) % 5)
 	for pick in picks:
 		match int(pick):
 			0:
@@ -5138,6 +5149,42 @@ func _varnisolify(an: Animal) -> void:
 					spot.material_override = Destructible.make_material(Color("#a0ff6a"), 2.0)
 					spot.position = Vector3(randf_range(-0.3, 0.3), 0.72, randf_range(-0.3, 0.3))
 					an.add_child(spot)
+			3:
+				# quill fan: a peacock tail of thin spines
+				for qi in 5:
+					var quill := MeshInstance3D.new()
+					var qm := CylinderMesh.new()
+					qm.top_radius = 0.0
+					qm.bottom_radius = 0.035
+					qm.height = randf_range(0.6, 0.9)
+					quill.mesh = qm
+					quill.material_override = Destructible.make_material(
+						Color(str(pal[qi % 2])), 0.8)
+					quill.position = Vector3(0, 0.7, 0.35)
+					quill.rotation_degrees = Vector3(-38.0, 0, -40.0 + 20.0 * float(qi))
+					an.add_child(quill)
+			4:
+				# a single spiral horn: stacked shrinking rings up a cone
+				var horn := MeshInstance3D.new()
+				var hm9 := CylinderMesh.new()
+				hm9.top_radius = 0.0
+				hm9.bottom_radius = 0.09
+				hm9.height = 0.85
+				horn.mesh = hm9
+				horn.material_override = Destructible.make_material(Color("#e8e0cc"), 0.4)
+				horn.position = Vector3(0, 1.25, -0.15)
+				horn.rotation_degrees = Vector3(randf_range(-12, 4), 0, 0)
+				an.add_child(horn)
+				for hr in 3:
+					var band := MeshInstance3D.new()
+					var btm := TorusMesh.new()
+					btm.inner_radius = 0.05 - 0.012 * float(hr)
+					btm.outer_radius = 0.085 - 0.018 * float(hr)
+					band.mesh = btm
+					band.material_override = Destructible.make_material(
+						Color(str(pal[hr % 2])), 0.7)
+					band.position = Vector3(0, -0.22 + 0.22 * float(hr), 0)
+					horn.add_child(band)
 
 ## A seeded random surface direction (deterministic geology).
 func _h_dir(r: RandomNumberGenerator) -> Vector3:
