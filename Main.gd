@@ -71,6 +71,7 @@ func _ready() -> void:
 		_dens = Universe.world_scale
 	_setup_environment()
 	_setup_light()
+	_crater_spots.clear()
 	for b in Universe.bodies:
 		_build_body(b)
 	if not Game.tutorial_session:
@@ -3061,7 +3062,29 @@ func _spawn_lava_arc(b, player_pos: Vector3) -> void:
 # ------------------------------------------- Sol system surface features
 
 ## Crater: a flattened rim ring + darker floor disc, dug into the shading.
+var _crater_spots := {}   # body name -> [[dir, size], ...] placed craters
+
 func _crater(b, dir: Vector3, size: float, col: Color) -> void:
+	# craters do not spawn inside each other: keep angular distance from
+	# every crater already on this body, re-rolling up to 8 spots
+	var ckey := str(b.name)
+	if not _crater_spots.has(ckey):
+		_crater_spots[ckey] = []
+	var tries := 0
+	while tries < 8:
+		var ok := true
+		for e in _crater_spots[ckey]:
+			var mind: float = (float(e[1]) + size) * 1.15 / float(b.radius)
+			if (e[0] as Vector3).angle_to(dir) < mind:
+				ok = false
+				break
+		if ok:
+			break
+		dir = _surface_dir()
+		tries += 1
+	if tries >= 8:
+		return   # crowded planet: skip rather than overlap
+	_crater_spots[ckey].append([dir, size])
 	var root := Node3D.new()
 	add_child(root)
 	var rim := MeshInstance3D.new()
