@@ -68,6 +68,13 @@ func _tang(a: float) -> Vector3:
 func _fr(a: float) -> Basis:
 	return Basis(_e2, _pdir(a), _tang(a)).orthonormalized()
 
+func _bup(up: Vector3) -> Basis:
+	var x := up.cross(Vector3(0, 0, 1))
+	if x.length() < 0.01:
+		x = up.cross(Vector3(1, 0, 0))
+	x = x.normalized()
+	return Basis(x, up, x.cross(up).normalized()).orthonormalized()
+
 func build(b, dir: Vector3) -> void:
 	_b = b
 	var R: float = b.radius

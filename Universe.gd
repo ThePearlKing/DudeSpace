@@ -39,9 +39,10 @@ func _ready() -> void:
 	_def("Circuitia",Vector3(0, 0, 4200),        95.0,  9.0,  "circuit", Color("#0e3b2e"))
 	_def("Logica",   Vector3(3600, 0, -2200),    72.0,  8.0,  "logic",   Color("#141820"))
 	_def("Pi",       Vector3(-4200, 1500, 3000), 115.0, 11.0, "pi",      Color("#5a2a00"))
-	# Mainframe: the dudes' control planet. Amber terminals, steel ribs,
-	# nobody home -- the facility runs itself.
-	_def("Mainframe",Vector3(1800, 2600, 1400),  78.0,  8.0,  "circuit", Color("#ffb000"))
+	# Big Computer: the dudes' control planet -- a MOTHERBOARD in space,
+	# the same board-and-traces face the title screen's dude planets
+	# wear. The facility inside runs itself; nobody home.
+	_def("Big Computer",Vector3(1800, 2600, 1400),  78.0,  8.0,  "dude", Color("#16283e"))
 	# --- distant Shader System (a star + 4 shader planets + a moon) ---
 	_def("ShaderSun",Vector3(0, 0, -25000),      235.0, 20.0, "sun",       Color("#ff7a0f"))
 	_def("Contrast", Vector3(0, 0, -24100),      60.0,  9.0,  "contrast",  Color("#ffffff"))

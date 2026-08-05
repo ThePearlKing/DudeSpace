@@ -116,7 +116,7 @@ func _ready() -> void:
 				col9.build(cb, COLONY_DIRS[cname],
 					float(COLONY_ROLLS.get(cname, 0.0)))
 		# the Mainframe facility: dude-built, automated, nobody home
-		var mfb = Universe.body_named("Mainframe")
+		var mfb = Universe.body_named("Big Computer")
 		if mfb != null:
 			var mfc := MainframeComplex.new()
 			add_child(mfc)
@@ -634,7 +634,7 @@ func _mainframe_test() -> void:
 	print("MFTEST starting")
 	await get_tree().process_frame
 	await get_tree().create_timer(3.0).timeout
-	var b = Universe.body_named("Mainframe")
+	var b = Universe.body_named("Big Computer")
 	var u0: Vector3 = MAINFRAME_DIR
 	var C: Vector3 = b.center
 	var R: float = b.radius
@@ -649,6 +649,12 @@ func _mainframe_test() -> void:
 		if hit.is_empty():
 			return -1.0
 		return (hit["position"] as Vector3).distance_to(from)
+	# 0. the mouth WORKS from outside: a ray from orbit must sail through
+	# the shell hole + shaft + ceiling hatch and land on the atrium floor
+	var d0: float = cast.call(C + u0 * (R + 20.0), C)
+	var thru: float = (R + 20.0) - d0
+	print("MFTEST mouth from orbit: first hit radius %.1f (atrium ~%.1f) %s" % [
+		thru, rF, "PASS" if absf(thru - rF) < 1.0 else "FAIL"])
 	# 1. the drop: mouth -> atrium floor (solid, hatch is ceiling-only)
 	var d1: float = cast.call(C + u0 * (R - 1.0), C)
 	var caught: float = (R - 1.0) - d1
@@ -718,7 +724,7 @@ func _mouth_shot_test() -> void:
 	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_apt.png"))
 	print("MOUTHSHOT apt saved")
 	# third: the Mainframe control deck, looking down the curve
-	var mb = Universe.body_named("Mainframe")
+	var mb = Universe.body_named("Big Computer")
 	var mu: Vector3 = MAINFRAME_DIR
 	var me1 := mu.cross(Vector3(0, 0, 1)).normalized()
 	var mrF: float = mb.radius - 16.0
@@ -733,6 +739,14 @@ func _mouth_shot_test() -> void:
 	var img3 := get_viewport().get_texture().get_image()
 	img3.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_deck.png"))
 	print("MOUTHSHOT deck saved")
+	# fourth: Big Computer from orbit -- the hull must read as BUILT
+	var ov := (mu + mu.cross(Vector3(0, 0, 1)).normalized() * 0.9).normalized()
+	cam.global_position = mb.center + ov * (mb.radius * 2.7)
+	cam.look_at(mb.center, mu)
+	await get_tree().create_timer(0.6).timeout
+	var img4 := get_viewport().get_texture().get_image()
+	img4.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_orbit.png"))
+	print("MOUTHSHOT orbit saved")
 
 func _dish_test() -> void:
 	await get_tree().process_frame
@@ -1685,7 +1699,7 @@ func _build_body(b) -> void:
 		hole_specs.append([MINE_DIRS[b.name], 4.8])
 	if COLONY_DIRS.has(b.name):
 		hole_specs.append([COLONY_DIRS[b.name], 4.8])
-	if b.name == "Mainframe":
+	if b.name == "Big Computer":
 		hole_specs.append([MAINFRAME_DIR, 4.8])
 	if hole_specs.size() > 0:
 		# Holed planet (mine mouths, colony mouths): BOTH the collider and
@@ -2105,6 +2119,37 @@ func _planet_material(kind: String, color: Color) -> Material:
 	match kind:
 		"pixel", "datamosh", "wob", "contrast":
 			return ShaderLib.make(kind, color)
+		"dude":
+			# the title screen's motherboard face, on a real planet:
+			# copper traces cell by cell, glowing pads, pulsing
+			var dsh := Shader.new()
+			dsh.code = "shader_type spatial;\nuniform vec3 base : source_color;\n" \
+				+ preload("res://Title.gd")._TP_NOISE + """
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 9.0);
+	vec3 f = fract(n * 9.0);
+	float h = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+	float tr = 0.0;
+	if (h < 0.34) { tr = step(abs(f.y - 0.5), 0.06); }
+	else if (h < 0.67) { tr = step(abs(f.x - 0.5), 0.06); }
+	else { tr = max(step(abs(f.x - 0.5), 0.06) * step(f.y, 0.5),
+		step(abs(f.y - 0.5), 0.06) * step(f.x, 0.5)); }
+	float pad = step(length(f.xy - vec2(0.5)), 0.11);
+	vec3 board = base * (0.5 + 0.25 * fbm(n * 7.0));
+	vec3 copper = vec3(0.85, 0.55, 0.2);
+	vec3 col = mix(board, copper, clamp(tr, 0.0, 1.0) * 0.9);
+	float pulse = 0.5 + 0.5 * sin(TIME * 2.0 + h * 12.0);
+	ALBEDO = col;
+	EMISSION = vec3(0.3, 1.0, 0.5) * pad * (0.5 + pulse) + copper * tr * 0.15;
+	METALLIC = tr * 0.7;
+	ROUGHNESS = 0.5;
+}
+"""
+			var dm9 := ShaderMaterial.new()
+			dm9.shader = dsh
+			dm9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))
+			return dm9
 		"earth":
 			return _earth_material()
 		"luna", "mercury":
@@ -2379,6 +2424,10 @@ func _populate(b) -> void:
 			_spawn_enemies(b, 5, 1)
 			_spawn_res_nodes(b, 8, "raw_irid", 2)
 			_build_mine(b, MINE_DIRS["Circuitia"], "raw_ingot", 8, Color("#a24bff"))
+		"dude":
+			# Big Computer: the facility IS the content. No mine, no
+			# enemies -- dead quiet. Salvage crates only.
+			_register_crates(b, 24, 6)
 		"logic":
 			_register_crates(b, 30, 16)
 			for i in 2:
