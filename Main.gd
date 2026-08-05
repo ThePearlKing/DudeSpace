@@ -3918,6 +3918,11 @@ func collect_world() -> Array:
 			var hrefb: Basis = _basis_from_up(up)
 			var hzz: Vector3 = hrefb.inverse() * n.global_transform.basis.z
 			e["hyaw"] = atan2(hzz.x, hzz.z)
+			# the FULL forward too: near the poles _basis_from_up's
+			# reference axis flips on float rounding and hyaw replays in
+			# the wrong frame -- hfwd needs no reference at all
+			var hbz: Vector3 = n.global_transform.basis.z
+			e["hfwd"] = [hbz.x, hbz.y, hbz.z]
 		if n is Furniture:
 			e["fkind"] = n.kind
 			# ACTUAL orientation, as yaw relative to the restore basis --
@@ -4028,7 +4033,16 @@ func restore_world() -> void:
 			if n is Furniture:
 				n.rotate_object_local(Vector3.UP, float(e.get("fyaw", 0.0)))
 			if n is House:
-				n.rotate_object_local(Vector3.UP, float(e.get("hyaw", 0.0)))
+				var hf = e.get("hfwd", null)
+				var fz := Vector3.ZERO
+				if hf is Array and hf.size() == 3:
+					fz = Vector3(float(hf[0]), float(hf[1]), float(hf[2]))
+					fz = (fz - up * fz.dot(up)).normalized()
+				if fz.length() > 0.5:
+					n.global_transform = Transform3D(
+						Basis(up.cross(fz).normalized(), up, fz).orthonormalized(), pos)
+				else:
+					n.rotate_object_local(Vector3.UP, float(e.get("hyaw", 0.0)))
 		if n is Machine:
 			n.buf = float(e.get("buf", 0.0))
 			var si = e.get("slot_in", null)
