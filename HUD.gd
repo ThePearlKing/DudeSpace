@@ -422,7 +422,8 @@ func _refresh() -> void:
 func _on_killed() -> void:
 	_over.visible = true
 	_over.modulate = Color("#ff4444")
-	_over.text = "KILLED BY ALIENS\n\nscore  %d\n\npress R to respawn" % Game.score
+	_over.text = "KILLED BY %s\n\nscore  %d\n\npress R to respawn" \
+		% [Game.death_cause.to_upper(), Game.score]
 	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 
 func _on_transformed() -> void:

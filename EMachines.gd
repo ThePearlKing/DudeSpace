@@ -892,10 +892,11 @@ class NuclearReactor extends Machine:
 		wat.mesh = wbm
 		wat.position = Vector3(0, hy * 0.5, 0)
 		var wmat := StandardMaterial3D.new()
-		wmat.albedo_color = Color(0.1, 0.28, 0.42, 0.4)
+		wmat.albedo_color = Color(0.08, 0.16, 0.4, 0.42)
 		wmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		wmat.emission_enabled = true
-		wmat.emission = Color("#38c8ff")
+		# real Cherenkov is a deep electric BLUE (~450nm), not teal
+		wmat.emission = Color(0.25, 0.45, 1.0)
 		wmat.emission_energy_multiplier = 0.2
 		wat.material_override = wmat
 		add_child(wat)
@@ -1071,52 +1072,61 @@ class NuclearReactor extends Machine:
 
 	func _meltdown(yield_scale: float = 1.0) -> void:
 		var here := global_position
-		Sfx.play("explode", 2.0)
+		# YIELD: what the core was holding when it let go. A cold sputter
+		# is a firecracker; a full-power, full-pressure, fresh-fuel core
+		# is a crater with your name on it.
+		var y := clampf((0.7 + power * 1.1 + press / 100.0 * 0.7 \
+			+ (_fuel / FUEL_SECS) * 1.5) * yield_scale, 0.7, 4.0)
+		Sfx.play("nuke", 4.0)
 		Game.anger(30.0)   # splitting atoms was ALREADY pushing it
-		# fire: one giant burst + a lingering plume
-		for burst in [[220, 26.0, 1.0], [80, 10.0, 2.6]]:
-			var parts := GPUParticles3D.new()
-			parts.amount = burst[0]
-			parts.one_shot = true
-			parts.explosiveness = 0.9
-			parts.lifetime = burst[2]
-			var pm := ParticleProcessMaterial.new()
-			pm.direction = Vector3.UP
-			pm.spread = 80.0
-			pm.initial_velocity_min = burst[1] * 0.4
-			pm.initial_velocity_max = burst[1]
-			pm.gravity = Vector3.ZERO
-			pm.scale_min = 0.3
-			pm.scale_max = 1.4
-			pm.color = Color("#ff6a1a")
-			parts.process_material = pm
-			var mesh := SphereMesh.new()
-			mesh.radius = 0.6
-			mesh.height = 1.2
-			mesh.radial_segments = 6
-			mesh.rings = 3
-			mesh.material = Destructible.make_material(Color("#ff8c2a"), 4.0)
-			parts.draw_pass_1 = mesh
-			get_parent().add_child(parts)
-			parts.global_position = here
-			parts.emitting = true
-		# everything mechanical within 18m dies. no refunds. it's slag.
+		# the cloud, scaled to the sin
+		var up9 := (here - Universe.nearest(here).center).normalized()
+		var mc := MushroomCloud.new()
+		get_parent().add_child(mc)
+		mc.global_position = here
+		mc.setup(y, up9)
+		# machines: slagged only up CLOSE; the middle ring is shrapnel
+		# roulette; beyond that they keep their jobs
+		var r_slag := 16.0 * y
+		var r_shrap := 40.0 * y
 		for grp in ["machine", "chest", "autominer", "rocket", "spawn"]:
 			for n in get_tree().get_nodes_in_group(grp):
 				if n == self or not (n is Node3D) or not is_instance_valid(n):
 					continue
-				if n.global_position.distance_to(here) < 18.0 * yield_scale:
+				var dm9: float = n.global_position.distance_to(here)
+				if dm9 < r_slag or (dm9 < r_shrap and randf() < 0.3):
 					Destructible.spawn_debris(get_parent(), n.global_position,
 						Vector3(1.2, 1.2, 1.2), Color("#3a3a3a"), Vector3.UP)
 					Net.broadcast_remove(n.global_position)
 					n.queue_free()
-		# and you, if you kept standing there reading the gauge
+		# players: everyone CLOSE dies, no negotiation; farther out it's
+		# large damage falling off with distance
+		var r_kill := 26.0 * y
+		var r_hurt := 90.0 * y
 		var p = get_tree().get_first_node_in_group("player")
 		if p and is_instance_valid(p):
 			var d: float = p.global_position.distance_to(here)
-			var rr := 22.0 * yield_scale
-			if d < rr:
-				Game.hurt((220.0 * (1.0 - d / rr) + 20.0) * yield_scale)
+			if d < r_kill:
+				Game.hurt(100000.0, false, "a nuclear meltdown")
+			elif d < r_hurt:
+				Game.hurt(lerpf(260.0, 40.0, (d - r_kill) / (r_hurt - r_kill)),
+					false, "a nuclear meltdown")
+		# peers in range: same rules, but friendly fire is the law --
+		# Net.hit_player silently no-ops when the host forbids it
+		if Net.active:
+			for pid in Net.player_names.keys():
+				var av = Net.avatar_position(int(pid))
+				if av == null:
+					continue
+				var dv: float = (av as Vector3).distance_to(here)
+				if dv < r_kill:
+					Net.hit_player(int(pid), 100000.0, true)
+				elif dv < r_hurt:
+					Net.hit_player(int(pid),
+						lerpf(260.0, 40.0, (dv - r_kill) / (r_hurt - r_kill)), true)
+		# if that was you: watch what you made
+		if Game.dead and p:
+			mc.take_camera()
 		Net.broadcast_remove(here)
 		Destructible.spawn_debris(get_parent(), here, Vector3(2.4, 2.4, 2.4),
 			Color("#8a8d90"), Vector3.UP)

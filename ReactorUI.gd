@@ -296,14 +296,14 @@ func _open_manual() -> void:
 STARTUP (in this order, no improvising):
  1. LOAD a uranium rod. an empty core does nothing.
  2. COOLANT FLOW to HALF or FULL. no flow, no startup mode.
- 3. MODE: STARTUP. rods now move, but only down to 45%%.
- 4. Rods OUT until insertion drops BELOW 65%%. that's the
-    magic number: above 65%% in, ρ stays negative and power
+ 3. MODE: STARTUP. rods now move, but only down to 45%.
+ 4. Rods OUT until insertion drops BELOW 65%. that's the
+    magic number: above 65% in, ρ stays negative and power
     just sinks -- pulling "a little" does NOTHING. head for
-    ~55%% (startup floor is 45%%) and watch ρ flip positive.
+    ~55% (startup floor is 45%) and watch ρ flip positive.
  4b. ρ positive = power RISING, exponentially. small positive
     is a startup. big positive is a headline.
- 5. When POWER > 3%% and CORE >= 150°C, MODE: RUN.
+ 5. When POWER > 3% and CORE >= 150°C, MODE: RUN.
     (both numbers are on the readout. no vibes required.)
  6. Rods OUT slowly toward criticality. the hot core and the
     xenon both push ρ down -- that's the core stabilizing
@@ -314,10 +314,10 @@ STARTUP (in this order, no improvising):
 FUEL, OR: WHY ρ JUST SLAMMED NEGATIVE
  · one rod = ~60 seconds of full-power burn. burn slower,
    it lasts longer.
- · at FUEL 0%% the core physically cannot react: ρ pins to
+ · at FUEL 0% the core physically cannot react: ρ pins to
    -1.0 instantly and power dies. that's not a malfunction,
    that's an empty furnace.
- · watch the FUEL %% on the readout; the FUEL LOW lamp and
+ · watch the FUEL % on the readout; the FUEL LOW lamp and
    the coach line warn you near the end. keep rods in the
    hopper -- a FUNNEL can restock it automatically.
 
@@ -327,7 +327,7 @@ RULES OF NOT EXPLODING:
  · PRESSURE follows temp. the guarded VENT dumps 30 bar and
    costs coolant. coolant comes back only when the core is calm.
  · XENON, in dude terms: burning fuel makes an invisible
-   ASH (xenon) that soaks up your reaction. the XENON %% on
+   ASH (xenon) that soaks up your reaction. the XENON % on
    the readout is how much. it's why power sinks while RODS
    and FUEL look fine.
 
@@ -335,18 +335,18 @@ HOW TO SET POWER (you can't. you steer it):
  · there is no power dial. RODS steer ρ, and ρ steers power:
    ρ positive = power climbs. ρ negative = power falls.
    ρ near zero = power HOLDS where it is.
- · so to get to, say, 60%%: rods OUT until ρ reads ~+0.05,
-   watch POWER climb, and when it reaches ~60%%, rods back IN
+ · so to get to, say, 60%: rods OUT until ρ reads ~+0.05,
+   watch POWER climb, and when it reaches ~60%, rods back IN
    until ρ reads ~0. that's it. that's driving a reactor.
 
 HOW TO NOT LET THE ASH RUIN YOUR DAY (the playbook):
- 1. CRUISE at 50-70%% power, FLOW FULL. this is the sweet
+ 1. CRUISE at 50-70% power, FLOW FULL. this is the sweet
     spot: steady heat, and the ash levels off instead of
-    piling. 100%%+ overheats the core AND maxes the ash.
+    piling. 100%+ overheats the core AND maxes the ash.
  2. the ash takes a few minutes to settle in. as it does,
-    expect to pull rods a few extra %% now and then to hold
+    expect to pull rods a few extra % now and then to hold
     power -- that's normal upkeep, not a malfunction.
- 3. move rods in ~5%% steps. after each step, WAIT and watch
+ 3. move rods in ~5% steps. after each step, WAIT and watch
     ρ. keep ρ between about -0.05 and +0.05. big pulls are
     how headlines happen.
  4. do NOT shut down from high power unless it's an actual
@@ -373,7 +373,10 @@ func _draw_pool() -> void:
 		return
 	var szp := _pool_view.size
 	var glow := clampf(0.08 + rx.power * 0.8 + rx.temp / 100.0 * 0.4, 0.0, 1.0)
-	var blue := Color(0.22, 0.78, 1.0)
+	# matches the tank: real Cherenkov blue (~450nm), whitening only
+	# when the core is truly screaming
+	var blue := Color(0.25, 0.45, 1.0).lerp(Color(0.8, 0.9, 1.0),
+		clampf((glow - 0.7) / 0.3, 0.0, 1.0))
 	_pool_view.draw_rect(Rect2(Vector2.ZERO, szp),
 		Color(0.02, 0.05 + glow * 0.12, 0.1 + glow * 0.3, 0.9))
 	for i in 5:
@@ -423,7 +426,7 @@ func _process(delta: float) -> void:
 	elif rx._fuel < 12.0:
 		coach = "\n>> FUEL LOW: ~%.0fs of burn left -- restock the hopper" % rx._fuel
 	elif rx.mode == 1 and rho <= 0.0:
-		coach = "\n>> ρ negative: rods below 65%% before power can rise"
+		coach = "\n>> ρ negative: rods below 65% before power can rise"
 	elif rx.mode == 1 and rx.power < 0.03:
 		coach = "\n>> ρ positive -- power climbing, hold on"
 	elif rx.mode == 1 and rx.temp < 15.0:
@@ -442,13 +445,16 @@ func _process(delta: float) -> void:
 			+ "\n   fuel is FINE. either pull rods further out (RUN)" \
 			+ "\n   to burn the ash off -- then ease them back in --" \
 			+ "\n   or shut down ~2 min and it fades on its own."
-	_read.text = ("POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s" + coach) % [
+	# the readout formats FIRST, coach appends AFTER -- a stray % in a
+	# coach line used to blow up the whole format and show raw %f codes
+	_read.text = ("POWER    %6.1f %% rated\nρ        %+0.3f\nRODS     %5.1f %% in  (ordered %.0f%%)\nXENON    %5.1f %%\nCORE     %5.0f °C\nPRESS    %5.1f bar\nCOOLANT  %5.1f %%   flow %s\nBREAKER  %s\nOUTPUT   %+5.1f EU/s   charge %.0f/%.0f\nFUEL     %s") % [
 		rx.power * 100.0, rho, rx.rods * 100.0, rx.rods_target * 100.0,
 		rx.xenon * 100.0, rx.temp * 10.0, rx.press,
 		rx.coolant, ["OFF", "HALF", "FULL"][rx.flow],
 		"CLOSED (exporting)" if rx.breaker else "OPEN",
 		rx.out_eu_s(), rx.buf, rx.buf_cap,
 		_fuel_line()]
+	_read.text += coach
 	_lamp("HI TEMP", rx.temp > 55.0, rx.temp > 80.0)
 	_lamp("HI PRESS", rx.press > 65.0, rx.press > 85.0)
 	_lamp("LO COOLANT", rx.coolant < 55.0, rx.coolant < 30.0)

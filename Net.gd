@@ -269,11 +269,13 @@ func _ev_break(pos: Vector3) -> void:
 # ----------------------------------------------------------- PvP damage
 
 ## Shot another player's avatar. Only lands if the host allows it.
-func hit_player(peer_id: int, dmg: float) -> void:
+## silent = splash damage (grenades, meltdowns): no chat nag when FF is off.
+func hit_player(peer_id: int, dmg: float, silent: bool = false) -> void:
 	if not active:
 		return
 	if not bool(host_settings.get("friendly_fire", false)):
-		chat_received.emit("SERVER", "friendly fire is off")
+		if not silent:
+			chat_received.emit("SERVER", "friendly fire is off")
 		return
 	_take_hit.rpc_id(peer_id, dmg)
 
@@ -282,10 +284,22 @@ func _take_hit(dmg: float) -> void:
 	# victim double-checks the rule (host is authoritative via settings sync)
 	if not bool(host_settings.get("friendly_fire", false)):
 		return
-	Game.hurt(dmg)
 	var attacker := str(player_names.get(multiplayer.get_remote_sender_id(), "someone"))
+	Game.hurt(dmg, false, attacker)   # the death screen names your killer
 	if Game.dead:
 		chat_received.emit("SERVER", "%s was slain by %s" % [my_name(), attacker])
+
+## Where a peer's avatar stands right now (null if not rendered here).
+func avatar_position(peer_id: int):
+	var cs = get_tree().current_scene
+	if cs == null:
+		return null
+	var av = cs.get("_remote_avatars")
+	if av is Dictionary and av.has(peer_id):
+		var rec = av[peer_id]
+		if rec is Dictionary and is_instance_valid(rec.get("root")):
+			return (rec["root"] as Node3D).global_position
+	return null
 
 # --------------------------- per-player data, stored on the host's save
 

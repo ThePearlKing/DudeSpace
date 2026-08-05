@@ -1460,7 +1460,7 @@ func _physics_process(delta: float) -> void:
 		_scan_hazards()
 	if inside:
 		if _rad:
-			Game.hurt(1.2)   # cancer, the slow kind
+			Game.hurt(1.2, false, "radiation poisoning")   # cancer, the slow kind
 			if randf() < 0.5:
 				Sfx.play("click", -16.0)   # the geiger disagrees with your choices
 		if _smoke:

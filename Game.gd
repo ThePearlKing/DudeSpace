@@ -263,7 +263,9 @@ var earth_pop_target: int = 0   # census at worldgen: repopulation aims here
 var player_proxy: Vector3 = Vector3.ZERO   # where the player 'is' on the
 var has_proxy: bool = false                # planet while inside a pocket room
 
-func hurt(d: float, vaporize: bool = false) -> void:
+var death_cause := ""   # what got you -- shown on the death screen
+
+func hurt(d: float, vaporize: bool = false, cause: String = "") -> void:
 	if dead or godmode:
 		return
 	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
@@ -278,6 +280,7 @@ func hurt(d: float, vaporize: bool = false) -> void:
 			changed.emit()
 			return
 		dead = true
+		death_cause = cause if cause != "" else "ALIENS"
 		# even the god observes a mourning period. red, silent, watching.
 		# and every time it broods, it wakes a little worse.
 		god_standby_until = playtime + 180.0

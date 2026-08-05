@@ -1203,7 +1203,7 @@ func _process(delta: float) -> void:
 				if _hud:
 					_hud.sun_fire()
 					_hud.flash("ABSORBED BY %s" % str(b.name).to_upper())
-				Game.hurt(100000.0, true)   # star deaths vaporize your items
+				Game.hurt(100000.0, true, str(b.name))   # star deaths vaporize your items
 			elif sd < b.radius * 1.6:
 				Game.hurt(50.0 * delta, true)
 				if _burn_t <= 0.0:
@@ -1218,9 +1218,9 @@ func _process(delta: float) -> void:
 		var gd: float = pos.distance_to(b.center)
 		if not Game.dead:
 			if gd < b.radius * 0.75:
-				Game.hurt(100000.0, true)
+				Game.hurt(100000.0, true, str(b.name) + "'s clouds")
 			elif gd < b.radius:
-				Game.hurt(22.0 * delta)
+				Game.hurt(22.0 * delta, false, str(b.name) + "'s clouds")
 		for r in get_tree().get_nodes_in_group("rocket"):
 			if r is Rocket and is_instance_valid(r) \
 					and r.global_position.distance_to(b.center) < b.radius * 0.75:

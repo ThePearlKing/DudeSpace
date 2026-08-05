@@ -81,6 +81,10 @@ func _advise(delta: float) -> void:
 		_tip.text = "ρ %+.2f   rods %d%%  ·  climb: pull to ~%d%%  ·  hold: ~%d%%  ·  taxes: heat %.2f, xenon %.2f (they GROW as you run -- keep easing rods out)" \
 			% [rho, int(rx.rods_target * 100.0), int(climb * 100.0),
 			int(hold * 100.0), htax, xtax]
+		if rx.temp > 25.0:
+			# TEMPERATURE SCHOOL, live: heat in = power, heat out = flow.
+			_tip.text += "\nTEMP %d°C · flow %s — heat IN is power, heat OUT is flow: raise FLOW to cool, trim power (rods in a nudge) to hold. cruise happy zone 150-700°C; past 800 you are negotiating with physics." \
+				% [int(rx.temp * 10.0), ["OFF", "HALF", "FULL"][rx.flow]]
 	# the watchdog: rho quietly negative while the rods sit still is the
 	# classic silent stall -- power bleeds away and nothing explains it.
 	# THIS explains it, fast, with the exact fix.
@@ -184,17 +188,17 @@ func _text(id: String) -> String:
 		"flow":
 			return "COOLANT FLOW: set it FULL. no flow, no startup — steam is the whole business."
 		"rods":
-			return "pull RODS below 65%% (aim ~55%%). above 65%% insertion ρ stays negative and power can only sink."
+			return "pull RODS below 65% (aim ~55%). above 65% insertion ρ stays negative and power can only sink."
 		"startup":
-			return "MODE: STARTUP. interlocks now let the rods move, down to a 45%% floor."
+			return "MODE: STARTUP. interlocks now let the rods move, down to a 45% floor."
 		"power":
-			return "keep ρ POSITIVE (advisor below shows the exact rod %% -- it changes as the core heats). power climbs while ρ > 0, bleeds while ρ < 0. wait for POWER ≥ 3%%."
+			return "keep ρ POSITIVE (advisor below shows the exact rod % -- it changes as the core heats). power climbs while ρ > 0, bleeds while ρ < 0. wait for POWER ≥ 3%."
 		"warm":
 			return "the reaction heats the core -- and HEAT TAXES ρ. as temp climbs you must keep pulling rods out to stay positive (the advisor tracks it). reach 150°C."
 		"run":
 			return "MODE: RUN. the startup floor is gone — full rod authority."
 		"cruise":
-			return "steer power into 45–75%% and HOLD it 6s: rods toward the advisor's CLIMB number to rise, toward HOLD to level off. there is no power dial — you ARE the dial."
+			return "steer power into 45–75% and HOLD it 6s: rods toward the advisor's CLIMB number to rise, toward HOLD to level off. there is no power dial — you ARE the dial."
 		"breaker":
 			return "close the BREAKER. steam is real now: the turbine syncs and you EXPORT."
 	return ""

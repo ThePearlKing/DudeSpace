@@ -82,7 +82,17 @@ func _boom() -> void:
 	if p != null:
 		var dp: float = pos.distance_to(p.global_position)
 		if dp < HURT_R:
-			Game.hurt(30.0 * (1.0 - dp / HURT_R))
+			Game.hurt(30.0 * (1.0 - dp / HURT_R), false, "your own grenade")
+	# friends in the blast: friendly fire law applies (hit_player
+	# silently refuses when the host forbids it)
+	if Net.active:
+		for pid in Net.player_names.keys():
+			var av = Net.avatar_position(int(pid))
+			if av == null:
+				continue
+			var dpe: float = (av as Vector3).distance_to(pos)
+			if dpe < HURT_R:
+				Net.hit_player(int(pid), 30.0 * (1.0 - dpe / HURT_R), true)
 	# the show
 	var parts := GPUParticles3D.new()
 	parts.amount = 70

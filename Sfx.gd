@@ -22,6 +22,15 @@ func _ready() -> void:
 
 	_sounds["explode"] = _bake(0.4, func(t: float, n: float) -> float:
 		return (randf() * 2.0 - 1.0) * exp(-6.0 * n))
+	_sounds["nuke"] = _bake(5.5, func(t: float, n: float) -> float:
+		# sub punch, blast wall, long rolling rumble, echo cracks
+		var sub := sin(TAU * lerpf(52.0, 21.0, n) * t) * exp(-n * 2.0) * 1.5
+		var blast := (randf() * 2.0 - 1.0) * exp(-n * 4.0) * 1.3
+		var rumble := (randf() * 2.0 - 1.0) * 0.55 * exp(-n * 1.1) \
+			* (0.55 + 0.45 * sin(TAU * 2.6 * t))
+		var crack := (randf() * 2.0 - 1.0) * exp(-fmod(n * 4.0, 1.0) * 9.0) \
+			* 0.3 * exp(-n * 1.8)
+		return clampf(sub + blast + rumble + crack, -1.0, 1.0))
 	_sounds["coin"] = _bake(0.16, func(t: float, n: float) -> float:
 		var f := 880.0 if n < 0.5 else 1320.0
 		return sin(TAU * f * t) * 0.6 * exp(-3.0 * n))
