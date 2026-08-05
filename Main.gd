@@ -3287,7 +3287,8 @@ func _spawn_res_nodes(b, count: int, res: String, per: int,
 		(func() -> void:
 			_dress_ore(nd, res, s)).call_deferred()
 		var d := _surface_dir()
-		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
+		# half-buried: deposits GROW out of the ground, they don't balance on it
+		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.08))
 
 ## Every ore is ITS OWN THING: unique rock skin + embedded features,
 ## not a tinted cube. Ultima and prism boil with their glows; uranium is
@@ -3347,7 +3348,8 @@ func _spawn_rocks(b, count: int, col: Color) -> void:
 		nd.setup(Vector3(s, s * randf_range(0.7, 1.2), s), col, 2, 3, 0.1)
 		add_child(nd)
 		var d := _surface_dir()
-		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.45))
+		# half-buried: deposits GROW out of the ground, they don't balance on it
+		nd.global_transform = Transform3D(_basis_from_up(d), b.center + d * (b.radius + s * 0.08))
 
 func _spawn_enemies(b, count: int, level: int) -> void:
 	for i in _n(count):
