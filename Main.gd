@@ -111,7 +111,7 @@ func _ready() -> void:
 		_bgm = AudioStreamPlayer.new()
 		_bgm.volume_db = -8.0
 		add_child(_bgm)
-		_bgm_gap = randf_range(8.0, 20.0)
+		_bgm_gap = randf_range(20.0, 60.0)   # the FIRST song finds you quickly
 
 	_hud = HUD.new()
 	add_child(_hud)
@@ -1040,7 +1040,8 @@ func _update_bgm(delta: float) -> void:
 		_bgm_order.shuffle()
 	_bgm.stream = RadioLib.custom_track(int(_bgm_order.pop_back()))
 	_bgm.play()
-	_bgm_gap = randf_range(25.0, 60.0)   # breathing room between songs
+	# minecraft rules after that: songs are an EVENT, minutes apart
+	_bgm_gap = randf_range(180.0, 420.0)
 
 func _process(delta: float) -> void:
 	_update_bgm(delta)
