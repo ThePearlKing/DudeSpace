@@ -456,7 +456,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		f.position = fspec[1]
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
-	_tv(body, Vector3(4.5, -0.4, 2.8), Vector3(0, 0, 90))
+	_tv(body, Vector3(4.55, -0.3, 2.6), 0.0)
 	# living details: rug, ceiling fixture, wall art, shelf with glow
 	# trinkets, a crystal plant -- someone LIVES here
 	var rug := MeshInstance3D.new()
@@ -710,7 +710,7 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		f.position = fspec[1]
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
-	_tv(body, Vector3(4.5, -0.6, 0), Vector3(0, 0, 90))
+	_tv(body, Vector3(4.6, -0.4, 0), 0.0)
 	# back up to the story-two junction you dropped in from
 	var lift2 := Gate.new().configure({
 		"target": _b.center + _mouth_dir * (float(_b.radius) - 25.0), "zone": "",
@@ -723,21 +723,23 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 ## Apartment television: a shared colony feed of the Datamosh studio
 ## (one SubViewport for the WHOLE colony, proximity-gated) or a
 ## procedural test-pattern channel. It only renders with someone there.
-func _tv(body: Node3D, at: Vector3, rot: Vector3) -> void:
+func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
+	# a proper wall television: dark frame flat on the wall, big screen
+	# facing INTO the room. yaw spins the whole set around local up.
 	var frame := MeshInstance3D.new()
 	var fbm := BoxMesh.new()
-	fbm.size = Vector3(0.12, 0.9, 1.4)
+	fbm.size = Vector3(0.1, 1.05, 1.65)
 	frame.mesh = fbm
 	frame.position = at
-	frame.rotation_degrees = rot
+	frame.rotation_degrees = Vector3(0, yaw_deg, 0)
 	frame.material_override = Surfaces.metal(Color("#14171c"))
 	body.add_child(frame)
 	var scr := MeshInstance3D.new()
 	var qm := QuadMesh.new()
-	qm.size = Vector2(1.24, 0.74)
+	qm.size = Vector2(1.5, 0.9)
 	scr.mesh = qm
-	scr.position = Vector3(-0.08, 0, 0)
-	scr.rotation_degrees = Vector3(0, 90, 0)
+	scr.position = Vector3(-0.07, 0, 0)
+	scr.rotation_degrees = Vector3(0, -90, 0)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if randf() < 0.6:
