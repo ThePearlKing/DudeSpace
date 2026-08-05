@@ -191,6 +191,8 @@ func _ready() -> void:
 		_door_test()
 	if OS.get_environment("CTD_TEST") == "20":
 		_radio_test()
+	if OS.get_environment("CTD_TEST") == "21":
+		_nuke_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -519,7 +521,46 @@ func _repopulate() -> void:
 ## Headless: two houses, a doorframe in each, one Door connect. Verify
 ## the rooms docked, the walls opened, and the link persisted.
 ## Headless: spawn a powered radio, aim at station 0, verify sound flow.
+## CTD_TEST=21: force a meltdown next to the player, die, and report
+## WHICH camera is live + where it looks for the funeral shot.
+func _nuke_test() -> void:
+	await get_tree().process_frame
+	await get_tree().create_timer(2.0).timeout
+	var rx := EMachines.NuclearReactor.new()
+	add_child(rx)
+	rx.set_meta("placed_id", "nreactor")
+	var b = Universe.nearest(_player.global_position)
+	var up: Vector3 = (_player.global_position - b.center).normalized()
+	rx.global_transform = Transform3D(_basis_from_up(up),
+		_player.global_position + _player.global_transform.basis.x * 5.0)
+	await get_tree().process_frame
+	rx._meltdown()   # straight to the bad ending
+	await get_tree().create_timer(1.5).timeout
+	var cam := get_viewport().get_camera_3d()
+	var mc = get_tree().current_scene.find_children("*", "MushroomCloud", true, false)
+	print("NUKETEST dead=%s cam=%s cam_parent=%s clouds=%d" % [Game.dead,
+		cam.get_class() if cam else "none",
+		cam.get_parent().get_class() if cam and cam.get_parent() else "none",
+		mc.size()])
+	if mc.size() > 0 and cam != null:
+		var cl: Node3D = mc[0]
+		var toward: Vector3 = (cl.global_position - cam.global_position).normalized()
+		print("NUKETEST cam_dist=%.1f facing_dot=%.2f cloud_pos_ok=%s" % [
+			cam.global_position.distance_to(cl.global_position),
+			(-cam.global_transform.basis.z).dot(toward),
+			cl.global_position.distance_to(b.center) > float(b.radius) * 0.9])
+		print("NUKETEST cloud=%v camg=%v fwd=%v up=%v cloud_up=%v" % [
+			cl.global_position, cam.global_position,
+			-cam.global_transform.basis.z, cam.global_transform.basis.y,
+			cl.global_transform.basis.y])
+		print("NUKETEST cam_local=%v cam_parent_is_cloud=%s" % [cam.position,
+			cam.get_parent() == cl])
+	await get_tree().create_timer(3.0).timeout
+	var cam2 := get_viewport().get_camera_3d()
+	print("NUKETEST t+3s cam_parent=%s" % [cam2.get_parent().get_class() if cam2 and cam2.get_parent() else "none"])
+
 func _radio_test() -> void:
+
 	await get_tree().create_timer(2.0).timeout
 	var p = get_tree().get_first_node_in_group("player")
 	var r := RadioTower.new()

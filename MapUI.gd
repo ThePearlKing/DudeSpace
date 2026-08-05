@@ -10,6 +10,8 @@ var _dragging: bool = false
 var _last_scale: float = 0.001
 
 var select_cb: Callable = Callable()   # set = click-a-planet picker mode
+var _traj_pts: Array = []              # cached trajectory (world points)
+var _traj_ms: int = 0
 var _press_pos: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
@@ -152,23 +154,32 @@ class _MapView extends Control:
 			draw_arc(sp, maxf(rad, 3.0), 0, TAU, 24, Color.WHITE, 1.0)
 			draw_string(font, sp + Vector2(rad + 4, 4), b.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.8))
 
-		# rocket trajectory prediction
+		# rocket trajectory prediction -- SIMULATED at 10Hz, drawn every
+		# frame. 240 gravity integrations per draw was the map's laptop
+		# tax; the path doesn't change faster than the rocket does.
 		var rk: Rocket = null
 		for r in get_tree().get_nodes_in_group("rocket"):
 			if r is Rocket and r.piloted:
 				rk = r
 				break
 		if rk:
+			var now := Time.get_ticks_msec()
+			if now - owner_ui._traj_ms > 100 or owner_ui._traj_pts.is_empty():
+				owner_ui._traj_ms = now
+				owner_ui._traj_pts.clear()
+				var pp: Vector3 = rk.global_position
+				var vv: Vector3 = rk.vel
+				for i in 240:
+					vv += Universe.gravity_at(pp) * 1.0
+					pp += vv * 1.0
+					owner_ui._traj_pts.append(pp)
+					var nb = Universe.nearest(pp)
+					if pp.distance_to(nb.center) < nb.radius:
+						break
 			var pts := PackedVector2Array()
-			var pp: Vector3 = rk.global_position
-			var vv: Vector3 = rk.vel
-			for i in 240:
-				vv += Universe.gravity_at(pp) * 1.0
-				pp += vv * 1.0
-				pts.append(c + Vector2(pp.x - origin.x, pp.z - origin.z) * scale)
-				var nb = Universe.nearest(pp)
-				if pp.distance_to(nb.center) < nb.radius:
-					break
+			for wp in owner_ui._traj_pts:
+				pts.append(c + Vector2((wp as Vector3).x - origin.x,
+					(wp as Vector3).z - origin.z) * scale)
 			if pts.size() >= 2:
 				draw_polyline(pts, Color("#7cf9ff", 0.8), 1.5)
 

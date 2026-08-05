@@ -147,9 +147,14 @@ func gravity_at(pos: Vector3) -> Vector3:
 			a += -td / r2 * (b.gm() / (r2 * r2))
 			continue
 		var d: Vector3 = b.center - pos
-		var r: float = d.length()
-		if r < 1.0:
+		# squared-distance cull FIRST: bodies whose pull is under
+		# 0.0004 m/s^2 contribute nothing you could ever feel, and
+		# skipping them skips a sqrt + normalize per body per call --
+		# this function runs 240x per frame under the map's trajectory
+		var rsq: float = d.length_squared()
+		if rsq < 1.0 or b.gm() / rsq < 0.0004:
 			continue
+		var r: float = sqrt(rsq)
 		a += d / r * (b.gm() / (r * r))
 	return a
 

@@ -22,7 +22,10 @@ func setup(yield_s: float, up: Vector3) -> void:
 	if x.length() < 0.01:
 		x = up.cross(Vector3(1, 0, 0))
 	x = x.normalized()
-	global_transform = Transform3D(Basis(x, up, x.cross(up).normalized() * -1.0)
+	# RIGHT-handed basis (Z = X cross Y). The mirrored variant used for
+	# machine placement flips any CHILD CAMERA's look_at 180 degrees --
+	# that was the funeral shot staring into empty space.
+	global_transform = Transform3D(Basis(x, up, x.cross(up).normalized())
 		.orthonormalized(), global_position)
 	var smoke := StandardMaterial3D.new()
 	smoke.albedo_color = Color("#2b2320")
