@@ -377,6 +377,92 @@ func _process(delta: float) -> void:
 		_invader.rotate_y(delta * -0.7)
 		_invader.rotate_z(delta * 0.25)
 
+const _TP_NOISE := """
+varying vec3 vn;
+float hash3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float vnoise(vec3 p){
+	vec3 i = floor(p); vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x);
+	float b = mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x);
+	float c = mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x);
+	float d = mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x);
+	return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
+}
+float fbm(vec3 p){
+	float v = 0.0; float amp = 0.55;
+	for (int i = 0; i < 4; i++){ v += vnoise(p) * amp; p *= 2.1; amp *= 0.5; }
+	return v;
+}
+void vertex(){ vn = NORMAL; }
+"""
+
+## Title planets get real faces, keyed off their colour.
+func _tp_mat(style: String, c: Color) -> ShaderMaterial:
+	var frag := ""
+	match style:
+		"gas":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	float t = TIME * 0.04;
+	float band = sin(n.y * 16.0 + fbm(n * 3.0 + vec3(t, 0.0, t)) * 4.0);
+	vec3 col = mix(base * 0.55, base * 1.25, band * 0.5 + 0.5);
+	float storm = smoothstep(0.22, 0.0, length(n.xy - vec2(0.45, -0.25)));
+	col = mix(col, vec3(0.85, 0.4, 0.25), storm * 0.8);
+	ALBEDO = col; ROUGHNESS = 0.9;
+}
+"""
+		"cont":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	float m = fbm(n * 4.0);
+	vec3 sea = base * 0.35 + vec3(0.0, 0.03, 0.14);
+	vec3 land = base * (0.9 + 0.5 * fbm(n * 9.0));
+	vec3 col = mix(sea, land, smoothstep(0.45, 0.55, m));
+	col = mix(col, vec3(0.92), smoothstep(0.82, 0.92, abs(n.y)));
+	ALBEDO = col; ROUGHNESS = 0.8;
+}
+"""
+		"circuit":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 g = fract(n * 7.0);
+	float trace = step(0.92, g.x) + step(0.92, g.y) + step(0.92, g.z);
+	float pulse = 0.5 + 0.5 * sin(TIME * 1.4 + floor(n.x * 7.0) + floor(n.z * 7.0));
+	ALBEDO = base * (0.5 + 0.3 * fbm(n * 6.0));
+	EMISSION = vec3(0.2, 1.0, 0.55) * clamp(trace, 0.0, 1.0) * (0.35 + 0.65 * pulse);
+	ROUGHNESS = 0.7;
+}
+"""
+		"dune":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	float d = sin(n.y * 26.0 + fbm(n * 5.0) * 6.0);
+	vec3 col = mix(base * 0.7, base * 1.2, d * 0.5 + 0.5);
+	col *= 0.85 + 0.3 * fbm(n * 11.0);
+	ALBEDO = col; ROUGHNESS = 1.0;
+}
+"""
+		_:
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	float sw = fbm(n * 3.0 + fbm(n * 6.0) * 1.8);
+	vec3 col = mix(base * 0.75, vec3(1.0, 0.95, 0.98), smoothstep(0.35, 0.75, sw));
+	ALBEDO = col; ROUGHNESS = 0.6;
+}
+"""
+	var sh9 := Shader.new()
+	sh9.code = "shader_type spatial;\nuniform vec3 base : source_color;\n" + _TP_NOISE + frag
+	var m9 := ShaderMaterial.new()
+	m9.shader = sh9
+	m9.set_shader_parameter("base", Vector3(c.r, c.g, c.b))
+	return m9
+
 func _build_background() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
@@ -402,9 +488,39 @@ func _build_background() -> void:
 	light.light_energy = 1.2
 	add_child(light)
 
-	# a little solar system spins behind the menu...
-	for spec in [[7.0, 0.9, 0.10, Color("#2f7d32")], [11.0, 1.4, -0.06, Color("#0e3b2e")],
-			[15.0, 0.6, 0.14, Color("#c8a557")], [19.0, 1.1, -0.04, Color("#e8a3c0")]]:
+	# the centerpiece: a slow-churning GAS GIANT with a dust ring
+	var giant_orbit := Node3D.new()
+	giant_orbit.rotation_degrees = Vector3(4, 0, -7)
+	add_child(giant_orbit)
+	var giant := MeshInstance3D.new()
+	var gm9 := SphereMesh.new()
+	gm9.radius = 2.4
+	gm9.height = 4.8
+	gm9.radial_segments = 48
+	gm9.rings = 32
+	giant.mesh = gm9
+	giant.material_override = _tp_mat("gas", Color("#c78a4e"))
+	giant.position = Vector3(-3.2, 0.6, -3.0)
+	giant_orbit.add_child(giant)
+	var gring := MeshInstance3D.new()
+	var grm := TorusMesh.new()
+	grm.inner_radius = 3.1
+	grm.outer_radius = 4.1
+	gring.mesh = grm
+	gring.scale = Vector3(1, 0.04, 1)
+	gring.material_override = Destructible.make_material(Color("#a8895e"), 0.35)
+	gring.position = giant.position
+	gring.rotation_degrees = Vector3(14, 0, 9)
+	giant_orbit.add_child(gring)
+	_orbits.append([giant_orbit, 0.016])
+
+	# a little solar system spins behind the menu -- every planet styled
+	# off its colour: living continents, circuit traces, banded dunes,
+	# candy marble
+	for spec in [[7.0, 0.9, 0.10, Color("#2f7d32"), "cont"],
+			[11.0, 1.4, -0.06, Color("#0e3b2e"), "circuit"],
+			[15.0, 0.6, 0.14, Color("#c8a557"), "dune"],
+			[19.0, 1.1, -0.04, Color("#e8a3c0"), "swirl"]]:
 		var orbit := Node3D.new()
 		orbit.rotation_degrees = Vector3(randf_range(-14, 14), randf_range(0, 360), 0)
 		add_child(orbit)
@@ -412,10 +528,34 @@ func _build_background() -> void:
 		var pm2 := SphereMesh.new()
 		pm2.radius = spec[1]
 		pm2.height = spec[1] * 2.0
+		pm2.radial_segments = 36
+		pm2.rings = 24
 		pl.mesh = pm2
-		pl.material_override = Destructible.make_material(spec[3], 0.15)
+		pl.material_override = _tp_mat(str(spec[4]), spec[3])
 		pl.position = Vector3(spec[0], 0, 0)
 		orbit.add_child(pl)
+		if str(spec[4]) == "dune":
+			# the dune world carries a thin tilted ring
+			var ring9 := MeshInstance3D.new()
+			var rt9 := TorusMesh.new()
+			rt9.inner_radius = 0.85
+			rt9.outer_radius = 1.15
+			ring9.mesh = rt9
+			ring9.scale = Vector3(1, 0.05, 1)
+			ring9.material_override = Destructible.make_material(Color("#d8bd88"), 0.4)
+			ring9.rotation_degrees = Vector3(24, 0, 12)
+			ring9.position = pl.position
+			orbit.add_child(ring9)
+		elif str(spec[4]) == "swirl":
+			# the candy world keeps a little grey moon
+			var moon9 := MeshInstance3D.new()
+			var mn9 := SphereMesh.new()
+			mn9.radius = 0.22
+			mn9.height = 0.44
+			moon9.mesh = mn9
+			moon9.material_override = Destructible.make_material(Color("#9a97a2"), 0.1)
+			moon9.position = pl.position + Vector3(1.7, 0.5, 0)
+			orbit.add_child(moon9)
 		_orbits.append([orbit, spec[2]])
 	# ...and Clawde the space invader crab tumbles through it all
 	var crab_orbit := Node3D.new()
