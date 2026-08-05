@@ -706,15 +706,40 @@ func _start_ghost(cat: String, kind: String) -> void:
 	_ghost.material_override = gm
 	get_parent().add_child(_ghost)
 
-## Docked transform for a station piece joining near_st, probed from
-## `probe`. With ring snap the piece is ROTATED around the planet by the
-## exact panel angle (2*atan(13/r)) so the edges kiss and a chain of
-## decks closes into a ring instead of shearing off on a tangent.
-func _station_dock_tf(near_st: House, probe: Vector3) -> Transform3D:
+## Docked transform for a station piece joining near_st. Sides are
+## ranked by where you stand -- and standing dead-center (on a STACKED
+## deck the probe is centered) falls back to where you LOOK. Sides
+## already holding a station are skipped; all four taken -> null.
+func _station_dock_tf(near_st: House, probe: Vector3):
 	var gb: Basis = near_st.global_transform.basis
 	var rel: Vector3 = gb.inverse() * (probe - near_st.global_position)
-	var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
-		if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
+	var lookw: Vector3 = gb.inverse() * (-_camera.global_transform.basis.z)
+	var sx := rel.x if absf(rel.x) > 0.8 else lookw.x * 26.0
+	var sz := rel.z if absf(rel.z) > 0.8 else lookw.z * 26.0
+	var vx := Vector3(26.0 * (1.0 if sx >= 0.0 else -1.0), 0, 0)
+	var vz := Vector3(0, 0, 26.0 * (1.0 if sz >= 0.0 else -1.0))
+	var cands: Array = [vx, vz, -vz, -vx] if absf(sx) >= absf(sz) \
+		else [vz, vx, -vx, -vz]
+	for side_v in cands:
+		var tf := _dock_tf_for(near_st, side_v)
+		var free := true
+		for h in get_tree().get_nodes_in_group("house"):
+			if h is House and h != near_st and h.kind == "station" \
+					and is_instance_valid(h):
+				var lrel: Vector3 = gb.inverse() * (h.global_position - tf.origin)
+				if absf(lrel.y) < 2.0 and absf(lrel.x) < 20.0 and absf(lrel.z) < 20.0:
+					free = false
+					break
+		if free:
+			return tf
+	return null
+
+## The raw dock math for ONE side. With ring snap the piece is ROTATED
+## around the planet by the exact panel angle (2*atan(13/r)) so the
+## edges kiss and a chain of decks closes into a ring instead of
+## shearing off on a tangent.
+func _dock_tf_for(near_st: House, side_v: Vector3) -> Transform3D:
+	var gb: Basis = near_st.global_transform.basis
 	if _ring_snap:
 		var b = Universe.nearest(near_st.global_position)
 		if b != null:
@@ -748,9 +773,14 @@ func _update_ghost() -> void:
 						ngd = d
 						near_g = h
 		if near_g != null:
-			var dock := _station_dock_tf(near_g, foot)
-			_ghost.global_transform = Transform3D(dock.basis,
-				dock.origin + dock.basis.y * 0.6)
+			var dock = _station_dock_tf(near_g, foot)
+			if dock != null:
+				_ghost.global_transform = Transform3D(dock.basis,
+					dock.origin + dock.basis.y * 0.6)
+			else:
+				# every edge taken: preview floats free underfoot
+				_ghost.global_transform = Transform3D(_basis_from_up(upS), foot)
+				_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
 		else:
 			_ghost.global_transform = Transform3D(_basis_from_up(upS), foot)
 			_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
@@ -801,7 +831,13 @@ func _confirm_ghost() -> void:
 		var sbasis := tf.basis
 		var spos := base_pos
 		if near_st != null:
-			var dock := _station_dock_tf(near_st, base_pos)
+			var dock = _station_dock_tf(near_st, base_pos)
+			if dock == null:
+				Sfx.play("denied")
+				if hudn:
+					hudn.flash("no free edge on that platform — hold CTRL to place free")
+				_cancel_ghost()
+				return
 			sbasis = dock.basis
 			spos = dock.origin
 		else:
