@@ -63,10 +63,30 @@ func _ready() -> void:
 			close_ui())
 		col.add_child(b)
 
+	# planets: hand off to the map's picker -- right-click one there
+	var pb := Button.new()
+	pb.text = "PLANET (pick on the map)"
+	pb.custom_minimum_size = Vector2(0, 46)
+	pb.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	pb.mouse_entered.connect(func() -> void: pb.modulate = Color(1.25, 1.25, 1.25))
+	pb.mouse_exited.connect(func() -> void: pb.modulate = Color(1, 1, 1))
+	pb.pressed.connect(func() -> void:
+		close_ui()
+		var mp = get_tree().get_first_node_in_group("map_ui")
+		if mp != null:
+			var hudl = get_tree().get_first_node_in_group("hud")
+			if hudl:
+				hudl.flash("RIGHT-CLICK a planet on the map to locate it (30s)")
+			mp.open_select(func(b) -> void:
+				var p := get_tree().get_first_node_in_group("player")
+				if p and p.has_method("locate_planet"):
+					p.locate_planet(b)))
+	col.add_child(pb)
+
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 12)
 	_status.modulate = Color(1, 1, 1, 0.6)
-	_status.text = "ping lasts 45s · shows through planets"
+	_status.text = "ping lasts 45s (planets 30s) · shows through planets"
 	col.add_child(_status)
 
 	var close := Button.new()

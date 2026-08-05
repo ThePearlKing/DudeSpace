@@ -1152,6 +1152,11 @@ func _physics_process(delta: float) -> void:
 	_update_shake(delta)
 	_update_hand(delta)
 	_update_hwreck_preview()
+	# planet lock: the ping follows the body (Harold ORBITS)
+	if Game.locator_planet != "" and Game.playtime < Game.locator_until:
+		var lb = Universe.body_named(Game.locator_planet)
+		if lb != null:
+			Game.locator_targets = [lb.center]
 	_update_tool_hover()
 
 	# third-person body animation + jetpack on the back
@@ -2278,7 +2283,21 @@ func _launch_orbit(n: Node3D) -> void:
 ## The locator: single-instance targets ping alone, mine entrance pings the
 ## nearest one on this planet, swarm targets (invaders, rifts) ping ALL of
 ## them at once. 45s green HUD waypoints.
+## Lock the locator onto a PLANET picked on the map: 30s ping that
+## keeps tracking even if the planet moves (looking at you, Harold).
+func locate_planet(b) -> void:
+	Game.locator_planet = str(b.name)
+	Game.locator_targets = [b.center]
+	Game.locator_label = str(b.name).to_upper()
+	Game.locator_lie = 1.0
+	Game.locator_until = Game.playtime + 30.0
+	Sfx.play("click", -10.0)
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud:
+		hud.flash("LOCATOR: " + Game.locator_label)
+
 func locate(mode: int) -> void:
+	Game.locator_planet = ""   # a category ping releases the planet lock
 	Game.locator_mode = mode
 	var label := ""
 	var targets: Array = []

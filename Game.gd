@@ -143,6 +143,7 @@ var locator_targets: Array = []     # Vector3 list -- multi-ping modes fill many
 var locator_label: String = ""
 var locator_until: float = -1.0
 var locator_lie: float = 1.0   # displayed-distance multiplier (cosmic readings)
+var locator_planet := ""   # planet-name lock: ping tracks it while it moves
 var eh_log_t: float = 0.0      # EVENT HORIZON log: accumulated listen time
 var eh_log_done: bool = false  # heard it all -- silent until world restart
 var permadead: bool = false
