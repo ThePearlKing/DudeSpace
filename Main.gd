@@ -2311,8 +2311,15 @@ func _populate(b) -> void:
 						b.center + md * (b.radius + mh + slm.size.y * 0.35))
 					slab.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 					mh += slm.size.y * 0.8
-			# SPIKE BIOME: one region bristling with tall carved rock needles
-			var spike_dir := _h_dir(hrng)
+			# SPIKE BIOME: one region bristling with tall carved rock
+			# needles -- permanently on the side FACING the black hole,
+			# so you always know where it lives
+			var spike_bh = Universe.body_named("TIN 618")
+			var spike_dir: Vector3 = (spike_bh.center - b.center).normalized() \
+				if spike_bh != null else Vector3(1, 0, 0)
+			hrng.randf()   # keep the rest of the seeded rolls aligned
+			hrng.randf()
+			hrng.randf()
 			for i in _n(38):
 				var sd8: Vector3 = (spike_dir + Vector3(hrng.randf_range(-0.4, 0.4),
 					hrng.randf_range(-0.4, 0.4), hrng.randf_range(-0.4, 0.4))).normalized()
