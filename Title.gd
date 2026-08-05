@@ -430,12 +430,24 @@ void fragment(){
 			frag = """
 void fragment(){
 	vec3 n = normalize(vn);
-	vec3 g = fract(n * 7.0);
-	float trace = step(0.92, g.x) + step(0.92, g.y) + step(0.92, g.z);
-	float pulse = 0.5 + 0.5 * sin(TIME * 1.4 + floor(n.x * 7.0) + floor(n.z * 7.0));
-	ALBEDO = base * (0.5 + 0.3 * fbm(n * 6.0));
-	EMISSION = vec3(0.2, 1.0, 0.55) * clamp(trace, 0.0, 1.0) * (0.35 + 0.65 * pulse);
-	ROUGHNESS = 0.7;
+	vec3 g = fract(n * 6.0);
+	float tr = max(max(step(0.88, g.x), step(0.88, g.y)), step(0.88, g.z));
+	float tile = mod(floor(n.x * 6.0) + floor(n.y * 6.0) + floor(n.z * 6.0), 2.0);
+	vec3 col = base * (0.4 + 0.3 * tile + 0.2 * fbm(n * 8.0));
+	float pulse = 0.5 + 0.5 * sin(TIME * 2.2 + floor(n.x * 6.0) * 1.7 + floor(n.z * 6.0));
+	ALBEDO = col;
+	EMISSION = vec3(0.25, 1.0, 0.6) * tr * (0.6 + 1.4 * pulse);
+	ROUGHNESS = 0.55;
+}
+"""
+		"rock":
+			frag = """
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 col = base * (0.62 + 0.5 * fbm(n * 6.0));
+	float cr = smoothstep(0.16, 0.1, abs(fbm(n * 4.0) - 0.45));
+	col *= 1.0 - 0.35 * cr;
+	ALBEDO = col; ROUGHNESS = 1.0;
 }
 """
 		"dune":
@@ -552,7 +564,7 @@ func _build_background() -> void:
 	mm.radius = 0.7
 	mm.height = 1.4
 	moon.mesh = mm
-	moon.material_override = Destructible.make_material(Color("#c8c8d8"), 0.1)
+	moon.material_override = _tp_mat("rock", Color("#c8c8d8"))   # no plastic moons
 	moon.position = Vector3(-4.5, 1.2, 1.0)
 	_bg_pivot.add_child(moon)
 
