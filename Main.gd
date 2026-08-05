@@ -2645,6 +2645,7 @@ func _populate(b) -> void:
 				# LAND animals only, and they are EVERYWHERE on the planet
 				var an := Animal.new()
 				an.setup(b, true)
+				an.ground_locked = true   # Varnisol fauna NEVER leaves the dirt
 				add_child(an)
 				var ad := _surface_dir()
 				an.global_transform = Transform3D(_basis_from_up(ad),

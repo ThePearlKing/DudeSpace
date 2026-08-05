@@ -83,6 +83,7 @@ var _fly_chase: bool = false
 var genome: int = -1   # deterministic body seed: same genome = same animal
 
 var flat_home := false   # lives on a flat interior floor (house pocket)
+var ground_locked := false   # HARD ground lock: never leaves the surface
 var _flat_t := 0.0       # next self-check of the above
 
 func setup(home_body, ground_only: bool = false, bug: bool = false, genome_in: int = -1) -> void:
@@ -299,11 +300,21 @@ func _physics_process(delta: float) -> void:
 		# any tamed animal sprouts the will to fly when you're overhead
 		v_up = minf(v_up + 14.0 * delta, 9.0)
 	if not _flier and not _fly_chase:
-		v_up = minf(v_up, 6.0)   # grounded lungs, grounded jumps
+		v_up = minf(v_up, 2.2 if ground_locked else 6.0)   # grounded lungs, grounded jumps
 	v_up -= g * delta * (0.4 if (_flier or _fly_chase) else 1.0)
 	velocity = _dir * spd + up * v_up
 	up_direction = up
 	move_and_slide()
+	# HARD LOCK: continuous 2m ceiling instead of the 8m leash-teleport.
+	# A pine collider can still kick, but the kick dies the same frame --
+	# no flight, no visible teleport.
+	if ground_locked and not flat_home:
+		var altg := global_position.distance_to(_home.center) - float(_home.radius)
+		if altg > 2.0:
+			global_position = _home.center + up * (float(_home.radius) + 2.0)
+			var vout := velocity.dot(up)
+			if vout > 0.0:
+				velocity -= up * vout
 
 	# limbs writhe as it moves, in whatever way its body decided is walking
 	_walk_t += delta * (1.5 + spd * 0.5)
