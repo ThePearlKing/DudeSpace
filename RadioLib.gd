@@ -195,6 +195,23 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 				var tk := b0 + int(beat_s * 0.5)
 				for i in mini(int(0.04 * SR), total - tk):
 					buf[tk + i] += (randf() * 2.0 - 1.0) * exp(-float(i) / (SR * 0.008)) * 0.16
+	if kind == "lava" or kind == "volcanic":
+		# SANUS: the fire is in the band. Low roar bed (lp-filtered noise
+		# flutter + deep pulse) with granular flame crackle over it --
+		# same DNA as the star stations' solar crackle, woodier decay.
+		var frng := RandomNumberGenerator.new()
+		frng.seed = seed_v + 77
+		var lpn := 0.0
+		for i in total:
+			var t3 := float(i) / SR
+			lpn += ((frng.randf() * 2.0 - 1.0) - lpn) * 0.02
+			buf[i] += lpn * 0.42 * (0.7 + 0.3 * sin(TAU * 0.35 * t3)) \
+				+ sin(TAU * 46.0 * t3) * 0.05 * (0.6 + 0.4 * sin(TAU * 0.21 * t3 + 1.7))
+		for c2 in 340:
+			var cst := frng.randi() % (total - 160)
+			var camp := frng.randf_range(0.06, 0.2)
+			for j2 in 140:
+				buf[cst + j2] += (frng.randf() * 2.0 - 1.0) * camp * exp(-float(j2) / 22.0)
 	var bytes := PackedByteArray()
 	bytes.resize(total * 2)
 	for i in total:

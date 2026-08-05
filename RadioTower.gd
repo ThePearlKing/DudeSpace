@@ -105,10 +105,13 @@ func _ready() -> void:
 	spec_tex = ImageTexture.create_from_image(_spec_img)
 	# little spectrogram SCREENS on the base -- mounted in a real bezel:
 	# recessed dark housing, raised frame edges, a wee standby lamp
-	for sxs in [-1.0, 1.0]:
+	for mspec in [[Vector3(-(box_size.x * 0.5), 0.62, 0), -90.0],
+			[Vector3(box_size.x * 0.5, 0.62, 0), 90.0],
+			[Vector3(0, 0.62, box_size.z * 0.5), 0.0],
+			[Vector3(0, 0.62, -(box_size.z * 0.5)), 180.0]]:
 		var mount := Node3D.new()
-		mount.position = Vector3(sxs * (box_size.x * 0.5), 0.62, 0)
-		mount.rotation_degrees.y = 90.0 * sxs
+		mount.position = mspec[0]
+		mount.rotation_degrees.y = float(mspec[1])
 		add_child(mount)
 		var housing := MeshInstance3D.new()
 		var hbm := BoxMesh.new()
