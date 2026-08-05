@@ -509,14 +509,15 @@ func _update_hwreck_preview() -> void:
 	var t: Node3D = _delete_target_under_crosshair() if _hwreck_mode else null
 	if t != null and not is_instance_valid(t):
 		t = null
-	# a FREED target compares equal to null, so 'did it change' never
-	# fired after a delete and the red box lingered. Purge stale refs
-	# explicitly before comparing.
-	if _hwreck_target != null and not is_instance_valid(_hwreck_target):
-		_hwreck_target = null
-		if _hwreck_hl and is_instance_valid(_hwreck_hl):
+	# freed objects compare equal to null in GDScript, so ANY null-based
+	# staleness check silently never fires. The only honest question is
+	# is_instance_valid -- if a box exists but its target doesn't, the
+	# box goes NOW.
+	if _hwreck_hl != null and not is_instance_valid(_hwreck_target):
+		if is_instance_valid(_hwreck_hl):
 			_hwreck_hl.queue_free()
 		_hwreck_hl = null
+		_hwreck_target = null
 	if t != _hwreck_target:
 		_hwreck_target = t
 		if _hwreck_hl and is_instance_valid(_hwreck_hl):
@@ -561,6 +562,11 @@ func _hwreck_click() -> void:
 		t.queue_free()
 	elif t is Machine:
 		t._on_destroyed(Vector3.UP)   # refunds itself + slots, drops cables
+	# the box dies WITH the target, not a few frames later
+	if _hwreck_hl and is_instance_valid(_hwreck_hl):
+		_hwreck_hl.queue_free()
+	_hwreck_hl = null
+	_hwreck_target = null
 
 func _wreck_click() -> void:
 	_cooldown = 0.3
