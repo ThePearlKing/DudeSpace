@@ -131,7 +131,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 	# T opens chat only while actually playing (mouse captured = no UI open)
-	if event.keycode == KEY_T and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
+	if event.keycode == Settings.key("chat") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
 			and not Game.dead:
 		open()
 		get_viewport().set_input_as_handled()

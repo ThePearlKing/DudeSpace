@@ -299,26 +299,26 @@ func _unhandled_input(event: InputEvent) -> void:
 			and get_window().has_focus():
 		_look += event.relative
 	elif event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_F:
-				_interact()
-			KEY_J:
-				if Inventory.has_jetpack:
-					_jetting = not _jetting
-					Inventory.jet_on = _jetting
-			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
-				Inventory.select_slot(event.keycode - KEY_1)
-			KEY_F5:
-				_toggle_view()
-			KEY_Q:
-				Inventory.drop_slot(Inventory.selected)
-			KEY_G:
-				if _body:
-					_body.set_pose((_body.pose + 1) % 6)
-					var hudp = get_tree().get_first_node_in_group("hud")
-					if hudp:
-						hudp.flash("pose: " + Human.POSE_NAMES[_body.pose])
-					Sfx.play("click", -16.0)
+		var kc9: int = event.keycode
+		if kc9 == Settings.key("interact"):
+			_interact()
+		elif kc9 == Settings.key("jetpack"):
+			if Inventory.has_jetpack:
+				_jetting = not _jetting
+				Inventory.jet_on = _jetting
+		elif kc9 >= KEY_1 and kc9 <= KEY_5:
+			Inventory.select_slot(kc9 - KEY_1)
+		elif kc9 == KEY_F5:
+			_toggle_view()
+		elif kc9 == Settings.key("drop"):
+			Inventory.drop_slot(Inventory.selected)
+		elif kc9 == Settings.key("pose"):
+			if _body:
+				_body.set_pose((_body.pose + 1) % 6)
+				var hudp = get_tree().get_first_node_in_group("hud")
+				if hudp:
+					hudp.flash("pose: " + Human.POSE_NAMES[_body.pose])
+				Sfx.play("click", -16.0)
 	elif event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_RIGHT:
@@ -993,7 +993,7 @@ func _physics_process(delta: float) -> void:
 			return
 	# C zooms whenever it isn't busy meaning "down" (jetpack/zero-g/fly modes)
 	# V = zoom, always. C keeps meaning "down".
-	_zooming = Input.is_key_pressed(KEY_V) and not _ui_open() and not Game.dead and not freecam
+	_zooming = Input.is_key_pressed(Settings.key("zoom")) and not _ui_open() and not Game.dead and not freecam
 	if not _zooming:
 		_zoom_extra = 1.0
 	_zoom_f = lerpf(_zoom_f, 0.42 * _zoom_extra if _zooming else 1.0, delta * 9.0)
@@ -1014,7 +1014,7 @@ func _physics_process(delta: float) -> void:
 			if Input.is_key_pressed(KEY_A): fly2 -= cb2.x
 			if Input.is_key_pressed(KEY_D): fly2 += cb2.x
 			if Input.is_key_pressed(KEY_SPACE): fly2 += cb2.y
-			if Input.is_key_pressed(KEY_C): fly2 -= cb2.y
+			if Input.is_key_pressed(Settings.key("jet_down")): fly2 -= cb2.y
 			if fly2.length() > 0.1:
 				var spd2 := 60.0 if Input.is_key_pressed(KEY_SHIFT) else 12.0
 				_fc.global_position += fly2.normalized() * spd2 * delta
@@ -1041,7 +1041,7 @@ func _physics_process(delta: float) -> void:
 			if Input.is_key_pressed(KEY_A): fly -= cb.x
 			if Input.is_key_pressed(KEY_D): fly += cb.x
 			if Input.is_key_pressed(KEY_SPACE): fly += global_transform.basis.y
-			if Input.is_key_pressed(KEY_C): fly -= global_transform.basis.y
+			if Input.is_key_pressed(Settings.key("jet_down")): fly -= global_transform.basis.y
 			if fly.length() > 0.1:
 				var spd := 8000.0 if Input.is_key_pressed(KEY_SHIFT) else 600.0
 				global_position += fly.normalized() * spd * delta
@@ -1113,7 +1113,7 @@ func _physics_process(delta: float) -> void:
 			var jp := JET_THRUST * Inventory.jet_power
 			var thrust := wish * jp
 			if Input.is_key_pressed(KEY_SPACE): thrust += up * jp
-			if Input.is_key_pressed(KEY_C): thrust -= up * jp
+			if Input.is_key_pressed(Settings.key("jet_down")): thrust -= up * jp
 			if thrust.length() > 0.1:
 				velocity += thrust.normalized() * jp * delta
 				Inventory.jet_fuel = maxf(0.0, Inventory.jet_fuel - JET_BURN * 0.6 * delta)
@@ -1136,7 +1136,7 @@ func _physics_process(delta: float) -> void:
 			if Input.is_key_pressed(KEY_SPACE):
 				velocity += up * JET_THRUST * Inventory.jet_power * delta
 				Inventory.jet_fuel = maxf(0.0, Inventory.jet_fuel - JET_BURN * delta)
-			if Input.is_key_pressed(KEY_C):
+			if Input.is_key_pressed(Settings.key("jet_down")):
 				velocity -= up * JET_THRUST * Inventory.jet_power * 0.8 * delta
 				Inventory.jet_fuel = maxf(0.0, Inventory.jet_fuel - JET_BURN * 0.5 * delta)
 			velocity += wish * AIR_ACCEL * delta
@@ -1166,7 +1166,7 @@ func _physics_process(delta: float) -> void:
 
 	# third-person body animation + jetpack on the back
 	if _body:
-		var thrusting := jet_ok and (Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(KEY_C))
+		var thrusting := jet_ok and (Input.is_key_pressed(KEY_SPACE) or Input.is_key_pressed(Settings.key("jet_down")))
 		_body.set_jetpack(Inventory.has_jetpack, thrusting,
 			3 if Inventory.jet_max >= 1000.0 \
 			else (2 if Inventory.jet_max >= 500.0 else 1))

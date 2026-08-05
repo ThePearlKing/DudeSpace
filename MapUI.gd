@@ -59,7 +59,7 @@ func close_ui() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == Settings.key("map"):
 		if Game.dead:
 			return
 		if visible:

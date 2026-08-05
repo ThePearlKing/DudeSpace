@@ -224,7 +224,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cam_dist = minf(600.0, _cam_dist * 1.15)   # zoom WAY out
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F:
+		if event.keycode == Settings.key("interact"):
 			_try_exit()
 			get_viewport().set_input_as_handled()   # or the player re-boards SAME press
 			return
@@ -261,7 +261,7 @@ func _physics_process(delta: float) -> void:
 	var ui := Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 
 	# F to hop out. Polled unconditionally -- exiting must ALWAYS work.
-	if Input.is_key_pressed(KEY_F):
+	if Input.is_key_pressed(Settings.key("interact")):
 		if not _f_held:
 			_f_held = true
 			_try_exit()
@@ -316,7 +316,7 @@ func _physics_process(delta: float) -> void:
 		_engine_on = true
 
 	# --- hyperdrive: hold H, screams toward the nose. Ship-mounted. ---
-	if hyperdrive and not ui and Input.is_key_pressed(KEY_H) and Inventory.fuel > 0.5:
+	if hyperdrive and not ui and Input.is_key_pressed(Settings.key("hyper")) and Inventory.fuel > 0.5:
 		vel = vel.lerp(fwd * 900.0, delta * 1.2)
 		Inventory.fuel = maxf(0.0, Inventory.fuel - 10.0 * burn_eff * delta)
 		_engine_on = true

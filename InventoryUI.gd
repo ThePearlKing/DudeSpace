@@ -337,7 +337,7 @@ func _hot_style(selected: bool) -> StyleBoxFlat:
 	return sb
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == Settings.key("inventory"):
 		if Game.dead:
 			return
 		_toggle()

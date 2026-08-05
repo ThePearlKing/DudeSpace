@@ -107,7 +107,7 @@ func play(name: String, vol_db: float = -8.0) -> void:
 	var p: AudioStreamPlayer = _pool[_pool_i]
 	_pool_i = (_pool_i + 1) % _pool.size()
 	p.stream = _sounds[name]
-	p.volume_db = vol_db
+	p.volume_db = vol_db + Settings.sfx_db()
 	p.play()
 
 ## Positional one-shot: rumbles from WHERE it happened.
@@ -118,7 +118,7 @@ func play_at(name: String, pos: Vector3, vol_db: float = 0.0) -> void:
 	_pool3d_i = (_pool3d_i + 1) % _pool3d.size()
 	p.global_position = pos
 	p.stream = _sounds[name]
-	p.volume_db = vol_db
+	p.volume_db = vol_db + Settings.sfx_db()
 	p.play()
 
 func engine(on: bool) -> void:

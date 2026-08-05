@@ -672,11 +672,15 @@ func _update_beam(delta: float) -> void:
 		return
 	var dirn := aim_dir.normalized()
 	var origin: Vector3 = _dish_pivot.global_position + dirn * 0.55
-	var side := dirn.cross(global_transform.basis.y)
+	# BILLBOARD: the ribbon's face always turns to the viewer, so the
+	# wave reads from every angle instead of vanishing edge-on
+	var cam9 := get_viewport().get_camera_3d()
+	var vdir: Vector3 = (global_position - cam9.global_position).normalized() \
+		if cam9 != null else global_transform.basis.z
+	var side := dirn.cross(vdir)
 	if side.length() < 0.05:
-		side = dirn.cross(global_transform.basis.x)
+		side = dirn.cross(global_transform.basis.y)
 	side = side.normalized()
-	var upb := side.cross(dirn).normalized()
 	var col := Color.from_hsv(_beam_hue, 0.85, 1.0)
 	_beam_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for i in 41:
@@ -684,7 +688,7 @@ func _update_beam(delta: float) -> void:
 		var swell := sin(PI * minf(t * 3.0, 1.0))   # eases out of the feed
 		var wob := sin(t * 26.0 - _beam_t * 14.0) \
 			* (0.1 + 0.45 * _beam_env) * swell
-		var p := origin + dirn * (t * 9.0) + upb * wob
+		var p := origin + dirn * (t * 9.0) + side * wob
 		var a := (1.0 - t) * (0.1 + 0.55 * _beam_env)
 		var w := 0.05 + 0.09 * _beam_env * (1.0 - t * 0.6)
 		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))

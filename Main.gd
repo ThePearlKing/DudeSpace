@@ -1038,6 +1038,7 @@ func _update_bgm(delta: float) -> void:
 			want_db = lerpf(-34.0, -8.0, pos9 / 3.0)
 		if len9 > 8.0 and len9 - pos9 < 4.0:
 			want_db = lerpf(-8.0, -40.0, clampf((4.0 - (len9 - pos9)) / 4.0, 0.0, 1.0))
+		want_db += Settings.music_db()   # the MUSIC VOLUME slider
 		if radio_hot:
 			want_db = -40.0
 		_bgm.volume_db = lerpf(_bgm.volume_db, want_db, minf(1.0, delta * 2.5))

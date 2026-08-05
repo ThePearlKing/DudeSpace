@@ -73,6 +73,28 @@ func _ready() -> void:
 	fov.value_changed.connect(func(v): Settings.fov = v)
 	frow.add_child(fov)
 
+	# volumes: music (the soundtrack) and SFX (everything punchy)
+	for vspec in [["Music Volume", "music_vol"], ["SFX Volume", "sfx_vol"]]:
+		var vrow := HBoxContainer.new()
+		vrow.add_theme_constant_override("separation", 12)
+		col.add_child(vrow)
+		var vlabel := Label.new()
+		vlabel.text = str(vspec[0])
+		vlabel.custom_minimum_size = Vector2(200, 0)
+		vrow.add_child(vlabel)
+		var vsl := HSlider.new()
+		vsl.min_value = 0.0
+		vsl.max_value = 1.0
+		vsl.step = 0.05
+		vsl.value = float(Settings.get(str(vspec[1])))
+		vsl.custom_minimum_size = Vector2(240, 0)
+		var prop: String = str(vspec[1])
+		vsl.value_changed.connect(func(v: float) -> void:
+			Settings.set(prop, v)
+			if prop == "sfx_vol":
+				Sfx.play("click", -14.0))   # instant preview
+		vrow.add_child(vsl)
+
 	var fs := CheckBox.new()
 	fs.text = "Fullscreen"
 	fs.button_pressed = Settings.fullscreen
@@ -101,6 +123,21 @@ func _ready() -> void:
 
 var _tut_panel: PanelContainer
 var _ctl_panel: PanelContainer
+var _rebind_action := ""      # controls panel: waiting for a key for this
+var _rebind_btns: Dictionary = {}
+
+func _input(event: InputEvent) -> void:
+	# rebind capture: the next key pressed becomes the binding
+	if _rebind_action == "" or not (event is InputEventKey) or not event.pressed:
+		return
+	if event.keycode != KEY_ESCAPE:
+		Settings.keys[_rebind_action] = event.keycode
+		Settings.save_cfg()
+	var btn: Button = _rebind_btns.get(_rebind_action)
+	if btn != null and is_instance_valid(btn):
+		btn.text = OS.get_keycode_string(Settings.key(_rebind_action))
+	_rebind_action = ""
+	get_viewport().set_input_as_handled()
 
 ## Every keybind in the game, one place.
 func _open_controls() -> void:
@@ -123,8 +160,37 @@ func _open_controls() -> void:
 	title.text = "CONTROLS"
 	title.add_theme_font_size_override("font_size", 24)
 	col.add_child(title)
+	# REBINDS: click a key, press the new one (Esc cancels)
+	var rl := Label.new()
+	rl.text = "click a binding, then press the new key"
+	rl.add_theme_font_size_override("font_size", 13)
+	rl.modulate = Color(1, 1, 1, 0.65)
+	col.add_child(rl)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 6)
+	col.add_child(grid)
+	for aspec in [["interact", "Interact"], ["inventory", "Inventory"],
+			["jetpack", "Jetpack"], ["jet_down", "Jet descend"],
+			["zoom", "Zoom"], ["map", "Map"], ["calendar", "Calendar"],
+			["chat", "Chat"], ["pose", "Pose"], ["drop", "Drop item"],
+			["hyper", "Hyperdrive"]]:
+		var an9 := str(aspec[0])
+		var al9 := Label.new()
+		al9.text = str(aspec[1])
+		al9.add_theme_font_size_override("font_size", 14)
+		grid.add_child(al9)
+		var ab9 := Button.new()
+		ab9.text = OS.get_keycode_string(Settings.key(an9))
+		ab9.custom_minimum_size = Vector2(84, 32)
+		ab9.pressed.connect(func() -> void:
+			_rebind_action = an9
+			ab9.text = "...")
+		grid.add_child(ab9)
+		_rebind_btns[an9] = ab9
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(640, 460)
+	scroll.custom_minimum_size = Vector2(640, 320)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(scroll)
 	var txt := Label.new()

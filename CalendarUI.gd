@@ -171,7 +171,7 @@ func _process(_d: float) -> void:
 		_clock.text = "%s   ·   %s" % [Game.date_text(), Game.clock_text()]
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_K:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == Settings.key("calendar"):
 		if Game.dead:
 			return
 		if visible:
