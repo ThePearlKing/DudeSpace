@@ -4567,21 +4567,55 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 		ch.position = Vector3(hrng.randf_range(-5.0, 5.0), 0.3, hrng.randf_range(2.8, 4.4))
 		ch.rotation = Vector3(hrng.randf_range(-0.3, 0.3), hrng.randf() * TAU, 0)
 		root.add_child(ch)
-	# the SLOT: a four-faced pyramid of absence, apex INTO the stone
+	# the SLOT: a REAL carved tetrahedral cavity. Triangular opening in
+	# the face, three interior walls meeting at an apex deep inside the
+	# stone, vertex-shaded darker the deeper it goes -- an absence, not
+	# a decal. Four triangular faces counting the missing base: a true
+	# 4-sided pyramid.
+	var st7 := SurfaceTool.new()
+	st7.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var zface := 1.815
+	var tri: Array = []
+	for vi in 3:
+		var va := TAU * float(vi) / 3.0 + PI * 0.5
+		tri.append(Vector3(cos(va) * 1.0, 6.55 + sin(va) * 1.0, zface))
+	var apex := Vector3(0, 6.55, zface - 1.6)
+	var mouth_c := Color(0.2, 0.17, 0.13)
+	var deep_c := Color(0.012, 0.01, 0.008)
+	for vi in 3:
+		var p1: Vector3 = tri[vi]
+		var p2: Vector3 = tri[(vi + 1) % 3]
+		var nrm: Vector3 = (p2 - p1).cross(apex - p1).normalized()
+		if nrm.z < 0.0:
+			nrm = -nrm
+		st7.set_normal(nrm)
+		st7.set_color(mouth_c)
+		st7.add_vertex(p1)
+		st7.set_color(mouth_c)
+		st7.add_vertex(p2)
+		st7.set_color(deep_c)
+		st7.add_vertex(apex)
 	var slot := MeshInstance3D.new()
-	var slm := CylinderMesh.new()
-	slm.top_radius = 0.0
-	slm.bottom_radius = 0.95
-	slm.height = 1.1
-	slm.radial_segments = 3
-	slot.mesh = slm
+	slot.mesh = st7.commit()
 	var smat := StandardMaterial3D.new()
-	smat.albedo_color = Color("#0b0a08")
-	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.vertex_color_use_as_albedo = true
+	smat.roughness = 1.0
+	smat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	slot.material_override = smat
-	slot.rotation_degrees = Vector3(-90, 0, 0)
-	slot.position = Vector3(0, 6.55, 1.27)
 	root.add_child(slot)
+	# worn rim framing the opening
+	var ink0 := Surfaces.stone(Color("#4a4136"))
+	for vi in 3:
+		var e1: Vector3 = tri[vi]
+		var e2: Vector3 = tri[(vi + 1) % 3]
+		var rim := MeshInstance3D.new()
+		var rbm := BoxMesh.new()
+		rbm.size = Vector3(e1.distance_to(e2) + 0.08, 0.09, 0.06)
+		rim.mesh = rbm
+		rim.material_override = ink0
+		rim.position = (e1 + e2) * 0.5 + Vector3(0, 0, 0.02)
+		rim.rotation_degrees.z = rad_to_deg(atan2(e2.y - e1.y, e2.x - e1.x))
+		root.add_child(rim)
 	# six pictograms ringing the slot -- drawings, not runes
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
@@ -4629,17 +4663,25 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.62, 0.05), Vector2.ZERO, -18.0)
 			bar.call(Vector2(0.4, 0.04), Vector2(0, -0.07), -18.0)
 		2:
-			# icosahedron, flattened: hexagon with spokes to the corners
-			for hi in 6:
-				var ha := TAU * float(hi) / 6.0
-				var hb := TAU * float(hi + 1) / 6.0
-				var pa := Vector2(cos(ha), sin(ha)) * 0.3
-				var pb := Vector2(cos(hb), sin(hb)) * 0.3
-				var mid := (pa + pb) * 0.5
-				bar.call(Vector2(0.3, 0.045), mid, rad_to_deg((pb - pa).angle()))
-			for sp2 in 3:
-				var sa := TAU * float(sp2 * 2) / 6.0
-				bar.call(Vector2(0.3, 0.04), Vector2(cos(sa), sin(sa)) * 0.15, rad_to_deg(sa))
+			# icosahedron down its five-fold axis: the top vertex is the
+			# center dot, edges fan to the inner pentagon, a zigzag band
+			# links it to the outer pentagon rim -- 25 carved edges
+			var seg := func(a2: Vector2, b3: Vector2) -> void:
+				bar.call(Vector2(a2.distance_to(b3), 0.035), (a2 + b3) * 0.5,
+					rad_to_deg((b3 - a2).angle()))
+			var outer: Array = []
+			var inner: Array = []
+			for pv in 5:
+				var oa := TAU * float(pv) / 5.0 + PI * 0.5
+				outer.append(Vector2(cos(oa), sin(oa)) * 0.36)
+				var ia := oa + PI / 5.0
+				inner.append(Vector2(cos(ia), sin(ia)) * 0.17)
+			for pv in 5:
+				seg.call(outer[pv], outer[(pv + 1) % 5])
+				seg.call(inner[pv], inner[(pv + 1) % 5])
+				seg.call(Vector2.ZERO, inner[pv])
+				seg.call(inner[pv], outer[pv])
+				seg.call(inner[pv], outer[(pv + 1) % 5])
 		3:
 			# the pyramid
 			bar.call(Vector2(0.56, 0.05), Vector2(0, -0.2), 0.0)
