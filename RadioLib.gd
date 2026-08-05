@@ -451,6 +451,57 @@ static func _bh_loop() -> AudioStreamWAV:
 		out[i] = v2
 	return _encode_loop(out, total, "_bh")
 
+static var _bh_presence_wav: AudioStreamWAV = null
+
+## The hole IN PERSON: the radio wail pitched down into god register
+## (voices an octave and a half deep, slower clocks), with layered
+## drones under it -- a beating sub root, a bare fifth, a slow-breathing
+## pressure pulse. What the dish politely calls EVENT HORIZON.
+static func bh_presence() -> AudioStreamWAV:
+	if _bh_presence_wav:
+		return _bh_presence_wav
+	var total := int(22.0 * SR)
+	var render := int(25.0 * SR)
+	var buf := PackedFloat32Array()
+	buf.resize(render)
+	var voices: Array = [
+		[65.4, 0.5, 0.9, 0.0], [77.8, 0.7, 0.35, 2.1], [103.8, 0.4, 1.2, 4.0],
+		[138.6, 0.6, 0.7, 1.0], [51.9, 0.3, 1.5, 3.3]]
+	for v in voices:
+		var f0: float = v[0]
+		var r1: float = v[1]
+		var r2: float = v[2]
+		var ph0: float = v[3]
+		var phase := 0.0
+		for i in render:
+			var t := float(i) / SR
+			var lp := t / 22.0 * TAU
+			var bend := 1.0 + 0.07 * sin(lp * r1 + ph0) \
+				+ 0.035 * sin(lp * r2 * 1.9 + ph0 * 2.0)
+			phase += TAU * f0 * bend / SR
+			var amp := 0.15 * (0.5 + 0.5 * sin(lp * r2 + ph0 * 3.0))
+			buf[i] += (sin(phase) + 0.4 * sin(phase * 2.0)) * amp
+	# the drone stack: beating sub root, bare fifth, breathing pressure
+	for i in render:
+		var t2 := float(i) / SR
+		buf[i] += (sin(TAU * 32.7 * t2) + sin(TAU * 32.95 * t2)) * 0.13 \
+			+ sin(TAU * 49.0 * t2) * 0.07 * (0.6 + 0.4 * sin(TAU * 0.09 * t2 + 2.0)) \
+			+ sin(TAU * 24.5 * t2) * 0.1 * (0.5 + 0.5 * sin(TAU * 0.045 * t2)) \
+			+ sin(TAU * 311.0 * t2) * 0.02 \
+			* (0.5 + 0.5 * sin(TAU * 0.21 * t2)) * (0.6 + 0.4 * sin(TAU * 5.0 * t2)) \
+			+ (randf() * 2.0 - 1.0) * 0.012
+	var out := PackedFloat32Array()
+	out.resize(total)
+	var xf := render - total
+	for i in total:
+		var v2 := buf[i]
+		if i < xf:
+			var k := float(i) / float(xf)
+			v2 = buf[total + i] * (1.0 - k) + buf[i] * k
+		out[i] = v2
+	_bh_presence_wav = _encode_loop(out, total, "_bhp")
+	return _bh_presence_wav
+
 ## Stars hum. Weirdly. Inharmonic shimmer partials breathing on their
 ## own clocks, solar-crackle granules, and a deep fusion roar.
 static func _star_loop(seed_v: int) -> AudioStreamWAV:

@@ -90,7 +90,7 @@ func _ready() -> void:
 	var bhb2 = Universe.body_named("TIN 618")
 	if bhb2 != null:
 		var bhum := AudioStreamPlayer3D.new()
-		bhum.stream = RadioLib._bh_loop()
+		bhum.stream = RadioLib.bh_presence()   # deeper, godlier than the broadcast
 		bhum.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 		bhum.unit_size = 2600.0
 		bhum.max_distance = 30000.0
