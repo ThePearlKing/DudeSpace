@@ -1303,6 +1303,7 @@ func _build_body(b) -> void:
 	p.set_meta("body_name", b.name)   # the apple cinematic needs to find these
 	add_child(p)
 	p.global_position = b.center
+	b.node = p   # movers (Harold) drag their visuals along
 
 	if b.kind in ["home", "life", "sand", "pi"]:
 		_add_aurora(b)   # polar lights on the pretty planets
@@ -1540,6 +1541,7 @@ func _build_torus(b) -> void:
 	p.add_child(col)
 	add_child(p)
 	p.global_position = b.center
+	b.node = p   # movers (Harold) drag their visuals along
 	# crates all around the tube -- outside, inside the hole, everywhere
 	for i in 40:
 		var theta := randf() * TAU
