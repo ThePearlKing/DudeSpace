@@ -41,6 +41,11 @@ var now_line_until: float = 0.0
 var now_line_col: Color = Color("#ffd166")
 var _last_cue: String = ""      # sauce line cache: shape text ONCE per bar
 var _sauce_pos: float = 0.0     # where the tape was when the signal dropped
+var _beam: MeshInstance3D       # the visible frequency wave off the dish
+var _beam_mesh: ImmediateMesh
+var _beam_env := 0.0            # beat envelope: snaps up, decays slow
+var _beam_hue := 0.1
+var _beam_t := 0.0
 var _sauce_seen: float = -99.0
 var _good_t: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
@@ -90,6 +95,21 @@ func _ready() -> void:
 	fmi.position = Vector3(0, 0, -0.4)
 	fmi.material_override = Surfaces.metal(Color("#8a9098"))
 	_dish_pivot.add_child(fmi)
+	# the broadcast made visible: a wave ribbon riding out of the dish
+	_beam = MeshInstance3D.new()
+	_beam_mesh = ImmediateMesh.new()
+	_beam.mesh = _beam_mesh
+	_beam.top_level = true
+	var bmat9 := StandardMaterial3D.new()
+	bmat9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bmat9.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	bmat9.vertex_color_use_as_albedo = true
+	bmat9.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_beam.material_override = bmat9
+	add_child(_beam)
+	_beam.global_transform = Transform3D()
+
 	# a dedicated analyzer bus: everything the radio plays goes through
 	# it, and the spectrogram reads the ACTUAL audio
 	var bi := AudioServer.get_bus_index("RadioFX")
@@ -611,6 +631,7 @@ func _process(d: float) -> void:
 		gx = gx.normalized()
 		_dish_pivot.global_transform.basis = Basis(gx,
 			gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
+	_update_beam(d)
 	# a discharged control coil silences the set COMPLETELY
 	if has_coil and coil_node != null and is_instance_valid(coil_node) \
 			and coil_node.buf <= 0.0:
@@ -619,6 +640,58 @@ func _process(d: float) -> void:
 		if _hiss.playing:
 			_hiss.stop()
 		_cur_station = -1
+
+## The wave off the dish: pitch picks the colour, loudness picks the
+## glow (beats flare it), quiet fades it toward transparent, and it
+## launches EXACTLY from the dish along the aim.
+func _update_beam(delta: float) -> void:
+	if _beam == null or _beam_mesh == null:
+		return
+	var active: bool = _talk != null and _talk.playing and _an != null
+	var loud := 0.0
+	var hue := _beam_hue
+	if active:
+		var mags: Array = []
+		var total := 0.0
+		for bnd in [[60.0, 250.0], [250.0, 700.0], [700.0, 1600.0], [1600.0, 4200.0]]:
+			var mg: float = _an.get_magnitude_for_frequency_range(
+				float(bnd[0]), float(bnd[1])).length()
+			mags.append(mg)
+			total += mg
+		loud = clampf(total * 6.0, 0.0, 1.0)
+		if total > 0.0005:
+			var cent := 0.0
+			for k in 4:
+				cent += float(mags[k]) * float(k)
+			hue = lerpf(0.02, 0.75, clampf(cent / (total * 3.0), 0.0, 1.0))
+	_beam_env = maxf(loud, _beam_env - delta * 1.5)
+	_beam_hue = lerpf(_beam_hue, hue, minf(1.0, delta * 6.0))
+	_beam_t += delta
+	_beam_mesh.clear_surfaces()
+	if not active or _beam_env < 0.03:
+		return
+	var dirn := aim_dir.normalized()
+	var origin: Vector3 = _dish_pivot.global_position + dirn * 0.55
+	var side := dirn.cross(global_transform.basis.y)
+	if side.length() < 0.05:
+		side = dirn.cross(global_transform.basis.x)
+	side = side.normalized()
+	var upb := side.cross(dirn).normalized()
+	var col := Color.from_hsv(_beam_hue, 0.85, 1.0)
+	_beam_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	for i in 41:
+		var t := float(i) / 40.0
+		var swell := sin(PI * minf(t * 3.0, 1.0))   # eases out of the feed
+		var wob := sin(t * 26.0 - _beam_t * 14.0) \
+			* (0.1 + 0.45 * _beam_env) * swell
+		var p := origin + dirn * (t * 9.0) + upb * wob
+		var a := (1.0 - t) * (0.1 + 0.55 * _beam_env)
+		var w := 0.05 + 0.09 * _beam_env * (1.0 - t * 0.6)
+		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
+		_beam_mesh.surface_add_vertex(p - side * w)
+		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
+		_beam_mesh.surface_add_vertex(p + side * w)
+	_beam_mesh.surface_end()
 
 func info_text() -> String:
 	var act := ""
