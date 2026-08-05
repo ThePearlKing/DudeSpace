@@ -142,13 +142,16 @@ func build(b, dir: Vector3) -> void:
 			# to dead-end on a corridor roof) and their FLOOR (the drop
 			# chute to story two continues straight down)
 			var at_cross := i == 0
+			# the two rings CROSS at the mouth and the antipode: those
+			# segments drop both side walls -- real 4-way intersections
+			var junction := i == 0 or i == NS / 2
 			# apartments EVERYWHERE: every other segment, alternating sides
 			var pod_side := 0
 			if (i % 2 == 1) and not near_mouth:
 				pod_side = 1 if (i / 2) % 2 == 0 else -1
 			_tube_seg(C + pdir * r1, pdir, tang, 2.0 * PI * r1 / float(NS) + 0.8,
-				_wallc(), accent, pod_side, at_cross, at_cross)
-			if pod_side != 0:
+				_wallc(), accent, 2 if junction else pod_side, at_cross, at_cross)
+			if pod_side != 0 and not junction:
 				_apartment(C, pdir, tang, r1, accent, pod_side)
 	# STORY TWO: one ring, four cafeteria halls at the diagonals
 	for i in NS:
@@ -238,9 +241,13 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 	elif not open_top:
 		parts.append([Vector3(5.6, 0.5, ln), Vector3(0, 2.2, 0)])
 	# apartment segments get a real DOORWAY, not a missing wall: two
-	# flanks, a header, and a glowing frame around a 1.8m opening
+	# flanks, a header, and a glowing frame around a 1.8m opening.
+	# open_side == 2 is a JUNCTION: both walls gone so the crossing
+	# ring is walkable straight through -- the + turns at the +.
 	for wsgn in [-1, 1]:
-		if open_side == wsgn:
+		if open_side == 2:
+			continue
+		elif open_side == wsgn:
 			var dfl := (ln - 1.8) * 0.5
 			parts.append([Vector3(0.4, 4.9, dfl),
 				Vector3(2.8 * float(wsgn), 0, (1.8 + dfl) * 0.5)])
