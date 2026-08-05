@@ -1079,11 +1079,15 @@ class NuclearReactor extends Machine:
 			+ (_fuel / FUEL_SECS) * 1.5) * yield_scale, 0.7, 4.0)
 		Sfx.play("nuke", 4.0)
 		Game.anger(30.0)   # splitting atoms was ALREADY pushing it
-		# the cloud, scaled to the sin
-		var up9 := (here - Universe.nearest(here).center).normalized()
+		# the cloud, scaled to the sin. A reactor inside a HOUSE melts
+		# down in a pocket dimension -- the cloud (and the funeral shot)
+		# erupt at the house's real spot on the planet outside, where
+		# there is actually a sky to ruin.
+		var vis9: Vector3 = Zones.exterior_of(here)
+		var up9 := (vis9 - Universe.nearest(vis9).center).normalized()
 		var mc := MushroomCloud.new()
 		get_parent().add_child(mc)
-		mc.global_position = here
+		mc.global_position = vis9 + up9 * 1.5
 		mc.setup(y, up9)
 		# machines: slagged only up CLOSE; the middle ring is shrapnel
 		# roulette; beyond that they keep their jobs
