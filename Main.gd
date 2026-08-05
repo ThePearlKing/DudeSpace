@@ -2494,6 +2494,7 @@ func _populate(b) -> void:
 				add_child(an)
 				var ad := _surface_dir()
 				an.global_position = b.center + ad * (b.radius + 1.5)
+				_varnisolify(an)
 		"crystal":
 			# ultima crystals: guarded, far, worth the trip
 			for i in 22:
@@ -4952,6 +4953,82 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.34, 0.05), Vector2(0, 0.02), 0.0)
 			for pi3 in 3:
 				bar.call(Vector2(0.05, 0.24), Vector2(-0.14 + 0.14 * float(pi3), 0.16), 0.0)
+
+## Varnisol fauna is WEIRD: the gentle planet grows strange meat.
+## Every animal wears something the rest of the universe doesn't --
+## a glowing lantern stalk, forked antlers, or a moss pelt with
+## bioluminescent spots. Sometimes two of those.
+func _varnisolify(an: Animal) -> void:
+	var picks: Array = [randi() % 3]
+	if randf() < 0.35:
+		picks.append((int(picks[0]) + 1 + randi() % 2) % 3)
+	for pick in picks:
+		match int(pick):
+			0:
+				# lantern stalk: anglerfish of the pines
+				var stalk := MeshInstance3D.new()
+				var stm := CylinderMesh.new()
+				stm.top_radius = 0.03
+				stm.bottom_radius = 0.05
+				stm.height = 0.9
+				stalk.mesh = stm
+				stalk.material_override = Destructible.make_material(Color("#3a4a3a"), 0.1)
+				stalk.position = Vector3(0, 1.15, 0)
+				stalk.rotation_degrees = Vector3(randf_range(-14, 14), 0, randf_range(-14, 14))
+				an.add_child(stalk)
+				var bulb := MeshInstance3D.new()
+				var blm := SphereMesh.new()
+				blm.radius = 0.15
+				blm.height = 0.3
+				bulb.mesh = blm
+				bulb.material_override = Destructible.make_material(Color("#8fffe0"), 2.4)
+				bulb.position = Vector3(0, 0.52, 0)
+				stalk.add_child(bulb)
+			1:
+				# forked antlers, asymmetric on purpose
+				for side in [-1.0, 1.0]:
+					var beam := MeshInstance3D.new()
+					var bem := CylinderMesh.new()
+					bem.top_radius = 0.025
+					bem.bottom_radius = 0.05
+					bem.height = randf_range(0.55, 0.85)
+					beam.mesh = bem
+					beam.material_override = Destructible.make_material(Color("#6a5138"), 0.1)
+					beam.position = Vector3(side * 0.22, 0.95, -0.1)
+					beam.rotation_degrees = Vector3(randf_range(-20, 5), 0, side * randf_range(24, 40))
+					an.add_child(beam)
+					for tn in 2:
+						var tine := MeshInstance3D.new()
+						var tnm := CylinderMesh.new()
+						tnm.top_radius = 0.012
+						tnm.bottom_radius = 0.028
+						tnm.height = randf_range(0.25, 0.4)
+						tine.mesh = tnm
+						tine.material_override = beam.material_override
+						tine.position = Vector3(0, 0.1 + 0.22 * float(tn), 0)
+						tine.rotation_degrees = Vector3(0, 0, side * randf_range(30, 55))
+						beam.add_child(tine)
+			2:
+				# moss pelt with glow spots: the forest claims its own
+				for mi2 in 3:
+					var moss := MeshInstance3D.new()
+					var mm2 := BoxMesh.new()
+					mm2.size = Vector3(randf_range(0.3, 0.55), 0.08, randf_range(0.3, 0.5))
+					moss.mesh = mm2
+					moss.material_override = Destructible.make_material(Color("#2f5a30"), 0.15)
+					moss.position = Vector3(randf_range(-0.25, 0.25), 0.75 + randf_range(0.0, 0.15),
+						randf_range(-0.3, 0.3))
+					moss.rotation_degrees.y = randf() * 360.0
+					an.add_child(moss)
+				for gi in 2:
+					var spot := MeshInstance3D.new()
+					var spm2 := SphereMesh.new()
+					spm2.radius = 0.05
+					spm2.height = 0.1
+					spot.mesh = spm2
+					spot.material_override = Destructible.make_material(Color("#a0ff6a"), 2.0)
+					spot.position = Vector3(randf_range(-0.3, 0.3), 0.72, randf_range(-0.3, 0.3))
+					an.add_child(spot)
 
 ## A seeded random surface direction (deterministic geology).
 func _h_dir(r: RandomNumberGenerator) -> Vector3:
