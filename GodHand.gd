@@ -13,6 +13,58 @@ var _lbl: Label3D
 var _fingers: Array = []
 var _thrown := false
 var _outdir := Vector3.ZERO
+var _mat_skin: ShaderMaterial
+var _mat_nail: ShaderMaterial
+
+## Reality-tear materialization: noise-dissolve with a glowing seam at
+## the front where the hand is currently BECOMING, unphased regions
+## shivering like bad reception.
+const _PHASE_SH := """
+shader_type spatial;
+uniform vec4 base : source_color;
+uniform float phase = 0.0;
+varying vec3 vpos;
+float hash3(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float vnoise(vec3 p){
+	vec3 i = floor(p); vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x);
+	float b = mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x);
+	float c = mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x);
+	float d = mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x);
+	return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
+}
+float fbm(vec3 p){
+	float v = 0.0; float amp = 0.55;
+	for (int i = 0; i < 4; i++){ v += vnoise(p) * amp; p *= 2.1; amp *= 0.5; }
+	return v;
+}
+void vertex(){
+	vpos = VERTEX;
+	float shiver = vnoise(VERTEX * 0.5 + vec3(TIME * 3.0));
+	VERTEX += NORMAL * (1.0 - clamp(phase, 0.0, 1.0)) * shiver * 1.8;
+}
+void fragment(){
+	float n = fbm(vpos * 0.32);
+	float edge = clamp(phase, 0.0, 1.0) * 1.18;
+	if (n > edge) { discard; }
+	float rim = smoothstep(edge - 0.14, edge, n) * step(phase, 0.999);
+	ALBEDO = base.rgb;
+	ROUGHNESS = 0.65;
+	vec3 tear = mix(vec3(0.25, 0.9, 1.0), vec3(0.8, 0.3, 1.0),
+		0.5 + 0.5 * sin(TIME * 7.0 + vpos.y * 0.25));
+	EMISSION = tear * rim * (2.6 + 2.0 * sin(TIME * 21.0 + vpos.x * 0.4));
+}
+"""
+
+func _phase_mat(c: Color) -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = _PHASE_SH
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("base", c)
+	m.set_shader_parameter("phase", 0.0)
+	return m
 
 func begin(victim: Node3D, target: Vector3) -> void:
 	_victim = victim
@@ -38,12 +90,10 @@ func begin(victim: Node3D, target: Vector3) -> void:
 func _build_hand() -> void:
 	_hand = Node3D.new()
 	add_child(_hand)
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color("#d9b08a")
-	skin.roughness = 0.65
-	var nail := StandardMaterial3D.new()
-	nail.albedo_color = Color("#efdcc8")
-	nail.roughness = 0.35
+	_mat_skin = _phase_mat(Color("#d9b08a"))
+	_mat_nail = _phase_mat(Color("#efdcc8"))
+	var skin := _mat_skin
+	var nail := _mat_nail
 	var palm := MeshInstance3D.new()
 	var pm := BoxMesh.new()
 	pm.size = Vector3(26.0, 30.0, 7.5)
@@ -153,6 +203,11 @@ func _process(delta: float) -> void:
 		for fset in _fingers:
 			for si in (fset as Array).size():
 				((fset as Array)[si] as Node3D).rotation.x = -kk * (0.35 + 0.2 * float(si))
+		# the hand PHASES INTO REALITY as it closes the distance --
+		# noise-dissolve seam crawling across it, static shiver on the
+		# not-yet-real parts
+		_mat_skin.set_shader_parameter("phase", kk)
+		_mat_nail.set_shader_parameter("phase", kk)
 		if k >= 1.0:
 			_thrown = true
 			var back := (_target - _victim.global_position).normalized()
@@ -166,6 +221,9 @@ func _process(delta: float) -> void:
 		_hand.global_position += (_target - global_position).normalized() \
 			* 320.0 * delta * sw
 		if _t > 2.6:
-			_hand.scale = Vector3.ONE * maxf(0.001, 1.0 - (_t - 2.6) / 1.6)
+			# it leaves the way it came: dissolving back out of reality
+			var ph := maxf(0.0, 1.0 - (_t - 2.6) / 1.6)
+			_mat_skin.set_shader_parameter("phase", ph)
+			_mat_nail.set_shader_parameter("phase", ph)
 	if _t > 5.2:
 		queue_free()
