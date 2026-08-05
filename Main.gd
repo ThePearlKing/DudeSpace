@@ -1021,6 +1021,12 @@ func _update_bgm(delta: float) -> void:
 					and r.global_position.distance_to(_player.global_position) < 45.0:
 				radio_hot = true
 				break
+	if _bgm.stream_paused:
+		# the radio walked out of earshot: the song comes back mid-note
+		if not radio_hot:
+			_bgm.volume_db = -34.0
+			_bgm.stream_paused = false
+		return
 	if _bgm.playing:
 		# songs breathe: ~3s fade-in, ~4s fade-out at the natural end
 		var want_db := -8.0
@@ -1034,7 +1040,8 @@ func _update_bgm(delta: float) -> void:
 			want_db = -40.0
 		_bgm.volume_db = lerpf(_bgm.volume_db, want_db, minf(1.0, delta * 2.5))
 		if radio_hot and _bgm.volume_db < -38.0:
-			_bgm.stop()   # fully faded: give the track back later
+			_bgm.stream_paused = true   # HOLD the song -- it resumes where
+			# it was when you leave the radio's range
 		return
 	if radio_hot:
 		return
