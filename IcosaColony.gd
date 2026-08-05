@@ -563,12 +563,23 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		tb.position = Vector3(0, -1.9, -4.5 + 4.5 * float(ti))
 		tb.material_override = Surfaces.metal(Color("#3a4254"))
 		body.add_child(tb)
+		# hanging FIXTURE: cord from the ceiling, smaller shade -- they
+		# read as lamps now, not mystery spheres over dinner
+		var cord := MeshInstance3D.new()
+		var cdm := CylinderMesh.new()
+		cdm.top_radius = 0.03
+		cdm.bottom_radius = 0.03
+		cdm.height = 0.7
+		cord.mesh = cdm
+		cord.position = Vector3(0, 2.55, -4.5 + 4.5 * float(ti))
+		cord.material_override = Surfaces.metal(Color("#22262e"))
+		body.add_child(cord)
 		var orb := MeshInstance3D.new()
 		var om := SphereMesh.new()
-		om.radius = 0.4
-		om.height = 0.8
+		om.radius = 0.26
+		om.height = 0.52
 		orb.mesh = om
-		orb.position = Vector3(0, 1.8, -4.5 + 4.5 * float(ti))
+		orb.position = Vector3(0, 2.1, -4.5 + 4.5 * float(ti))
 		orb.material_override = Destructible.make_material(accent, 2.6)
 		body.add_child(orb)
 	for ri in 3:
@@ -756,9 +767,18 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 		"var": randf_range(0.1, 0.5),
 		"wave": ["sine", "square", "saw"][randi() % 3],
 		"rate": randf_range(0.9, 1.5), "artic": randf_range(1.3, 2.0)}
+	var shell := _ResShell.new()
+	shell.colony = self
+	shell.ridx = _residents.size()
+	var shc := CollisionShape3D.new()
+	var shs := SphereShape3D.new()
+	shs.radius = 0.7
+	shc.shape = shs
+	shell.add_child(shc)
+	a.add_child(shell)
 	_residents.append({"node": a, "base": at, "phase": randf() * TAU,
 		"lbl": lbl, "lines": lines, "line_i": randi() % lines.size(), "up": up,
-		"voice": prof, "full": "", "say": null})
+		"voice": prof, "full": "", "say": null, "flash": 0.0})
 
 func _process(delta: float) -> void:
 	# residents bob gently, always
@@ -769,6 +789,13 @@ func _process(delta: float) -> void:
 			nd.global_position = (r["base"] as Vector3) \
 				+ (r["up"] as Vector3) * sin(t * 0.9 + float(r["phase"])) * 0.18
 			nd.rotate_object_local(Vector3.UP, delta * 0.4)
+			# hit flash rides the fluid shader's amp, then settles
+			if float(r.get("flash", 0.0)) > 0.0:
+				r["flash"] = maxf(0.0, float(r["flash"]) - delta)
+				var fm9 = (nd as MeshInstance3D).material_override
+				if fm9 is ShaderMaterial:
+					(fm9 as ShaderMaterial).set_shader_parameter("amp",
+						1.0 + float(r["flash"]) * 45.0)
 			# the name text hangs along GRAVITY's up, explicitly -- not
 			# whatever +Y the parent happens to think it has
 			var lb9: Label3D = r["lbl"]
@@ -861,6 +888,71 @@ func _wise_line() -> String:
 		else:
 			fills.append(RadioLib.AP_VERDICTS[randi() % RadioLib.AP_VERDICTS.size()])
 	return t % fills
+
+## Bullets treat residents like the news desk treats them: deflected
+## with a ping, a flash of the fluid glow, a voice jitter, and -- if
+## you keep it up -- commentary.
+class _ResShell extends StaticBody3D:
+	var colony = null
+	var ridx := -1
+	func destroy(_push: Vector3) -> void:
+		if colony != null:
+			colony.resident_hit(ridx)
+
+const RES_OW := ["ow. statistically.",
+	"we felt that in dimensions you don't rent.",
+	"this is a RESIDENCE. the news desk gets paid for that. we don't.",
+	"noted. forever.",
+	"the soup will remember this.",
+	"violence. in MY apartment ring. bold.",
+	"your bullet has been recycled into an opinion."]
+
+var _ping_wav: AudioStreamWAV = null
+
+func _colony_ping(at: Vector3) -> void:
+	if _ping_wav == null:
+		var n9 := int(0.14 * 22050)
+		var bytes := PackedByteArray()
+		bytes.resize(n9 * 2)
+		for i in n9:
+			var t := float(i) / 22050.0
+			var v := (sin(TAU * 1900.0 * t) * 0.5 + sin(TAU * 2640.0 * t) * 0.35) \
+				* exp(-t * 26.0)
+			bytes.encode_s16(i * 2, int(clampf(v, -1.0, 1.0) * 22000.0))
+		_ping_wav = AudioStreamWAV.new()
+		_ping_wav.format = AudioStreamWAV.FORMAT_16_BITS
+		_ping_wav.mix_rate = 22050
+		_ping_wav.data = bytes
+	var p := AudioStreamPlayer3D.new()
+	p.stream = _ping_wav
+	add_child(p)
+	p.global_position = at
+	p.play()
+	p.finished.connect(p.queue_free)
+
+func resident_hit(i: int) -> void:
+	if i < 0 or i >= _residents.size():
+		return
+	var r: Dictionary = _residents[i]
+	var nd = r.get("node")
+	if nd == null or not is_instance_valid(nd):
+		return
+	_colony_ping((nd as Node3D).global_position)
+	r["flash"] = 0.15
+	var sp = r.get("say")
+	if sp != null and is_instance_valid(sp) and sp.playing:
+		sp.pitch_scale = randf_range(0.55, 1.7)
+		get_tree().create_timer(0.06).timeout.connect(func() -> void:
+			if is_instance_valid(sp):
+				sp.pitch_scale = 1.0)
+	if randf() < 0.35 and not _cooking_say:
+		var line := str(RES_OW[randi() % RES_OW.size()])
+		r["full"] = line
+		var prof: Dictionary = r["voice"]
+		_cooking_say = true
+		WorkerThreadPool.add_task(func() -> void:
+			var w = HumanVoice.render(line, prof)
+			_say_ready.call_deferred(r, w))
 
 var _cooking_say := false
 
