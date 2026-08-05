@@ -16,23 +16,6 @@ class Body:
 
 var bodies: Array = []
 var world_scale: float = 1.0
-var _harold_ang := 0.0
-
-## Harold circles TIN 618: one slow doomed lap every 20 minutes. The
-## body's center AND its built node move together; gravity, radio and
-## the map all read center per-frame so they follow for free.
-func _process(delta: float) -> void:
-	var bh := body_named("TIN 618")
-	var gr := body_named("Harold")
-	if bh == null or gr == null:
-		return
-	_harold_ang += delta * (TAU / 1200.0)
-	# 11600m out: just past the dilation influence (10 x radius = 11000),
-	# so standing on Harold does NOT slow your clock. barely. he likes it
-	gr.center = bh.center + Vector3(cos(_harold_ang),
-		0.1 * sin(_harold_ang * 2.0), sin(_harold_ang)) * 11600.0 * world_scale
-	if gr.node != null and is_instance_valid(gr.node):
-		gr.node.global_position = gr.center
 
 var BOUNDARY := 95000.0   # edge of the universe; cross it and the god throws you back
 
@@ -75,8 +58,9 @@ func _ready() -> void:
 	_def("Crystalia",Vector3(-9000, 4000, -8000),90.0,  9.0,  "crystal",   Color("#40e0d0"))
 	# --- TIN 618: a black hole. Extreme pull, endless fall, time dilation. ---
 	_def("TIN 618",  Vector3(40000, -3000, 34000), 1100.0, 80.0, "blackhole", Color("#000000"))
-	# Harold: a tired old rock ORBITING the black hole. He's fine.
-	_def("Harold",   Vector3(40000 + 11600, -3000, 34000), 44.0, 6.5, "mercury", Color("#8f8377"))
+	# Harold: a tired old rock parked beside the black hole, 11600m out --
+	# just past the 11000m dilation edge. Big enough to LAND on. He's fine.
+	_def("Harold",   Vector3(40000 + 11600, -3000, 34000), 130.0, 8.0, "mercury", Color("#8f8377"))
 	# --- the ACTUAL Sol system. Yes, that one. Far out in -X, long haul. ---
 	var SC := Vector3(-52000, 3000, 14000)   # Sol system centre
 	_def("Sol",      SC,                          420.0, 26.0, "sun",     Color("#fff4d6"))
