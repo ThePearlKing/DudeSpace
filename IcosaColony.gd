@@ -77,6 +77,7 @@ func _wallc() -> Color:
 
 func build(b, dir: Vector3, roll_deg: float = 0.0) -> void:
 	_b = b
+	add_to_group("icosa_colony")
 	_style = str(b.kind)
 	_mouth_dir = dir.normalized()
 	_roll = deg_to_rad(roll_deg)
@@ -933,16 +934,19 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 ## (one SubViewport for the WHOLE colony, proximity-gated) or a
 ## procedural test-pattern channel. It only renders with someone there.
 func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
-	# a proper wall television: dark frame flat on the wall, big screen
+	# a proper wall television: THIN GLOWING frame with 45-degree
+	# chamfered corners (one seamless octagonal plate), big screen
 	# facing INTO the room. yaw spins the whole set around local up.
+	var tvroot := Node3D.new()
+	body.add_child(tvroot)
+	tvroot.position = at
+	tvroot.rotation_degrees = Vector3(0, yaw_deg, 0)
 	var frame := MeshInstance3D.new()
-	var fbm := BoxMesh.new()
-	fbm.size = Vector3(0.1, 1.05, 1.65)
-	frame.mesh = fbm
-	frame.position = at
-	frame.rotation_degrees = Vector3(0, yaw_deg, 0)
-	frame.material_override = Surfaces.metal(Color("#14171c"))
-	body.add_child(frame)
+	frame.mesh = _cham_mesh(1.06, 0.08, 1.66, 0.14)
+	frame.rotation_degrees = Vector3(0, 0, 90)
+	frame.material_override = Destructible.make_material(
+		(_b.color as Color) if _b != null else Color("#33ff99"), 1.8)
+	tvroot.add_child(frame)
 	var scr := MeshInstance3D.new()
 	var qm := QuadMesh.new()
 	qm.size = Vector2(1.5, 0.9)
@@ -988,7 +992,7 @@ void fragment(){
 		var sm2 := ShaderMaterial.new()
 		sm2.shader = sh
 		scr.material_override = sm2
-	frame.add_child(scr)
+	tvroot.add_child(scr)
 
 var _tv_vp: SubViewport = null
 var _tv_cam: Camera3D = null
@@ -1074,21 +1078,6 @@ func _process(delta: float) -> void:
 			var lb9: Label3D = r["lbl"]
 			if is_instance_valid(lb9):
 				lb9.global_position = nd.global_position + (r["up"] as Vector3) * 1.1
-	# COLONY CCTV: with someone in the colony the shared TV camera stops
-	# watching the news room and watches YOU -- hovering beside the
-	# player, upright in the planet's gravity. Updated per frame so the
-	# picture tracks smoothly.
-	if _tv_cam != null and _b != null and _pcache != null \
-			and is_instance_valid(_pcache):
-		var ppos9: Vector3 = _pcache.global_position
-		if ppos9.distance_to(_b.center) < float(_b.radius) + 4.0:
-			var up9: Vector3 = (ppos9 - (_b.center as Vector3)).normalized()
-			var east9: Vector3 = up9.cross(Vector3(0, 0, 1))
-			if east9.length() < 0.01:
-				east9 = up9.cross(Vector3(1, 0, 0))
-			east9 = east9.normalized()
-			_tv_cam.global_position = ppos9 + up9 * 1.7 + east9 * 2.4
-			_tv_cam.look_at(ppos9 + up9 * 0.55, up9)
 	# dialog: the nearest resident to the player speaks, rotating
 	# through its shuffled deck. checked at 5Hz, not per frame.
 	_dialog_t -= delta

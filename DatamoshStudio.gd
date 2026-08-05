@@ -792,11 +792,21 @@ func _drive_tv(delta: float, p: Node3D) -> void:
 				_tv_cam.look_at(_human_target.global_position, up)
 				_tv_cam.fov = lerpf(_tv_cam.fov, 22.0, delta * 0.8)
 		"player":
+			# the surveillance shot: not a view of the news room anymore.
+			# A camera hangs metres ABOVE the dude, wherever they are,
+			# upright in whatever gravity owns them
 			if p != null:
-				var orb := _t * 0.5
-				_tv_cam.global_position = POS + Vector3(cos(orb) * 6.0,
-					1.0 + sin(_t * 0.7) * 1.2, sin(orb) * 5.0)
-				_tv_cam.look_at(p.global_position + Vector3(0, 0.8, 0), Vector3.UP)
-				_tv_cam.fov = 42.0 + 18.0 * sin(_t * 0.35)
+				var b9 = Universe.nearest(p.global_position)
+				var up9 := Vector3.UP
+				if b9 != null:
+					up9 = (p.global_position - (b9.center as Vector3)).normalized()
+				var east9: Vector3 = up9.cross(Vector3(0, 0, 1))
+				if east9.length() < 0.01:
+					east9 = up9.cross(Vector3(1, 0, 0))
+				east9 = east9.normalized()
+				_tv_cam.global_position = p.global_position \
+					+ up9 * (7.0 + 1.5 * sin(_t * 0.4)) + east9 * 1.4
+				_tv_cam.look_at(p.global_position + up9 * 0.4, east9)
+				_tv_cam.fov = 42.0 + 8.0 * sin(_t * 0.35)
 		_:
 			pass

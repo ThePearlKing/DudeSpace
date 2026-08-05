@@ -1432,6 +1432,19 @@ const AP_FOURTH_TV := [
 		"important: Harold, by TIN 618. the monument remembers what fits in it.",
 		"and that is genuinely all we know. it scares us too."]]
 
+## the DISH version of the Harold tip: rushed, unencrypted channel,
+## zero explanation -- they just blurt the name and move on
+const AP_FOURTH_DISH := [
+	["no time. dish person: Harold. go to Harold.",
+		"he means the little planet by the big hole. that's it. that's the message.",
+		"back to the weather."],
+	["decoder, quick, before the beam drifts: HAROLD.",
+		"no, we cannot explain over an unencrypted dish. Harold.",
+		"moving on."],
+	["to the dish: Harold. write it down. H-A-R-O-L-D.",
+		"why? can't say. where? by the big hole. when? yes.",
+		"segment over."]]
+
 const AP_FOURTH := [
 	["instruments say someone OUTSIDE the system is decoding this signal. again.",
 		"hello, decoder. we count your clicks too.",
@@ -1820,13 +1833,20 @@ static func alien_exchange(in_room: bool = false, watched: bool = false) -> Arra
 					out = [[0, "to the dude standing in our studio: %s" % _ax_sentence(p, p2)],
 						[3, "yes, YOU, dude. the one by the sofas."],
 						[1, _ax_opinion()]]
-			elif randi() % 2 == 0:
-				var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
-				out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
 			else:
-				out = [[0, "to whoever is decoding this: %s" % _ax_sentence(p, p2)],
-					[3, "write THAT down, dish person."],
-					[1, _ax_opinion()]]
+				match randi() % 3:
+					0:
+						var fw: Array = AP_FOURTH[randi() % AP_FOURTH.size()]
+						out = [[0, str(fw[0])], [1, str(fw[1])], [3, str(fw[2])]]
+					1:
+						# the Harold tip reaches the dish too -- rushed,
+						# no explanation, name only
+						var fh: Array = AP_FOURTH_DISH[randi() % AP_FOURTH_DISH.size()]
+						out = [[0, str(fh[0])], [1, str(fh[1])], [3, str(fh[2])]]
+					_:
+						out = [[0, "to whoever is decoding this: %s" % _ax_sentence(p, p2)],
+							[3, "write THAT down, dish person."],
+							[1, _ax_opinion()]]
 		_:
 			# HUMANS: dumb, inefficient, endlessly watchable. the segment
 			# opens like a field report, not a talk-show card
