@@ -376,6 +376,63 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
 	_tv(body, Vector3(-4.5, -0.4, -3.4), Vector3(0, 180, 90))
+	# living details: rug, ceiling fixture, wall art, shelf with glow
+	# trinkets, a crystal plant -- someone LIVES here
+	var rug := MeshInstance3D.new()
+	var rugm := BoxMesh.new()
+	rugm.size = Vector3(4.6, 0.06, 3.4)
+	rug.mesh = rugm
+	rug.position = Vector3(0.4, -2.2, 0.4)
+	rug.material_override = Destructible.make_material(accent.darkened(0.55), 0.15)
+	body.add_child(rug)
+	var cl := MeshInstance3D.new()
+	var clm := CylinderMesh.new()
+	clm.top_radius = 0.7
+	clm.bottom_radius = 0.7
+	clm.height = 0.1
+	cl.mesh = clm
+	cl.position = Vector3(0, 2.15, 0)
+	cl.material_override = Destructible.make_material(Color("#f2ead8"), 1.6)
+	body.add_child(cl)
+	for ai in 2:
+		var art := MeshInstance3D.new()
+		var artm := BoxMesh.new()
+		artm.size = Vector3(0.08, 1.1, 1.4)
+		art.mesh = artm
+		art.position = Vector3(4.55, 0.4, -1.6 + 3.2 * float(ai))
+		if _style == "datamosh" and ai == 1:
+			art.rotation_degrees.x = 9.0   # one frame hangs WRONG. home.
+		art.material_override = Destructible.make_material(
+			accent.lerp(Color.WHITE, 0.25 * float(ai)), 0.7)
+		body.add_child(art)
+	for si2 in 2:
+		var shl := MeshInstance3D.new()
+		var shm2 := BoxMesh.new()
+		shm2.size = Vector3(0.3, 0.08, 2.6)
+		shl.mesh = shm2
+		shl.position = Vector3(-4.5, 0.2 + 0.9 * float(si2), 2.6)
+		shl.material_override = Surfaces.metal(Color("#3a4254"))
+		body.add_child(shl)
+		for bi3 in 2:
+			var kn2 := MeshInstance3D.new()
+			var knm2 := BoxMesh.new()
+			knm2.size = Vector3(0.2, 0.24, 0.2)
+			kn2.mesh = knm2
+			kn2.position = Vector3(-4.5, 0.36 + 0.9 * float(si2),
+				2.0 + 1.1 * float(bi3))
+			kn2.material_override = Destructible.make_material(
+				HUES[(si2 * 2 + bi3) % 4], 1.2)
+			body.add_child(kn2)
+	var plant := MeshInstance3D.new()
+	var plm2 := CylinderMesh.new()
+	plm2.top_radius = 0.0
+	plm2.bottom_radius = 0.22
+	plm2.height = 1.0
+	plm2.radial_segments = 5
+	plant.mesh = plm2
+	plant.position = Vector3(4.1, -1.9, -4.1)
+	plant.material_override = Destructible.make_material(accent, 0.9)
+	body.add_child(plant)
 	_spawn_resident(room_c + pdir * 0.4, pdir)
 
 ## A cafeteria hall: double-height, long tables, hanging light orbs,
@@ -433,6 +490,33 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		cs.shape = bs
 		cs.position = spec[1]
 		body.add_child(cs)
+	# serving counter along one wall, bowls of something luminous
+	var cnt := MeshInstance3D.new()
+	var cntm := BoxMesh.new()
+	cntm.size = Vector3(2.0, 1.1, 12.0)
+	cnt.mesh = cntm
+	cnt.position = Vector3(6.4, -2.4, 0)
+	cnt.material_override = Surfaces.metal(Color("#454e62"))
+	body.add_child(cnt)
+	for bw in 4:
+		var bwl := MeshInstance3D.new()
+		var bwm := SphereMesh.new()
+		bwm.radius = 0.34
+		bwm.height = 0.34
+		bwm.is_hemisphere = true
+		bwl.mesh = bwm
+		bwl.position = Vector3(6.4, -1.82, -4.5 + 3.0 * float(bw))
+		bwl.material_override = Destructible.make_material(
+			HUES[bw % 4].lightened(0.2), 1.4)
+		body.add_child(bwl)
+	for wy in 2:
+		var stripe := MeshInstance3D.new()
+		var stm2 := BoxMesh.new()
+		stm2.size = Vector3(0.08, 0.16, 15.2)
+		stripe.mesh = stm2
+		stripe.position = Vector3(-7.7, -1.0 + 2.4 * float(wy), 0)
+		stripe.material_override = Destructible.make_material(accent, 1.5)
+		body.add_child(stripe)
 	for ti in 3:
 		var tb := MeshInstance3D.new()
 		var tbm := BoxMesh.new()
