@@ -193,6 +193,8 @@ func _ready() -> void:
 		_radio_test()
 	if OS.get_environment("CTD_TEST") == "21":
 		_nuke_test()
+	if OS.get_environment("CTD_TEST") == "22":
+		_dish_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -523,6 +525,34 @@ func _repopulate() -> void:
 ## Headless: spawn a powered radio, aim at station 0, verify sound flow.
 ## CTD_TEST=21: force a meltdown next to the player, die, and report
 ## WHICH camera is live + where it looks for the funeral shot.
+## CTD_TEST=22: watch a freshly-restored radio's dish for the startup
+## ratchet -- sample a rim point at 50ms and print every jump.
+func _dish_test() -> void:
+	await get_tree().process_frame
+	await get_tree().create_timer(1.0).timeout
+	var r := RadioTower.new()
+	add_child(r)
+	r.set_meta("placed_id", "radio")
+	var b = Universe.nearest(_player.global_position)
+	var up: Vector3 = (_player.global_position - b.center).normalized()
+	r.global_transform = Transform3D(_basis_from_up(up),
+		_player.global_position + _player.global_transform.basis.x * 4.0)
+	# mimic the restore path: aim + track arrive a beat later
+	await get_tree().create_timer(0.3).timeout
+	r.aim_dir = (Universe.body_named("Circuitia").center - r.global_position).normalized()
+	r.track_body = Universe.body_named("Circuitia")
+	var last := Vector3.INF
+	for i in 60:
+		await get_tree().create_timer(0.05).timeout
+		if not is_instance_valid(r) or r._dish_pivot == null:
+			break
+		var rim: Vector3 = r._dish_pivot.global_transform * Vector3(0, 0, -0.85)
+		if last != Vector3.INF and rim.distance_to(last) > 0.004:
+			print("DISHTEST t=%.2f jump=%.4f rim=%v pivot=%v" % [float(i) * 0.05,
+				rim.distance_to(last), rim, r._dish_pivot.global_position])
+		last = rim
+	print("DISHTEST done")
+
 func _nuke_test() -> void:
 	await get_tree().process_frame
 	await get_tree().create_timer(2.0).timeout
