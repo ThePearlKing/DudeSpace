@@ -397,7 +397,10 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		accent: Color, sgn: int = 1) -> void:
 	var side := pdir.cross(tang).normalized() * float(sgn)
 	var room_c := C + pdir * r1 + side * 7.8
-	var bas := Basis(side, pdir, tang).orthonormalized()
+	# tang flips WITH the side: keeps the basis right-handed on both
+	# sides of the corridor. A mirrored (negative-det) basis renders
+	# every screen and subtitle in the pod as a mirror image.
+	var bas := Basis(side, pdir, tang * float(sgn)).orthonormalized()
 	var body := StaticBody3D.new()
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
