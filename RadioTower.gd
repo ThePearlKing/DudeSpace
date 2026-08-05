@@ -49,6 +49,7 @@ var _beam_t := 0.0
 var _beam_prev := 0.0           # slow loudness average (beat reference)
 var _beam_flash := 0.0          # sudden-burst flash: pops on beats
 var _beam_rate := 0.0           # rebuild accumulator (30Hz cap)
+var _aim_warm := 0.0            # seconds since _ready (snap aim during warmup)
 var _sauce_seen: float = -99.0
 var _good_t: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
@@ -637,8 +638,14 @@ func _process(d: float) -> void:
 		# reference axis between two branches in a single frame -- the
 		# dish visibly 'nudged an inch' and froze. Now it sweeps.
 		var want_b := Basis(gx, gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
+		# the first second is CONSTRUCTION: the saved aim arrives a few
+		# frames after _ready, and easing into it looked like the dish
+		# sliding backwards off its rest pose at every game start. Snap
+		# during warmup, sweep forever after.
+		_aim_warm += d
+		var wgt := 1.0 if _aim_warm < 1.0 else minf(1.0, d * 7.0)
 		_dish_pivot.global_transform.basis = _dish_pivot.global_transform.basis \
-			.orthonormalized().slerp(want_b, minf(1.0, d * 7.0))
+			.orthonormalized().slerp(want_b, wgt)
 	_update_beam(d)
 	# a discharged control coil silences the set COMPLETELY
 	if has_coil and coil_node != null and is_instance_valid(coil_node) \
