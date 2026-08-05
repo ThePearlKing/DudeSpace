@@ -46,6 +46,8 @@ var _beam_mesh: ImmediateMesh
 var _beam_env := 0.0            # beat envelope: snaps up, decays slow
 var _beam_hue := 0.1
 var _beam_t := 0.0
+var _beam_prev := 0.0           # slow loudness average (beat reference)
+var _beam_flash := 0.0          # sudden-burst flash: pops on beats
 var _sauce_seen: float = -99.0
 var _good_t: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
@@ -663,9 +665,16 @@ func _update_beam(delta: float) -> void:
 			var cent := 0.0
 			for k in 4:
 				cent += float(mags[k]) * float(k)
-			hue = lerpf(0.02, 0.75, clampf(cent / (total * 3.0), 0.0, 1.0))
+			# gamma-spread the centroid so ordinary pitch movement sweeps
+			# a WIDE hue range instead of hovering in the middle
+			hue = lerpf(0.0, 0.85, pow(clampf(cent / (total * 3.0), 0.0, 1.0), 0.65))
+	# BEATS: a sudden jump over the rolling average fires a flash
+	if loud - _beam_prev > 0.09:
+		_beam_flash = 1.0
+	_beam_prev = lerpf(_beam_prev, loud, minf(1.0, delta * 8.0))
+	_beam_flash = maxf(0.0, _beam_flash - delta * 3.5)
 	_beam_env = maxf(loud, _beam_env - delta * 1.5)
-	_beam_hue = lerpf(_beam_hue, hue, minf(1.0, delta * 6.0))
+	_beam_hue = lerpf(_beam_hue, hue, minf(1.0, delta * 18.0))
 	_beam_t += delta
 	_beam_mesh.clear_surfaces()
 	if not active or _beam_env < 0.03:
@@ -682,14 +691,18 @@ func _update_beam(delta: float) -> void:
 		side = dirn.cross(global_transform.basis.y)
 	side = side.normalized()
 	var col := Color.from_hsv(_beam_hue, 0.85, 1.0)
+	# beat flash: the whole wave brightens past white-hot (additive bloom)
+	var glow9 := 1.0 + 2.2 * _beam_flash
+	col = Color(col.r * glow9, col.g * glow9, col.b * glow9)
 	_beam_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for i in 121:
 		var t := float(i) / 120.0
 		# one clean THIN sine, full amplitude the whole 40 meters
-		var wob := sin(t * 110.0 - _beam_t * 14.0) * (0.12 + 0.35 * _beam_env)
+		var wob := sin(t * 110.0 - _beam_t * 14.0) \
+			* (0.12 + 0.35 * _beam_env + 0.3 * _beam_flash)
 		var p := origin + dirn * (t * 40.0) + side * wob
-		var a := (1.0 - t) * (0.1 + 0.55 * _beam_env)
-		var w := 0.03
+		var a := (1.0 - t) * (0.1 + 0.5 * _beam_env + 0.35 * _beam_flash)
+		var w := 0.03 + 0.05 * _beam_flash
 		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
 		_beam_mesh.surface_add_vertex(p - side * w)
 		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
