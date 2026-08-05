@@ -2357,6 +2357,29 @@ func _populate(b) -> void:
 					lsh.rotate_object_local(Vector3.BACK, hrng.randf_range(-0.5, 0.5))
 					lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
 						hrng.randf_range(-2.2, 2.2))
+			# MESA BIOME: rarer, on the far side from the spikes -- a
+			# handful of huge flat-topped towers of terrain
+			var mesa_dir: Vector3 = -spike_dir
+			for i in _n(6):
+				var mdir: Vector3 = (mesa_dir + Vector3(hrng.randf_range(-0.3, 0.3),
+					hrng.randf_range(-0.3, 0.3), hrng.randf_range(-0.3, 0.3))).normalized()
+				var mbas := _basis_from_up(mdir)
+				var mh2 := 0.0
+				var mw := hrng.randf_range(12.0, 20.0)
+				var layers := 4 + hrng.randi() % 3
+				for lyr2 in layers:
+					var msl := MeshInstance3D.new()
+					var mslm := BoxMesh.new()
+					var lw := mw * (1.0 - float(lyr2) * 0.09)
+					mslm.size = Vector3(lw, hrng.randf_range(2.2, 3.4), lw * hrng.randf_range(0.8, 1.0))
+					msl.mesh = mslm
+					msl.material_override = Surfaces.stone(
+						Color("#7a6f62").lightened(float(lyr2) * 0.05))
+					add_child(msl)
+					msl.global_transform = Transform3D(mbas,
+						b.center + mdir * (b.radius + mh2 + mslm.size.y * 0.4))
+					msl.rotate_object_local(Vector3.UP, hrng.randf_range(-0.2, 0.2))
+					mh2 += mslm.size.y * 0.85
 			_spawn_res_nodes(b, 8, "coal", 2)
 			_spawn_res_nodes(b, 5, "uranium", 1)
 			# one bench, facing the black hole. he sits sometimes.
