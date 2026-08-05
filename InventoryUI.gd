@@ -394,6 +394,20 @@ func hot_click(i: int, btn: int) -> void:
 		if hid == "":
 			if sid == "":
 				return
+			# ARMOR: right-click wears it straight from the slot; whatever
+			# you had on lands back in that slot
+			if Inventory.armors.has(sid):
+				var aslot := str(Inventory.armors[sid]["slot"])
+				var worn := str(Inventory.equip.get(aslot, ""))
+				Inventory.equip[aslot] = sid
+				slot["n"] = int(slot["n"]) - 1
+				if worn != "":
+					Inventory.hotbar[i] = {"id": worn, "n": 1}
+				elif int(slot["n"]) <= 0:
+					Inventory.hotbar[i] = Inventory.empty_slot()
+				Sfx.play("learn", -12.0)
+				Inventory.changed.emit()
+				return
 			var take := ceili(int(slot["n"]) / 2.0)
 			held = {"id": sid, "n": take}
 			slot["n"] = int(slot["n"]) - take

@@ -1243,6 +1243,52 @@ func _update_held() -> void:
 ## Icons and dropped items borrow it so nothing is ever a mystery cube.
 	_update_held_layers()
 
+## THE armor model: one source of truth worn by the hand, the icon and
+## the floor drop alike. Prism and ultima pieces keep their true glow.
+func _armor_model(id: String) -> void:
+	var c: Color = Inventory.armors[id]["color"]
+	var mat: Material = Destructible.make_material(c, 0.35)
+	if id.begins_with("prism_"):
+		mat = Human._prism_material()
+	elif id.begins_with("ultima_"):
+		mat = Surfaces.portal(Color("#7df9ff"))
+	var aslot := str(Inventory.armors[id]["slot"])
+	var mk := func(size: Vector3, pos: Vector3) -> void:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = size
+		mi.mesh = bm
+		mi.position = pos
+		mi.material_override = mat
+		_held.add_child(mi)
+	match aslot:
+		"head":
+			# dome + brim, open face
+			var dome := MeshInstance3D.new()
+			var dm := SphereMesh.new()
+			dm.radius = 0.2
+			dm.height = 0.24
+			dm.is_hemisphere = true
+			dome.mesh = dm
+			dome.material_override = mat
+			dome.position = Vector3(0, 0.02, 0)
+			_held.add_child(dome)
+			mk.call(Vector3(0.42, 0.05, 0.42), Vector3(0, 0.0, 0))
+		"chest":
+			mk.call(Vector3(0.34, 0.3, 0.07), Vector3(0, 0.05, -0.05))
+			mk.call(Vector3(0.34, 0.3, 0.07), Vector3(0, 0.05, 0.08))
+			mk.call(Vector3(0.12, 0.07, 0.16), Vector3(-0.2, 0.22, 0.0))
+			mk.call(Vector3(0.12, 0.07, 0.16), Vector3(0.2, 0.22, 0.0))
+		"legs":
+			mk.call(Vector3(0.13, 0.34, 0.13), Vector3(-0.09, 0, 0))
+			mk.call(Vector3(0.13, 0.34, 0.13), Vector3(0.09, 0, 0))
+			mk.call(Vector3(0.32, 0.09, 0.15), Vector3(0, 0.2, 0))
+		"boots":
+			mk.call(Vector3(0.13, 0.14, 0.24), Vector3(-0.09, -0.05, -0.03))
+			mk.call(Vector3(0.13, 0.14, 0.24), Vector3(0.09, -0.05, -0.03))
+			mk.call(Vector3(0.13, 0.06, 0.1), Vector3(-0.09, -0.09, -0.14))
+			mk.call(Vector3(0.13, 0.06, 0.1), Vector3(0.09, -0.09, -0.14))
+
 func model_for(id: String) -> Node3D:
 	var keep := _held
 	var out := Node3D.new()
@@ -1355,6 +1401,9 @@ func _make_held_model(id: String) -> void:
 				_hm_box(Vector3(0.14, 0.16, 0.4), Vector3(0, 0, 0.12), dark, 0.2)
 				_hm_cyl(0.035, 0.55, Vector3(0, 0.03, -0.25), col, 0.9).rotation_degrees = Vector3(90, 0, 0)
 				_hm_box(Vector3(0.07, 0.2, 0.1), Vector3(0, -0.16, 0.26), dark, 0.1)
+		return
+	if Inventory.armors.has(id):
+		_armor_model(id)
 		return
 	match id:
 		"rocket":

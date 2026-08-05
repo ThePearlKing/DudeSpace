@@ -280,16 +280,12 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 				var grip := BoxMesh.new()
 				grip.size = Vector3(0.1, 0.2, 0.1)
 				_p(r, grip, Vector3(-0.15, -0.16, 0), Color("#3a2c20"), 0.1)
-			elif Inventory.armors.has(id):
-				# armor: curved chest plate + shoulder bumps
-				var plate := BoxMesh.new()
-				plate.size = Vector3(0.44, 0.4, 0.16)
-				_p(r, plate, Vector3.ZERO, c)
-				for sx in [-0.26, 0.26]:
-					var sh2 := SphereMesh.new()
-					sh2.radius = 0.11
-					sh2.height = 0.22
-					_p(r, sh2, Vector3(sx, 0.2, 0), c)
+			elif tree != null and Inventory.armors.has(id) \
+					and _hand_model(id, tree) != null:
+				# armor previews use THE item model -- no separate icon
+				var am9 := _hand_model(id, tree)
+				am9.scale = Vector3(1.5, 1.5, 1.5)
+				r.add_child(am9)
 			elif tree != null and _hand_model(id, tree) != null:
 				var hm := _hand_model(id, tree)
 				hm.scale = Vector3(1.4, 1.4, 1.4)
