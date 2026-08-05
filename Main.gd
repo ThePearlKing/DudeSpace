@@ -3306,11 +3306,14 @@ func _dress_ore(nd: Node3D, res: String, s: float) -> void:
 	var scol := surf.darkened(0.22)
 	var look: Dictionary = RES_LOOK.get(res, {"col": Color("#c0c0c0")})
 	var glow: Color = look["col"]
-	# the base rock hunkers down in terrain colors
+	# NO boulder: the old base rock is flattened into a flush terrain
+	# pad, so the crystals rise straight out of the ground
 	var rock_mat := Surfaces.stone(scol)
 	for ch in nd.get_children():
 		if ch is MeshInstance3D:
 			ch.material_override = rock_mat
+			ch.scale = Vector3(1.15, 0.16, 1.15)
+			ch.position.y -= s * 0.28
 	# shards: surface-tinted crystal prisms with a faint ore-colored
 	# inner light (ultima/prism keep their true materials -- they ARE glow)
 	var shard_mat := StandardMaterial3D.new()
