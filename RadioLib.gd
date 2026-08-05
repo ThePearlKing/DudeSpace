@@ -1275,7 +1275,7 @@ static func alien_profile() -> Dictionary:
 		"wave": ["buzz", "wobble", "square", "saw"][randi() % 4],
 		"rate": randf_range(0.45, 1.7), "artic": randf_range(1.2, 1.8)}
 
-# ---- WTH TALK RADIO: a real AM station run by aliens ------------------
+# ---- DATAMOSH TALK RADIO: a real AM station run by aliens -------------
 # Four RECURRING voices (stable profiles, so you learn who's who) doing
 # actual radio: news about the local planets, call-ins, debates, weather,
 # markets. Procedural, but each segment is a coherent little exchange.

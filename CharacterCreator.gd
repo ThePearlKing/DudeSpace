@@ -16,7 +16,7 @@ var _human: Human
 var _color: Color = Color("#3aa0ff")
 var _shader: String = "none"
 var _pad: _Pad
-var _shaders := ["none", "pixel", "wth", "wireframe", "contrast", "effect"]
+var _shaders := ["none", "pixel", "datamosh", "wireframe", "contrast", "effect"]
 var _fx := {"strength": 1.0, "speed": 1.0, "nscale": 5.0, "sharp": 2.0,
 	"rainbow": 0.0, "fluid": 0.0}
 var _fx_box: VBoxContainer

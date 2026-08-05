@@ -43,7 +43,7 @@ func _ready() -> void:
 	_def("ShaderSun",Vector3(0, 0, -25000),      235.0, 20.0, "sun",       Color("#ff7a0f"))
 	_def("Contrast", Vector3(0, 0, -24100),      60.0,  9.0,  "contrast",  Color("#ffffff"))
 	_def("Pixel",    Vector3(1600, 0, -25000),   82.0,  8.0,  "pixel",     Color("#ff66aa"))
-	_def("Wth",      Vector3(-1700, 300, -24000),88.0,  8.0,  "wth",       Color("#33ff99"))
+	_def("Datamosh", Vector3(-1700, 300, -24000),88.0,  8.0,  "datamosh",  Color("#33ff99"))
 	_def("Wireframe",Vector3(0, 1300, -26600),   92.0,  9.0,  "wireframe", Color("#0affaf"))
 	_def("Blind",    Vector3(320, 1300, -26600), 40.0,  4.0,  "blind",     Color("#ffffff"))
 	_def("Wobble",   Vector3(2600, -900, -23500),78.0,  8.0,  "wob",       Color("#ff9a3c"))
@@ -170,6 +170,8 @@ func nearest(pos: Vector3) -> Body:
 	return best
 
 func body_named(n: String) -> Body:
+	if n == "Wth":
+		n = "Datamosh"   # the planet got renamed; old saves didn't
 	for b in bodies:
 		if b.name == n:
 			return b

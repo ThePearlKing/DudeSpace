@@ -209,7 +209,7 @@ func _build_stations() -> void:
 				stations.append({"name": "EARTH2", "type": "music",
 					"freq": snappedf(rng.randf_range(88.5, 107.5), 0.1),
 					"body": b, "kind": "earth"})
-			"Wth":
+			"Datamosh":
 				st = {"name": "??? (shader system)", "type": "alien"}
 			"Pi", "Verdant", "Crystalia", "Donut", "Euclid", "Circuitia", "Sanus", "Varnisol", "Venus", "Xero":
 				st = {"name": b.name.to_upper(), "type": "music"}
@@ -531,7 +531,7 @@ func work(delta: float) -> void:
 						# raw text -- the dish UI stretches it VISUALLY
 						now_line = "⊙: " + curc
 					now_line_until = Game.playtime + 1.2
-			# WTH: readable subtitles, one line per turn, tinted per orb
+			# DATAMOSH: readable subtitles, one line per turn, tinted per orb
 			# (white anchor, gold analyst, purple wonderer, red deadpan)
 			if str(st["type"]) == "alien" and _talk.playing \
 					and RadioLib.alien_cues.size() > 0:
@@ -574,7 +574,7 @@ func work(delta: float) -> void:
 								{"base": 185.0, "var": 0.42, "wave": "sine",
 								"rate": 1.35, "artic": 1.6})
 						"alien":
-							# WTH runs a TALK SHOW: recurring hosts,
+							# DATAMOSH runs a TALK SHOW: recurring hosts,
 							# call-ins, planet news, weather, markets
 							return RadioLib.alien_render(ex)
 						"noodle":

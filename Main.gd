@@ -89,7 +89,7 @@ func _ready() -> void:
 
 	if not Game.tutorial_session:
 		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
-	add_child(WthStudio.new())       # the WTH station: hole, mast, studio
+	add_child(DatamoshStudio.new())  # the DATAMOSH station: hole, mast, studio
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -1856,7 +1856,7 @@ void fragment(){
 
 func _planet_material(kind: String, color: Color) -> Material:
 	match kind:
-		"pixel", "wth", "wob", "contrast":
+		"pixel", "datamosh", "wob", "contrast":
 			return ShaderLib.make(kind, color)
 		"earth":
 			return _earth_material()
@@ -2105,7 +2105,7 @@ func _shader_code(kind: String) -> String:
 	match kind:
 		"pixel":
 			return "shader_type spatial;\nvoid fragment(){\n vec3 q=floor(VERTEX*0.7);\n float n=fract(sin(dot(q,vec3(12.9898,78.233,37.719)))*43758.5453);\n vec3 c=vec3(step(0.5,n),step(0.33,fract(n*3.0)),step(0.66,fract(n*7.0)));\n ALBEDO=c; EMISSION=c*0.4;\n}"
-		"wth":
+		"datamosh":
 			return "shader_type spatial;\nvoid fragment(){\n float t=TIME;\n float band=floor(VERTEX.y*4.0+t*6.0);\n float g=fract(sin(band)*43758.5453);\n vec3 c=vec3(fract(VERTEX.x*0.3+t),g,fract(VERTEX.z*0.3-t));\n if(g>0.7){c=vec3(1.0)-c;}\n ALBEDO=c; EMISSION=c*0.6;\n}"
 		"wireframe":
 			return "shader_type spatial;\nvoid fragment(){\n vec2 gr=abs(fract(UV*40.0)-0.5);\n float line=1.0-smoothstep(0.0,0.05,min(gr.x,gr.y));\n ALBEDO=vec3(0.02); EMISSION=vec3(0.1,0.9,0.5)*line;\n}"
@@ -2223,7 +2223,7 @@ func _populate(b) -> void:
 			# the surface have lumps sticking out
 			_build_mine(b, MINE_DIRS["Verdant"], "coal", 3, Color("#26262c"))
 			_spawn_res_nodes(b, 8, "coal", 2)
-		"pixel", "wth", "wob", "wireframe", "contrast":
+		"pixel", "datamosh", "wob", "wireframe", "contrast":
 			_register_crates(b, 18, 40)
 			# prism shards: ONLY grow under shader light
 			for i in 14:

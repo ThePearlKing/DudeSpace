@@ -202,7 +202,7 @@ func _draw_map() -> void:
 				var pulse := 0.5 + 0.4 * sin(Time.get_ticks_msec() * 0.004)
 				_map.draw_arc(px, r + 4.0 + pulse * 3.0, 0, TAU, 24,
 					NEON if str(st["type"]) != "alien" else Color("#ff66aa"), 1.5)
-		if b.radius > 100.0 or b.name in ["Earth", "Wth", "Home"]:
+		if b.radius > 100.0 or b.name in ["Earth", "Datamosh", "Home"]:
 			_map.draw_string(ThemeDB.fallback_font, px + Vector2(6, -6), b.name,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.55))
 	# the noodle god

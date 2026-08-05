@@ -4,8 +4,8 @@ extends RefCounted
 ## character-creator skins so they match.
 ##   pixel     - chunky pixelated surface
 ##   contrast  - crushed, extreme high-contrast terminator
-##   wth       - actually broken/glitchy datamosh
-##   wob       - the old "wth" (legacy wobble bands)
+##   datamosh  - actually broken/glitchy datamosh
+##   wob       - the old datamosh (legacy wobble bands)
 ##   wireframe - fake grid (planets get a REAL polygon wireframe in Main)
 
 static func shader_code(kind: String) -> String:
@@ -17,7 +17,7 @@ static func shader_code(kind: String) -> String:
 			return "shader_type spatial;\nfloat h3(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453);}\nvoid fragment(){\n vec2 res=vec2(200.0,112.0);\n vec2 cell=(floor(SCREEN_UV*res)+0.5)/res;\n vec2 dpx=(cell-SCREEN_UV)*VIEWPORT_SIZE;\n vec3 wp=(INV_VIEW_MATRIX*vec4(VERTEX,1.0)).xyz;\n vec3 wpc=wp+dFdx(wp)*dpx.x+dFdy(wp)*dpx.y;\n float n=h3(floor(wpc*0.3));\n vec3 c=n<0.2?vec3(0.95,0.3,0.62):n<0.4?vec3(0.2,0.55,0.95):n<0.6?vec3(1.0,0.85,0.2):n<0.8?vec3(0.3,0.9,0.5):vec3(0.5,0.25,0.8);\n ALBEDO=c; EMISSION=c*0.2; ROUGHNESS=1.0;\n}"
 		"contrast":
 			return "shader_type spatial;\nvoid fragment(){\n float v=dot(normalize(NORMAL),normalize(VIEW));\n v=clamp((v-0.5)*7.0+0.5,0.0,1.0);\n ALBEDO=mix(vec3(0.02,0.0,0.06),vec3(1.0,0.97,0.85),v);\n EMISSION=vec3(step(0.88,v))*0.8;\n METALLIC=0.0; ROUGHNESS=0.4;\n}"
-		"wth":
+		"datamosh":
 			# STILL broken, but broken in slow motion: spikes GROW and
 			# retract (interpolated between corruption seeds), the row
 			# tear eases in and out, and the blackouts/inversions are
@@ -30,7 +30,7 @@ static func shader_code(kind: String) -> String:
 	return ""
 
 static func is_shader(kind: String) -> bool:
-	return kind in ["pixel", "wth", "wob", "wireframe", "contrast"]
+	return kind in ["pixel", "datamosh", "wob", "wireframe", "contrast"]
 
 static var _fx_shader: Shader = null
 
@@ -119,6 +119,8 @@ void fragment() {
 
 static func make(kind: String, color: Color, tex: Texture2D = null,
 		fx: Dictionary = {}) -> Material:
+	if kind == "wth":
+		kind = "datamosh"   # saved characters predate the rename
 	if kind == "effect":
 		return effect_material(color, fx)
 	if is_shader(kind):

@@ -1,6 +1,6 @@
-class_name WthStudio
+class_name DatamoshStudio
 extends Node3D
-## The WTH talk-radio station, in the flesh: a mine-style hole on Wth's
+## The DATAMOSH talk-radio station, in the flesh: a mine-style hole on Datamosh's
 ## surface with a transmitter pole beside it, leading down to a studio
 ## pocket where four floating icosahedron aliens run the show LIVE --
 ## voices clear, no static, bodies swelling with their own volume.
@@ -72,7 +72,7 @@ class _AlienShell extends StaticBody3D:
 ## complained about identically on every player's client -- the plan
 ## (who says what) is chosen by the shooter and shipped as text, and
 ## voices render deterministically from text, so everyone hears the
-## same words. Radios tuned to WTH get the ping, the jitter, and the
+## same words. Radios tuned to DATAMOSH get the ping, the jitter, and the
 ## complaint pushed through their speaker too.
 func orb_hit(idx: int, at: Vector3) -> void:
 	var plan := _hit_plan(idx)
@@ -119,7 +119,7 @@ func _apply_hit(idx: int, at: Vector3, plan: Array) -> void:
 	if idx == _cur_host and _talk != null and _talk.playing:
 		_jitter_t = 0.05
 		_talk.pitch_scale = randf_range(0.55, 1.7)
-	# radios tuned to WTH carry the assault live: ping + a jitter blip
+	# radios tuned to DATAMOSH carry the assault live: ping + a jitter blip
 	for r in _tuned_radios():
 		_play_ping(r.global_position + r.global_transform.basis.y * 2.4)
 		if r._talk != null and r._talk.playing:
@@ -139,7 +139,7 @@ func _apply_hit(idx: int, at: Vector3, plan: Array) -> void:
 				cooked.append([int(entry[0]), w, str(entry[1])])
 		_callout_ready.call_deferred(cooked))
 
-## Radios currently locked to the WTH station and making sound.
+## Radios currently locked to the DATAMOSH station and making sound.
 func _tuned_radios() -> Array:
 	var out: Array = []
 	for r in get_tree().get_nodes_in_group("radio"):
@@ -156,7 +156,7 @@ func _callout_ready(cooked: Array) -> void:
 	_talk.stop()   # the show interrupts ITSELF to tell you off
 	for ci in range(cooked.size() - 1, -1, -1):
 		_turns.push_front(cooked[ci])
-	# and every radio tuned to WTH airs the complaint verbatim
+	# and every radio tuned to DATAMOSH airs the complaint verbatim
 	var bytes := PackedByteArray()
 	var gap := PackedByteArray()
 	gap.resize(int(22050 * 0.35) * 2)
@@ -199,13 +199,13 @@ func _play_ping(at: Vector3) -> void:
 	pl.finished.connect(pl.queue_free)
 
 func _ready() -> void:
-	add_to_group("wth_studio")
+	add_to_group("datamosh_studio")
 	_build_surface()
 	_build_studio()
 
 ## ---- the way in: a dug-out hole + the transmitter pole ----
 func _build_surface() -> void:
-	var wth = Universe.body_named("Wth")
+	var wth = Universe.body_named("Datamosh")
 	if wth == null:
 		return
 	var dir := Vector3(0.3, 0.9, 0.2).normalized()
@@ -233,7 +233,7 @@ func _build_surface() -> void:
 	pit.global_transform = Transform3D(bs, base - dir * 1.0)
 	var gate := Gate.new().configure({
 		"target": POS + Vector3(0, -1.6, 5.0), "zone": "flat", "zone_g": 9.0,
-		"label": "STATION WTH", "color": Color("#33ff99")})
+		"label": "STATION DATAMOSH", "color": Color("#33ff99")})
 	add_child(gate)
 	gate.global_transform = Transform3D(bs, base - dir * 0.4)
 	# the TRANSMITTER: a proper mast beside the hole, lamp blinking
@@ -452,7 +452,7 @@ func _build_studio() -> void:
 		add_child(rack)
 		rack.global_position = POS + Vector3(rx, -1.3, -6.4)
 	# the ESCAPE PORTAL: tucked dark in a corner, no label, no ceremony
-	var wth = Universe.body_named("Wth")
+	var wth = Universe.body_named("Datamosh")
 	if wth != null:
 		var dir := Vector3(0.3, 0.9, 0.2).normalized()
 		var out := Gate.new().configure({
