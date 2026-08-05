@@ -2312,76 +2312,80 @@ func _populate(b) -> void:
 					slab.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 					mh += slm.size.y * 0.8
 			# BIOME FIELD: seeded noise over the sphere decides what grows
-			# where. Several spike patches and rarer mesa patches, SPREAD
-			# across the whole planet -- not hemispheres -- and identical
-			# every run (noise seed 618).
+			# where (seed 618, identical every run). Spike FORESTS: big,
+			# dense clusters. Mesas: real mountains -- long massifs that
+			# curve with the planet, flat walkable tops, spikes riding them.
 			var bnoise := FastNoiseLite.new()
 			bnoise.seed = 618
 			bnoise.frequency = 1.0
-			var spikes_left := _n(44)
-			var mesas_left := _n(7)
-			for i in 1200:
+			var spikes_left := _n(96)
+			var mesas_left := _n(4)
+			for i in 1600:
 				if spikes_left <= 0 and mesas_left <= 0:
 					break
 				var cd := _h_dir(hrng)
 				var nv := bnoise.get_noise_3d(cd.x * 2.2, cd.y * 2.2, cd.z * 2.2)
-				if nv > 0.3 and spikes_left > 0:
-					# carved rock needle: tapering stacked segments
-					spikes_left -= 1
-					var sb8 := _basis_from_up(cd)
-					var segs := 3 + hrng.randi() % 3
-					var sh8 := 0.0
-					var bw := hrng.randf_range(1.4, 2.6)
-					for sg in segs:
-						var nk := MeshInstance3D.new()
-						var nkm := CylinderMesh.new()
-						var frac := 1.0 - float(sg) / float(segs)
-						nkm.bottom_radius = bw * frac
-						nkm.top_radius = bw * maxf(0.06, frac - 1.0 / float(segs)) * 0.8
-						nkm.height = hrng.randf_range(2.2, 4.6)
-						nkm.radial_segments = 6
-						nk.mesh = nkm
-						nk.material_override = Surfaces.stone(
-							Color("#6f655a").lightened(float(sg) * 0.06))
-						add_child(nk)
-						nk.global_transform = Transform3D(sb8,
-							b.center + cd * (b.radius + sh8 + nkm.height * 0.5 - 0.4))
-						nk.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
-						sh8 += nkm.height * 0.94
-					for sh9 in 2:
-						var lsh := MeshInstance3D.new()
-						var lshm := BoxMesh.new()
-						lshm.size = Vector3(0.5, hrng.randf_range(1.6, 3.0), 0.5)
-						lsh.mesh = lshm
-						lsh.material_override = Surfaces.stone(Color("#665c50"))
-						add_child(lsh)
-						lsh.global_transform = Transform3D(sb8,
-							b.center + cd * (b.radius + lshm.size.y * 0.3))
-						lsh.rotate_object_local(Vector3.RIGHT, hrng.randf_range(-0.5, 0.5))
-						lsh.rotate_object_local(Vector3.BACK, hrng.randf_range(-0.5, 0.5))
-						lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
-							hrng.randf_range(-2.2, 2.2))
+				if nv > 0.26 and spikes_left > 0:
+					# forest: every hit plants a tight cluster of needles
+					var cluster := 3 + hrng.randi() % 3
+					spikes_left -= cluster
+					for ci in cluster:
+						var cdir: Vector3 = (cd + Vector3(
+							hrng.randf_range(-0.05, 0.05), hrng.randf_range(-0.05, 0.05),
+							hrng.randf_range(-0.05, 0.05))).normalized()
+						_h_spike(b, cdir, b.radius, hrng)
 				elif nv < -0.42 and mesas_left > 0:
-					# mesa: huge flat-topped tower of terrain (the rare one)
+					# MESA: one long mountain following the planet's curve
 					mesas_left -= 1
-					var mbas := _basis_from_up(cd)
-					var mh2 := 0.0
-					var mw := hrng.randf_range(12.0, 20.0)
-					var layers := 4 + hrng.randi() % 3
-					for lyr2 in layers:
-						var msl := MeshInstance3D.new()
-						var mslm := BoxMesh.new()
-						var lw := mw * (1.0 - float(lyr2) * 0.09)
-						mslm.size = Vector3(lw, hrng.randf_range(2.2, 3.4),
-							lw * hrng.randf_range(0.8, 1.0))
-						msl.mesh = mslm
-						msl.material_override = Surfaces.stone(
-							Color("#7a6f62").lightened(float(lyr2) * 0.05))
-						add_child(msl)
-						msl.global_transform = Transform3D(mbas,
-							b.center + cd * (b.radius + mh2 + mslm.size.y * 0.4))
-						msl.rotate_object_local(Vector3.UP, hrng.randf_range(-0.2, 0.2))
-						mh2 += mslm.size.y * 0.85
+					var maxis: Vector3 = _h_dir(hrng).cross(cd).normalized()
+					if maxis.length() < 0.5:
+						maxis = cd.cross(Vector3.RIGHT).normalized()
+					var arc := hrng.randf_range(0.5, 0.95)
+					var mh3 := hrng.randf_range(9.0, 14.0)
+					var mw3 := hrng.randf_range(13.0, 19.0)
+					var steps := maxi(7, int(arc * b.radius / (mw3 * 0.4)))
+					var tops: Array = []
+					for st6 in steps:
+						var ang := -arc * 0.5 + arc * float(st6) / float(steps - 1)
+						var dirS: Vector3 = cd.rotated(maxis, ang).normalized()
+						var tanv: Vector3 = maxis.cross(dirS).normalized()
+						var bas := Basis(dirS.cross(tanv).normalized(), dirS,
+							tanv).orthonormalized()
+						# mountain profile: swells in the middle, dies at the ends
+						var prof := 0.4 + 0.6 * sin(PI * float(st6) / float(steps - 1))
+						var hh6 := mh3 * prof
+						var seglen := arc * b.radius / float(steps - 1) * 1.4
+						var body6 := StaticBody3D.new()
+						var mi6 := MeshInstance3D.new()
+						var bm6 := BoxMesh.new()
+						bm6.size = Vector3(mw3 * prof, hh6, seglen)
+						mi6.mesh = bm6
+						mi6.material_override = Surfaces.stone(Color("#7a6f62"))
+						body6.add_child(mi6)
+						var cs6 := CollisionShape3D.new()
+						var bs6 := BoxShape3D.new()
+						bs6.size = bm6.size
+						cs6.shape = bs6
+						body6.add_child(cs6)
+						# broad sloped skirt: massif, not wall
+						var sk := MeshInstance3D.new()
+						var skm := BoxMesh.new()
+						skm.size = Vector3(mw3 * prof * 1.75, hh6 * 0.45, seglen)
+						sk.mesh = skm
+						sk.material_override = Surfaces.stone(Color("#6e6357"))
+						sk.position = Vector3(0, -hh6 * 0.35, 0)
+						body6.add_child(sk)
+						add_child(body6)
+						body6.global_transform = Transform3D(bas,
+							b.center + dirS * (b.radius + hh6 * 0.5 - 1.2))
+						if prof > 0.82:
+							tops.append([dirS, b.radius + hh6 - 1.4])
+					# needles riding the summit line
+					for tp in 3 + hrng.randi() % 3:
+						if tops.is_empty():
+							break
+						var pick: Array = tops[hrng.randi() % tops.size()]
+						_h_spike(b, pick[0], float(pick[1]), hrng)
 			_spawn_res_nodes(b, 8, "coal", 2)
 			_spawn_res_nodes(b, 5, "uranium", 1)
 			# one bench, facing the black hole. he sits sometimes.
@@ -4445,6 +4449,44 @@ func _spawn_starship() -> void:
 
 func _surface_dir() -> Vector3:
 	return Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)).normalized()
+
+## One carved rock needle at `alt` along `cd` (base shards only when
+## it stands on actual ground).
+func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
+	var sb8 := _basis_from_up(cd)
+	var segs := 3 + hrng.randi() % 3
+	var sh8 := 0.0
+	var bw := hrng.randf_range(1.4, 2.6)
+	for sg in segs:
+		var nk := MeshInstance3D.new()
+		var nkm := CylinderMesh.new()
+		var frac := 1.0 - float(sg) / float(segs)
+		nkm.bottom_radius = bw * frac
+		nkm.top_radius = bw * maxf(0.06, frac - 1.0 / float(segs)) * 0.8
+		nkm.height = hrng.randf_range(2.2, 4.6)
+		nkm.radial_segments = 6
+		nk.mesh = nkm
+		nk.material_override = Surfaces.stone(
+			Color("#6f655a").lightened(float(sg) * 0.06))
+		add_child(nk)
+		nk.global_transform = Transform3D(sb8,
+			b.center + cd * (alt + sh8 + nkm.height * 0.5 - 0.4))
+		nk.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
+		sh8 += nkm.height * 0.94
+	if alt <= float(b.radius) + 0.01:
+		for sh9 in 2:
+			var lsh := MeshInstance3D.new()
+			var lshm := BoxMesh.new()
+			lshm.size = Vector3(0.5, hrng.randf_range(1.6, 3.0), 0.5)
+			lsh.mesh = lshm
+			lsh.material_override = Surfaces.stone(Color("#665c50"))
+			add_child(lsh)
+			lsh.global_transform = Transform3D(sb8,
+				b.center + cd * (alt + lshm.size.y * 0.3))
+			lsh.rotate_object_local(Vector3.RIGHT, hrng.randf_range(-0.5, 0.5))
+			lsh.rotate_object_local(Vector3.BACK, hrng.randf_range(-0.5, 0.5))
+			lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
+				hrng.randf_range(-2.2, 2.2))
 
 ## A seeded random surface direction (deterministic geology).
 func _h_dir(r: RandomNumberGenerator) -> Vector3:
