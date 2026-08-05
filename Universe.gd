@@ -74,9 +74,9 @@ func _ready() -> void:
 	# --- Crystalia: far, dangerous, alien-guarded. Ultima crystals. ---
 	_def("Crystalia",Vector3(-9000, 4000, -8000),90.0,  9.0,  "crystal",   Color("#40e0d0"))
 	# --- TIN 618: a black hole. Extreme pull, endless fall, time dilation. ---
-	_def("TIN 618",  Vector3(48000, -34000, -20000), 1100.0, 80.0, "blackhole", Color("#000000"))
+	_def("TIN 618",  Vector3(40000, -3000, 34000), 1100.0, 80.0, "blackhole", Color("#000000"))
 	# Harold: a tired old rock ORBITING the black hole. He's fine.
-	_def("Harold",   Vector3(48000 + 13500, -34000, -20000), 44.0, 6.5, "mercury", Color("#8f8377"))
+	_def("Harold",   Vector3(40000 + 13500, -3000, 34000), 44.0, 6.5, "mercury", Color("#8f8377"))
 	# --- the ACTUAL Sol system. Yes, that one. Far out in -X, long haul. ---
 	var SC := Vector3(-52000, 3000, 14000)   # Sol system centre
 	_def("Sol",      SC,                          420.0, 26.0, "sun",     Color("#fff4d6"))
