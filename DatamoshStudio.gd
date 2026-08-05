@@ -538,6 +538,13 @@ func subtitle() -> String:
 		return ""
 	return _cur_text.substr(0, maxi(0, _bub_chars))
 
+## ...and in the SPEAKER'S bubble colour, exactly like the studio.
+func subtitle_color() -> Color:
+	if _cur_host >= 0 and _cur_host < 4:
+		return [Color("#33ff99"), Color("#ffcf40"),
+			Color("#b388ff"), Color("#ff6a6a")][_cur_host]
+	return Color.WHITE
+
 ## ---- the live show ----
 func _process(delta: float) -> void:
 	_t += delta

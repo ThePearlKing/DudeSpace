@@ -356,15 +356,27 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 					rail9.material_override = Destructible.make_material(accent, 1.4)
 					body.add_child(rail9)
 		"pixel":
-			# checker floor tiles, big and proud
-			var tile9 := MeshInstance3D.new()
-			var tbm9 := BoxMesh.new()
-			tbm9.size = Vector3(2.6, 0.08, ln * 0.5)
-			tile9.mesh = tbm9
-			tile9.position = Vector3(1.3, -1.92, 0)
-			tile9.material_override = Destructible.make_material(
-				Color("#ff66aa").darkened(0.3), 0.3)
-			body.add_child(tile9)
+			# chunky pixel-art mural on the solid wall, dead pixels
+			# included -- the planet's aesthetic hung as ART. (Replaces
+			# the old pink floor slabs, which read as glitch litter.)
+			if open_side != 2:
+				var msgn9 := 1 if open_side == -1 else -1
+				var px9 := 0.44
+				for gx9 in 6:
+					for gy9 in 4:
+						if randf() < 0.4:
+							continue   # dead pixel
+						var dot9 := MeshInstance3D.new()
+						var dm9 := BoxMesh.new()
+						dm9.size = Vector3(0.1, px9 - 0.07, px9 - 0.07)
+						dot9.mesh = dm9
+						dot9.position = Vector3(2.55 * float(msgn9),
+							-0.66 + px9 * float(gy9),
+							(float(gx9) - 2.5) * px9)
+						dot9.material_override = Destructible.make_material(
+							[Color("#ff66aa"), accent,
+							Color("#ffd0e8")][(gx9 + gy9 * 3) % 3], 1.2)
+						body.add_child(dot9)
 		"datamosh":
 			# one panel per segment sits WRONG. on purpose. probably.
 			if randf() < 0.5:
@@ -757,7 +769,9 @@ func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
 		sub.pixel_size = 0.004
 		sub.width = 340.0
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sub.modulate = Color(1.0, 1.0, 0.85)
+		# colour is LIVE: repainted every tick to the current speaker's
+		# studio bubble hue
+		sub.modulate = Color.WHITE
 		sub.outline_size = 10
 		sub.outline_modulate = Color(0, 0, 0, 0.9)
 		sub.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -766,20 +780,28 @@ func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
 		scr.add_child(sub)
 		_tv_subs.append(sub)
 	else:
-		# the other channel: scrolling colour bars with a rolling glitch
+		# the other channel: scrolling colour bars with a rolling glitch,
+		# and the STATION bleeding through underneath -- a wobbling ghost
+		# of the studio feed you can kinda see through the bars
+		_ensure_tv_feed()
 		var sh := Shader.new()
 		sh.code = """
 shader_type spatial;
 render_mode unshaded;
+uniform sampler2D feed : source_color;
 void fragment(){
 	float band = floor(fract(UV.x + TIME * 0.03) * 7.0);
 	vec3 col = vec3(fract(band * 0.37), fract(band * 0.61), fract(band * 0.83));
 	float roll = step(0.97, fract(UV.y * 1.0 - TIME * 0.4));
-	ALBEDO = mix(col * 0.8, vec3(1.0), roll);
+	vec3 bars = mix(col * 0.8, vec3(1.0), roll);
+	vec2 guv = UV + vec2(sin(TIME * 1.7 + UV.y * 9.0) * 0.006, 0.0);
+	vec3 ghost = texture(feed, guv).rgb;
+	ALBEDO = mix(bars, ghost * 1.15, 0.45);
 }
 """
 		var sm2 := ShaderMaterial.new()
 		sm2.shader = sh
+		sm2.set_shader_parameter("feed", _tv_vp.get_texture())
 		scr.material_override = sm2
 	frame.add_child(scr)
 
@@ -885,12 +907,16 @@ func _process(delta: float) -> void:
 		# 3D emitter a whole planet away -- silent here, text only.
 		var st = get_tree().get_first_node_in_group("datamosh_studio")
 		var sub_text := ""
+		var sub_col := Color.WHITE
 		if inside and st != null:
 			st.remote_watch = 0.6
 			sub_text = str(st.subtitle())
+			sub_col = st.subtitle_color()
 		for sl in _tv_subs:
-			if is_instance_valid(sl) and sl.text != sub_text:
-				sl.text = sub_text
+			if is_instance_valid(sl):
+				if sl.text != sub_text:
+					sl.text = sub_text
+				sl.modulate = sub_col
 	if _pcache == null or not is_instance_valid(_pcache):
 		_pcache = get_tree().get_first_node_in_group("player")
 	if _pcache == null:
