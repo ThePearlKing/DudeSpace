@@ -247,6 +247,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	# lives on the Furniture Placer
 	if _hwreck_mode and Inventory.slot_id(Inventory.selected) != "housekit":
 		_hwreck_mode = false
+	# right-click ALWAYS backs out of the destroy tools (Esc can get
+	# eaten by the pause menu -- nobody stays trapped in delete mode)
+	if (_hwreck_mode or _wreck_mode) and event is InputEventMouseButton \
+			and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		_hwreck_mode = false
+		_wreck_mode = false
+		var hudc = get_tree().get_first_node_in_group("hud")
+		if hudc:
+			hudc.flash("delete tool off")
+		Sfx.play("click", -18.0)
+		get_viewport().set_input_as_handled()
+		return
 	if _hwreck_mode and event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		_hwreck_click()
@@ -532,7 +544,8 @@ func _hwreck_click() -> void:
 		Sfx.play("denied")
 		return
 	if t is House:
-		Inventory.give("housekit", 1)
+		if not Game.creative:
+			Inventory.give("housekit", 1)
 		Destructible.spawn_debris(t.get_parent(), t.global_position,
 			Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
 		Sfx.play("explode", -10.0)
@@ -555,7 +568,8 @@ func _wreck_click() -> void:
 		if hud:
 			hud.flash("door connection collapsed — doorways walled up")
 	else:
-		Inventory.give("plantfiber", 2)
+		if not Game.creative:
+			Inventory.give("plantfiber", 2)
 		Destructible.spawn_debris(get_parent(),
 			f.global_position + Vector3(0, 0.8, 0),
 			Vector3(1.0, 1.0, 1.0), Color("#7a5a34"), Vector3.UP)
@@ -1917,7 +1931,7 @@ func _use_selected() -> void:
 						_wreck_mode = false
 						var hudh = get_tree().get_first_node_in_group("hud")
 						if hudh:
-							hudh.flash("DELETE — click any house or machine. ONE click. the red box shows what dies (Esc stops)")
+							hudh.flash("DELETE — click any house or machine. ONE click. the red box shows what dies (right-click cancels)")
 					else:
 						_start_ghost("house", kind))
 			get_tree().current_scene.add_child(pui)
@@ -1939,7 +1953,7 @@ func _use_selected() -> void:
 						_door_mode = false
 						var hudw = get_tree().get_first_node_in_group("hud")
 						if hudw:
-							hudw.flash("DESTROY — click furniture to break it (Esc stops)")
+							hudw.flash("DESTROY — click furniture to break it (right-click cancels)")
 					else:
 						_start_ghost("furn", kind))
 			get_tree().current_scene.add_child(pui2)
