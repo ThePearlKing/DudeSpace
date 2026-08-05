@@ -28,6 +28,10 @@ var MINE_DIRS := {
 	"Pi": Vector3(-0.3, -0.8, 0.5).normalized(),
 	"Verdant": Vector3(0.7, 0.2, 0.7).normalized(),
 	"Crystalia": Vector3(-0.6, 0.5, -0.6).normalized(),
+	"Mercury": Vector3(0.4, 0.6, 0.7).normalized(),
+	"Mars": Vector3(-0.7, 0.4, -0.6).normalized(),
+	"Extroma": Vector3(0.5, -0.6, 0.6).normalized(),
+	"Xero": Vector3(-0.4, 0.7, 0.6).normalized(),
 	"Tutoria": Tutorial.ORE_DIR.normalized(),   # the tutorial's teaching mine
 }
 var _dens: float = 1.0   # spawn-density multiplier (bscale worlds)
@@ -2226,7 +2230,9 @@ func _populate(b) -> void:
 				_crater(b, _surface_dir(), randf_range(1.5, 4.5), Color("#a8a8ac"))
 			_moon_flag(b)
 		"ice":
-			# XERO: pale craters and translucent ice spires catching the light
+			# XERO: pale craters and translucent ice spires catching the
+			# light -- and ultima veins twice as fat as Crystalia's
+			_build_mine(b, MINE_DIRS["Xero"], "ultima", 2, Color("#7df9ff"), 12)
 			for i in _n(10):
 				_crater(b, _surface_dir(), randf_range(1.5, 4.0), Color("#4aa8f0"))
 			for i in 12:
@@ -2241,6 +2247,8 @@ func _populate(b) -> void:
 			_spawn_rocks(b, 8, Color("#9cd2f2"))
 		"mercury":
 			# scorched crater field: baked boulders to smash, coal in the dark ones
+			# and a uranium shaft -- Sol pays for the trip
+			_build_mine(b, MINE_DIRS["Mercury"], "uranium", 2, Color("#9aff2a"), 18)
 			for i in _n(12):
 				_crater(b, _surface_dir(), randf_range(1.0, 3.0), Color("#8a7d70"))
 			_spawn_rocks(b, 14, Color("#7d7168"))
@@ -2440,7 +2448,9 @@ func _populate(b) -> void:
 			_spawn_res_nodes(b, 12, "sulfur", 3)
 			_spawn_enemies(b, 4, 2)   # even the locals are hostile. it's venus.
 		"mars":
-			# rust, ruins of exploration, and iridium under the dust
+			# rust, ruins of exploration, and iridium under the dust --
+			# the RICHEST iridium veins anywhere are down this shaft
+			_build_mine(b, MINE_DIRS["Mars"], "raw_irid", 7, Color("#2a8f6a"), 22)
 			for i in _n(8):
 				_crater(b, _surface_dir(), randf_range(1.2, 3.5), Color("#a5502f"))
 			_spawn_res_nodes(b, 10, "raw_irid", 2)
@@ -2454,7 +2464,9 @@ func _populate(b) -> void:
 			_spawn_res_nodes(b, 8, "raw_irid", 3, Color("#b8300a"), 1.4)
 			_spawn_rocks(b, 10, Color("#2a0c06"))   # cooled slag boulders
 		"volcanic":
-			# Extroma: geologically furious, economically generous
+			# Extroma: geologically furious, economically generous -- its
+			# uranium shaft out-yields everything in the Dude system
+			_build_mine(b, MINE_DIRS["Extroma"], "uranium", 3, Color("#9aff2a"), 22)
 			for i in _n(9):
 				_volcano(b, _surface_dir())
 			for i in _n(8):
@@ -3671,6 +3683,71 @@ func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color, or
 	}
 	_mines.append(mine)
 	_spawn_chamber_ore(mine, ore_count)
+	# CAVE DRESSING: stalactites off the ceiling, stalagmites off the
+	# floor, rubble -- and in the Dude system (Verdant excepted) the
+	# shafts are TECHY: steel support ribs and glowing conduit strips.
+	var techy: bool = b.center.length() < 12000.0 and str(b.kind) != "life"
+	var drng := RandomNumberGenerator.new()
+	drng.seed = int(b.radius * 77.0) + str(b.name).length()
+	var rockc := Color("#3a2f48")
+	for i in 26:
+		var px := drng.randf_range(-15.0, 15.0)
+		var pz := drng.randf_range(-15.0, 15.0)
+		if absf(px) < 5.0 and absf(pz) < 5.0:
+			continue   # the shaft landing stays clear
+		var hang := drng.randf() < 0.5
+		var tip := MeshInstance3D.new()
+		var tcm := CylinderMesh.new()
+		var trr := drng.randf_range(0.25, 0.55)
+		tcm.top_radius = trr if hang else 0.0
+		tcm.bottom_radius = 0.0 if hang else trr
+		tcm.height = drng.randf_range(1.2, 3.6)
+		tcm.radial_segments = 7
+		tip.mesh = tcm
+		tip.material_override = Surfaces.stone(rockc.lightened(drng.randf() * 0.18))
+		add_child(tip)
+		var ty := (cham_y + 5.4 - tcm.height * 0.5) if hang \
+			else (cham_y - 5.4 + tcm.height * 0.5)
+		tip.global_transform = Transform3D(B, C + B * Vector3(px, ty, pz))
+	for i in 10:
+		var rb9 := MeshInstance3D.new()
+		var rbm9 := BoxMesh.new()
+		var rs9 := drng.randf_range(0.4, 1.1)
+		rbm9.size = Vector3(rs9, rs9 * 0.7, rs9)
+		rb9.mesh = rbm9
+		rb9.material_override = Surfaces.stone(rockc.lightened(drng.randf() * 0.12))
+		add_child(rb9)
+		rb9.global_transform = Transform3D(B, C + B * Vector3(
+			drng.randf_range(-15.0, 15.0), cham_y - 5.3, drng.randf_range(-15.0, 15.0)))
+		rb9.rotate_object_local(Vector3.UP, drng.randf() * TAU)
+	if techy:
+		var steel9 := Surfaces.metal(Color("#4a505c"))
+		for i in 8:
+			# steel support ribs pinned along the walls
+			var along := drng.randf_range(-14.0, 14.0)
+			var wall9 := i % 4
+			var wx: float = [16.6, -16.6, along, along][wall9]
+			var wz: float = [along, along, 16.6, -16.6][wall9]
+			var rib := MeshInstance3D.new()
+			var ribm := BoxMesh.new()
+			ribm.size = Vector3(0.6, 11.5, 0.6)
+			rib.mesh = ribm
+			rib.material_override = steel9
+			add_child(rib)
+			rib.global_transform = Transform3D(B, C + B * Vector3(wx, cham_y, wz))
+		for espec9 in [[Vector3(0, 5.55, 16.1), Vector3(32, 0.1, 0.3)],
+				[Vector3(0, 5.55, -16.1), Vector3(32, 0.1, 0.3)],
+				[Vector3(16.1, 5.55, 0), Vector3(0.3, 0.1, 32)],
+				[Vector3(-16.1, 5.55, 0), Vector3(0.3, 0.1, 32)]]:
+			# conduit glow strips tracing the ceiling edges
+			var strip := MeshInstance3D.new()
+			var stm9 := BoxMesh.new()
+			stm9.size = espec9[1]
+			strip.mesh = stm9
+			strip.material_override = Destructible.make_material(Color("#5adfff"), 1.8)
+			add_child(strip)
+			strip.global_transform = Transform3D(B,
+				C + B * (Vector3(espec9[0].x, cham_y + espec9[0].y, espec9[0].z)))
 	# no free furnace. bring your own machines.
 	# exit drops you BESIDE the mouth, not back down the hole
 	var out := Gate.new().configure({
@@ -3685,7 +3762,9 @@ func _mine_box(B: Basis, pos: Vector3, size: Vector3, c: Color, emit: float) -> 
 	var m := BoxMesh.new()
 	m.size = size
 	mi.mesh = m
-	mi.material_override = Destructible.make_material(c, emit)
+	# stone shader, not flat plastic -- caves are made of rock
+	mi.material_override = Surfaces.stone(c.lightened(0.12)) if emit <= 0.25 \
+		else Destructible.make_material(c, emit)
 	body.add_child(mi)
 	var col := CollisionShape3D.new()
 	var cs := BoxShape3D.new()
