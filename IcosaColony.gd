@@ -15,6 +15,8 @@ var _b = null
 var _residents: Array = []   # {node, base, phase, lbl, lines, line_i}
 var _dialog_t := 0.0
 var _pcache = null
+var _mouth_dir := Vector3.UP
+var _mouth_e1 := Vector3.RIGHT
 
 const HUES: Array = [Color("#33ff99"), Color("#ffcf40"),
 	Color("#b388ff"), Color("#ff6a6a")]
@@ -56,6 +58,7 @@ func _wallc() -> Color:
 func build(b, dir: Vector3) -> void:
 	_b = b
 	_style = str(b.kind)
+	_mouth_dir = dir.normalized()
 	var R: float = b.radius
 	var C: Vector3 = b.center
 	var u0 := dir.normalized()
@@ -63,6 +66,7 @@ func build(b, dir: Vector3) -> void:
 	if e1.length() < 0.01:
 		e1 = u0.cross(Vector3(1, 0, 0))
 	e1 = e1.normalized()
+	_mouth_e1 = e1
 	var e2 := u0.cross(e1).normalized()
 	var r1 := R - 13.0
 	var r2 := R - 24.0
@@ -141,18 +145,24 @@ func build(b, dir: Vector3) -> void:
 			# crossing segments open their CEILING (the mouth shaft used
 			# to dead-end on a corridor roof) and their FLOOR (the drop
 			# chute to story two continues straight down)
-			var at_cross := i == 0
-			# the two rings CROSS at the mouth and the antipode: those
-			# segments drop both side walls -- real 4-way intersections
+			# crossings are sealed JUNCTION BOXES built separately --
+			# open-sided tube ends leaked into the hollow planet
 			var junction := i == 0 or i == NS / 2
+			if junction:
+				continue
 			# apartments EVERYWHERE: every other segment, alternating sides
 			var pod_side := 0
 			if (i % 2 == 1) and not near_mouth:
 				pod_side = 1 if (i / 2) % 2 == 0 else -1
 			_tube_seg(C + pdir * r1, pdir, tang, 2.0 * PI * r1 / float(NS) + 0.8,
-				_wallc(), accent, 2 if junction else pod_side, at_cross, at_cross)
-			if pod_side != 0 and not junction:
+				_wallc(), accent, pod_side, false, false)
+			if pod_side != 0:
 				_apartment(C, pdir, tang, r1, accent, pod_side)
+	# sealed junction boxes at the two crossings of story one: four
+	# doorways, hatch above and below at the mouth, solid at the antipode
+	_junction_box(C + u0 * r1, u0, e1, accent, true, true)
+	_junction_box(C - u0 * r1, -u0, e1, accent, false, false)
+	_junction_box(C + u0 * r2, u0, e1, accent, true, true)
 	# STORY TWO: one ring, four cafeteria halls at the diagonals
 	for i in NS:
 		var ang := TAU * float(i) / float(NS)
@@ -161,9 +171,11 @@ func build(b, dir: Vector3) -> void:
 		# the crossing opens BOTH ways (story-one hatch above, premium
 		# core chute below); cafeteria segments open their floor too --
 		# the halls are a LOWER FLOOR now, not side rooms
+		if i == 0:
+			continue   # the story-two crossing is its own junction box
 		var caf_here := i in [3, 10, 17, 24]
 		_tube_seg(C + pdir * r2, pdir, tang, 2.0 * PI * r2 / float(NS) + 0.8,
-			_wallc().darkened(0.2), accent, 0, i == 0, i == 0 or caf_here)
+			_wallc().darkened(0.2), accent, 0, false, caf_here)
 		if caf_here:
 			_cafeteria(C, pdir, tang, r2, accent)
 	# exit gate at the story-one crossing, back to the mouth's doorstep
@@ -207,6 +219,70 @@ func build(b, dir: Vector3) -> void:
 		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out2)
 	out2.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.8) + e1 * 3.5)
+
+## A sealed crossing chamber: 7m box, four 2.4m doorways facing the
+## corridor directions, optional hatches above/below for the chute.
+func _junction_box(center: Vector3, up: Vector3, e1: Vector3,
+		accent: Color, top_open: bool, floor_open: bool) -> void:
+	var tang := up.cross(e1)
+	if tang.length() < 0.5:
+		tang = up.cross(Vector3(1, 0, 0))
+	tang = tang.normalized()
+	var bas := Basis(up.cross(tang).normalized(), up, tang).orthonormalized()
+	var body := StaticBody3D.new()
+	add_child(body)
+	body.global_transform = Transform3D(bas, center)
+	var mat := Surfaces.metal(_wallc())
+	var parts: Array = []
+	# floor + ceiling, with 5.2 hatches when the chute passes through
+	for yspec in [[-2.4, floor_open], [2.4, top_open]]:
+		var yy := float(yspec[0])
+		if bool(yspec[1]):
+			parts.append([Vector3(7.0, 0.5, 0.9), Vector3(0, yy, 3.05)])
+			parts.append([Vector3(7.0, 0.5, 0.9), Vector3(0, yy, -3.05)])
+			parts.append([Vector3(0.9, 0.5, 5.2), Vector3(3.05, yy, 0)])
+			parts.append([Vector3(0.9, 0.5, 5.2), Vector3(-3.05, yy, 0)])
+		else:
+			parts.append([Vector3(7.0, 0.5, 7.0), Vector3(0, yy, 0)])
+	# four walls, each with a 2.4m doorway to its corridor
+	for wspec in [[Vector3(1.0, 0, 0), Vector3(0, 0, 1.0)],
+			[Vector3(0, 0, 1.0), Vector3(1.0, 0, 0)]]:
+		var ax: Vector3 = wspec[0]
+		var lat: Vector3 = wspec[1]
+		for sgn9 in [-1.0, 1.0]:
+			var wl := 2.05
+			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * wl,
+				4.3, absf(ax.z) * 0.5 + absf(lat.z) * wl),
+				ax * 3.25 * sgn9 + lat * 2.45])
+			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * wl,
+				4.3, absf(ax.z) * 0.5 + absf(lat.z) * wl),
+				ax * 3.25 * sgn9 - lat * 2.45])
+			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * 2.4,
+				1.1, absf(ax.z) * 0.5 + absf(lat.z) * 2.4),
+				ax * 3.25 * sgn9 + up * 0.0 + Vector3(0, 1.85, 0)])
+	for spec in parts:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = spec[0]
+		mi.mesh = bm
+		mi.position = spec[1]
+		mi.material_override = mat
+		body.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = spec[0]
+		cs.shape = bs
+		cs.position = spec[1]
+		body.add_child(cs)
+	# junction beacon light
+	var jl := MeshInstance3D.new()
+	var jlm := SphereMesh.new()
+	jlm.radius = 0.3
+	jlm.height = 0.6
+	jl.mesh = jlm
+	jl.position = Vector3(2.6, 1.6, 2.6)
+	jl.material_override = Destructible.make_material(accent, 2.4)
+	body.add_child(jl)
 
 func _bup(up: Vector3) -> Basis:
 	var x := up.cross(Vector3(0, 0, 1))
@@ -328,6 +404,26 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	var body := StaticBody3D.new()
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
+	# doorway TUNNEL collar: seals the sliver between corridor wall and
+	# room wall so nothing slips into the raw planet between them
+	for tcol in [[Vector3(1.2, 0.4, 2.6), Vector3(-4.55, 1.35, 0)],
+			[Vector3(1.2, 0.4, 2.6), Vector3(-4.55, -2.35, 0)],
+			[Vector3(1.2, 3.6, 0.4), Vector3(-4.55, -0.4, 1.35)],
+			[Vector3(1.2, 3.6, 0.4), Vector3(-4.55, -0.4, -1.35)]]:
+		var tb9 := StaticBody3D.new()
+		var tm9 := MeshInstance3D.new()
+		var tbm9 := BoxMesh.new()
+		tbm9.size = tcol[0]
+		tm9.mesh = tbm9
+		tm9.material_override = Surfaces.metal(Color("#2a2f3a"))
+		tb9.add_child(tm9)
+		var tc9 := CollisionShape3D.new()
+		var ts9 := BoxShape3D.new()
+		ts9.size = tcol[0]
+		tc9.shape = ts9
+		tb9.add_child(tc9)
+		body.add_child(tb9)
+		tb9.position = tcol[1]
 	# the DOOR: a glowing frame at the corridor end plus a slid-open
 	# panel -- someone lives here and left it ajar
 	for dpost in [-1.0, 1.0]:
@@ -536,6 +632,14 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	for ri in 3:
 		_spawn_resident(room_c + pdir * 0.6
 			+ tang * (-4.0 + 4.0 * float(ri)), pdir)
+	# core gravity is INSANE: every low hall gets a lift home
+	var lift := Gate.new().configure({
+		"target": _b.center + _mouth_dir * (float(_b.radius) + 1.5)
+			+ _mouth_e1 * 9.0, "zone": "",
+		"label": "TO SURFACE", "color": accent, "cube": true})
+	add_child(lift)
+	lift.global_transform = Transform3D(bas, room_c)
+	lift.translate_object_local(Vector3(-6.4, -2.6, 6.4))
 
 ## A premium core suite: double the floor, gold trim, a glass slab in
 ## the floor looking at the naked center of the planet.
@@ -601,6 +705,13 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
 	_tv(body, Vector3(4.5, -0.6, 0), Vector3(0, 0, 90))
+	var lift2 := Gate.new().configure({
+		"target": _b.center + _mouth_dir * (float(_b.radius) + 1.5)
+			+ _mouth_e1 * 9.0, "zone": "",
+		"label": "TO SURFACE", "color": accent, "cube": true})
+	add_child(lift2)
+	lift2.global_transform = Transform3D(bas, room_c)
+	lift2.translate_object_local(Vector3(3.8, -2.7, -3.8))
 	_spawn_resident(room_c + pdir * 0.4, pdir)
 
 ## Apartment television: a shared colony feed of the Datamosh studio
