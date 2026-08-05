@@ -1919,15 +1919,22 @@ static func rune_text(ex: Array) -> String:
 			out += ch
 	return out.strip_edges()
 
+# per-turn subtitle cues for the LAST rendered show: [start_sec, host, text]
+static var alien_cues: Array = []
+
 static func alien_render(ex: Array) -> AudioStreamWAV:
 	var bytes := PackedByteArray()
 	var gap := PackedByteArray()
 	gap.resize(int(SR * 0.45) * 2)
+	var cues: Array = []
 	for turn in ex:
 		var w := HumanVoice.render(str(turn[1]), ALIEN_HOSTS[int(turn[0])])
 		if w != null:
+			cues.append([float(bytes.size()) / 2.0 / float(SR),
+				int(turn[0]), str(turn[1])])
 			bytes.append_array(w.data)
 			bytes.append_array(gap)
+	alien_cues = cues
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = SR

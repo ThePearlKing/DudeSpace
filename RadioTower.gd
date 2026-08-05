@@ -495,7 +495,7 @@ func work(delta: float) -> void:
 			now_line_until = Game.playtime + 0.8
 		if Game.eh_log_t >= RadioLib.EH_END:
 			Game.eh_log_done = true
-	elif str(st["type"]) != "noodle":
+	elif str(st["type"]) != "noodle" and str(st["type"]) != "alien":
 		now_line_col = Color("#ffd166")
 	match str(st["type"]):
 		"music":
@@ -531,6 +531,24 @@ func work(delta: float) -> void:
 						# raw text -- the dish UI stretches it VISUALLY
 						now_line = "⊙: " + curc
 					now_line_until = Game.playtime + 1.2
+			# WTH: readable subtitles, one line per turn, tinted per orb
+			# (white anchor, gold analyst, purple wonderer, red deadpan)
+			if str(st["type"]) == "alien" and _talk.playing \
+					and RadioLib.alien_cues.size() > 0:
+				var apos := _talk.get_playback_position()
+				var cur_h := 0
+				var cur_txt := ""
+				for cue in RadioLib.alien_cues:
+					if apos >= float(cue[0]):
+						cur_h = int(cue[1])
+						cur_txt = str(cue[2])
+				if cur_txt != "":
+					if cur_txt != _last_cue:
+						_last_cue = cur_txt
+						now_line = "[%d] %s" % [cur_h + 1, cur_txt]
+						now_line_col = [Color("#e8e8f0"), Color("#ffd166"),
+							Color("#b388ff"), Color("#ff6a6a")][clampi(cur_h, 0, 3)]
+					now_line_until = Game.playtime + 1.0
 			_sentence_cd -= delta
 			if not _talk.playing and _sentence_cd <= 0.0:
 				var t := str(st["type"])
@@ -544,7 +562,7 @@ func work(delta: float) -> void:
 							_cook_line = line
 						"alien":
 							ex = RadioLib.alien_exchange()
-							_cook_line = RadioLib.rune_text(ex)
+							_cook_line = ""   # live per-orb cues instead of the rune wall
 						_:
 							_cook_line = ""
 				if _serve(func() -> AudioStreamWAV:
