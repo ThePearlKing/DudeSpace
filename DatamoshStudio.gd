@@ -576,7 +576,10 @@ func _process(delta: float) -> void:
 		_next_seg_t -= delta
 		if _next_seg_t <= 0.0 and not _cooking:
 			_cooking = true
-			var ex := RadioLib.alien_exchange(true)   # live: the guest is HERE
+			# in_room only when the player is PHYSICALLY at the studio; a
+			# colony TV viewer gets the WATCHED treatment instead -- the
+			# hosts know, and they use it to point at Harold
+			var ex := RadioLib.alien_exchange(here, remote_watch > 0.0)
 			_apply_topic(RadioLib.last_alien_meta)
 			WorkerThreadPool.add_task(func() -> void:
 				var cooked: Array = []

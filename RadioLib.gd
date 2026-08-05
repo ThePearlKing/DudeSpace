@@ -1418,6 +1418,20 @@ const AP_FOURTH_ROOM := [
 		"dude, leave the table alone. it is load-bearing. emotionally.",
 		"wave at the dude, everyone. professionally."]]
 
+const AP_FOURTH_TV := [
+	["we know you are watching this, dude. the colony screens work both ways.",
+		"listen carefully, because we can only say it once: go to Harold.",
+		"the little planet by the big hole. that is ALL we can say on air."],
+	["to the dude in front of the colony television: yes. this is for you.",
+		"the stone on Harold is older than this station, and it is MISSING a piece.",
+		"we are legally -- cosmically -- not allowed to finish that sentence."],
+	["camera four says you're watching. hello, dude.",
+		"when you're done down there: Harold. the stele. count the sides of the empty socket.",
+		"four. it's four. i've said too much. weather is next."],
+	["you. yes, you. the one the camera keeps following around.",
+		"important: Harold, by TIN 618. the monument remembers what fits in it.",
+		"and that is genuinely all we know. it scares us too."]]
+
 const AP_FOURTH := [
 	["instruments say someone OUTSIDE the system is decoding this signal. again.",
 		"hello, decoder. we count your clicks too.",
@@ -1730,7 +1744,7 @@ static func _ax_fresh(arr: Array) -> String:
 ## Topics rotate (no repeats back-to-back), lines assemble from parts,
 ## and RARELY the hosts notice they're being decoded -- or someone just
 ## quietly announces the foil cone. Unscheduled. Heartfelt.
-static func alien_exchange(in_room: bool = false) -> Array:
+static func alien_exchange(in_room: bool = false, watched: bool = false) -> Array:
 	# subjects: mostly the local shader system, but the desk follows the
 	# whole universe -- Earth, Jupiter, the humans, even the hole
 	var pool: Array = AP if randi() % 10 < 6 else AX_FAR
@@ -1792,9 +1806,13 @@ static func alien_exchange(in_room: bool = false) -> Array:
 				[2, _ax_opinion()]]
 		8:
 			# the FOURTH WALL segment: they know. they've always known.
-			# in the ROOM, they address the person standing there; over
-			# the dish, they address the decoder. never crossed.
-			if in_room:
+			# in the ROOM, they address the person standing there; on the
+			# colony TVs, they address the viewer and point at Harold --
+			# and can't say more; over the dish, the decoder. never crossed.
+			if not in_room and watched:
+				var fwt: Array = AP_FOURTH_TV[randi() % AP_FOURTH_TV.size()]
+				out = [[0, str(fwt[0])], [1, str(fwt[1])], [3, str(fwt[2])]]
+			elif in_room:
 				if randi() % 2 == 0:
 					var fwr: Array = AP_FOURTH_ROOM[randi() % AP_FOURTH_ROOM.size()]
 					out = [[0, str(fwr[0])], [1, str(fwr[1])], [3, str(fwr[2])]]
