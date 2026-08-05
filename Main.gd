@@ -4674,6 +4674,16 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	pmat.roughness = 1.0
 	pmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	plate.material_override = pmat
+	# solid hitbox over the whole carved front -- you don't fit in the
+	# mouth anyway, so the collider ignores the carving
+	var pbody := StaticBody3D.new()
+	var pcs := CollisionShape3D.new()
+	var pbs := BoxShape3D.new()
+	pbs.size = Vector3(hx * 2.0, hy * 2.0, zf - zback)
+	pcs.shape = pbs
+	pcs.position = Vector3(0, cy, (zf + zback) * 0.5)
+	pbody.add_child(pcs)
+	plate.add_child(pbody)
 	root.add_child(plate)
 	# six pictograms ringing the mouth
 	# ring nudged up + tightened so the bottom glyph clears the diamond
