@@ -131,6 +131,14 @@ class _MapView extends Control:
 			var col: Color = b.color
 			if b.kind == "blackhole":
 				col = Color(0.1, 0.1, 0.12)
+				# the accretion bands, same radii + colours as the real disk
+				for rs in [[1.25, 1.7, Color("#fff2c0", 0.5)],
+						[1.7, 2.3, Color("#ff9a1a", 0.4)],
+						[2.3, 3.1, Color("#ff4d1a", 0.3)],
+						[3.1, 4.2, Color("#7a1aff", 0.25)]]:
+					var mid: float = (float(rs[0]) + float(rs[1])) * 0.5
+					var wid: float = maxf(1.5, (float(rs[1]) - float(rs[0])) * b.radius * scale)
+					draw_arc(sp, b.radius * mid * scale, 0, TAU, 48, rs[2], wid)
 			draw_arc(sp, maxf(rad * 8.0, 8.0), 0, TAU, 40, Color(1, 1, 1, 0.10), 1.0)
 			draw_circle(sp, rad, col)
 			draw_arc(sp, maxf(rad, 3.0), 0, TAU, 24, Color.WHITE, 1.0)
