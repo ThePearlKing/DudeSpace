@@ -2427,6 +2427,7 @@ func _populate(b) -> void:
 				bench.yaw = atan2(tow.x, tow.z)
 				add_child(bench)
 				bench.global_transform = Transform3D(bb9, bpos)
+			_h_monument(b, hrng)
 		"venus":
 			# the pressure-cooker: glowing fissures, sulfur crusting everything
 			for i in _n(7):
@@ -4530,6 +4531,133 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 			lsh.rotate_object_local(Vector3.BACK, hrng.randf_range(-0.5, 0.5))
 			lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
 				hrng.randf_range(-2.2, 2.2))
+
+## The ANCIENT of Harold: a dusty monument out of the ground -- broad
+## footing, narrow waist, a crown wider (but no deeper) than the waist.
+## In the waist: a tetrahedral SLOT, apex pointing into the stone, ringed
+## by six carved pictograms. It does nothing. Yet.
+func _h_monument(b, hrng: RandomNumberGenerator) -> void:
+	var dir := _h_dir(hrng)
+	var bas := _basis_from_up(dir)
+	var root := Node3D.new()
+	add_child(root)
+	root.global_transform = Transform3D(bas, b.center + dir * b.radius)
+	var stone := Surfaces.stone(Color("#8a7f70"))
+	var dark := Surfaces.stone(Color("#6b6154"))
+	for spec in [[Vector3(11.0, 2.6, 7.0), 0.9], [Vector3(8.0, 2.2, 5.5), 3.2],
+			[Vector3(5.0, 4.5, 3.6), 6.35], [Vector3(11.5, 3.8, 3.2), 10.4]]:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = spec[0]
+		mi.mesh = bm
+		mi.material_override = dark if int(spec[1]) % 2 == 1 else stone
+		mi.position = Vector3(0, float(spec[1]), 0)
+		var shp := BoxShape3D.new()
+		shp.size = spec[0]
+		_rockify(mi, shp)
+		root.add_child(mi)
+	# weathered corner chips: it has STOOD here
+	for i in 5:
+		var ch := MeshInstance3D.new()
+		var chm := BoxMesh.new()
+		chm.size = Vector3(hrng.randf_range(0.5, 1.2), hrng.randf_range(0.3, 0.7),
+			hrng.randf_range(0.5, 1.0))
+		ch.mesh = chm
+		ch.material_override = dark
+		ch.position = Vector3(hrng.randf_range(-5.0, 5.0), 0.3, hrng.randf_range(2.8, 4.4))
+		ch.rotation = Vector3(hrng.randf_range(-0.3, 0.3), hrng.randf() * TAU, 0)
+		root.add_child(ch)
+	# the SLOT: a four-faced pyramid of absence, apex INTO the stone
+	var slot := MeshInstance3D.new()
+	var slm := CylinderMesh.new()
+	slm.top_radius = 0.0
+	slm.bottom_radius = 0.95
+	slm.height = 1.1
+	slm.radial_segments = 3
+	slot.mesh = slm
+	var smat := StandardMaterial3D.new()
+	smat.albedo_color = Color("#0b0a08")
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	slot.material_override = smat
+	slot.rotation_degrees = Vector3(-90, 0, 0)
+	slot.position = Vector3(0, 6.55, 1.27)
+	root.add_child(slot)
+	# six pictograms ringing the slot -- drawings, not runes
+	for g in 6:
+		var ga := TAU * float(g) / 6.0 + 0.26
+		_h_glyph(root, g, Vector3(cos(ga) * 1.65, 6.55 + sin(ga) * 1.65, 1.84))
+
+## One carved pictogram, flat on the monument face, drawn with thin
+## engraved bars. 0: the circle-with-a-dot and the spaghetti pouring
+## out. 1: the black hole with its ring. 2: an icosahedron in flat
+## perspective (hexagon + spokes). 3: a pyramid. 4: a watching eye.
+## 5: the fork.
+func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
+	var ink := Surfaces.stone(Color("#332a1f"))
+	var g := Node3D.new()
+	g.position = at
+	root.add_child(g)
+	var bar := func(sz: Vector2, pos: Vector2, rot: float) -> void:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(sz.x, sz.y, 0.05)
+		mi.mesh = bm
+		mi.material_override = ink
+		mi.position = Vector3(pos.x, pos.y, 0)
+		mi.rotation_degrees.z = rot
+		g.add_child(mi)
+	var ring := func(r_in: float, r_out: float, tilt: float) -> void:
+		var mi := MeshInstance3D.new()
+		var tm := TorusMesh.new()
+		tm.inner_radius = r_in
+		tm.outer_radius = r_out
+		mi.mesh = tm
+		mi.material_override = ink
+		mi.rotation_degrees = Vector3(90, 0, tilt)
+		g.add_child(mi)
+	match kind:
+		0:
+			# the circle, the dot, the spaghetti
+			ring.call(0.18, 0.24, 0.0)
+			bar.call(Vector2(0.08, 0.08), Vector2.ZERO, 0.0)
+			for si in 3:
+				bar.call(Vector2(0.05, 0.3), Vector2(-0.12 + 0.12 * float(si), -0.36), 18.0 - 14.0 * float(si))
+				bar.call(Vector2(0.05, 0.18), Vector2(-0.14 + 0.12 * float(si), -0.52), -20.0 + 16.0 * float(si))
+		1:
+			# the hole and its ring
+			ring.call(0.1, 0.2, 0.0)
+			bar.call(Vector2(0.62, 0.05), Vector2.ZERO, -18.0)
+			bar.call(Vector2(0.4, 0.04), Vector2(0, -0.07), -18.0)
+		2:
+			# icosahedron, flattened: hexagon with spokes to the corners
+			for hi in 6:
+				var ha := TAU * float(hi) / 6.0
+				var hb := TAU * float(hi + 1) / 6.0
+				var pa := Vector2(cos(ha), sin(ha)) * 0.3
+				var pb := Vector2(cos(hb), sin(hb)) * 0.3
+				var mid := (pa + pb) * 0.5
+				bar.call(Vector2(0.3, 0.045), mid, rad_to_deg((pb - pa).angle()))
+			for sp2 in 3:
+				var sa := TAU * float(sp2 * 2) / 6.0
+				bar.call(Vector2(0.3, 0.04), Vector2(cos(sa), sin(sa)) * 0.15, rad_to_deg(sa))
+		3:
+			# the pyramid
+			bar.call(Vector2(0.56, 0.05), Vector2(0, -0.2), 0.0)
+			bar.call(Vector2(0.62, 0.05), Vector2(-0.14, 0.02), 62.0)
+			bar.call(Vector2(0.62, 0.05), Vector2(0.14, 0.02), -62.0)
+		4:
+			# the watching eye
+			ring.call(0.16, 0.22, 0.0)
+			bar.call(Vector2(0.1, 0.1), Vector2.ZERO, 45.0)
+			for ri in 4:
+				var ra := TAU * float(ri) / 4.0 + TAU / 8.0
+				bar.call(Vector2(0.14, 0.04), Vector2(cos(ra), sin(ra)) * 0.34, rad_to_deg(ra))
+		5:
+			# the fork. it is coming.
+			bar.call(Vector2(0.06, 0.42), Vector2(0, -0.22), 0.0)
+			bar.call(Vector2(0.34, 0.05), Vector2(0, 0.02), 0.0)
+			for pi3 in 3:
+				bar.call(Vector2(0.05, 0.24), Vector2(-0.14 + 0.14 * float(pi3), 0.16), 0.0)
 
 ## A seeded random surface direction (deterministic geology).
 func _h_dir(r: RandomNumberGenerator) -> Vector3:

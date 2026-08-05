@@ -194,15 +194,17 @@ func set_spawn(pos: Vector3, up: Vector3) -> void:
 
 ## Strip carried items (keep coins + character) and send you to spawn.
 func reset_character() -> void:
-	Inventory.lose_half()   # resetting costs you 50% of carried coins too
-	Inventory.hotbar = []
-	for i in 5:
-		Inventory.hotbar.append(Inventory.empty_slot())
-	Inventory.selected = 0
-	Inventory.fuel = 0.0
-	Inventory.jet_fuel = 0.0
-	Inventory.has_jetpack = false
-	Inventory.has_rcs = false
+	# the KEEP INVENTORY cheat honors respawns too, not just deaths
+	if not keep_inv:
+		Inventory.lose_half()   # resetting costs you 50% of carried coins too
+		Inventory.hotbar = []
+		for i in 5:
+			Inventory.hotbar.append(Inventory.empty_slot())
+		Inventory.selected = 0
+		Inventory.fuel = 0.0
+		Inventory.jet_fuel = 0.0
+		Inventory.has_jetpack = false
+		Inventory.has_rcs = false
 	health = HEALTH_MAX
 	dead = false
 	mode = Mode.ON_FOOT
