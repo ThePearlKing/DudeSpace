@@ -100,7 +100,7 @@ func _process(delta: float) -> void:
 
 func open() -> void:
 	_input.visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_input.grab_focus()
 
 func close_chat() -> void:

@@ -464,16 +464,16 @@ func _on_killed() -> void:
 	_over.modulate = Color("#ff4444")
 	_over.text = "KILLED BY %s\n\nscore  %d\n\npress R to respawn" \
 		% [Game.death_cause.to_upper(), Game.score]
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _on_transformed() -> void:
 	_over.visible = true
 	_over.modulate = Color("#ff5aa0")
 	_over.text = "YOU ANGERED THE DESTRUCTION NOODLE GODS\n\nyou are now the Pythagorean theorem\n\na² + b² = c²\n\npress R to be reborn"
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _on_perma() -> void:
 	_over.visible = true
 	_over.modulate = Color("#c0c0ff")
 	_over.text = "PERMADEATH\n\nyour save is erased.\n\npress R to return to the title"
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

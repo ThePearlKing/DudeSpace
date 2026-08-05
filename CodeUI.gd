@@ -125,7 +125,7 @@ func open_for(machine) -> void:
 	_con_len = -1
 	_edit.text = machine.script_src
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_status.text = "editing %s" % machine.title
 	_status.modulate = Color(1, 1, 1, 0.7)
 	_edit.grab_focus()

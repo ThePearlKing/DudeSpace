@@ -426,7 +426,7 @@ func _import_skin() -> void:
 
 func open() -> void:
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_refresh_files()
 	_refresh_skin_imports()
 

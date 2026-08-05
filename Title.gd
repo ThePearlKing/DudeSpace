@@ -58,7 +58,7 @@ func _ready() -> void:
 	Engine.time_scale = 1.0
 	get_tree().paused = false
 	get_window().grab_focus()
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if not Settings.epilepsy_seen:
 		_show_epilepsy_note.call_deferred()
 	# back from a tutorial session: throw its world away

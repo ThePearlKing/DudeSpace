@@ -116,7 +116,7 @@ func _ready() -> void:
 func open_machine(m: Machine) -> void:
 	_m = m
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("click")
 	for c in _btn_box.get_children():
 		c.queue_free()

@@ -2187,7 +2187,7 @@ func _apple_prompt(slot: int) -> void:
 	row.add_child(no)
 
 	get_tree().paused = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var closer := func(eaten: bool) -> void:
 		layer.queue_free()
 		get_tree().paused = false

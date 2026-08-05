@@ -43,7 +43,7 @@ const SHOT := 0.55   # seconds per planet execution
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().paused = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 	var p = get_tree().get_first_node_in_group("player")
 	if p:
@@ -167,7 +167,7 @@ func _process(delta: float) -> void:
 				Engine.time_scale = 1.0
 				get_tree().change_scene_to_file("res://Title.tscn"))
 			_fade.get_parent().add_child(_title_btn)
-			Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		if _title_btn:
 			_title_btn.modulate.a = minf(1.0, _title_btn.modulate.a + delta * 0.35)
 		return

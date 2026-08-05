@@ -68,7 +68,7 @@ func open() -> void:
 	visible = true
 	_mode = "shell"
 	_out.scroll_following = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_out.clear()
 	_print("EUCLID TEMPLE OS v3.14")
 	if Game.door_open:

@@ -78,7 +78,7 @@ func _ready() -> void:
 
 func open() -> void:
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("learn", -8.0)
 	_refresh()
 

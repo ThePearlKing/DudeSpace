@@ -25,7 +25,7 @@ const C := 4.0   # 3-4-5, as the ancients demanded
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().paused = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("warp", -8.0)
 
 	var p = get_tree().get_first_node_in_group("player")

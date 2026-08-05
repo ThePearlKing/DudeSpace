@@ -346,7 +346,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _toggle() -> void:
 	visible = not visible
 	if visible:
-		Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_refresh()
 	else:
 		_flush_held()

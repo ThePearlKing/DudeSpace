@@ -84,7 +84,7 @@ func _ready() -> void:
 func open_pad(pad) -> void:
 	_pad = pad
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_name_edit.text = pad.tname
 	_rebuild()
 	Sfx.play("click")

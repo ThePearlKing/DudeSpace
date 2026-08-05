@@ -111,7 +111,7 @@ func open() -> void:
 	_month = int(d.month)
 	_year = int(d.year)
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_rebuild()
 	Sfx.play("click", -14.0)
 

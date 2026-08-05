@@ -1493,7 +1493,21 @@ func _process(delta: float) -> void:
 			Game.reset()
 			get_tree().reload_current_scene()
 
+var _refocus_capture := false
+
 func _notification(what: int) -> void:
+	# window loses focus (alt-tab, click away): free the mouse so it is
+	# never stuck in a windowed game; recapture on the way back in
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_refocus_capture = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+		if _refocus_capture:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		if _refocus_capture:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			_refocus_capture = false
+		# focused game belongs on TOP -- no file explorer floating over it
+		DisplayServer.window_move_to_foreground()
 	# window closed mid-run: save the exact position on the way out
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		Game.quitting = true   # cooked audio mid-flight must NOT land in

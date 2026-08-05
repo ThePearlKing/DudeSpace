@@ -206,9 +206,12 @@ func _toggle() -> void:
 		_cheats.visible = false
 	if _tp:
 		_tp.visible = false
-	get_tree().paused = _paused
+	# in a multiplayer session the WORLD never pauses -- freezing your
+	# own sim just parks you blind while everyone else keeps moving.
+	# The menu still opens; the universe keeps going behind it.
+	get_tree().paused = _paused and not Net.active
 	if _paused:
-		Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif not Game.dead and not _any_ui_open():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -515,7 +518,7 @@ func _quit_title() -> void:
 	Save.save_progress()
 	get_tree().paused = false
 	Engine.time_scale = 1.0
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file("res://Title.tscn")
 
 func _any_ui_open() -> bool:

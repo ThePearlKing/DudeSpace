@@ -133,7 +133,7 @@ func open(chest) -> void:
 	_chest = chest
 	_title.text = "CHEST"
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_refresh()
 
 func open_backpack(kind: String = "backpack") -> void:
@@ -148,7 +148,7 @@ func open_backpack(kind: String = "backpack") -> void:
 			_chest = PackRef.new(Inventory.backpack_store)
 			_title.text = "BACKPACK"
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("click")
 	_refresh()
 

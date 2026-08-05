@@ -97,7 +97,7 @@ func _ready() -> void:
 
 func open() -> void:
 	visible = true
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("click", -14.0)
 
 func close_ui() -> void:

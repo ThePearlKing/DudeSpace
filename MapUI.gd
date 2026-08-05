@@ -31,7 +31,7 @@ func open_select(cb: Callable) -> void:
 	visible = true
 	pan = Vector2.ZERO
 	_dragging = false
-	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("click", -14.0)
 
 ## Which body sits under this screen point? (same transform as _draw)
@@ -70,7 +70,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			visible = true
 			pan = Vector2.ZERO
 			_dragging = false
-			Input.mouse_mode = Input.MOUSE_MODE_CONFINED   # free mouse to drag
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE   # free mouse to drag
 		Sfx.play("click", -14.0)
 		get_viewport().set_input_as_handled()
 		return
