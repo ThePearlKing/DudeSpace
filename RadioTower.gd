@@ -633,8 +633,12 @@ func _process(d: float) -> void:
 		if gx.length() < 0.05:
 			gx = aim_dir.cross(global_transform.basis.x)
 		gx = gx.normalized()
-		_dish_pivot.global_transform.basis = Basis(gx,
-			gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
+		# SLERP to the target: near-vertical aims used to flip the
+		# reference axis between two branches in a single frame -- the
+		# dish visibly 'nudged an inch' and froze. Now it sweeps.
+		var want_b := Basis(gx, gx.cross(gz).normalized() * -1.0, gz).orthonormalized()
+		_dish_pivot.global_transform.basis = _dish_pivot.global_transform.basis \
+			.orthonormalized().slerp(want_b, minf(1.0, d * 7.0))
 	_update_beam(d)
 	# a discharged control coil silences the set COMPLETELY
 	if has_coil and coil_node != null and is_instance_valid(coil_node) \
