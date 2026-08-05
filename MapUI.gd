@@ -154,6 +154,21 @@ class _MapView extends Control:
 			draw_arc(sp, maxf(rad, 3.0), 0, TAU, 24, Color.WHITE, 1.0)
 			draw_string(font, sp + Vector2(rad + 4, 4), b.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.8))
 
+		# mine + colony mouths: small rings on their planets
+		var cs9 = get_tree().current_scene
+		if cs9 != null:
+			for dspec in [["MINE_DIRS", Color("#ffcf40", 0.75)],
+					["COLONY_DIRS", Color("#33ff99", 0.75)]]:
+				var dd9 = cs9.get(str(dspec[0]))
+				if dd9 is Dictionary:
+					for bn in dd9:
+						var bb9 = Universe.body_named(str(bn))
+						if bb9 == null:
+							continue
+						var mp9: Vector3 = bb9.center \
+							+ (dd9[bn] as Vector3) * float(bb9.radius)
+						var msp := c + Vector2(mp9.x - origin.x, mp9.z - origin.z) * scale
+						draw_arc(msp, 5.0, 0, TAU, 12, dspec[1], 1.5)
 		# rocket trajectory prediction -- SIMULATED at 10Hz, drawn every
 		# frame. 240 gravity integrations per draw was the map's laptop
 		# tax; the path doesn't change faster than the rocket does.

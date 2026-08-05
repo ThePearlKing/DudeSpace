@@ -119,6 +119,13 @@ func _ready() -> void:
 			# chestplate photobombs first person for a frame on hotbar scroll
 			_apply_body_vis())
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# dying pins a locator ping on the spot -- your stuff is THERE
+	Game.killed.connect(func() -> void:
+		Game.locator_planet = ""
+		Game.locator_targets = [global_position]
+		Game.locator_label = "WHERE YOU DIED"
+		Game.locator_lie = 1.0
+		Game.locator_until = Game.playtime + 240.0)
 
 func _char_color() -> Color:
 	var hex: String = Save.character.get("color", "3aa0ff")

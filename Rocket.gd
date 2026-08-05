@@ -37,6 +37,7 @@ var _engine_on: bool = false
 var _f_held: bool = false
 var _traj_t: float = 0.0
 var _fuel_last: float = -1.0
+var _cam_up_s := Vector3.UP   # smoothed camera reference (no SOI snap)
 
 func _ready() -> void:
 	add_to_group("rocket")
@@ -178,6 +179,7 @@ func board(p: Player) -> void:
 	_smash_area.monitoring = true
 	p.enter_vehicle()
 	_cam.current = true
+	_cam_up_s = (global_position - Universe.nearest(global_position).center).normalized()
 	_ensure_traj()
 	set_physics_process(true)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -292,7 +294,12 @@ func _physics_process(delta: float) -> void:
 	# KSP-style orbit camera: anchored to LOCAL UP (radial from the nearest
 	# planet), NOT the ship's facing. The rocket tumbles freely in view; the
 	# camera stays level with the world.
-	var cam_up := (global_position - Universe.nearest(global_position).center).normalized()
+	# SMOOTHED reference up: crossing into another planet's influence
+	# used to flip this vector instantly -- and with it the camera
+	# frame, INVERTING the controls mid-flight. Now it eases over.
+	var cam_up_raw := (global_position - Universe.nearest(global_position).center).normalized()
+	_cam_up_s = _cam_up_s.slerp(cam_up_raw, minf(1.0, delta * 2.0)).normalized()
+	var cam_up := _cam_up_s
 	var ct := Vector3(0, 1, 0)
 	if absf(cam_up.dot(ct)) > 0.99:
 		ct = Vector3(1, 0, 0)
