@@ -4410,6 +4410,11 @@ func _spawn_starship() -> void:
 func _surface_dir() -> Vector3:
 	return Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)).normalized()
 
+## A seeded random surface direction (deterministic geology).
+func _h_dir(r: RandomNumberGenerator) -> Vector3:
+	var v := Vector3(r.randf_range(-1, 1), r.randf_range(-1, 1), r.randf_range(-1, 1))
+	return v.normalized() if v.length() > 0.05 else Vector3.UP
+
 func _basis_from_up(up: Vector3) -> Basis:
 	var t := Vector3(0, 1, 0)
 	if absf(up.dot(t)) > 0.99:
