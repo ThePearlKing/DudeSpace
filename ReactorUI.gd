@@ -372,18 +372,24 @@ func _draw_pool() -> void:
 	if rx == null or not is_instance_valid(rx):
 		return
 	var szp := _pool_view.size
-	var glow := clampf(0.08 + rx.power * 0.8 + rx.temp / 100.0 * 0.4, 0.0, 1.0)
-	# matches the tank: real Cherenkov blue (~450nm), whitening only
-	# when the core is truly screaming
-	var blue := Color(0.25, 0.45, 1.0).lerp(Color(0.8, 0.9, 1.0),
-		clampf((glow - 0.7) / 0.3, 0.0, 1.0))
-	_pool_view.draw_rect(Rect2(Vector2.ZERO, szp),
-		Color(0.02, 0.05 + glow * 0.12, 0.1 + glow * 0.3, 0.9))
+	# Cherenkov intensity rides the reaction hard: power lights it,
+	# and a truly HOT core (999°C) blazes instead of hinting
+	var glow := clampf(0.05 + rx.power * 1.3 + pow(rx.temp / 100.0, 1.4) * 0.9, 0.0, 1.0)
+	# the real color: saturated ~450nm electric blue, bleaching toward
+	# white only at the top of the scale
+	var blue := Color(0.16, 0.45, 1.0).lerp(Color(0.75, 0.88, 1.0),
+		clampf((glow - 0.85) / 0.15, 0.0, 1.0))
+	var water := Color(0.01, 0.03, 0.08, 0.92).lerp(
+		Color(blue.r * 0.4, blue.g * 0.5, blue.b * 0.7, 0.95), glow)
+	_pool_view.draw_rect(Rect2(Vector2.ZERO, szp), water)
 	for i in 5:
 		var x := szp.x * (0.15 + 0.175 * float(i))
-		if glow > 0.05:
-			_pool_view.draw_rect(Rect2(Vector2(x - 8, szp.y * 0.1),
-				Vector2(16, szp.y * 0.8)), Color(blue.r, blue.g, blue.b, glow * 0.28))
+		if glow > 0.04:
+			# wide halo, then a hot inner sheath -- it should LOOK lit
+			_pool_view.draw_rect(Rect2(Vector2(x - 12, szp.y * 0.08),
+				Vector2(24, szp.y * 0.84)), Color(blue.r, blue.g, blue.b, glow * 0.3))
+			_pool_view.draw_rect(Rect2(Vector2(x - 7, szp.y * 0.1),
+				Vector2(14, szp.y * 0.8)), Color(blue.r, blue.g, blue.b, glow * 0.5))
 		_pool_view.draw_rect(Rect2(Vector2(x - 4, szp.y * 0.12),
 			Vector2(8, szp.y * 0.76)), Color(0.27, 0.29, 0.32).lerp(blue, glow))
 	var bh := szp.y * 0.76 * clampf(rx.rods, 0.0, 1.0)
