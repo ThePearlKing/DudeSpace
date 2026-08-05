@@ -1108,7 +1108,8 @@ func _process(delta: float) -> void:
 	if bh:
 		var d := pos.distance_to(bh.center)
 		var horizon := bh.radius
-		var influence := horizon * 10.0
+		# dilation hugs the event horizon -- not a system-wide field
+		var influence := horizon * 2.2
 		if d < influence:
 			var t := clampf((d - horizon) / (influence - horizon), 0.0, 1.0)
 			Game.dilation = maxf(0.005, pow(t, 1.8))

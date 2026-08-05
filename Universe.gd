@@ -58,9 +58,9 @@ func _ready() -> void:
 	_def("Crystalia",Vector3(-9000, 4000, -8000),90.0,  9.0,  "crystal",   Color("#40e0d0"))
 	# --- TIN 618: a black hole. Extreme pull, endless fall, time dilation. ---
 	_def("TIN 618",  Vector3(40000, -3000, 34000), 1100.0, 80.0, "blackhole", Color("#000000"))
-	# Harold: a tired old rock parked beside the black hole, 11600m out --
-	# just past the 11000m dilation edge. Big enough to LAND on. He's fine.
-	_def("Harold",   Vector3(40000 + 11600, -3000, 34000), 130.0, 8.0, "harold", Color("#8f8377"))
+	# Harold: a tired old rock parked beside the black hole, 9500m out.
+	# Dilation only bites within ~2400m of the horizon now. He's fine.
+	_def("Harold",   Vector3(40000 + 9500, -3000, 34000), 130.0, 8.0, "harold", Color("#8f8377"))
 	# --- the ACTUAL Sol system. Yes, that one. Far out in -X, long haul. ---
 	var SC := Vector3(-52000, 3000, 14000)   # Sol system centre
 	_def("Sol",      SC,                          420.0, 26.0, "sun",     Color("#fff4d6"))
