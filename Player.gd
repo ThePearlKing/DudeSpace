@@ -247,7 +247,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	# lives on the Furniture Placer
 	if _hwreck_mode and Inventory.slot_id(Inventory.selected) != "housekit":
 		_hwreck_mode = false
-		_hwreck_pending = null
 	if _hwreck_mode and event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		_hwreck_click()
@@ -256,7 +255,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _hwreck_mode and event is InputEventKey and event.pressed \
 			and event.keycode == KEY_ESCAPE:
 		_hwreck_mode = false
-		_hwreck_pending = null
 		Sfx.play("click", -18.0)
 		get_viewport().set_input_as_handled()
 		return
@@ -336,9 +334,10 @@ var _ghost_yaw := 0.0
 var _door_mode: bool = false      # door tool armed: clicks select frames
 var _door_frame: Node3D = null    # first frame clicked
 var _wreck_mode: bool = false     # DESTROY tool: clicks break furniture
-var _hwreck_mode: bool = false    # house DELETE tool: clicks demolish houses
+var _hwreck_mode: bool = false    # DELETE tool: one click demolishes houses/machines
 var _ring_snap: bool = true       # station docks curve around the planet (T)
-var _hwreck_pending = null        # house awaiting its confirming second click
+var _hwreck_hl: MeshInstance3D = null   # red preview box over the doomed target
+var _hwreck_target = null
 
 ## The Door tool: OUTSIDE, pick house A (with a free frame), then
 ## house B. They dock into one build, hallway and all.
@@ -454,7 +453,9 @@ func _furn_under_crosshair() -> Furniture:
 			n = n.get_parent()
 	return null
 
-func _house_under_crosshair() -> House:
+## What the DELETE tool would eat: any house or ANY machine (chests,
+## electric, radio -- everything that extends Machine).
+func _delete_target_under_crosshair() -> Node3D:
 	var space := get_world_3d().direct_space_state
 	var from := _camera.global_position
 	var q := PhysicsRayQueryParameters3D.create(from,
@@ -464,35 +465,80 @@ func _house_under_crosshair() -> House:
 	if hit:
 		var n: Node = hit.collider
 		while n:
-			if n is House:
+			if n is House or n is Machine:
 				return n
 			n = n.get_parent()
 	return null
 
-## House DELETE tool. Houses ask for a confirming second click;
-## station platforms are structure, not homes -- they go on the first.
+func _delete_size(t: Node3D) -> Vector3:
+	if t is House:
+		match t.kind:
+			"station": return Vector3(26.4, 1.7, 26.4)
+			"moonbase": return Vector3(16.0, 6.0, 12.0)
+			"two_story": return Vector3(5.8, 6.6, 5.8)
+			"factory": return Vector3(8.6, 5.0, 8.6)
+			"tower": return Vector3(4.6, 18.4, 4.6)
+			"box": return Vector3(4.0, 3.4, 4.0)
+			_: return Vector3(5.8, 3.9, 5.8)
+	if t is Machine:
+		return t.box_size + Vector3(0.4, 1.2, 0.4)   # stacks poke above the box
+	return Vector3(1.6, 1.6, 1.6)
+
+func _delete_center(t: Node3D) -> Vector3:
+	if t is House and t.kind == "station":
+		return t.global_position
+	var sz := _delete_size(t)
+	return t.global_position + t.global_transform.basis.y * (sz.y * 0.45)
+
+## Red hologram over whatever the DELETE tool is aimed at, so a
+## misclick is impossible: you always see what dies before it does.
+func _update_hwreck_preview() -> void:
+	var t: Node3D = _delete_target_under_crosshair() if _hwreck_mode else null
+	if t != null and not is_instance_valid(t):
+		t = null
+	if t != _hwreck_target:
+		_hwreck_target = t
+		if _hwreck_hl and is_instance_valid(_hwreck_hl):
+			_hwreck_hl.queue_free()
+		_hwreck_hl = null
+		if t != null:
+			_hwreck_hl = MeshInstance3D.new()
+			var bm3 := BoxMesh.new()
+			bm3.size = _delete_size(t)
+			_hwreck_hl.mesh = bm3
+			var m3 := StandardMaterial3D.new()
+			m3.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m3.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			m3.cull_mode = BaseMaterial3D.CULL_DISABLED
+			m3.albedo_color = Color(1.0, 0.14, 0.1, 0.26)
+			_hwreck_hl.material_override = m3
+			get_tree().current_scene.add_child(_hwreck_hl)
+	if _hwreck_hl != null and t != null:
+		_hwreck_hl.global_transform = Transform3D(
+			t.global_transform.basis, _delete_center(t))
+		# breathing pulse so it reads as a warning, not decoration
+		var mm := _hwreck_hl.material_override as StandardMaterial3D
+		mm.albedo_color.a = 0.18 + 0.12 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008))
+
+## DELETE tool: ONE click, no confirm -- the preview box IS the
+## confirmation. Houses refund the kit; machines refund themselves.
 func _hwreck_click() -> void:
 	_cooldown = 0.3
-	var hud = get_tree().get_first_node_in_group("hud")
-	var h := _house_under_crosshair()
-	if h == null:
+	var t := _delete_target_under_crosshair()
+	if t == null:
 		Sfx.play("denied", -18.0)
 		return
-	if not Net.can_break(str(h.get_meta("owner", ""))):
+	if not Net.can_break(str(t.get_meta("owner", ""))):
 		Sfx.play("denied")
 		return
-	if h.kind != "station" and _hwreck_pending != h:
-		_hwreck_pending = h
-		if hud:
-			hud.flash("click %s again to demolish it — the kit comes back" % h.display_name())
-		Sfx.play("click", -14.0)
-		return
-	_hwreck_pending = null
-	Inventory.give("housekit", 1)
-	Destructible.spawn_debris(h.get_parent(), h.global_position,
-		Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
-	Sfx.play("explode", -10.0)
-	h.queue_free()
+	if t is House:
+		Inventory.give("housekit", 1)
+		Destructible.spawn_debris(t.get_parent(), t.global_position,
+			Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
+		Sfx.play("explode", -10.0)
+		t.queue_free()
+	elif t is Machine:
+		t._on_destroyed(Vector3.UP)   # refunds itself + slots, drops cables
 
 func _wreck_click() -> void:
 	_cooldown = 0.3
@@ -597,7 +643,7 @@ func _start_ghost(cat: String, kind: String) -> void:
 	if kind == "station":
 		var hudg = get_tree().get_first_node_in_group("hud")
 		if hudg:
-			hudg.flash("RING SNAP %s — [T] toggles. On: docked pieces curve around the planet" % ("ON" if _ring_snap else "OFF"))
+			hudg.flash("RING SNAP %s — [T] toggles · hold CTRL to place free (no dock)" % ("ON" if _ring_snap else "OFF"))
 	_ghost_cat = cat
 	_ghost_kind = kind
 	_ghost = MeshInstance3D.new()
@@ -680,12 +726,13 @@ func _update_ghost() -> void:
 		var foot := global_position - upS * 1.6
 		var near_g: House = null
 		var ngd := 45.0
-		for h in get_tree().get_nodes_in_group("house"):
-			if h is House and h.kind == "station" and is_instance_valid(h):
-				var d: float = h.global_position.distance_to(foot)
-				if d < ngd:
-					ngd = d
-					near_g = h
+		if not Input.is_key_pressed(KEY_CTRL):   # CTRL: place free, no dock
+			for h in get_tree().get_nodes_in_group("house"):
+				if h is House and h.kind == "station" and is_instance_valid(h):
+					var d: float = h.global_position.distance_to(foot)
+					if d < ngd:
+						ngd = d
+						near_g = h
 		if near_g != null:
 			var dock := _station_dock_tf(near_g, foot)
 			_ghost.global_transform = Transform3D(dock.basis,
@@ -730,12 +777,13 @@ func _confirm_ghost() -> void:
 		var hudn = get_tree().get_first_node_in_group("hud")
 		var near_st: House = null
 		var nd := 45.0
-		for h in get_tree().get_nodes_in_group("house"):
-			if h is House and h.kind == "station" and is_instance_valid(h):
-				var d: float = h.global_position.distance_to(base_pos)
-				if d < nd:
-					nd = d
-					near_st = h
+		if not Input.is_key_pressed(KEY_CTRL):   # CTRL: place free, no dock
+			for h in get_tree().get_nodes_in_group("house"):
+				if h is House and h.kind == "station" and is_instance_valid(h):
+					var d: float = h.global_position.distance_to(base_pos)
+					if d < nd:
+						nd = d
+						near_st = h
 		var sbasis := tf.basis
 		var spos := base_pos
 		if near_st != null:
@@ -1050,6 +1098,7 @@ func _physics_process(delta: float) -> void:
 		_cooldown = float(Inventory.current_weapon()["rate"])
 	_update_shake(delta)
 	_update_hand(delta)
+	_update_hwreck_preview()
 	_update_tool_hover()
 
 	# third-person body animation + jetpack on the back
@@ -1877,10 +1926,9 @@ func _use_selected() -> void:
 						_hwreck_mode = true
 						_door_mode = false
 						_wreck_mode = false
-						_hwreck_pending = null
 						var hudh = get_tree().get_first_node_in_group("hud")
 						if hudh:
-							hudh.flash("DELETE — click a house to demolish it (Esc stops)")
+							hudh.flash("DELETE — click any house or machine. ONE click. the red box shows what dies (Esc stops)")
 					else:
 						_start_ghost("house", kind))
 			get_tree().current_scene.add_child(pui)
