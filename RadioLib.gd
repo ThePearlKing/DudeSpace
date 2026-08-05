@@ -500,8 +500,19 @@ static func bh_presence() -> AudioStreamWAV:
 		var lp3 := t3 / 22.0 * TAU
 		buf[i] += (sin(TAU * 349.2 * t3) * (0.5 + 0.5 * sin(lp3 * 2.0 + 1.0)) \
 			+ sin(TAU * 466.2 * t3) * (0.5 + 0.5 * sin(lp3 * 3.0 + 3.9)) \
-			+ sin(TAU * 523.3 * t3) * (0.5 + 0.5 * sin(lp3 * 5.0 + 2.2))) * 0.03
-		buf[i] *= 0.8 + 0.2 * sin(lp3 + 4.6)
+			+ sin(TAU * 523.3 * t3) * (0.5 + 0.5 * sin(lp3 * 5.0 + 2.2)) \
+			+ sin(TAU * 659.3 * t3) * (0.5 + 0.5 * sin(lp3 * 4.0 + 0.7)) \
+			+ sin(TAU * 698.5 * t3) * (0.5 + 0.5 * sin(lp3 * 7.0 + 5.1))) * 0.045
+		buf[i] *= 0.76 + 0.24 * sin(lp3 + 4.6)
+	# THE TOLL: once per loop, a vast deep bell strikes somewhere inside
+	# the geometry and takes eight seconds to let go
+	var bell0 := int(3.0 * SR)
+	for i in int(12.0 * SR):
+		var tb := float(i) / SR
+		var env := exp(-tb / 3.2) * minf(1.0, tb * 30.0)
+		buf[bell0 + i] += (sin(TAU * 98.0 * tb) + 0.6 * sin(TAU * 98.0 * 2.4 * tb) \
+			+ 0.35 * sin(TAU * 98.0 * 3.9 * tb) + 0.2 * sin(TAU * 98.0 * 5.4 * tb)) \
+			* env * 0.11
 	var out := PackedFloat32Array()
 	out.resize(total)
 	var xf := render - total
