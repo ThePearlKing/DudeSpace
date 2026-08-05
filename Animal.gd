@@ -83,6 +83,7 @@ var _fly_chase: bool = false
 var genome: int = -1   # deterministic body seed: same genome = same animal
 
 var flat_home := false   # lives on a flat interior floor (house pocket)
+var _flat_t := 0.0       # next self-check of the above
 
 func setup(home_body, ground_only: bool = false, bug: bool = false, genome_in: int = -1) -> void:
 	_home = home_body
@@ -206,9 +207,13 @@ func _physics_process(delta: float) -> void:
 	if tamed:
 		# pets re-home to whatever planet they're on now
 		_home = Universe.nearest(global_position)
-		var pz = get_tree().get_first_node_in_group("player")
-		if pz != null and pz.global_position.distance_to(global_position) < 60.0:
-			flat_home = Game.zone == "flat"   # follows you indoors and out
+	# flat-or-not comes from the animal's OWN position, re-checked every
+	# second -- inferring it from the player's zone went stale the moment
+	# you walked off without the pet
+	_flat_t -= delta
+	if _flat_t <= 0.0:
+		_flat_t = 1.0
+		flat_home = Zones.exterior_of(global_position) != global_position
 	var g: float = _home.g_surf
 	var up := Universe.surface_up(_home, global_position)
 	# GRAVITY LEASH: land animals do not go to space. Pine colliders and

@@ -133,6 +133,9 @@ func _input(event: InputEvent) -> void:
 	# rebind capture: the next key pressed becomes the binding
 	if _rebind_action == "" or not (event is InputEventKey) or not event.pressed:
 		return
+	# typing in a text field (username box) must never feed the binder
+	if get_viewport().gui_get_focus_owner() is LineEdit:
+		return
 	if event.keycode != KEY_ESCAPE:
 		Settings.keys[_rebind_action] = event.keycode
 		Settings.save_cfg()

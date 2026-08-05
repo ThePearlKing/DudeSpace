@@ -123,13 +123,15 @@ func _process(delta: float) -> void:
 	_ring_mat.albedo_color.a = maxf(0.0, 0.7 - _t * 0.28)
 	_ring.visible = _ring_mat.albedo_color.a > 0.01
 	_light.light_energy = maxf(0.0, 9.0 * (1.0 - _t / 6.0))
-	# funeral orbit
+	# funeral orbit: WIDE view, always centered on the blast, high
+	# enough to keep the horizon and the cloud in frame together
 	if _cam != null:
-		var ang := _t * 0.22
-		var dist := (26.0 + 14.0 * _y)
-		_cam.position = Vector3(cos(ang) * dist, cap_h * 0.5 + 6.0 + _t * 0.8,
-			sin(ang) * dist)
-		_cam.look_at(global_position + global_transform.basis.y * cap_h * 0.8,
+		var ang := _t * 0.16
+		var dist := 55.0 + 30.0 * _y
+		_cam.fov = 72.0
+		_cam.position = Vector3(cos(ang) * dist,
+			cap_h * 0.75 + 16.0 + _t * 1.2, sin(ang) * dist)
+		_cam.look_at(global_position + global_transform.basis.y * (cap_h * 0.55),
 			global_transform.basis.y)
 	# the long fade, then gone
 	if _t > 30.0:

@@ -88,7 +88,7 @@ func _boom() -> void:
 	if Net.active:
 		for pid in Net.player_names.keys():
 			var av = Net.avatar_position(int(pid))
-			if av == null:
+			if not (av is Vector3):
 				continue
 			var dpe: float = (av as Vector3).distance_to(pos)
 			if dpe < HURT_R:
