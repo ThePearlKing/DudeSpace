@@ -36,7 +36,9 @@ func _ready() -> void:
 	col.add_child(title)
 
 	col.add_child(_btn("Resume", _toggle))
-	col.add_child(_btn("Open to LAN", _open_lan))
+	if not (Net.active and not Net.is_host):
+		# guests don't get to open someone ELSE'S world to LAN
+		col.add_child(_btn("Open to LAN", _open_lan))
 	col.add_child(_btn("Options", _open_options))
 	col.add_child(_btn("Cheats", _open_cheats))
 	col.add_child(_btn("Edit Character (look)", _open_editor))
@@ -434,6 +436,18 @@ func _open_tp() -> void:
 		btn.pressed.connect(func() -> void:
 			_tp_to(body))
 		list.add_child(btn)
+	# your FRIENDS are destinations too
+	if Net.active:
+		for pid in Net.player_names.keys():
+			var pd := int(pid)
+			var pbtn := Button.new()
+			pbtn.text = "→ %s" % str(Net.player_names[pid])
+			pbtn.custom_minimum_size = Vector2(250, 38)
+			pbtn.pressed.connect(func() -> void:
+				if Net.player_pos.has(pd):
+					var pup: Vector3 = Net.player_ups.get(pd, Vector3.UP)
+					_tp_pos((Net.player_pos[pd] as Vector3) + pup * 1.5, Game.zone, Game.zone_g))
+			list.add_child(pbtn)
 	# places that aren't planets
 	var pois := [
 		["Shadow Temple", Zones.shadow_temple_spawn(), "flat", 9.0],

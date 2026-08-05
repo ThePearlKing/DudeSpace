@@ -1886,17 +1886,9 @@ func _planet_material(kind: String, color: Color) -> Material:
 			return ShaderLib.make(kind, color)
 		"earth":
 			return _earth_material()
-		"luna":
-			# the Moon is BLINDING: hot white emission, blooms like a
-			# lamp hung in the night sky
-			var lwrap := StandardMaterial3D.new()
-			lwrap.albedo_color = Color("#eef0f6")
-			lwrap.emission_enabled = true
-			lwrap.emission = Color("#f8f8ff")
-			lwrap.emission_energy_multiplier = 2.4
-			lwrap.roughness = 0.9
-			return lwrap
-		"mercury":
+		"luna", "mercury":
+			# honest rock. the blinding-lamp moon experiment looked like a
+			# glowing egg with craters -- reverted
 			return _rocky_material(color)
 		"harold":
 			# big planet, small grain: 6x tighter noise so the rock still
@@ -2265,6 +2257,12 @@ func _populate(b) -> void:
 		"blind":
 			_register_crates(b, 12, 30)
 		"earth":
+			for i9 in _n(30):
+				# Earth grows fiber too -- bring the knife
+				var ep9 := Plant.new()
+				add_child(ep9)
+				var epd9 := _surface_dir()
+				ep9.global_transform = Transform3D(_basis_from_up(epd9), b.center + epd9 * b.radius)
 			# the most famous planet in the universe, populated by its
 			# dumbest species. trees, lakescape greens, wandering Humans.
 			# earth trees only -- no alien Verdant flora here. brown bark,
@@ -2667,6 +2665,13 @@ func _populate(b) -> void:
 		"varnisol":
 			# Varnisol: the gentle one. Pine woods, a big lake, wildlife.
 			_spawn_res_nodes(b, 7, "coal", 2)   # forest coal under the pines
+			for i in _n(40):
+				# knife-harvestable undergrowth: plant fiber grows here
+				var vp := Plant.new()
+				add_child(vp)
+				var vpd := _surface_dir()
+				vp.global_transform = Transform3D(_basis_from_up(vpd),
+					b.center + vpd * b.radius)
 			var grove := _surface_dir()
 			for i in _n(34):
 				var pd := (grove + Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2),
@@ -4180,20 +4185,29 @@ func _on_net_pos(id: int, pos: Vector3, up: Vector3, fwd: Vector3, state: Dictio
 	av.visible = true
 	e["jet"] = bool(state.get("jet", false))
 	e["in_rocket"] = bool(state.get("rocket", false))
+	e["warp"] = float(state.get("warp", 1.0))
 	# flying friends show as a rocket, not a floating body
 	_sync_peer_rocket(e, id, bool(state.get("mk2", false)))
 	# player origin = capsule CENTRE; the avatar model's origin is its FEET
 	var foot := pos - up.normalized() * (0.0 if e["in_rocket"] else 1.0)
-	var prev: Vector3 = av.global_position
+	# INTERPOLATION TARGET, not a teleport: packets land at 10Hz; the
+	# avatar chases the predicted position every frame in
+	# _animate_avatars. Half-lerp-on-receive was both the stutter AND
+	# the trailing-behind.
+	var nowp := Time.get_ticks_msec() / 1000.0
+	var dtp := clampf(nowp - float(e.get("pkt_t", nowp - 0.1)), 0.033, 0.3)
+	var old_t: Vector3 = e.get("target", foot)
+	e["tvel"] = (foot - old_t) / dtp
+	e["target"] = foot
+	e["pkt_t"] = nowp
 	var x := up.cross(fwd)
 	if x.length() > 0.001 and fwd.length() > 0.001:
-		av.global_transform = Transform3D(
-			Basis(x.normalized(), up.normalized(), -fwd.normalized()).orthonormalized(),
-			prev.lerp(foot, 0.5) if prev.distance_to(foot) < 40.0 else foot)
-	else:
-		av.global_position = foot
-	# walking speed from packet spacing (10 Hz), smoothed; grounded guess
-	e["speed"] = lerpf(float(e["speed"]), prev.distance_to(av.global_position) * 10.0, 0.5)
+		e["tbasis"] = Basis(x.normalized(), up.normalized(),
+			-fwd.normalized()).orthonormalized()
+	if av.global_position.distance_to(foot) > 40.0:
+		av.global_position = foot   # true teleports snap
+		e["tvel"] = Vector3.ZERO
+	e["speed"] = lerpf(float(e["speed"]), (e["tvel"] as Vector3).length(), 0.5)
 	var b = Universe.nearest(pos)
 	e["grounded"] = pos.distance_to(b.center) < b.radius + 2.2
 
@@ -4205,12 +4219,44 @@ func _animate_avatars(delta: float) -> void:
 		var h = e["human"]
 		if not is_instance_valid(h):
 			continue
+		# chase the predicted position: target + velocity * packet age.
+		# smooth at every frame rate, no trailing, no 10Hz stutter.
+		var av9: Node3D = e["root"]
+		if is_instance_valid(av9) and e.has("target"):
+			var age := clampf(Time.get_ticks_msec() / 1000.0 \
+				- float(e.get("pkt_t", 0.0)), 0.0, 0.25)
+			var pred: Vector3 = (e["target"] as Vector3) \
+				+ (e.get("tvel", Vector3.ZERO) as Vector3) * age
+			av9.global_position = av9.global_position.lerp(pred,
+				minf(1.0, delta * 14.0))
+			if e.has("tbasis"):
+				av9.global_transform.basis = av9.global_transform.basis \
+					.orthonormalized().slerp(e["tbasis"], minf(1.0, delta * 10.0))
 		h.visible = not e["in_rocket"]
 		if e["in_rocket"]:
 			continue
 		h.set_jetpack(e["jet"], e["jet"] and not e["grounded"])
 		h.animate(float(e["speed"]), bool(e["grounded"]), delta,
 			e["jet"] and not e["grounded"])
+
+func peer_in_rocket(id: int) -> bool:
+	return _remote_avatars.has(id) \
+		and bool(_remote_avatars[id].get("in_rocket", false))
+
+func peer_warp(id: int) -> float:
+	if _remote_avatars.has(id):
+		return float(_remote_avatars[id].get("warp", 1.0))
+	return 1.0
+
+## The pilot's rocket-display transform, for seating passengers ON the
+## ship instead of on the pilot's head. Null while they're on foot.
+func peer_rocket_tf(id: int):
+	if not _remote_avatars.has(id):
+		return null
+	var rn = _remote_avatars[id].get("rocket_node")
+	if rn != null and is_instance_valid(rn):
+		return (rn as Node3D).global_transform
+	return null
 
 ## While a peer flies, their avatar node carries a rocket model.
 func _sync_peer_rocket(e: Dictionary, id: int, mk2: bool) -> void:

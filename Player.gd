@@ -983,12 +983,31 @@ func _physics_process(delta: float) -> void:
 			return
 	# passenger seat: glued to the pilot's synced rocket, no physics of ours
 	if riding_peer != -1:
-		if not Net.active or not Net.player_pos.has(riding_peer):
-			riding_peer = -1   # pilot gone: back on our own feet
+		var cs9 = get_tree().current_scene
+		var in_rk: bool = cs9 != null and cs9.has_method("peer_in_rocket") \
+			and cs9.peer_in_rocket(riding_peer)
+		if not Net.active or not Net.player_pos.has(riding_peer) or not in_rk:
+			# pilot landed (or vanished): the ride is over, gently
+			riding_peer = -1
+			Net.set_riding(-1)
+			var hudr9 = get_tree().get_first_node_in_group("hud")
+			if hudr9:
+				hudr9.flash("the rocket landed — you hop off")
 		else:
+			# seat ON the rocket's hull, not the pilot's head. Two seats
+			# on a 2.0: side by side.
+			var rtf = cs9.peer_rocket_tf(riding_peer)
 			var seat_up: Vector3 = Net.player_ups.get(riding_peer, Vector3.UP)
+			var lat := 0.0
+			if Net.rider_count(riding_peer) > 1:
+				lat = (float(maxi(0, Net.rider_index(riding_peer))) * 2.0 - 1.0) * 0.9
+			var seat: Vector3
+			if rtf is Transform3D:
+				seat = (rtf as Transform3D) * Vector3(lat, 1.8, -0.5)
+			else:
+				seat = (Net.player_pos[riding_peer] as Vector3) + seat_up * 1.6
 			global_position = global_position.lerp(
-				Net.player_pos[riding_peer] + seat_up * 1.6, minf(1.0, delta * 12.0))
+				seat, minf(1.0, delta * 12.0))
 			velocity = Vector3.ZERO
 			return
 	# C zooms whenever it isn't busy meaning "down" (jetpack/zero-g/fly modes)
@@ -1558,6 +1577,16 @@ func _make_held_model(id: String) -> void:
 		"plantfiber":
 			for fx2 in [-0.04, 0.0, 0.04]:
 				_hm_cyl(0.012, 0.3, Vector3(fx2, 0, fx2), Color("#4caf50"), 0.5).rotation_degrees = Vector3(0, 0, fx2 * 200.0)
+		"circle":
+			# a perfect gold ring, held like the treasure it sells for
+			var cring := MeshInstance3D.new()
+			var ctm := TorusMesh.new()
+			ctm.inner_radius = 0.14
+			ctm.outer_radius = 0.28
+			cring.mesh = ctm
+			cring.rotation_degrees = Vector3(90, 0, 0)
+			cring.material_override = Destructible.make_material(Color("#ffd94a"), 0.9)
+			_held.add_child(cring)
 		"coal":
 			# a fist of glossy black lumps, not a grey mystery cube
 			for lofs in [Vector3(0, -0.03, 0), Vector3(0.09, 0.02, 0.05),
@@ -2380,6 +2409,7 @@ func _interact() -> void:
 	# riding shotgun: F hops off
 	if riding_peer != -1:
 		riding_peer = -1
+		Net.set_riding(-1)
 		var hud0 = get_tree().get_first_node_in_group("hud")
 		if hud0:
 			hud0.flash("hopped off")
@@ -2402,14 +2432,21 @@ func _interact() -> void:
 				# only a LIVE pilot's rocket counts -- stale displays never
 				# swallow your F press
 				var hudp = get_tree().get_first_node_in_group("hud")
-				if n.get_meta("net_mk2", false):
-					riding_peer = int(n.get_meta("net_pilot"))
+				var pilotid := int(n.get_meta("net_pilot"))
+				# every rocket carries friends now: the 1.0 straps ONE to
+				# the hull, the 2.0's bubble seats TWO
+				var cap := 2 if bool(n.get_meta("net_mk2", false)) else 1
+				if Net.rider_count(pilotid) >= cap:
+					if hudp:
+						hudp.flash("seats full — %d rider%s already aboard" \
+							% [cap, "s" if cap > 1 else ""])
+				else:
+					riding_peer = pilotid
+					Net.set_riding(pilotid)
 					if hudp:
 						hudp.flash("riding with %s -- F to hop off" \
 							% str(Net.player_names.get(riding_peer, "them")))
 					Sfx.play("click")
-				elif hudp:
-					hudp.flash("no passenger seat -- only a Rocket 2.0 carries two")
 				return
 			if n is Gate or n is MengerShrine:
 				n.use(self)

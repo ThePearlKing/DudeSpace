@@ -206,12 +206,21 @@ func _req_world(pname: String) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	player_names[id] = pname
 	var m = get_tree().current_scene
+	# guests land at the WORLD's front door (Home), not the host's
+	# personal beacon -- a host camped on Harold was teleporting every
+	# new friend to Harold
+	var gsp := Game.spawn_pos
+	var hb = Universe.body_named("Home")
+	if hb != null:
+		gsp = hb.center + Vector3.UP * (float(hb.radius) + 2.0)
 	var snap := {
 		"world": m.collect_world() if m and m.has_method("collect_world") else [],
 		"playtime": Game.playtime,
-		"spawn": [Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z],
+		"spawn": [gsp.x, gsp.y, gsp.z],
 		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
 		"wseed": Game.world_seed,
+		"wscale": float(Save.character.get("wscale", 1.0)),
+		"bscale": bool(Save.character.get("bscale", false)),
 	}
 	_world_snapshot.rpc_id(id, snap, Save.guest_blob(pname))
 
@@ -288,6 +297,43 @@ func _take_hit(dmg: float) -> void:
 	Game.hurt(dmg, false, attacker)   # the death screen names your killer
 	if Game.dead:
 		chat_received.emit("SERVER", "%s was slain by %s" % [my_name(), attacker])
+
+var riders: Dictionary = {}   # rider peer id -> pilot peer id
+
+## Announce (or clear, pilot = -1) that WE are riding someone's rocket.
+func set_riding(pilot: int) -> void:
+	if not active:
+		return
+	var me := multiplayer.get_unique_id()
+	if pilot < 0:
+		riders.erase(me)
+	else:
+		riders[me] = pilot
+	_set_riding.rpc(pilot)
+
+@rpc("any_peer", "reliable")
+func _set_riding(pilot: int) -> void:
+	var rid := multiplayer.get_remote_sender_id()
+	if pilot < 0:
+		riders.erase(rid)
+	else:
+		riders[rid] = pilot
+
+func rider_count(pilot: int) -> int:
+	var c := 0
+	for k in riders:
+		if int(riders[k]) == pilot:
+			c += 1
+	return c
+
+## My seat index among this pilot's riders (stable by peer id).
+func rider_index(pilot: int) -> int:
+	var ids: Array = []
+	for k in riders:
+		if int(riders[k]) == pilot:
+			ids.append(int(k))
+	ids.sort()
+	return ids.find(multiplayer.get_unique_id())
 
 ## A player shot a Datamosh studio orb: everyone plays the same ping,
 ## jitter, and scripted complaint (the shooter picked the words).
@@ -366,6 +412,7 @@ func _process(delta: float) -> void:
 						# in flight: ship the ROCKET's attitude, not the body's
 						state["rocket"] = true
 						state["mk2"] = r.mk2
+						state["warp"] = Game.timewarp
 						_pos.rpc(r.global_position, r.global_transform.basis.y,
 							-r.global_transform.basis.z, state)
 						return

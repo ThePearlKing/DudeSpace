@@ -9,6 +9,8 @@ var _prompt: Label
 var _hint: Label
 var _over: Label
 var _jet_on_shown := false   # last jet state painted (gate relayouts)
+var _ride_lbl: Label
+var _ride_shown := ""
 var _flash: Label
 var _flash_t: float = 0.0
 var _slots: Array = []       # hotbar cell panels
@@ -177,6 +179,18 @@ func _ready() -> void:
 	_flash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_flash.visible = false
 	add_child(_flash)
+
+	_ride_lbl = Label.new()
+	_ride_lbl.anchor_left = 0.3
+	_ride_lbl.anchor_right = 0.7
+	_ride_lbl.anchor_top = 0.04
+	_ride_lbl.anchor_bottom = 0.09
+	_ride_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ride_lbl.add_theme_font_size_override("font_size", 16)
+	_ride_lbl.add_theme_color_override("font_color", Color("#7cf9ff"))
+	_ride_lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_ride_lbl.add_theme_constant_override("outline_size", 4)
+	add_child(_ride_lbl)
 
 	_over = Label.new()
 	_over.add_theme_font_size_override("font_size", 40)
@@ -396,6 +410,22 @@ func _process(delta: float) -> void:
 			_buff_lbl.text = bt   # Label.text writes force relayout: gate them
 
 	# jetpack ON indicator
+	# passenger readout: who's flying, and how fast time is going for
+	# them. No keybind prompts -- you're cargo.
+	var pplayer = get_tree().get_first_node_in_group("player")
+	var ride_txt := ""
+	if pplayer != null and "riding_peer" in pplayer and pplayer.riding_peer != -1:
+		var cs8 = get_tree().current_scene
+		var w8 := 1.0
+		if cs8 != null and cs8.has_method("peer_warp"):
+			w8 = cs8.peer_warp(pplayer.riding_peer)
+		ride_txt = "PASSENGER · pilot: %s" \
+			% str(Net.player_names.get(pplayer.riding_peer, "?"))
+		if w8 > 1.0:
+			ride_txt += " · time warp x%d" % int(w8)
+	if ride_txt != _ride_shown:
+		_ride_shown = ride_txt
+		_ride_lbl.text = ride_txt
 	if Inventory.has_jetpack:
 		var p := get_tree().get_first_node_in_group("player")
 		var on: bool = p != null and p.has_method("jetting") and p.jetting()

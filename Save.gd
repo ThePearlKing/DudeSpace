@@ -205,6 +205,11 @@ func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
 		# back exactly where you logged out)
 		"wseed": snap.get("wseed", 0),    # guests build the HOST's terrain
 	}
+	# the HOST's world scale + density rule the terrain: a guest whose
+	# own slot used a different wscale was generating planets at the
+	# wrong size -- cities, mines, everything landed somewhere else
+	character["wscale"] = float(snap.get("wscale", 1.0))
+	character["bscale"] = bool(snap.get("bscale", false))
 	for k in blob.keys():
 		if k == "character":
 			continue   # you just dressed for this visit -- local look wins
