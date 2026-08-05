@@ -97,9 +97,11 @@ func dress(equip: Dictionary) -> void:
 	var legs_id := str(equip.get("legs", ""))
 	if Inventory.armors.has(legs_id):
 		var lc: Color = Inventory.armors[legs_id]["color"]
-		# thigh guards riding the legs (they swing with the walk)
-		_armor_nodes.append(_bolt_on(_leg_l, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc, legs_id))
-		_armor_nodes.append(_bolt_on(_leg_r, Vector3(0.38, 0.55, 0.38), Vector3(0, 0.22, 0), lc, legs_id))
+		# PANTS: full-leg sleeves that swing with the walk, plus a hip
+		# band on the torso so no skin shows below the chestplate
+		_armor_nodes.append(_bolt_on(_leg_l, Vector3(0.4, 1.16, 0.4), Vector3(0, 0, 0), lc, legs_id))
+		_armor_nodes.append(_bolt_on(_leg_r, Vector3(0.4, 1.16, 0.4), Vector3(0, 0, 0), lc, legs_id))
+		_armor_nodes.append(_bolt_on(_torso, Vector3(0.98, 0.42, 0.53), Vector3(0, -0.47, 0), lc, legs_id))
 	var boots_id := str(equip.get("boots", ""))
 	if Inventory.armors.has(boots_id):
 		var bc: Color = Inventory.armors[boots_id]["color"]
