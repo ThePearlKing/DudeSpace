@@ -464,8 +464,10 @@ static func bh_presence() -> AudioStreamWAV:
 	var render := int(25.0 * SR)
 	var buf := PackedFloat32Array()
 	buf.resize(render)
+	# one voice sings the octave ABOVE, one hums the octave BELOW,
+	# the middle three stay put -- the chorus spreads three octaves
 	var voices: Array = [
-		[110.0, 0.5, 0.9, 0.0], [130.8, 0.7, 0.35, 2.1], [174.6, 0.4, 1.2, 4.0],
+		[55.0, 0.5, 0.9, 0.0], [130.8, 0.7, 0.35, 2.1], [349.2, 0.4, 1.2, 4.0],
 		[233.1, 0.6, 0.7, 1.0], [87.3, 0.3, 1.5, 3.3]]
 	for v in voices:
 		var f0: float = v[0]

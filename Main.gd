@@ -95,7 +95,7 @@ func _ready() -> void:
 		bhum.unit_size = 2600.0
 		bhum.max_distance = 30000.0
 		bhum.max_db = 0.0
-		bhum.volume_db = -6.0
+		bhum.volume_db = -4.5
 		add_child(bhum)
 		bhum.global_position = bhb2.center
 		bhum.play()
