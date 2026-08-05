@@ -845,6 +845,7 @@ func _build_interior() -> void:
 	_iroot.add_child(out)
 	out.global_position = c + Vector3(0, fy - c.y + 1.0, sz.z * 0.5 - 1.4)
 	out.set_meta("house", self)
+	exit_pad = out.global_position   # humans walk HERE to leave
 
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop
 ## looking like the inside of a shipping box.
@@ -1256,6 +1257,8 @@ func enter(p: Node3D) -> void:
 	p.global_position = interior_spawn()
 	p.velocity = Vector3.ZERO
 	Sfx.play("click", -12.0)
+
+var exit_pad := Vector3.ZERO   # interior LEAVE HOUSE button position
 
 func exit_to_door(p: Node3D) -> void:
 	Game.zone = ""

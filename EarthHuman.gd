@@ -1520,6 +1520,8 @@ func goal_text() -> String:
 			return "walking home" + extras
 		"goseat":
 			return "heading for a nice place to sit" + extras
+		"goexit":
+			return "heading for the LEAVE HOUSE button" + extras
 		"sit":
 			return "sitting. professionally." + extras
 		"friend":
@@ -2150,6 +2152,19 @@ func _physics_process(delta: float) -> void:
 								fr3._act_t = 40.0
 					else:
 						speed = WALK_SPEED * 1.1
+			"goexit":
+				if flat_house == null or not is_instance_valid(flat_house):
+					_pick_act()
+				else:
+					var to_x: Vector3 = flat_house.exit_pad - global_position
+					var flat_x := to_x - up * to_x.dot(up)
+					_dir = flat_x.normalized() if flat_x.length() > 0.01 else Vector3.ZERO
+					if flat_x.length() < 1.4:
+						_exit_house()   # button pressed. door used. dignity intact.
+					elif _act_t <= 0.5:
+						_exit_house()   # jammed behind a sofa: fine, phase out
+					else:
+						speed = WALK_SPEED * 1.05
 			"goseat":
 				if _seat == null or not is_instance_valid(_seat):
 					_pick_act()
@@ -2239,8 +2254,14 @@ func _physics_process(delta: float) -> void:
 			flat_house = null
 		else:
 			_house_t -= delta
-			if _house_t <= 0.0:
-				_exit_house()
+			if _house_t <= 0.0 and _act != "goexit":
+				# time to go -- but people USE the door button, they
+				# don't dematerialize mid-living-room
+				if flat_house.exit_pad != Vector3.ZERO:
+					_act = "goexit"
+					_act_t = 25.0   # give up and phase out if truly stuck
+				else:
+					_exit_house()
 	# leash: calm humans belong on the ground; punched/panicking ones get
 	# real air time. only ACTUAL astronauts get snapped back.
 	var alt: float = global_position.distance_to(_home.center) - float(_home.radius)
