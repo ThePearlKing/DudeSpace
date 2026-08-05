@@ -297,6 +297,10 @@ func align_for(st: Dictionary) -> float:
 	var slack := 0.0
 	if st["body"] != null:
 		var dist := _site().distance_to(st["body"].center)
+		# moon-close bodies (Xero over Varnisol) fill half the sky --
+		# no aiming contest required, the dish just HEARS them
+		if dist < 2500.0:
+			return 1.0
 		if dist > 1.0:
 			var ang := asin(clampf(float(st["body"].radius) * 2.5 / dist, 0.0, 0.9))
 			slack = 1.0 - cos(ang)

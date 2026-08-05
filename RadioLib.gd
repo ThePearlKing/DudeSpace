@@ -107,6 +107,10 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		var wavi := _ice_loop()
 		_music_cache[key] = wavi
 		return wavi
+	if kind == "varnisol":
+		var wavv := _varnisol_loop(seed_v)
+		_music_cache[key] = wavv
+		return wavv
 	if kind == "abyss":
 		var wavn := _abyss_loop(seed_v)
 		_music_cache[key] = wavn
@@ -524,6 +528,92 @@ static func bh_presence() -> AudioStreamWAV:
 		out[i] = v2
 	_bh_presence_wav = _encode_loop(out, total, "_bhp")
 	return _bh_presence_wav
+
+static var _varn_wav: AudioStreamWAV = null
+
+## VARNISOL: campfire folk under the pines. 6/8 fingerpicked lilt over
+## I-IV-vi-V, soft bass, a breathy flute answering in the back half,
+## bird chirps in the trees and a thin wind. The gentle planet sounds
+## gentle -- on purpose.
+static func _varnisol_loop(seed_v: int) -> AudioStreamWAV:
+	if _varn_wav:
+		return _varn_wav
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v + 12
+	var barlen := int(1.8 * SR)
+	var bars := 8
+	var total := barlen * bars
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	var base := 196.0
+	var roots: Array = [0, 5, 9, 7, 0, 5, 7, 0]   # I IV vi V I IV V I
+	for bi in bars:
+		var b0 := bi * barlen
+		var rf := base * pow(2.0, float(roots[bi]) / 12.0)
+		var third := 3.0 if roots[bi] == 9 else 4.0   # vi is minor
+		# fingerpick: root, fifth, third-up, fifth, octave, fifth
+		var picks: Array = [0.0, 7.0, third + 12.0, 7.0, 12.0, 7.0]
+		for pi4 in 6:
+			var p0 := b0 + pi4 * barlen / 6
+			var pf := rf * pow(2.0, float(picks[pi4]) / 12.0)
+			for i in mini(int(0.55 * SR), total - p0):
+				var t := float(i) / SR
+				buf[p0 + i] += (sin(TAU * pf * t) + 0.5 * sin(TAU * pf * 2.0 * t) \
+					+ 0.22 * sin(TAU * pf * 3.0 * t)) * 0.19 * exp(-t * 4.2) \
+					* minf(1.0, float(i) / (SR * 0.004))
+		# warm bass: root held under the bar
+		for i in barlen:
+			var tb := float(i) / SR
+			var env := minf(1.0, float(i) / (SR * 0.03)) \
+				* minf(1.0, float(barlen - i) / (SR * 0.12))
+			buf[b0 + i] += sin(TAU * rf * 0.5 * tb) * 0.13 * env
+		# soft pad triad breathing in
+		for i in barlen:
+			var tp := float(i) / SR
+			var envp := minf(1.0, float(i) / (SR * 0.5)) \
+				* minf(1.0, float(barlen - i) / (SR * 0.25))
+			buf[b0 + i] += (sin(TAU * rf * tp) + sin(TAU * rf * pow(2.0, third / 12.0) * tp) \
+				+ sin(TAU * rf * pow(2.0, 7.0 / 12.0) * tp)) * 0.028 * envp
+	# flute answers in the back half: major-pentatonic phrase, breathy
+	var pent: Array = [0, 2, 4, 7, 9, 12]
+	var deg := 2
+	for ni in 8:
+		var n0 := barlen * 4 + ni * barlen / 2
+		if rng.randf() < 0.2:
+			continue
+		deg = clampi(deg + rng.randi_range(-2, 2), 0, pent.size() - 1)
+		var ff := base * 2.0 * pow(2.0, float(pent[deg]) / 12.0)
+		var dur := mini(int(0.7 * SR), total - n0 - 1)
+		for i in dur:
+			var t2 := float(i) / SR
+			var vib := 1.0 + 0.007 * sin(TAU * 5.2 * t2)
+			var env2 := minf(1.0, float(i) / (SR * 0.06)) \
+				* minf(1.0, float(dur - i) / (SR * 0.18))
+			buf[n0 + i] += (sin(TAU * ff * vib * t2) * 0.11 \
+				+ (randf() * 2.0 - 1.0) * 0.008) * env2
+	# birds in the trees: quick upward chirps, clear of the loop seam
+	for c in 6:
+		var c0 := rng.randi() % (total - int(0.3 * SR))
+		var cf := rng.randf_range(2300.0, 2900.0)
+		for i in int(0.09 * SR):
+			var t3 := float(i) / SR
+			var env3 := sin(PI * float(i) / (0.09 * SR))
+			buf[c0 + i] += sin(TAU * (cf * t3 + 3800.0 * t3 * t3)) * 0.045 * env3
+	# thin wind through the pines
+	var wlp := 0.0
+	for i in total:
+		wlp += ((randf() * 2.0 - 1.0) - wlp) * 0.04
+		buf[i] += wlp * 0.05
+	# normalize gently
+	var peak := 0.0
+	for i in total:
+		peak = maxf(peak, absf(buf[i]))
+	if peak > 0.01:
+		var gg := minf(1.3, 0.92 / peak)
+		for i in total:
+			buf[i] *= gg
+	_varn_wav = _encode_loop(buf, total, "_varn")
+	return _varn_wav
 
 ## Stars hum. Weirdly. Inharmonic shimmer partials breathing on their
 ## own clocks, solar-crackle granules, and a deep fusion roar.
