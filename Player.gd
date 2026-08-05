@@ -269,6 +269,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			_ghost_yaw += PI * 0.25   # R: rotate the hologram
 		get_viewport().set_input_as_handled()
 		return
+	if _ghost != null and _ghost_kind == "station" and event is InputEventKey \
+			and event.pressed and event.keycode == KEY_T:
+		_ring_snap = not _ring_snap
+		var hudr = get_tree().get_first_node_in_group("hud")
+		if hudr:
+			hudr.flash("RING SNAP %s — docked pieces %s" % [
+				"ON" if _ring_snap else "OFF",
+				"curve around the planet" if _ring_snap else "extend dead flat"])
+		Sfx.play("click", -14.0)
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
 			and get_window().has_focus():
 		_look += event.relative
@@ -326,6 +337,7 @@ var _door_mode: bool = false      # door tool armed: clicks select frames
 var _door_frame: Node3D = null    # first frame clicked
 var _wreck_mode: bool = false     # DESTROY tool: clicks break furniture
 var _hwreck_mode: bool = false    # house DELETE tool: clicks demolish houses
+var _ring_snap: bool = true       # station docks curve around the planet (T)
 var _hwreck_pending = null        # house awaiting its confirming second click
 
 ## The Door tool: OUTSIDE, pick house A (with a free frame), then
@@ -582,6 +594,10 @@ func _start_ghost(cat: String, kind: String) -> void:
 	if kind == "station" and Game.zone != "":
 		Sfx.play("denied")
 		return
+	if kind == "station":
+		var hudg = get_tree().get_first_node_in_group("hud")
+		if hudg:
+			hudg.flash("RING SNAP %s — [T] toggles. On: docked pieces curve around the planet" % ("ON" if _ring_snap else "OFF"))
 	_ghost_cat = cat
 	_ghost_kind = kind
 	_ghost = MeshInstance3D.new()
@@ -630,6 +646,29 @@ func _start_ghost(cat: String, kind: String) -> void:
 	_ghost.material_override = gm
 	get_parent().add_child(_ghost)
 
+## Docked transform for a station piece joining near_st, probed from
+## `probe`. With ring snap the piece is ROTATED around the planet by the
+## exact panel angle (2*atan(13/r)) so the edges kiss and a chain of
+## decks closes into a ring instead of shearing off on a tangent.
+func _station_dock_tf(near_st: House, probe: Vector3) -> Transform3D:
+	var gb: Basis = near_st.global_transform.basis
+	var rel: Vector3 = gb.inverse() * (probe - near_st.global_position)
+	var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
+		if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
+	if _ring_snap:
+		var b = Universe.nearest(near_st.global_position)
+		if b != null:
+			var np: Vector3 = near_st.global_position
+			var r := np.distance_to(b.center)
+			var sd: Vector3 = (gb * side_v).normalized()
+			var u: Vector3 = (np - b.center).normalized()
+			var ax: Vector3 = sd.cross(u)
+			if r > 27.0 and ax.length() > 0.3:
+				var rot := Basis(ax.normalized(), -2.0 * atan(13.0 / r))
+				return Transform3D((rot * gb).orthonormalized(),
+					b.center + rot * (np - b.center))
+	return Transform3D(gb, near_st.global_position + gb * side_v)
+
 func _update_ghost() -> void:
 	if _ghost == null:
 		return
@@ -648,12 +687,9 @@ func _update_ghost() -> void:
 					ngd = d
 					near_g = h
 		if near_g != null:
-			var gb: Basis = near_g.global_transform.basis
-			var rel: Vector3 = gb.inverse() * (foot - near_g.global_position)
-			var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
-				if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
-			var snap: Vector3 = near_g.global_position + gb * side_v
-			_ghost.global_transform = Transform3D(gb, snap + gb.y * 0.6)
+			var dock := _station_dock_tf(near_g, foot)
+			_ghost.global_transform = Transform3D(dock.basis,
+				dock.origin + dock.basis.y * 0.6)
 		else:
 			_ghost.global_transform = Transform3D(_basis_from_up(upS), foot)
 			_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
@@ -703,11 +739,9 @@ func _confirm_ghost() -> void:
 		var sbasis := tf.basis
 		var spos := base_pos
 		if near_st != null:
-			sbasis = near_st.global_transform.basis
-			var rel: Vector3 = sbasis.inverse() * (base_pos - near_st.global_position)
-			var side_v := Vector3(26.0 * signf(rel.x), 0, 0) \
-				if absf(rel.x) > absf(rel.z) else Vector3(0, 0, 26.0 * signf(rel.z))
-			spos = near_st.global_position + sbasis * side_v
+			var dock := _station_dock_tf(near_st, base_pos)
+			sbasis = dock.basis
+			spos = dock.origin
 		else:
 			var nb3 = Universe.nearest(base_pos)
 			# NEXT TO planets is the whole point (orbit!) -- just not

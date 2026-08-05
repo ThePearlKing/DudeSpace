@@ -199,7 +199,7 @@ func _merge_rails() -> void:
 			continue
 		for sk in sides:
 			var expect: Vector3 = global_position + global_transform.basis * sides[sk]
-			if h.global_position.distance_to(expect) < 2.0:
+			if h.global_position.distance_to(expect) < 4.5:
 				_drop_rail(sk)
 				h._drop_rail(opp[sk])
 
