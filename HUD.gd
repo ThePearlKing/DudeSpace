@@ -26,6 +26,11 @@ class _WaypointLayer extends Control:
 	func _screen_pt(cam: Camera3D, wp: Vector3) -> Vector2:
 		var vp := get_viewport_rect().size
 		var behind := cam.is_position_behind(wp)
+		# a point EXACTLY on the camera plane can't unproject (p.d == 0
+		# engine error) -- nudge it a hair forward first
+		var rel := (wp - cam.global_position).dot(-cam.global_transform.basis.z)
+		if absf(rel) < 0.01:
+			wp += -cam.global_transform.basis.z * 0.05
 		var sp := cam.unproject_position(wp)
 		if behind:
 			sp = vp - sp   # unproject mirrors behind the camera: flip back

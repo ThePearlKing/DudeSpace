@@ -1124,9 +1124,10 @@ class NuclearReactor extends Machine:
 				elif dv < r_hurt:
 					Net.hit_player(int(pid),
 						lerpf(260.0, 40.0, (dv - r_kill) / (r_hurt - r_kill)), true)
-		# if that was you: watch what you made
+		# if that was you: watch what you made. Deferred a frame so the
+		# death-screen churn can't out-rank the camera grab.
 		if Game.dead and p:
-			mc.take_camera()
+			mc.call_deferred("take_camera")
 		Net.broadcast_remove(here)
 		Destructible.spawn_debris(get_parent(), here, Vector3(2.4, 2.4, 2.4),
 			Color("#8a8d90"), Vector3.UP)

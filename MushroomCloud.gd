@@ -125,7 +125,9 @@ func _process(delta: float) -> void:
 	_light.light_energy = maxf(0.0, 9.0 * (1.0 - _t / 6.0))
 	# funeral orbit: WIDE view, always centered on the blast, high
 	# enough to keep the horizon and the cloud in frame together
-	if _cam != null:
+	if _cam != null and is_instance_valid(_cam):
+		if not _cam.current:
+			_cam.current = true   # nobody steals the funeral shot
 		var ang := _t * 0.16
 		var dist := 55.0 + 30.0 * _y
 		_cam.fov = 72.0
