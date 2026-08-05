@@ -145,36 +145,23 @@ func build(b, dir: Vector3) -> void:
 			# crossing segments open their CEILING (the mouth shaft used
 			# to dead-end on a corridor roof) and their FLOOR (the drop
 			# chute to story two continues straight down)
-			# crossings are sealed JUNCTION BOXES built separately --
-			# open-sided tube ends leaked into the hollow planet
+			# THE FLOOR PLAN, finally thought through: rings run FULLY
+			# sealed (no skipped segments, no gaps). At the two crossings
+			# ring A keeps its tube but its side walls carry a corridor-
+			# sized WINDOW (5.8m) exactly where ring B passes -- corners
+			# seal themselves. Ring B yields its crossing segments; its
+			# traffic walks ring A's floor for those 5.6 meters.
 			var junction := i == 0 or i == NS / 2
-			if junction:
-				continue
-			# apartments EVERYWHERE: every other segment, alternating sides
+			if junction and ering_v == e2:
+				continue   # ring B yields at crossings
 			var pod_side := 0
-			if (i % 2 == 1) and not near_mouth:
+			if (i % 2 == 1) and not near_mouth and not junction:
 				pod_side = 1 if (i / 2) % 2 == 0 else -1
 			_tube_seg(C + pdir * r1, pdir, tang, 2.0 * PI * r1 / float(NS) + 0.8,
-				_wallc(), accent, pod_side, false, false)
+				_wallc(), accent, 2 if junction else pod_side,
+				junction and i == 0, junction and i == 0)
 			if pod_side != 0:
 				_apartment(C, pdir, tang, r1, accent, pod_side)
-	# sealed junction boxes at the two crossings of story one: four
-	# doorways, hatch above and below at the mouth, solid at the antipode
-	_junction_box(C + u0 * r1, u0, e1, accent, true, true, true)
-	_junction_box(C - u0 * r1, -u0, e1, accent, false, false, true)
-	_junction_box(C + u0 * r2, u0, e1, accent, true, true, false)
-	# CONNECTORS: skipping the crossing segments left ~5m of raw rock
-	# between each corridor end and the junction box -- bridge all of it
-	for con in [[u0 * r1, e1], [u0 * r1, -e1], [u0 * r1, e2], [u0 * r1, -e2],
-			[-u0 * r1, e1], [-u0 * r1, -e1], [-u0 * r1, e2], [-u0 * r1, -e2],
-			[u0 * r2, e1], [u0 * r2, -e1]]:
-		var cbase: Vector3 = con[0]
-		var cdir: Vector3 = (con[1] as Vector3).normalized()
-		var cup := (cbase as Vector3).normalized()
-		if cbase.length() < r1 + 1.0 and cbase.length() > r1 - 1.0:
-			pass
-		_tube_seg(C + cbase + cdir * 7.0, cup, cdir, 8.5,
-			_wallc(), accent, 0, false, false)
 	# STORY TWO: one ring, four cafeteria halls at the diagonals
 	for i in NS:
 		var ang := TAU * float(i) / float(NS)
@@ -183,11 +170,9 @@ func build(b, dir: Vector3) -> void:
 		# the crossing opens BOTH ways (story-one hatch above, premium
 		# core chute below); cafeteria segments open their floor too --
 		# the halls are a LOWER FLOOR now, not side rooms
-		if i == 0:
-			continue   # the story-two crossing is its own junction box
 		var caf_here := i in [3, 10, 17, 24]
 		_tube_seg(C + pdir * r2, pdir, tang, 2.0 * PI * r2 / float(NS) + 0.8,
-			_wallc().darkened(0.2), accent, 0, false, caf_here)
+			_wallc().darkened(0.2), accent, 0, i == 0, i == 0 or caf_here)
 		if caf_here:
 			_cafeteria(C, pdir, tang, r2, accent)
 	# exit gate at the story-one crossing, back to the mouth's doorstep
@@ -195,7 +180,8 @@ func build(b, dir: Vector3) -> void:
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
 		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out)
-	out.global_transform = Transform3D(_bup(u0), C + u0 * (r1 - 1.8) + e1 * 3.5)
+	out.global_transform = Transform3D(_bup(u0),
+		C + u0 * (r1 - 1.6) + (e1 + e2).normalized() * 2.1)
 	# PREMIUM SUITES: a third, tiny ring hugging the core. Bigger rooms,
 	# gold trim, a window slab facing the exact center of the planet.
 	# location, location, location.
@@ -212,7 +198,7 @@ func build(b, dir: Vector3) -> void:
 		var wb3 := StaticBody3D.new()
 		var mi3 := MeshInstance3D.new()
 		var bm3 := BoxMesh.new()
-		var ln3: float = (r2 - 2.6) - (r3 + 2.6)
+		var ln3: float = (r2 - 2.6) - (r3 + 5.4)   # meets the penthouse roof
 		bm3.size = Vector3(sspec3[0].x, ln3, sspec3[0].z)
 		mi3.mesh = bm3
 		mi3.material_override = Surfaces.metal(_wallc())
@@ -224,86 +210,13 @@ func build(b, dir: Vector3) -> void:
 		wb3.add_child(cs3)
 		add_child(wb3)
 		wb3.global_transform = Transform3D(_bup(u0),
-			C + u0 * ((r2 - 2.6 + r3 + 2.6) * 0.5))
+			C + u0 * ((r2 - 2.6 + r3 + 5.4) * 0.5))
 		wb3.translate_object_local(Vector3(sspec3[1].x, 0, sspec3[1].z))
 	var out2 := Gate.new().configure({
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
 		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out2)
-	out2.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.8) + e1 * 3.5)
-
-## A sealed crossing chamber: 7m box, four 2.4m doorways facing the
-## corridor directions, optional hatches above/below for the chute.
-func _junction_box(center: Vector3, up: Vector3, e1: Vector3,
-		accent: Color, top_open: bool, floor_open: bool,
-		four_way: bool = true) -> void:
-	var tang := up.cross(e1)
-	if tang.length() < 0.5:
-		tang = up.cross(Vector3(1, 0, 0))
-	tang = tang.normalized()
-	var bas := Basis(up.cross(tang).normalized(), up, tang).orthonormalized()
-	var body := StaticBody3D.new()
-	add_child(body)
-	body.global_transform = Transform3D(bas, center)
-	var mat := Surfaces.metal(_wallc())
-	var parts: Array = []
-	# floor + ceiling, with 5.2 hatches when the chute passes through
-	for yspec in [[-2.4, floor_open], [2.4, top_open]]:
-		var yy := float(yspec[0])
-		if bool(yspec[1]):
-			parts.append([Vector3(7.0, 0.5, 0.9), Vector3(0, yy, 3.05)])
-			parts.append([Vector3(7.0, 0.5, 0.9), Vector3(0, yy, -3.05)])
-			parts.append([Vector3(0.9, 0.5, 5.2), Vector3(3.05, yy, 0)])
-			parts.append([Vector3(0.9, 0.5, 5.2), Vector3(-3.05, yy, 0)])
-		else:
-			parts.append([Vector3(7.0, 0.5, 7.0), Vector3(0, yy, 0)])
-	# walls: doorways face the corridors; a two-way junction seals the
-	# crossing axis solid instead of opening doors into raw rock
-	for wspec in [[Vector3(1.0, 0, 0), Vector3(0, 0, 1.0)],
-			[Vector3(0, 0, 1.0), Vector3(1.0, 0, 0)]]:
-		var ax: Vector3 = wspec[0]
-		var lat: Vector3 = wspec[1]
-		var doored: bool = four_way or ax.z > 0.5
-		if not doored:
-			for sgn8 in [-1.0, 1.0]:
-				parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * 7.0,
-					5.3, absf(ax.z) * 0.5 + absf(lat.z) * 7.0),
-					ax * 3.25 * sgn8])
-			continue
-		for sgn9 in [-1.0, 1.0]:
-			var wl := 2.05
-			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * wl,
-				4.3, absf(ax.z) * 0.5 + absf(lat.z) * wl),
-				ax * 3.25 * sgn9 + lat * 2.45])
-			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * wl,
-				4.3, absf(ax.z) * 0.5 + absf(lat.z) * wl),
-				ax * 3.25 * sgn9 - lat * 2.45])
-			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * 2.4,
-				1.1, absf(ax.z) * 0.5 + absf(lat.z) * 2.4),
-				ax * 3.25 * sgn9 + up * 0.0 + Vector3(0, 1.85, 0)])
-	for spec in parts:
-		var mi := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = spec[0]
-		mi.mesh = bm
-		mi.position = spec[1]
-		mi.material_override = mat
-		body.add_child(mi)
-		var cs := CollisionShape3D.new()
-		var bs := BoxShape3D.new()
-		bs.size = spec[0]
-		cs.shape = bs
-		cs.position = spec[1]
-		body.add_child(cs)
-	# junction beacon light
-	var jl := MeshInstance3D.new()
-	var jlm := SphereMesh.new()
-	jlm.radius = 0.3
-	jlm.height = 0.6
-	jl.mesh = jlm
-	jl.position = Vector3(2.6, 1.6, 2.6)
-	jl.material_override = Destructible.make_material(accent, 2.4)
-	body.add_child(jl)
+	out2.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.6) + e1 * 2.3)
 
 func _bup(up: Vector3) -> Basis:
 	var x := up.cross(Vector3(0, 0, 1))
@@ -343,6 +256,14 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 	# ring is walkable straight through -- the + turns at the +.
 	for wsgn in [-1, 1]:
 		if open_side == 2:
+			# crossing window: wall flanks leave a 5.8m full-height
+			# opening centered where the other ring's corridor passes
+			var wfl := (ln - 5.8) * 0.5
+			if wfl > 0.3:
+				parts.append([Vector3(0.4, 4.9, wfl),
+					Vector3(2.8 * float(wsgn), 0, (5.8 + wfl) * 0.5)])
+				parts.append([Vector3(0.4, 4.9, wfl),
+					Vector3(2.8 * float(wsgn), 0, -(5.8 + wfl) * 0.5)])
 			continue
 		elif open_side == wsgn:
 			var dfl := (ln - 1.8) * 0.5
@@ -492,7 +413,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		f.position = fspec[1]
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
-	_tv(body, Vector3(-4.5, -0.4, -3.4), Vector3(0, 180, 90))
+	_tv(body, Vector3(4.5, -0.4, 2.8), Vector3(0, 0, 90))
 	# living details: rug, ceiling fixture, wall art, shelf with glow
 	# trinkets, a crystal plant -- someone LIVES here
 	var rug := MeshInstance3D.new()
@@ -812,8 +733,8 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	am.rings = 3
 	a.mesh = am
 	# the SAME fluid glow the studio anchors wear -- they're one species
-	a.material_override = DatamoshStudio._fluid_material(
-		HUES[_residents.size() % HUES.size()])
+	var rhue := Color.from_hsv(randf(), randf_range(0.55, 0.9), 1.0)
+	a.material_override = DatamoshStudio._fluid_material(rhue)
 	add_child(a)
 	a.global_transform = Transform3D(_bup(up), at)
 	# EXACT studio bubble spec: same font, scale, outline, colour
@@ -821,7 +742,7 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.font_size = 26
 	lbl.pixel_size = 0.006
-	lbl.modulate = HUES[_residents.size() % HUES.size()]
+	lbl.modulate = rhue
 	lbl.outline_size = 8
 	lbl.outline_modulate = Color(0, 0, 0, 0.85)
 	lbl.text = ""
@@ -829,10 +750,12 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	lbl.position = Vector3(0, 1.1, 0)
 	var lines := WISDOM.duplicate()
 	lines.shuffle()
-	# every resident gets a news-anchor voice: a studio host profile
-	# with its own pitch roll, so no two sound quite alike
-	var prof: Dictionary = (RadioLib.ALIEN_HOSTS[_residents.size() % 4] as Dictionary).duplicate()
-	prof["base"] = float(prof.get("base", 200.0)) * randf_range(0.82, 1.22)
+	# every resident gets its OWN voice, rolled fresh -- same species as
+	# the news desk, not the same four throats
+	var prof: Dictionary = {"base": randf_range(140.0, 380.0),
+		"var": randf_range(0.1, 0.5),
+		"wave": ["sine", "square", "saw"][randi() % 3],
+		"rate": randf_range(0.9, 1.5), "artic": randf_range(1.3, 2.0)}
 	_residents.append({"node": a, "base": at, "phase": randf() * TAU,
 		"lbl": lbl, "lines": lines, "line_i": randi() % lines.size(), "up": up,
 		"voice": prof, "full": "", "say": null})
@@ -888,8 +811,7 @@ func _process(delta: float) -> void:
 				lbl.text = str(r["full"])
 			if str(r["full"]) == "" or (randf() < 0.04 \
 					and (sp == null or not is_instance_valid(sp) or not sp.playing)):
-				r["line_i"] = (int(r["line_i"]) + 1) % (r["lines"] as Array).size()
-				var line := str((r["lines"] as Array)[r["line_i"]])
+				var line := _wise_line()
 				r["full"] = line
 				lbl.text = ""
 				if not _cooking_say:
@@ -905,6 +827,40 @@ func _process(delta: float) -> void:
 			if sp != null and is_instance_valid(sp):
 				sp.queue_free()
 				r["say"] = null
+
+## Resident dialog is COMPOSED, not recited: 40% classics (the starter
+## home line lives forever), 60% assembled fresh from the show's own
+## vocabulary. Casually above you, never mean about it.
+const WISE_T := [
+	"we discussed %s at breakfast. it went %s. we let it.",
+	"the %s is %s. we checked. twice. both answers were right.",
+	"i thought about %s for nine seconds today. a heavy day.",
+	"%s called. it wants advice about %s. we said: be round about it.",
+	"your %s is a lovely starter %s.",
+	"we predicted %s would end up %s. it did. we clapped politely.",
+	"the cafeteria soup tastes like %s tonight. this is considered lucky.",
+	"somewhere, %s is %s. we find that comforting. you should too.",
+]
+const WISE_FILL_A := ["the black hole", "your sun", "the fork", "gravity",
+	"the tesselation", "entropy", "the noodle broadcast", "your rocket",
+	"the third dimension", "the horizon"]
+
+func _wise_line() -> String:
+	if randf() < 0.4:
+		return WISDOM[randi() % WISDOM.size()]
+	var t: String = WISE_T[randi() % WISE_T.size()]
+	var c := t.count("%s")
+	if c == 0:
+		return t
+	var fills: Array = []
+	for i in c:
+		if randf() < 0.5:
+			fills.append(WISE_FILL_A[randi() % WISE_FILL_A.size()])
+		elif randf() < 0.5:
+			fills.append(RadioLib.AP_STATES[randi() % RadioLib.AP_STATES.size()])
+		else:
+			fills.append(RadioLib.AP_VERDICTS[randi() % RadioLib.AP_VERDICTS.size()])
+	return t % fills
 
 var _cooking_say := false
 
