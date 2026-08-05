@@ -137,6 +137,10 @@ func _ready() -> void:
 	bsl.value_changed.connect(func(v: float) -> void:
 		_pad.set_brush(int(v))
 		blbl.text = "brush %d" % int(v))
+	# cyan dot marks the default (7)
+	bsl.draw.connect(func() -> void:
+		bsl.draw_circle(Vector2(bsl.size.x * (6.0 / 127.0), bsl.size.y * 0.5),
+			3.0, Color("#35e0e0")))
 	brow.add_child(bsl)
 
 	# import a face straight off one of your saved skins (or the dude
@@ -437,4 +441,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif visible and event is InputEventKey and event.pressed \
 			and event.keycode == KEY_ESCAPE:
 		close_ui()
+		get_viewport().set_input_as_handled()
+	elif visible and event is InputEventKey and event.pressed \
+			and event.keycode == KEY_Z and event.ctrl_pressed:
+		_pad.undo()
 		get_viewport().set_input_as_handled()

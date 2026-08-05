@@ -317,6 +317,10 @@ func _ready() -> void:
 	bsl.value_changed.connect(func(v: float) -> void:
 		_pad.set_brush(int(v))
 		blbl.text = "brush %d" % int(v))
+	# cyan dot marks the default (7)
+	bsl.draw.connect(func() -> void:
+		bsl.draw_circle(Vector2(bsl.size.x * (6.0 / 127.0), bsl.size.y * 0.5),
+			3.0, Color("#35e0e0")))
 	brow.add_child(bsl)
 
 	var start := Button.new()
@@ -442,6 +446,12 @@ func _load_selected_skin() -> void:
 	Sfx.play("click", -12.0)
 	_rebuild()
 
+func _unhandled_input(event: InputEvent) -> void:
+	if visible and _pad != null and event is InputEventKey and event.pressed \
+			and event.keycode == KEY_Z and event.ctrl_pressed:
+		_pad.undo()
+		get_viewport().set_input_as_handled()
+
 func _on_start() -> void:
 	if guest_mode:
 		# server visit: the look lives in memory, never on this disk
@@ -480,8 +490,23 @@ class _Pad extends Control:
 	var _erasing: bool = false
 	var brush: int = 7   # stroke width in canvas pixels (1..128)
 
+	var _undo: Array = []
+
 	func set_brush(b: int) -> void:
 		brush = clampi(b, 1, 128)
+
+	func _push_undo() -> void:
+		_undo.append(_img.duplicate())
+		if _undo.size() > 24:
+			_undo.pop_front()
+
+	func undo() -> void:
+		if _undo.is_empty():
+			return
+		_img = _undo.pop_back()
+		_tex.update(_img)
+		queue_redraw()
+		painted.emit()
 
 	func set_ink(c: Color) -> void:
 		ink = c
@@ -506,6 +531,7 @@ class _Pad extends Control:
 		return _img.save_png_to_buffer()
 
 	func clear() -> void:
+		_push_undo()
 		_img.fill(Color(0, 0, 0, 0))
 		_tex.update(_img)
 		queue_redraw()
@@ -520,6 +546,7 @@ class _Pad extends Control:
 		im.convert(Image.FORMAT_RGBA8)
 		if im.get_width() != 128 or im.get_height() != 128:
 			im.resize(128, 128)
+		_push_undo()
 		_img = im
 		_tex.update(_img)
 		queue_redraw()
@@ -535,6 +562,7 @@ class _Pad extends Control:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			p = event.position
 			painting = true
+			_push_undo()   # one undo step per stroke
 		elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			p = event.position
 			painting = true
