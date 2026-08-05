@@ -578,16 +578,19 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	am.radial_segments = 5
 	am.rings = 3
 	a.mesh = am
-	a.material_override = Destructible.make_material(
-		HUES[_residents.size() % HUES.size()], 1.1)
+	# the SAME fluid glow the studio anchors wear -- they're one species
+	a.material_override = DatamoshStudio._fluid_material(
+		HUES[_residents.size() % HUES.size()])
 	add_child(a)
 	a.global_transform = Transform3D(_bup(up), at)
+	# EXACT studio bubble spec: same font, scale, outline, colour
 	var lbl := Label3D.new()
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	lbl.font_size = 34
-	lbl.pixel_size = 0.008
+	lbl.font_size = 26
+	lbl.pixel_size = 0.006
 	lbl.modulate = HUES[_residents.size() % HUES.size()]
 	lbl.outline_size = 8
+	lbl.outline_modulate = Color(0, 0, 0, 0.85)
 	lbl.text = ""
 	a.add_child(lbl)
 	lbl.position = Vector3(0, 1.1, 0)
@@ -694,4 +697,4 @@ func _say_ready(r: Dictionary, wav) -> void:
 	(nd as Node3D).add_child(sp)
 	sp.play()
 	sp.finished.connect(sp.queue_free)
-	r["say"] = sp""
+	r["say"] = sp

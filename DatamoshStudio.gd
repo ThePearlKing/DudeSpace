@@ -497,7 +497,7 @@ func _build_studio() -> void:
 
 ## The fluid glow: the boiling fbm skin the user saved for later. Later
 ## is now. Per-anchor hue.
-func _fluid_material(col: Color) -> ShaderMaterial:
+static func _fluid_material(col: Color) -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = """
 shader_type spatial;
