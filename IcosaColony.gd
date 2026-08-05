@@ -155,8 +155,10 @@ func build(b, dir: Vector3) -> void:
 		var ang := TAU * float(i) / float(NS)
 		var pdir := (u0 * cos(ang) + e1 * sin(ang)).normalized()
 		var tang := (-u0 * sin(ang) + e1 * cos(ang)).normalized()
+		# the crossing opens BOTH ways here: hatch in the ceiling from
+		# story one, hatch in the floor down to the premium core ring
 		_tube_seg(C + pdir * r2, pdir, tang, 2.0 * PI * r2 / float(NS) + 0.8,
-			_wallc().darkened(0.2), accent, 0, i == 0, false)
+			_wallc().darkened(0.2), accent, 0, i == 0, i == 0)
 	for dang_v in [PI * 0.25, PI * 0.75, PI * 1.25, PI * 1.75]:
 		var dang := float(dang_v)
 		var pdir := (u0 * cos(dang) + e1 * sin(dang)).normalized()
@@ -165,7 +167,7 @@ func build(b, dir: Vector3) -> void:
 	# exit gate at the story-one crossing, back to the mouth's doorstep
 	var out := Gate.new().configure({
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
-		"label": "COLONY EXIT", "color": accent})
+		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out)
 	out.global_transform = Transform3D(_bup(u0), C + u0 * (r1 - 1.8) + e1 * 3.5)
 	# PREMIUM SUITES: a third, tiny ring hugging the core. Bigger rooms,
@@ -201,7 +203,7 @@ func build(b, dir: Vector3) -> void:
 		wb3.translate_object_local(Vector3(sspec3[1].x, 0, sspec3[1].z))
 	var out2 := Gate.new().configure({
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
-		"label": "COLONY EXIT", "color": accent})
+		"label": "COLONY EXIT", "color": accent, "cube": true})
 	add_child(out2)
 	out2.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.8) + e1 * 3.5)
 
@@ -223,9 +225,19 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 	body.global_transform = Transform3D(bas, center)
 	var mat := Surfaces.metal(wallc)
 	var parts: Array = []
-	if not open_floor:
+	# open segments keep MOST of their slab: just a 5.2m hatch matching
+	# the shaft, not the whole roof missing
+	var hole := minf(5.2, ln - 2.0)
+	var flank := (ln - hole) * 0.5
+	if open_floor and flank > 0.3:
+		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, -2.2, (hole + flank) * 0.5)])
+		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, -2.2, -(hole + flank) * 0.5)])
+	elif not open_floor:
 		parts.append([Vector3(5.6, 0.5, ln), Vector3(0, -2.2, 0)])
-	if not open_top:
+	if open_top and flank > 0.3:
+		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, 2.2, (hole + flank) * 0.5)])
+		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, 2.2, -(hole + flank) * 0.5)])
+	elif not open_top:
 		parts.append([Vector3(5.6, 0.5, ln), Vector3(0, 2.2, 0)])
 	if open_side != -1:
 		parts.append([Vector3(0.4, 4.9, ln), Vector3(-2.8, 0, 0)])

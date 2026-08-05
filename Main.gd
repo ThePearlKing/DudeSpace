@@ -1379,6 +1379,8 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	# window closed mid-run: save the exact position on the way out
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		Game.quitting = true   # cooked audio mid-flight must NOT land in
+		# freed nodes -- that was the heap-corruption abort on exit
 		# static caches held render resources past teardown -> the wall
 		# of "leaked at exit" warnings on quit. Drop them first.
 		Surfaces.shutdown()

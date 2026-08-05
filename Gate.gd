@@ -11,11 +11,13 @@ var label_text: String = "GATE"
 var color: Color = Color("#7cf9ff")
 var action: String = ""        # "", "recipe", "mindcore", "artifact", "terminal"
 var wall_button: bool = false  # flat panel ON a wall, not a floor block
+var cube := false   # blocky portal variant (colony exits)
 var requires: String = ""      # "", "door_open", "mindcore"
 var warn_jetpack: bool = false
 var flash_msg: String = ""
 
 func configure(cfg: Dictionary) -> Gate:
+	cube = bool(cfg.get("cube", false))
 	target = cfg.get("target", Vector3.ZERO)
 	zone = cfg.get("zone", "")
 	zone_g = cfg.get("zone_g", 9.0)
@@ -33,7 +35,15 @@ func _ready() -> void:
 	var mi := MeshInstance3D.new()
 	var lbl_y := 3.2
 	var col_size := Vector3(1.6, 2.6, 0.4)
-	if action == "":
+	if cube:
+		# a CUBE portal. some clients ask for a cube. the cube delivers.
+		var mc9 := BoxMesh.new()
+		mc9.size = Vector3(1.4, 1.4, 1.4)
+		mi.mesh = mc9
+		mi.position = Vector3(0, 0.7, 0)
+		lbl_y = 2.2
+		col_size = Vector3(1.5, 1.5, 1.5)
+	elif action == "":
 		# TELEPORT PORTAL: tall glowing doorway
 		var m := BoxMesh.new()
 		m.size = Vector3(1.6, 2.6, 0.4)

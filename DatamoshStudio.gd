@@ -150,6 +150,8 @@ func _tuned_radios() -> Array:
 	return out
 
 func _callout_ready(cooked: Array) -> void:
+	if Game.quitting:
+		return
 	_cooking_callout = false
 	if cooked.is_empty():
 		return
@@ -607,6 +609,8 @@ func _process(delta: float) -> void:
 	_drive_tv(delta, p)
 
 func _deliver(cooked: Array) -> void:
+	if Game.quitting:
+		return
 	_cooking = false
 	_turns = cooked
 	_next_seg_t = randf_range(3.0, 6.0)

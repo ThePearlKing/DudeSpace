@@ -176,6 +176,14 @@ func _physics_process(delta: float) -> void:
 		return
 	var center: Vector3 = _home.center
 	var g: float = _home.g_surf
+	# enemies do not EXIST inside planets: chased or glitched below the
+	# crust, they're set back on top instantly
+	if global_position.distance_to(center) < float(_home.radius) - 1.2:
+		var eup := (global_position - center).normalized()
+		if eup.length() < 0.5:
+			eup = Vector3.UP
+		global_position = center + eup * (float(_home.radius) + 1.0)
+		velocity = Vector3.ZERO
 	var up := (global_position - center).normalized()
 	_align_up(up)
 	_cd -= delta

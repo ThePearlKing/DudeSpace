@@ -614,6 +614,8 @@ func _serve(builder: Callable, clock_sync: bool) -> bool:
 	return false
 
 func _deliver(wav: AudioStreamWAV, idx: int, cl: String = "") -> void:
+	if Game.quitting:
+		return
 	_cooking = false
 	if wav != null:
 		_cooked = wav
