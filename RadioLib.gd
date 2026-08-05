@@ -207,11 +207,26 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 			lpn += ((frng.randf() * 2.0 - 1.0) - lpn) * 0.06
 			buf[i] += lpn * 0.95 * (0.65 + 0.35 * sin(TAU * 0.35 * t3)) \
 				+ sin(TAU * 46.0 * t3) * 0.12 * (0.6 + 0.4 * sin(TAU * 0.21 * t3 + 1.7))
-		for c2 in 520:
-			var cst := frng.randi() % (total - 440)
-			var camp := frng.randf_range(0.12, 0.35)
-			for j2 in 400:
-				buf[cst + j2] += (frng.randf() * 2.0 - 1.0) * camp * exp(-float(j2) / 60.0)
+		# the star-station HOWL: singing inharmonic partials with slow
+		# crossing swells, pitched low and molten. Frequencies snapped to
+		# whole cycles per loop so the seam stays silent.
+		var dur := float(total) / SR
+		var f0 := frng.randf_range(220.0, 420.0)
+		var hphases: Array = []
+		for k in 4:
+			hphases.append(frng.randf() * TAU)
+		var hparts: Array = [1.0, 2.76, 4.07, 5.43]
+		var hfreqs: Array = []
+		for k2 in hparts.size():
+			hfreqs.append(roundf(f0 * float(hparts[k2]) * dur) / dur)
+		for i in total:
+			var t4 := float(i) / SR
+			var lp2 := float(i) / float(total) * TAU
+			var hv := 0.0
+			for k3 in hfreqs.size():
+				var am := 0.5 + 0.5 * sin(lp2 * float(k3 + 1) + float(hphases[k3]))
+				hv += sin(TAU * float(hfreqs[k3]) * t4) * 0.07 * am
+			buf[i] += hv
 		# whooshes: six slow gusts of flame across the loop
 		var wlen := int(0.6 * SR)
 		for wsh in 6:
