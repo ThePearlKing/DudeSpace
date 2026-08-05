@@ -1205,15 +1205,17 @@ func _process(delta: float) -> void:
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
 	if Game.zone == "" and pos.length() > Universe.BOUNDARY:
-		var target := pos.normalized() * (Universe.BOUNDARY * 0.85)
-		var node := _active_node()
-		if node and node.has_method("god_throwback"):
-			node.god_throwback(target)
+		# no announcement anymore. a colossal "me" fades into the dark
+		# and a colossal hand throws you back toward the center of
+		# everything. the god does not narrate.
 		if not _threw_back:
 			_threw_back = true
 			Game.anger(15.0)
-			if _hud:
-				_hud.flash("THE UNIVERSE GOD (ThePearlKing) HURLS YOU BACK IN")
+			var node := _active_node()
+			if node != null:
+				var gh := GodHand.new()
+				add_child(gh)
+				gh.begin(node, Vector3.ZERO)
 	else:
 		_threw_back = false
 
@@ -4003,11 +4005,13 @@ func _spawn_player_and_rocket() -> void:
 
 	# No pre-placed rocket. It appears only once you BUY it (see _process).
 
-	# a starter ATM near spawn
-	var atm := ATM.new()
-	add_child(atm)
-	var adir := Vector3(-0.15, 1.0, 0.12).normalized()
-	atm.global_transform = Transform3D(_basis_from_up(adir), home.center + adir * home.radius)
+	# a starter ATM near spawn -- except in REACTOR SCHOOL, where a
+	# mystery money box next to the lesson reads as reactor equipment
+	if not (Game.tutorial_session and Game.tutorial_mode == "reactor"):
+		var atm := ATM.new()
+		add_child(atm)
+		var adir := Vector3(-0.15, 1.0, 0.12).normalized()
+		atm.global_transform = Transform3D(_basis_from_up(adir), home.center + adir * home.radius)
 
 # ------------------------------------------------- LAN player avatars
 ## peer id -> {root, human, rocket_node, speed, jet, grounded, in_rocket}
