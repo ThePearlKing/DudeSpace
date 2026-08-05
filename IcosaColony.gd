@@ -593,8 +593,13 @@ func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	lbl.position = Vector3(0, 1.1, 0)
 	var lines := WISDOM.duplicate()
 	lines.shuffle()
+	# every resident gets a news-anchor voice: a studio host profile
+	# with its own pitch roll, so no two sound quite alike
+	var prof: Dictionary = (RadioLib.ALIEN_HOSTS[_residents.size() % 4] as Dictionary).duplicate()
+	prof["base"] = float(prof.get("base", 200.0)) * randf_range(0.82, 1.22)
 	_residents.append({"node": a, "base": at, "phase": randf() * TAU,
-		"lbl": lbl, "lines": lines, "line_i": randi() % lines.size(), "up": up})
+		"lbl": lbl, "lines": lines, "line_i": randi() % lines.size(), "up": up,
+		"voice": prof, "full": "", "say": null})
 
 func _process(delta: float) -> void:
 	# residents bob gently, always
@@ -634,9 +639,59 @@ func _process(delta: float) -> void:
 		if not is_instance_valid(lbl):
 			continue
 		var near: bool = (r["base"] as Vector3).distance_to(pp) < 6.0
+		var sp = r["say"]
 		if near:
-			if lbl.text == "" or randf() < 0.04:   # ~every 5s at 5Hz
+			# letter-by-letter reveal riding the voice, studio style
+			if sp != null and is_instance_valid(sp) and sp.playing \
+					and sp.stream != null:
+				var frac: float = clampf(sp.get_playback_position() \
+					/ maxf(0.2, sp.stream.get_length() * 0.9), 0.0, 1.0)
+				lbl.text = str(r["full"]).substr(0,
+					int(float(str(r["full"]).length()) * frac))
+			elif str(r["full"]) != "" and lbl.text != str(r["full"]):
+				lbl.text = str(r["full"])
+			if str(r["full"]) == "" or (randf() < 0.04 \
+					and (sp == null or not is_instance_valid(sp) or not sp.playing)):
 				r["line_i"] = (int(r["line_i"]) + 1) % (r["lines"] as Array).size()
-				lbl.text = str((r["lines"] as Array)[r["line_i"]])
-		elif lbl.text != "":
-			lbl.text = ""
+				var line := str((r["lines"] as Array)[r["line_i"]])
+				r["full"] = line
+				lbl.text = ""
+				if not _cooking_say:
+					_cooking_say = true
+					var prof: Dictionary = r["voice"]
+					WorkerThreadPool.add_task(func() -> void:
+						var w = HumanVoice.render(line, prof)
+						_say_ready.call_deferred(r, w))
+		else:
+			if lbl.text != "":
+				lbl.text = ""
+			r["full"] = ""
+			if sp != null and is_instance_valid(sp):
+				sp.queue_free()
+				r["say"] = null
+
+var _cooking_say := false
+
+func _say_ready(r: Dictionary, wav) -> void:
+	_cooking_say = false
+	if Game.quitting or wav == null:
+		return
+	var nd = r.get("node")
+	if nd == null or not is_instance_valid(nd):
+		return
+	var old = r.get("say")
+	if old != null and is_instance_valid(old):
+		old.queue_free()
+	var sp := AudioStreamPlayer3D.new()
+	sp.stream = wav
+	sp.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE
+	sp.unit_size = 2.5
+	sp.max_distance = 16.0
+	sp.max_db = -6.0
+	sp.volume_db = -8.0
+	if AudioServer.get_bus_index("Voice") >= 0:
+		sp.bus = "Voice"
+	(nd as Node3D).add_child(sp)
+	sp.play()
+	sp.finished.connect(sp.queue_free)
+	r["say"] = sp""
