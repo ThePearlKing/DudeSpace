@@ -780,28 +780,20 @@ func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
 		scr.add_child(sub)
 		_tv_subs.append(sub)
 	else:
-		# the other channel: scrolling colour bars with a rolling glitch,
-		# and the STATION bleeding through underneath -- a wobbling ghost
-		# of the studio feed you can kinda see through the bars
-		_ensure_tv_feed()
+		# the other channel: scrolling colour bars with a rolling glitch
 		var sh := Shader.new()
 		sh.code = """
 shader_type spatial;
 render_mode unshaded;
-uniform sampler2D feed : source_color;
 void fragment(){
 	float band = floor(fract(UV.x + TIME * 0.03) * 7.0);
 	vec3 col = vec3(fract(band * 0.37), fract(band * 0.61), fract(band * 0.83));
 	float roll = step(0.97, fract(UV.y * 1.0 - TIME * 0.4));
-	vec3 bars = mix(col * 0.8, vec3(1.0), roll);
-	vec2 guv = UV + vec2(sin(TIME * 1.7 + UV.y * 9.0) * 0.006, 0.0);
-	vec3 ghost = texture(feed, guv).rgb;
-	ALBEDO = mix(bars, ghost * 1.15, 0.45);
+	ALBEDO = mix(col * 0.8, vec3(1.0), roll);
 }
 """
 		var sm2 := ShaderMaterial.new()
 		sm2.shader = sh
-		sm2.set_shader_parameter("feed", _tv_vp.get_texture())
 		scr.material_override = sm2
 	frame.add_child(scr)
 

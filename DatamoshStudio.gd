@@ -562,10 +562,13 @@ func _process(delta: float) -> void:
 		_pcache = get_tree().get_first_node_in_group("player")
 	var p = _pcache
 	var here: bool = p != null and p.global_position.distance_to(POS) < 40.0
-	if _tv_vp != null:
-		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here \
-			else SubViewport.UPDATE_DISABLED
 	remote_watch = maxf(0.0, remote_watch - delta)
+	# the news room's own screen keeps rendering while ANY TV watches the
+	# studio remotely -- the wall monitor must be alive INSIDE the relay
+	# picture, not a dead slab behind the desk
+	if _tv_vp != null:
+		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS \
+			if (here or remote_watch > 0.0) else SubViewport.UPDATE_DISABLED
 	if not here and remote_watch <= 0.0:
 		return
 	# the show never stops: queue segments, play turn by turn
