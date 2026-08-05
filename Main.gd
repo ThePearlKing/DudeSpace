@@ -49,6 +49,8 @@ var COLONY_DIRS := {
 # roll of the whole colony around its mouth axis, degrees -- used to
 # line the square entrance up with the planet-mesh facets it cuts
 var COLONY_ROLLS := {"Pixel": 59.5}
+# the Mainframe facility's mouth (same porthole kit as colonies/mines)
+var MAINFRAME_DIR := Vector3(0.35, 0.75, 0.56).normalized()
 
 func _n(base: int) -> int:
 	return maxi(1, int(round(float(base) * _dens)))
@@ -113,6 +115,12 @@ func _ready() -> void:
 				add_child(col9)
 				col9.build(cb, COLONY_DIRS[cname],
 					float(COLONY_ROLLS.get(cname, 0.0)))
+		# the Mainframe facility: dude-built, automated, nobody home
+		var mfb = Universe.body_named("Mainframe")
+		if mfb != null:
+			var mfc := MainframeComplex.new()
+			add_child(mfc)
+			mfc.build(mfb, MAINFRAME_DIR)
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -222,6 +230,8 @@ func _ready() -> void:
 		_colony_test()
 	if OS.get_environment("CTD_TEST") == "25":
 		_mouth_shot_test()
+	if OS.get_environment("CTD_TEST") == "26":
+		_mainframe_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -617,6 +627,64 @@ func _colony_test() -> void:
 		cafr, r2 - 9.45 - 4.0, "PASS" if absf(cafr - (r2 - 9.45 - 4.0)) < 2.0 else "FAIL"])
 	print("COLONYTEST done")
 
+## CTD_TEST=26: ray probes through the Mainframe facility -- drop path,
+## the curved control deck's floor and ceiling at three arc angles, the
+## server-hall drop, and both gate landing targets.
+func _mainframe_test() -> void:
+	print("MFTEST starting")
+	await get_tree().process_frame
+	await get_tree().create_timer(3.0).timeout
+	var b = Universe.body_named("Mainframe")
+	var u0: Vector3 = MAINFRAME_DIR
+	var C: Vector3 = b.center
+	var R: float = b.radius
+	var rF := R - 16.0
+	var r2 := R - 26.0
+	var e1 := u0.cross(Vector3(0, 0, 1)).normalized()
+	var e2 := u0.cross(e1).normalized()
+	var space := _player.get_world_3d().direct_space_state
+	var cast := func(from: Vector3, to: Vector3) -> float:
+		var q := PhysicsRayQueryParameters3D.create(from, to)
+		var hit := space.intersect_ray(q)
+		if hit.is_empty():
+			return -1.0
+		return (hit["position"] as Vector3).distance_to(from)
+	# 1. the drop: mouth -> atrium floor (solid, hatch is ceiling-only)
+	var d1: float = cast.call(C + u0 * (R - 1.0), C)
+	var caught: float = (R - 1.0) - d1
+	print("MFTEST drop: floor at radius %.1f (atrium ~%.1f) %s" % [caught, rF,
+		"PASS" if absf(caught - rF) < 1.0 else "FAIL"])
+	# 2. deck floor + ceiling at three angles along the curve
+	var step := 4.6 / rF
+	for a in [0.115 + step * 2.0, 0.115 + step * 5.0, 0.115 + step * 11.0]:
+		var pd := (u0 * cos(a) + e1 * sin(a)).normalized()
+		var df: float = cast.call(C + pd * (rF + 3.0), C)
+		var fr9: float = (rF + 3.0) - df
+		var dc: float = cast.call(C + pd * (rF + 3.0), C + pd * (rF + 20.0))
+		var cr9: float = (rF + 3.0) + dc
+		print("MFTEST deck a=%.2f: floor %.1f (~%.1f) ceil %.1f (~%.1f) %s" % [
+			a, fr9, rF, cr9, rF + 6.0,
+			"PASS" if absf(fr9 - rF) < 0.8 and absf(cr9 - (rF + 6.0)) < 0.8 else "FAIL"])
+	# 3. server drop through deck hatch seg 7
+	var ah := 0.115 + step * 7.0
+	var hp := (u0 * cos(ah) + e1 * sin(ah)).normalized()
+	var d3: float = cast.call(C + hp * (rF + 2.0), C)
+	var srv: float = (rF + 2.0) - d3
+	print("MFTEST server drop: floor at radius %.1f (hall ~%.1f) %s" % [srv, r2,
+		"PASS" if absf(srv - r2) < 1.0 else "FAIL"])
+	# 4. gate landings: server->atrium target and atrium->surface target
+	var g1 := C + u0 * (rF + 0.4) + e2 * 3.0
+	var d4: float = cast.call(g1, C)
+	var g1r: float = (g1 - C).length() - d4
+	print("MFTEST atrium gate target: floor %.1f (~%.1f) %s" % [g1r, rF,
+		"PASS" if absf(g1r - rF) < 1.0 else "FAIL"])
+	var g2 := C + u0 * (R + 1.5) + e1 * 7.0
+	var d5: float = cast.call(g2, C)
+	var g2r: float = (g2 - C).length() - d5
+	print("MFTEST surface gate target: ground %.1f (~%.1f) %s" % [g2r, R,
+		"PASS" if absf(g2r - R) < 1.2 else "FAIL"])
+	print("MFTEST done")
+
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
 ## straight down -- checks the mesh-cut opening actually clears the
 ## square entrance. CTD_SHOT names the png.
@@ -649,6 +717,22 @@ func _mouth_shot_test() -> void:
 	var img2 := get_viewport().get_texture().get_image()
 	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_apt.png"))
 	print("MOUTHSHOT apt saved")
+	# third: the Mainframe control deck, looking down the curve
+	var mb = Universe.body_named("Mainframe")
+	var mu: Vector3 = MAINFRAME_DIR
+	var me1 := mu.cross(Vector3(0, 0, 1)).normalized()
+	var mrF: float = mb.radius - 16.0
+	var ma := 0.115 + (4.6 / mrF) * 2.0
+	var mpd := (mu * cos(ma) + me1 * sin(ma)).normalized()
+	var mtd := (-mu * sin(ma) + me1 * cos(ma)).normalized()
+	var mla := ma + 0.22
+	cam.global_position = mb.center + mpd * (mrF + 2.8) - mtd * 1.0
+	cam.look_at(mb.center
+		+ (mu * cos(mla) + me1 * sin(mla)).normalized() * (mrF + 1.4), mpd)
+	await get_tree().create_timer(0.6).timeout
+	var img3 := get_viewport().get_texture().get_image()
+	img3.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_deck.png"))
+	print("MOUTHSHOT deck saved")
 
 func _dish_test() -> void:
 	await get_tree().process_frame
@@ -1601,6 +1685,8 @@ func _build_body(b) -> void:
 		hole_specs.append([MINE_DIRS[b.name], 4.8])
 	if COLONY_DIRS.has(b.name):
 		hole_specs.append([COLONY_DIRS[b.name], 4.8])
+	if b.name == "Mainframe":
+		hole_specs.append([MAINFRAME_DIR, 4.8])
 	if hole_specs.size() > 0:
 		# Holed planet (mine mouths, colony mouths): BOTH the collider and
 		# the VISIBLE mesh are a shell with every mouth cut out.
