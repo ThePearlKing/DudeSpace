@@ -4561,12 +4561,14 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 			lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
 				hrng.randf_range(-2.2, 2.2))
 
-## The ANCIENT of Harold: no longer a T -- a tall tapering column out
-## of the dust, crowned by a stone DISC ringed with floating halos.
-## The disc's face is genuinely pierced: a triangular opening built
-## into the front plate itself (the old cavity hid inside a solid box),
-## walls converging on an apex in the dark. Six pictograms ring the
-## opening. It does nothing. Yet.
+## The ANCIENT of Harold: the stele again -- but softened. Tapering
+## tiers with 45-degree diamond transition layers (nothing reads as a
+## plain cube), and a crown only a little wider than the waist and
+## SHORT, so the silhouette is a worn monolith, not a T. The waist
+## carries a genuinely carved tetrahedral socket: the front plate is a
+## custom mesh with the triangular mouth cut through it, three planar
+## walls sinking to a black apex. Six pictograms ring the mouth.
+## It does nothing. Yet.
 func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	var dir := _h_dir(hrng)
 	var bas := _basis_from_up(dir)
@@ -4575,16 +4577,22 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	root.global_transform = Transform3D(bas, b.center + dir * b.radius)
 	var stone := Surfaces.stone(Color("#8a7f70"))
 	var dark := Surfaces.stone(Color("#6b6154"))
-	# footing + plinth + three tapering column segments: it goes UP now
-	for spec in [[Vector3(9.0, 2.4, 6.0), 0.8], [Vector3(6.0, 2.0, 4.5), 2.8],
-			[Vector3(3.2, 4.0, 3.0), 5.6], [Vector3(2.6, 4.0, 2.4), 9.4],
-			[Vector3(2.2, 4.0, 2.0), 13.2]]:
+	# tiers: [size, position, yaw_degrees] -- diamonds break the cubic
+	# monotony; the waist sits back so its face never fills the mouth
+	for spec in [[Vector3(11.0, 2.4, 7.0), Vector3(0, 0.8, 0), 0.0],
+			[Vector3(8.0, 2.0, 5.5), Vector3(0, 2.9, 0), 0.0],
+			[Vector3(5.6, 0.7, 5.6), Vector3(0, 4.2, 0), 45.0],
+			[Vector3(5.0, 4.5, 3.6), Vector3(0, 6.35, -0.42), 0.0],
+			[Vector3(4.2, 0.6, 4.2), Vector3(0, 8.85, 0), 45.0],
+			[Vector3(6.0, 1.6, 3.0), Vector3(0, 9.9, 0), 0.0],
+			[Vector3(3.6, 0.9, 2.4), Vector3(0, 11.1, 0), 0.0]]:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = spec[0]
 		mi.mesh = bm
-		mi.material_override = dark if int(float(spec[1])) % 2 == 0 else stone
-		mi.position = Vector3(0, float(spec[1]), 0)
+		mi.material_override = dark if float(spec[2]) > 0.0 else stone
+		mi.position = spec[1]
+		mi.rotation_degrees.y = float(spec[2])
 		var shp := BoxShape3D.new()
 		shp.size = spec[0]
 		_rockify(mi, shp)
@@ -4597,101 +4605,78 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 			hrng.randf_range(0.5, 1.0))
 		ch.mesh = chm
 		ch.material_override = dark
-		ch.position = Vector3(hrng.randf_range(-4.0, 4.0), 0.3, hrng.randf_range(2.4, 3.8))
+		ch.position = Vector3(hrng.randf_range(-4.5, 4.5), 0.3, hrng.randf_range(2.8, 4.4))
 		ch.rotation = Vector3(hrng.randf_range(-0.3, 0.3), hrng.randf() * TAU, 0)
 		root.add_child(ch)
-	# THE DISC: one custom mesh -- front plate WITH the triangular hole
-	# in it, cavity walls to a black apex, rim, back cap. A real pierce.
+	# THE SOCKET: the waist's front is a custom plate with the triangular
+	# mouth REALLY cut through it -- ring plate, side skirts back to the
+	# structural box, cavity walls to a black apex. True tetrahedron.
 	var st8 := SurfaceTool.new()
 	st8.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var N := 24
-	var R := 2.6
+	var hx := 2.5
+	var hy := 2.25
 	var rt := 1.0
-	var zf := 0.3
-	var zb := -0.3
-	var apex := Vector3(0, 0, -1.05)
-	var stC := Color("#8a7f70")
+	var cy := 6.35
+	var zf := 1.8
+	var zback := 1.4
+	var apex := Vector3(0, cy, -0.2)
+	var stC := Color(0.541, 0.498, 0.439)
 	var mouth := Color(0.2, 0.17, 0.13)
 	var deep := Color(0.012, 0.01, 0.008)
-	var tv: Array = []
-	for k in 3:
-		var ta := deg_to_rad(90.0 + 120.0 * float(k))
-		tv.append(Vector3(cos(ta) * rt, sin(ta) * rt, zf))
-	var outerp: Array = []
+	var rectp: Array = []
 	var holep: Array = []
 	for i in N:
-		var oa := deg_to_rad(90.0 + 360.0 * float(i) / float(N))
-		outerp.append(Vector3(cos(oa) * R, sin(oa) * R, zf))
-		var tpar := float(i) / float(N) * 3.0
-		var e := mini(2, int(tpar))
-		holep.append((tv[e] as Vector3).lerp(tv[(e + 1) % 3], tpar - float(e)))
+		var th := deg_to_rad(90.0 + 360.0 * float(i) / float(N))
+		var dv := Vector2(cos(th), sin(th))
+		var rr := minf(hx / maxf(0.001, absf(dv.x)), hy / maxf(0.001, absf(dv.y)))
+		rectp.append(Vector3(dv.x * rr, cy + dv.y * rr, zf))
+		# regular-triangle radius along this ray (vertex at 90 degrees)
+		var loc := fposmod(th - deg_to_rad(90.0), TAU / 3.0)
+		var rtri := rt * cos(PI / 3.0) / cos(loc - PI / 3.0)
+		holep.append(Vector3(dv.x * rtri, cy + dv.y * rtri, zf))
 	var addv := func(p: Vector3, col: Color, nrm: Vector3) -> void:
 		st8.set_normal(nrm)
 		st8.set_color(col)
 		st8.add_vertex(p)
 	for i in N:
 		var j := (i + 1) % N
-		# front plate ring (this is the face -- the hole is REALLY in it)
-		addv.call(outerp[i], stC, Vector3.BACK)
+		# face plate ring: the mouth is genuinely IN the plate
+		addv.call(rectp[i], stC, Vector3.BACK)
 		addv.call(holep[i], stC, Vector3.BACK)
-		addv.call(outerp[j], stC, Vector3.BACK)
-		addv.call(outerp[j], stC, Vector3.BACK)
+		addv.call(rectp[j], stC, Vector3.BACK)
+		addv.call(rectp[j], stC, Vector3.BACK)
 		addv.call(holep[i], stC, Vector3.BACK)
 		addv.call(holep[j], stC, Vector3.BACK)
 		# cavity wall sinking to the apex
-		var wn: Vector3 = ((holep[j] - holep[i]) as Vector3).cross(apex - holep[i]).normalized()
+		var wn: Vector3 = ((holep[j] as Vector3) - holep[i]).cross(apex - holep[i]).normalized()
 		if wn.z < 0.0:
 			wn = -wn
 		addv.call(holep[i], mouth, wn)
 		addv.call(holep[j], mouth, wn)
 		addv.call(apex, deep, wn)
-		# rim strip
-		var ob := Vector3(outerp[i].x, outerp[i].y, zb)
-		var jb := Vector3(outerp[j].x, outerp[j].y, zb)
-		var rn := Vector3(outerp[i].x, outerp[i].y, 0).normalized()
-		addv.call(outerp[i], stC, rn)
-		addv.call(ob, stC, rn)
-		addv.call(outerp[j], stC, rn)
-		addv.call(outerp[j], stC, rn)
-		addv.call(ob, stC, rn)
+		# skirt back to the structural box
+		var rb := Vector3(rectp[i].x, rectp[i].y, zback)
+		var jb := Vector3(rectp[j].x, rectp[j].y, zback)
+		var rn := Vector3(rectp[i].x, rectp[i].y - cy, 0).normalized()
+		addv.call(rectp[i], stC, rn)
+		addv.call(rb, stC, rn)
+		addv.call(rectp[j], stC, rn)
+		addv.call(rectp[j], stC, rn)
+		addv.call(rb, stC, rn)
 		addv.call(jb, stC, rn)
-		# back cap
-		addv.call(ob, stC, Vector3.FORWARD)
-		addv.call(Vector3(0, 0, zb), stC, Vector3.FORWARD)
-		addv.call(jb, stC, Vector3.FORWARD)
-	var disc := MeshInstance3D.new()
-	disc.mesh = st8.commit()
-	var dmat := StandardMaterial3D.new()
-	dmat.vertex_color_use_as_albedo = true
-	dmat.roughness = 1.0
-	dmat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	disc.material_override = dmat
-	disc.position = Vector3(0, 17.4, 0)
-	var dshape := CylinderShape3D.new()
-	dshape.radius = R
-	dshape.height = 0.6
-	var dsb := StaticBody3D.new()
-	var dcs := CollisionShape3D.new()
-	dcs.shape = dshape
-	dcs.rotation_degrees.x = 90.0
-	dsb.add_child(dcs)
-	disc.add_child(dsb)
-	root.add_child(disc)
-	# floating halo rings around the disc
-	for rspec in [[3.5, 0.11, stone], [4.3, 0.07, dark]]:
-		var halo := MeshInstance3D.new()
-		var htm := TorusMesh.new()
-		htm.inner_radius = float(rspec[0]) - float(rspec[1])
-		htm.outer_radius = float(rspec[0]) + float(rspec[1])
-		halo.mesh = htm
-		halo.material_override = rspec[2]
-		halo.rotation_degrees.x = 90.0
-		halo.position = Vector3(0, 17.4, 0)
-		root.add_child(halo)
-	# six pictograms ringing the opening, on the disc face
+	var plate := MeshInstance3D.new()
+	plate.mesh = st8.commit()
+	var pmat := StandardMaterial3D.new()
+	pmat.vertex_color_use_as_albedo = true
+	pmat.roughness = 1.0
+	pmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	plate.material_override = pmat
+	root.add_child(plate)
+	# six pictograms ringing the mouth
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
-		_h_glyph(root, g, Vector3(cos(ga) * 1.8, 17.4 + sin(ga) * 1.8, 0.33))
+		_h_glyph(root, g, Vector3(cos(ga) * 1.65, cy + sin(ga) * 1.65, 1.84))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
