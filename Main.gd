@@ -1671,15 +1671,15 @@ void fragment(){
 	return m
 
 ## Rocky worlds: base colour with mottled noise + optional polar caps.
-func _rocky_material(color: Color, cap: float = 0.0) -> Material:
+func _rocky_material(color: Color, cap: float = 0.0, texscale: float = 1.0) -> Material:
 	var sh := Shader.new()
-	sh.code = "shader_type spatial;\nvarying vec3 vn;\nuniform vec3 base : source_color;\nuniform float capamt;\n" \
+	sh.code = "shader_type spatial;\nvarying vec3 vn;\nuniform vec3 base : source_color;\nuniform float capamt;\nuniform float tscale;\n" \
 		+ _NOISE_GLSL + """
 void vertex(){ vn = NORMAL; }
 void fragment(){
 	vec3 n = normalize(vn);
-	float m1 = fbm(n * 7.0);
-	float m2 = fbm(n * 21.0);
+	float m1 = fbm(n * 7.0 * tscale);
+	float m2 = fbm(n * 21.0 * tscale);
 	vec3 col = base * (0.72 + 0.42 * m1 + 0.16 * m2);
 	if (capamt > 0.0) {
 		col = mix(col, vec3(0.95), smoothstep(0.86 - capamt * 0.1, 0.92, abs(n.y)));
@@ -1692,6 +1692,7 @@ void fragment(){
 	m.shader = sh
 	m.set_shader_parameter("base", color)
 	m.set_shader_parameter("capamt", cap)
+	m.set_shader_parameter("tscale", texscale)
 	return m
 
 func _planet_material(kind: String, color: Color) -> Material:
@@ -1700,8 +1701,12 @@ func _planet_material(kind: String, color: Color) -> Material:
 			return ShaderLib.make(kind, color)
 		"earth":
 			return _earth_material()
-		"luna", "mercury", "harold":
+		"luna", "mercury":
 			return _rocky_material(color)
+		"harold":
+			# big planet, small grain: 6x tighter noise so the rock still
+			# reads as rock with your face against it
+			return _rocky_material(color, 0.0, 6.0)
 		"ice":
 			# glacial: saturated blue with a frosty sheen
 			var im2 := _rocky_material(Color("#5ab4f2"))
@@ -2285,7 +2290,7 @@ func _populate(b) -> void:
 					b.center + rd9 * (b.radius + 0.3))
 				rg.rotate_object_local(Vector3.UP, randf() * TAU)
 			_spawn_res_nodes(b, 8, "coal", 2)
-			_spawn_res_nodes(b, 6, "raw_irid", 2)
+			_spawn_res_nodes(b, 5, "uranium", 1)
 			# one bench, facing the black hole. he sits sometimes.
 			var bhh = Universe.body_named("TIN 618")
 			if bhh != null:
