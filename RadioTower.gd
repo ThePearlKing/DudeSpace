@@ -680,7 +680,9 @@ func _update_beam(delta: float) -> void:
 	if not active or _beam_env < 0.03:
 		return
 	var dirn := aim_dir.normalized()
-	var origin: Vector3 = _dish_pivot.global_position + dirn * 0.55
+	# starts right at the feed horn and runs the wave INWARD -- this dish
+	# RECEIVES: the signal arrives from the sky and falls into the bowl
+	var origin: Vector3 = _dish_pivot.global_position + dirn * 0.05
 	# BILLBOARD: the ribbon's face always turns to the viewer, so the
 	# wave reads from every angle instead of vanishing edge-on
 	var cam9 := get_viewport().get_camera_3d()
@@ -698,7 +700,7 @@ func _update_beam(delta: float) -> void:
 	for i in 121:
 		var t := float(i) / 120.0
 		# one clean THIN sine, full amplitude the whole 40 meters
-		var wob := sin(t * 110.0 - _beam_t * 14.0) \
+		var wob := sin(t * 110.0 + _beam_t * 14.0) \
 			* (0.12 + 0.35 * _beam_env + 0.3 * _beam_flash)
 		var p := origin + dirn * (t * 40.0) + side * wob
 		var a := (1.0 - t) * (0.1 + 0.5 * _beam_env + 0.35 * _beam_flash)
