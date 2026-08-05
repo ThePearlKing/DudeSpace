@@ -4671,10 +4671,52 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 		addv.call(jb, stC, rn)
 	var plate := MeshInstance3D.new()
 	plate.mesh = st8.commit()
-	var pmat := StandardMaterial3D.new()
-	pmat.vertex_color_use_as_albedo = true
-	pmat.roughness = 1.0
-	pmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# the plate wears the SAME stone grain as the rest of the monument --
+	# vertex colors carry the cavity's depth fade, the fbm carries the rock
+	var psh2 := Shader.new()
+	psh2.code = """
+shader_type spatial;
+render_mode cull_disabled;
+varying vec3 vpos;
+varying vec4 vcol;
+float hash3(vec3 p) {
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+float vnoise(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x);
+	float b = mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x);
+	float c = mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x);
+	float d = mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x);
+	return mix(mix(a, b, f.y), mix(c, d, f.y), f.z);
+}
+float fbm(vec3 p) {
+	float v = 0.0;
+	float amp = 0.55;
+	for (int i = 0; i < 4; i++) {
+		v += vnoise(p) * amp;
+		p *= 2.1;
+		amp *= 0.5;
+	}
+	return v;
+}
+void vertex() {
+	vpos = VERTEX;
+	vcol = COLOR;
+}
+void fragment() {
+	float n = fbm(vpos * 4.0);
+	vec3 col = vcol.rgb * (0.72 + 0.4 * n);
+	float seam = smoothstep(0.46, 0.5, abs(fract(fbm(vpos * 2.4) * 3.0) - 0.5));
+	col *= 0.82 + 0.18 * seam;
+	ALBEDO = col;
+	ROUGHNESS = 0.95;
+}
+"""
+	var pmat := ShaderMaterial.new()
+	pmat.shader = psh2
 	plate.material_override = pmat
 	# solid hitbox over the whole carved front -- you don't fit in the
 	# mouth anyway, so the collider ignores the carving
