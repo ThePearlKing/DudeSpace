@@ -45,16 +45,16 @@ class Generator extends Machine:
 	func work(_d: float) -> void:
 		if _vent and _vent.material_override is StandardMaterial3D:
 			_vent.material_override.emission_energy_multiplier = 0.4 + (buf / buf_cap) * 4.0
-		if str(in_slot["id"]) == "coal" and int(in_slot["n"]) > 0 and buf <= buf_cap - 25.0:
+		if str(in_slot["id"]) == "coal" and int(in_slot["n"]) > 0 and buf <= buf_cap - 12.0:
 			in_slot["n"] = int(in_slot["n"]) - 1
 			if int(in_slot["n"]) <= 0:
 				in_slot = {"id": "", "n": 0}
-			buf += 25.0
+			buf += 12.0
 			Sfx.play("smelt", -20.0)
 	func accepts(id: String) -> bool:
 		return id == "coal"
 	func info_text() -> String:
-		return "energy: %.0f / %.0f EU\ncoal in: %s\n1 coal -> 25 EU" % [buf, buf_cap, Inventory.slot_text(in_slot)]
+		return "energy: %.0f / %.0f EU\ncoal in: %s\n1 coal -> 12 EU" % [buf, buf_cap, Inventory.slot_text(in_slot)]
 	func actions() -> Array:
 		return []
 

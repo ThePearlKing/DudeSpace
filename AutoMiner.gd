@@ -8,10 +8,15 @@ const NEAR_EU := 8.0
 const NEAR_SECS := 5.0
 const FAR_EU := 40.0
 const FAR_SECS := 9.0
+const FOREIGN_EU := 60.0    # ore this planet doesn't even have
+const FOREIGN_SECS := 60.0  # fabricating from planetary dust. glacial.
 
 var target_ore: String = "raw_ingot"
 var _t: float = 0.0
 var _drill: MeshInstance3D
+var _site_t: float = 0.0        # cached surveys, refreshed every few secs
+var _grounded := false
+var _native := false
 
 func _init() -> void:
 	title = "AUTO-MINER"
@@ -53,9 +58,15 @@ func _ready() -> void:
 	part(bin, Vector3(0, 0.3, box_size.z * 0.5 + 0.28), Color("#1a2a32"), 0.15)
 
 func work(delta: float) -> void:
+	_survey(delta)
+	if not _grounded:
+		# no planet under the pads: the drill has nothing to chew
+		if _drill:
+			_drill.rotate_y(delta * 0.15)
+		return
 	var near := _ore_nearby()
-	var eu := NEAR_EU if near else FAR_EU
-	var secs := NEAR_SECS if near else FAR_SECS
+	var eu := NEAR_EU if near else (FAR_EU if _native else FOREIGN_EU)
+	var secs := NEAR_SECS if near else (FAR_SECS if _native else FOREIGN_SECS)
 	if _drill:
 		_drill.rotate_y(delta * (7.0 if buf >= eu else 0.4))
 	_t += delta
@@ -73,6 +84,34 @@ func work(delta: float) -> void:
 		out_slot["n"] = int(out_slot["n"]) + 1
 	Sfx.play("smelt", -22.0)
 
+## Where are we, and does this planet even HAVE the target ore?
+## Surveyed every 4s, not every frame -- geology is slow.
+func _survey(delta: float) -> void:
+	_site_t -= delta
+	if _site_t > 0.0:
+		return
+	_site_t = 4.0
+	_grounded = false
+	_native = false
+	# pocket interiors (houses, temples) map elsewhere: not a surface
+	if Zones.exterior_of(global_position) != global_position:
+		return
+	# station decks are floors, not planets
+	for h in get_tree().get_nodes_in_group("house"):
+		if h is House and h.kind == "station" \
+				and h.global_position.distance_to(global_position) < 26.0:
+			return
+	var b = Universe.nearest(global_position)
+	if b == null or global_position.distance_to(b.center) > float(b.radius) + 25.0:
+		return
+	_grounded = true
+	# native = a surface deposit of the target ore exists on THIS planet
+	for o in get_tree().get_nodes_in_group("destructible"):
+		if o is Destructible and is_instance_valid(o) and o._res_id == target_ore \
+				and o.global_position.distance_to(b.center) < float(b.radius) * 1.3:
+			_native = true
+			return
+
 func _ore_nearby() -> bool:
 	for o in get_tree().get_nodes_in_group("mine_ore"):
 		if global_position.distance_to(o.global_position) < 25.0:
@@ -81,8 +120,15 @@ func _ore_nearby() -> bool:
 
 func info_text() -> String:
 	var near := _ore_nearby()
-	var mode := "NEAR ORE: %d EU / %ds" % [int(NEAR_EU), int(NEAR_SECS)] if near \
-		else "REMOTE: %d EU / %ds (thirsty)" % [int(FAR_EU), int(FAR_SECS)]
+	var mode: String
+	if not _grounded:
+		mode = "OFFLINE: needs bare planet surface (no houses, no station decks)"
+	elif near:
+		mode = "NEAR ORE: %d EU / %ds" % [int(NEAR_EU), int(NEAR_SECS)]
+	elif _native:
+		mode = "REMOTE: %d EU / %ds (thirsty)" % [int(FAR_EU), int(FAR_SECS)]
+	else:
+		mode = "FOREIGN ORE: %d EU / %ds (this planet has none. glacial.)" % [int(FOREIGN_EU), int(FOREIGN_SECS)]
 	return "energy: %.0f / %.0f EU\ntarget: %s\nout: %s\n%s" % [
 		buf, buf_cap, Inventory.hotbar_name(target_ore), Inventory.slot_text(out_slot), mode]
 
@@ -90,6 +136,7 @@ func actions() -> Array:
 	return [
 		["Target: " + Inventory.hotbar_name(target_ore) + "  (switch)", func() -> void:
 			target_ore = "raw_irid" if target_ore == "raw_ingot" else "raw_ingot"
+			_site_t = 0.0
 			Sfx.play("click")
 			use()],
 	]

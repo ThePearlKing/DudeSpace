@@ -109,7 +109,10 @@ func _ready() -> void:
 	_jetting = Inventory.jet_on and Inventory.has_jetpack   # as you left it
 	Inventory.changed.connect(func() -> void:
 		if _body and is_instance_valid(_body):
-			_body.dress(Inventory.equip))
+			_body.dress(Inventory.equip)
+			# fresh armor meshes spawn on layer 1 -- re-layer at once or the
+			# chestplate photobombs first person for a frame on hotbar scroll
+			_apply_body_vis())
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _char_color() -> Color:
@@ -240,6 +243,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sfx.play("click", -18.0)
 		get_viewport().set_input_as_handled()
 		return
+	# house DELETE tool: lives on the House Kit the same way DESTROY
+	# lives on the Furniture Placer
+	if _hwreck_mode and Inventory.slot_id(Inventory.selected) != "housekit":
+		_hwreck_mode = false
+		_hwreck_pending = null
+	if _hwreck_mode and event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		_hwreck_click()
+		get_viewport().set_input_as_handled()
+		return
+	if _hwreck_mode and event is InputEventKey and event.pressed \
+			and event.keycode == KEY_ESCAPE:
+		_hwreck_mode = false
+		_hwreck_pending = null
+		Sfx.play("click", -18.0)
+		get_viewport().set_input_as_handled()
+		return
 	if _ghost != null and event is InputEventKey and event.pressed 			and event.keycode == KEY_ESCAPE:
 		_cancel_ghost()
 		get_viewport().set_input_as_handled()
@@ -305,6 +325,8 @@ var _ghost_yaw := 0.0
 var _door_mode: bool = false      # door tool armed: clicks select frames
 var _door_frame: Node3D = null    # first frame clicked
 var _wreck_mode: bool = false     # DESTROY tool: clicks break furniture
+var _hwreck_mode: bool = false    # house DELETE tool: clicks demolish houses
+var _hwreck_pending = null        # house awaiting its confirming second click
 
 ## The Door tool: OUTSIDE, pick house A (with a free frame), then
 ## house B. They dock into one build, hallway and all.
@@ -419,6 +441,46 @@ func _furn_under_crosshair() -> Furniture:
 				return n
 			n = n.get_parent()
 	return null
+
+func _house_under_crosshair() -> House:
+	var space := get_world_3d().direct_space_state
+	var from := _camera.global_position
+	var q := PhysicsRayQueryParameters3D.create(from,
+		from - _camera.global_transform.basis.z * 60.0)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit:
+		var n: Node = hit.collider
+		while n:
+			if n is House:
+				return n
+			n = n.get_parent()
+	return null
+
+## House DELETE tool. Houses ask for a confirming second click;
+## station platforms are structure, not homes -- they go on the first.
+func _hwreck_click() -> void:
+	_cooldown = 0.3
+	var hud = get_tree().get_first_node_in_group("hud")
+	var h := _house_under_crosshair()
+	if h == null:
+		Sfx.play("denied", -18.0)
+		return
+	if not Net.can_break(str(h.get_meta("owner", ""))):
+		Sfx.play("denied")
+		return
+	if h.kind != "station" and _hwreck_pending != h:
+		_hwreck_pending = h
+		if hud:
+			hud.flash("click %s again to demolish it — the kit comes back" % h.display_name())
+		Sfx.play("click", -14.0)
+		return
+	_hwreck_pending = null
+	Inventory.give("housekit", 1)
+	Destructible.spawn_debris(h.get_parent(), h.global_position,
+		Vector3(2.2, 2.2, 2.2), Color("#c9b8a0"), Vector3.UP)
+	Sfx.play("explode", -10.0)
+	h.queue_free()
 
 func _wreck_click() -> void:
 	_cooldown = 0.3
@@ -948,6 +1010,7 @@ func _physics_process(delta: float) -> void:
 
 	_cooldown -= delta
 	if not _ui_open() and not Game.dead and not _door_mode and not _wreck_mode \
+			and not _hwreck_mode \
 			and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _cooldown <= 0.0:
 		_fire()
 		_cooldown = float(Inventory.current_weapon()["rate"])
@@ -1349,6 +1412,13 @@ func _make_held_model(id: String) -> void:
 		"plantfiber":
 			for fx2 in [-0.04, 0.0, 0.04]:
 				_hm_cyl(0.012, 0.3, Vector3(fx2, 0, fx2), Color("#4caf50"), 0.5).rotation_degrees = Vector3(0, 0, fx2 * 200.0)
+		"coal":
+			# a fist of glossy black lumps, not a grey mystery cube
+			for lofs in [Vector3(0, -0.03, 0), Vector3(0.09, 0.02, 0.05),
+					Vector3(-0.08, 0.04, -0.04), Vector3(0.01, 0.1, -0.07),
+					Vector3(-0.03, 0.08, 0.07)]:
+				var lump := _hm_box(Vector3(0.13, 0.1, 0.11), lofs, Color("#101014"), 0.03)
+				lump.rotation_degrees = Vector3(lofs.x * 260.0, lofs.y * 340.0, lofs.z * 300.0)
 		_:
 			if Inventory.placeables.has(id):
 				# mini machine: coloured body, dark base, glow dot
@@ -1766,9 +1836,19 @@ func _use_selected() -> void:
 					"basement": "House w/ Basement", "factory": "Factory House",
 					"tower": "Skyscraper", "moonbase": "Moonbase",
 					"station": "Space Station Platform (SPACE only)"}[k]})
+			hopts.append({"id": "demolish", "label": "DELETE (click a house)"})
 			var pui := PickUI.new().configure("HOUSE TYPE", hopts,
 				func(kind: String) -> void:
-					_start_ghost("house", kind))
+					if kind == "demolish":
+						_hwreck_mode = true
+						_door_mode = false
+						_wreck_mode = false
+						_hwreck_pending = null
+						var hudh = get_tree().get_first_node_in_group("hud")
+						if hudh:
+							hudh.flash("DELETE — click a house to demolish it (Esc stops)")
+					else:
+						_start_ghost("house", kind))
 			get_tree().current_scene.add_child(pui)
 		"furnkit":
 			var fopts: Array = []
