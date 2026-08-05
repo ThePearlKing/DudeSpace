@@ -2354,7 +2354,7 @@ func _populate(b) -> void:
 						# mountain profile: swells in the middle, dies at the ends
 						var prof := 0.4 + 0.6 * sin(PI * float(st6) / float(steps - 1))
 						var hh6 := mh3 * prof
-						var seglen := arc * b.radius / float(steps - 1) * 1.4
+						var seglen: float = arc * b.radius / float(steps - 1) * 1.4
 						var body6 := StaticBody3D.new()
 						var mi6 := MeshInstance3D.new()
 						var bm6 := BoxMesh.new()

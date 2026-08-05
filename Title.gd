@@ -315,7 +315,6 @@ const TIPS := [
 	"tip: spawn beacons place dormant. F claims one -- and un-claims all the others.",
 	"tip: Earth's humans look dumb. press F on one and reconsider.",
 	"tip: right-click the map in the teleport picker to warp straight there.",
-	"tip: the sell station got twice as fast. the e-seller is faster still.",
 	"tip: your face is drawable. your face is also saveable. skin library, character screen.",
 	"tip: killing a Clawde crab pays well and costs more. Claude is cool.",
 	"tip: full prism armor caps damage reduction on three pieces. the boots are a flex.",
