@@ -4561,10 +4561,12 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 			lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
 				hrng.randf_range(-2.2, 2.2))
 
-## The ANCIENT of Harold: a dusty monument out of the ground -- broad
-## footing, narrow waist, a crown wider (but no deeper) than the waist.
-## In the waist: a tetrahedral SLOT, apex pointing into the stone, ringed
-## by six carved pictograms. It does nothing. Yet.
+## The ANCIENT of Harold: no longer a T -- a tall tapering column out
+## of the dust, crowned by a stone DISC ringed with floating halos.
+## The disc's face is genuinely pierced: a triangular opening built
+## into the front plate itself (the old cavity hid inside a solid box),
+## walls converging on an apex in the dark. Six pictograms ring the
+## opening. It does nothing. Yet.
 func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	var dir := _h_dir(hrng)
 	var bas := _basis_from_up(dir)
@@ -4573,19 +4575,21 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	root.global_transform = Transform3D(bas, b.center + dir * b.radius)
 	var stone := Surfaces.stone(Color("#8a7f70"))
 	var dark := Surfaces.stone(Color("#6b6154"))
-	for spec in [[Vector3(11.0, 2.6, 7.0), 0.9], [Vector3(8.0, 2.2, 5.5), 3.2],
-			[Vector3(5.0, 4.5, 3.6), 6.35], [Vector3(11.5, 3.8, 3.2), 10.4]]:
+	# footing + plinth + three tapering column segments: it goes UP now
+	for spec in [[Vector3(9.0, 2.4, 6.0), 0.8], [Vector3(6.0, 2.0, 4.5), 2.8],
+			[Vector3(3.2, 4.0, 3.0), 5.6], [Vector3(2.6, 4.0, 2.4), 9.4],
+			[Vector3(2.2, 4.0, 2.0), 13.2]]:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = spec[0]
 		mi.mesh = bm
-		mi.material_override = dark if int(spec[1]) % 2 == 1 else stone
+		mi.material_override = dark if int(float(spec[1])) % 2 == 0 else stone
 		mi.position = Vector3(0, float(spec[1]), 0)
 		var shp := BoxShape3D.new()
 		shp.size = spec[0]
 		_rockify(mi, shp)
 		root.add_child(mi)
-	# weathered corner chips: it has STOOD here
+	# weathered chips: it has STOOD here
 	for i in 5:
 		var ch := MeshInstance3D.new()
 		var chm := BoxMesh.new()
@@ -4593,62 +4597,101 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 			hrng.randf_range(0.5, 1.0))
 		ch.mesh = chm
 		ch.material_override = dark
-		ch.position = Vector3(hrng.randf_range(-5.0, 5.0), 0.3, hrng.randf_range(2.8, 4.4))
+		ch.position = Vector3(hrng.randf_range(-4.0, 4.0), 0.3, hrng.randf_range(2.4, 3.8))
 		ch.rotation = Vector3(hrng.randf_range(-0.3, 0.3), hrng.randf() * TAU, 0)
 		root.add_child(ch)
-	# the SLOT: a REAL carved tetrahedral cavity. Triangular opening in
-	# the face, three interior walls meeting at an apex deep inside the
-	# stone, vertex-shaded darker the deeper it goes -- an absence, not
-	# a decal. Four triangular faces counting the missing base: a true
-	# 4-sided pyramid.
-	var st7 := SurfaceTool.new()
-	st7.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var zface := 1.815
-	var tri: Array = []
-	for vi in 3:
-		var va := TAU * float(vi) / 3.0 + PI * 0.5
-		tri.append(Vector3(cos(va) * 1.0, 6.55 + sin(va) * 1.0, zface))
-	var apex := Vector3(0, 6.55, zface - 1.6)
-	var mouth_c := Color(0.2, 0.17, 0.13)
-	var deep_c := Color(0.012, 0.01, 0.008)
-	for vi in 3:
-		var p1: Vector3 = tri[vi]
-		var p2: Vector3 = tri[(vi + 1) % 3]
-		var nrm: Vector3 = (p2 - p1).cross(apex - p1).normalized()
-		if nrm.z < 0.0:
-			nrm = -nrm
-		st7.set_normal(nrm)
-		st7.set_color(mouth_c)
-		st7.add_vertex(p1)
-		st7.set_color(mouth_c)
-		st7.add_vertex(p2)
-		st7.set_color(deep_c)
-		st7.add_vertex(apex)
-	var slot := MeshInstance3D.new()
-	slot.mesh = st7.commit()
-	var smat := StandardMaterial3D.new()
-	smat.vertex_color_use_as_albedo = true
-	smat.roughness = 1.0
-	smat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	slot.material_override = smat
-	root.add_child(slot)
-	# worn rim framing the opening
-	var ink0 := Surfaces.stone(Color("#4a4136"))
-	for vi in 3:
-		var e1: Vector3 = tri[vi]
-		var e2: Vector3 = tri[(vi + 1) % 3]
-		var rim := MeshInstance3D.new()
-		var rbm := BoxMesh.new()
-		rbm.size = Vector3(e1.distance_to(e2) + 0.08, 0.09, 0.06)
-		rim.mesh = rbm
-		rim.material_override = ink0
-		rim.position = (e1 + e2) * 0.5 + Vector3(0, 0, 0.02)
-		rim.rotation_degrees.z = rad_to_deg(atan2(e2.y - e1.y, e2.x - e1.x))
-		root.add_child(rim)
-	# six pictograms ringing the slot -- drawings, not runes
+	# THE DISC: one custom mesh -- front plate WITH the triangular hole
+	# in it, cavity walls to a black apex, rim, back cap. A real pierce.
+	var st8 := SurfaceTool.new()
+	st8.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var N := 24
+	var R := 2.6
+	var rt := 1.0
+	var zf := 0.3
+	var zb := -0.3
+	var apex := Vector3(0, 0, -1.05)
+	var stC := Color("#8a7f70")
+	var mouth := Color(0.2, 0.17, 0.13)
+	var deep := Color(0.012, 0.01, 0.008)
+	var tv: Array = []
+	for k in 3:
+		var ta := deg_to_rad(90.0 + 120.0 * float(k))
+		tv.append(Vector3(cos(ta) * rt, sin(ta) * rt, zf))
+	var outerp: Array = []
+	var holep: Array = []
+	for i in N:
+		var oa := deg_to_rad(90.0 + 360.0 * float(i) / float(N))
+		outerp.append(Vector3(cos(oa) * R, sin(oa) * R, zf))
+		var tpar := float(i) / float(N) * 3.0
+		var e := mini(2, int(tpar))
+		holep.append((tv[e] as Vector3).lerp(tv[(e + 1) % 3], tpar - float(e)))
+	var addv := func(p: Vector3, col: Color, nrm: Vector3) -> void:
+		st8.set_normal(nrm)
+		st8.set_color(col)
+		st8.add_vertex(p)
+	for i in N:
+		var j := (i + 1) % N
+		# front plate ring (this is the face -- the hole is REALLY in it)
+		addv.call(outerp[i], stC, Vector3.BACK)
+		addv.call(holep[i], stC, Vector3.BACK)
+		addv.call(outerp[j], stC, Vector3.BACK)
+		addv.call(outerp[j], stC, Vector3.BACK)
+		addv.call(holep[i], stC, Vector3.BACK)
+		addv.call(holep[j], stC, Vector3.BACK)
+		# cavity wall sinking to the apex
+		var wn: Vector3 = ((holep[j] - holep[i]) as Vector3).cross(apex - holep[i]).normalized()
+		if wn.z < 0.0:
+			wn = -wn
+		addv.call(holep[i], mouth, wn)
+		addv.call(holep[j], mouth, wn)
+		addv.call(apex, deep, wn)
+		# rim strip
+		var ob := Vector3(outerp[i].x, outerp[i].y, zb)
+		var jb := Vector3(outerp[j].x, outerp[j].y, zb)
+		var rn := Vector3(outerp[i].x, outerp[i].y, 0).normalized()
+		addv.call(outerp[i], stC, rn)
+		addv.call(ob, stC, rn)
+		addv.call(outerp[j], stC, rn)
+		addv.call(outerp[j], stC, rn)
+		addv.call(ob, stC, rn)
+		addv.call(jb, stC, rn)
+		# back cap
+		addv.call(ob, stC, Vector3.FORWARD)
+		addv.call(Vector3(0, 0, zb), stC, Vector3.FORWARD)
+		addv.call(jb, stC, Vector3.FORWARD)
+	var disc := MeshInstance3D.new()
+	disc.mesh = st8.commit()
+	var dmat := StandardMaterial3D.new()
+	dmat.vertex_color_use_as_albedo = true
+	dmat.roughness = 1.0
+	dmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	disc.material_override = dmat
+	disc.position = Vector3(0, 17.4, 0)
+	var dshape := CylinderShape3D.new()
+	dshape.radius = R
+	dshape.height = 0.6
+	var dsb := StaticBody3D.new()
+	var dcs := CollisionShape3D.new()
+	dcs.shape = dshape
+	dcs.rotation_degrees.x = 90.0
+	dsb.add_child(dcs)
+	disc.add_child(dsb)
+	root.add_child(disc)
+	# floating halo rings around the disc
+	for rspec in [[3.5, 0.11, stone], [4.3, 0.07, dark]]:
+		var halo := MeshInstance3D.new()
+		var htm := TorusMesh.new()
+		htm.inner_radius = float(rspec[0]) - float(rspec[1])
+		htm.outer_radius = float(rspec[0]) + float(rspec[1])
+		halo.mesh = htm
+		halo.material_override = rspec[2]
+		halo.rotation_degrees.x = 90.0
+		halo.position = Vector3(0, 17.4, 0)
+		root.add_child(halo)
+	# six pictograms ringing the opening, on the disc face
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
-		_h_glyph(root, g, Vector3(cos(ga) * 1.65, 6.55 + sin(ga) * 1.65, 1.84))
+		_h_glyph(root, g, Vector3(cos(ga) * 1.8, 17.4 + sin(ga) * 1.8, 0.33))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
@@ -4693,25 +4736,45 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.62, 0.05), Vector2.ZERO, -18.0)
 			bar.call(Vector2(0.4, 0.04), Vector2(0, -0.07), -18.0)
 		2:
-			# icosahedron down its five-fold axis: the top vertex is the
-			# center dot, edges fan to the inner pentagon, a zigzag band
-			# links it to the outer pentagon rim -- 25 carved edges
-			var seg := func(a2: Vector2, b3: Vector2) -> void:
-				bar.call(Vector2(a2.distance_to(b3), 0.035), (a2 + b3) * 0.5,
-					rad_to_deg((b3 - a2).angle()))
-			var outer: Array = []
-			var inner: Array = []
-			for pv in 5:
-				var oa := TAU * float(pv) / 5.0 + PI * 0.5
-				outer.append(Vector2(cos(oa), sin(oa)) * 0.36)
-				var ia := oa + PI / 5.0
-				inner.append(Vector2(cos(ia), sin(ia)) * 0.17)
-			for pv in 5:
-				seg.call(outer[pv], outer[(pv + 1) % 5])
-				seg.call(inner[pv], inner[(pv + 1) % 5])
-				seg.call(Vector2.ZERO, inner[pv])
-				seg.call(inner[pv], outer[pv])
-				seg.call(inner[pv], outer[(pv + 1) % 5])
+			# an ACTUAL icosahedron in 3D perspective: the real solid's
+			# projected vertices, all 30 edges -- hidden edges etched
+			# thinner, front edges deep, like a proper technical carving
+			for ed in [
+				[0.380, -0.001, 0.169, -0.288, true],
+				[0.380, -0.001, 0.171, 0.126, false],
+				[0.380, -0.001, 0.170, -0.261, false],
+				[0.380, -0.001, 0.169, 0.083, true],
+				[0.380, -0.001, 0.170, 0.339, true],
+				[-0.169, 0.288, 0.171, 0.126, false],
+				[-0.169, 0.288, -0.169, -0.083, false],
+				[-0.169, 0.288, -0.170, 0.261, true],
+				[-0.169, 0.288, -0.380, 0.001, false],
+				[-0.169, 0.288, 0.170, 0.339, false],
+				[-0.170, -0.339, 0.169, -0.288, true],
+				[-0.170, -0.339, -0.169, -0.083, false],
+				[-0.170, -0.339, 0.170, -0.261, false],
+				[-0.170, -0.339, -0.380, 0.001, false],
+				[-0.170, -0.339, -0.171, -0.126, true],
+				[0.169, -0.288, 0.170, -0.261, false],
+				[0.169, -0.288, 0.169, 0.083, true],
+				[0.169, -0.288, -0.171, -0.126, true],
+				[0.171, 0.126, -0.169, -0.083, false],
+				[0.171, 0.126, 0.170, -0.261, false],
+				[0.171, 0.126, 0.170, 0.339, false],
+				[-0.169, -0.083, 0.170, -0.261, false],
+				[-0.169, -0.083, -0.380, 0.001, false],
+				[-0.170, 0.261, -0.380, 0.001, true],
+				[-0.170, 0.261, 0.169, 0.083, true],
+				[-0.170, 0.261, -0.171, -0.126, true],
+				[-0.170, 0.261, 0.170, 0.339, true],
+				[-0.380, 0.001, -0.171, -0.126, true],
+				[0.169, 0.083, -0.171, -0.126, true],
+				[0.169, 0.083, 0.170, 0.339, true],
+			]:
+				var a4 := Vector2(float(ed[0]), float(ed[1]))
+				var b4 := Vector2(float(ed[2]), float(ed[3]))
+				bar.call(Vector2(a4.distance_to(b4), 0.045 if bool(ed[4]) else 0.022),
+					(a4 + b4) * 0.5, rad_to_deg((b4 - a4).angle()))
 		3:
 			# the pyramid
 			bar.call(Vector2(0.56, 0.05), Vector2(0, -0.2), 0.0)
