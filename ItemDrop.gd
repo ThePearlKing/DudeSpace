@@ -7,6 +7,9 @@ var id: String = ""
 var count: int = 1
 var _mesh: MeshInstance3D
 var _t: float = 0.0
+var _vel := Vector3.ZERO
+var _rest := false     # landed: physics off until further notice
+var _flat := false     # inside a pocket interior: gravity is plain DOWN
 
 func setup(id_in: String, n: int) -> void:
 	id = id_in
@@ -38,6 +41,35 @@ func _ready() -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.position = Vector3(0, 1.2, 0)
 	add_child(lbl)
+	_flat = Zones.exterior_of(global_position) != global_position
+
+## Dropped items FALL: planet gravity outside, plain down indoors,
+## raycast landing. Deep space has nothing to fall toward, so they float.
+func _physics_process(delta: float) -> void:
+	if _rest:
+		return
+	var g: Vector3 = Vector3.DOWN * 9.8 if _flat else Universe.gravity_at(global_position)
+	if not _flat and g.length() < 0.05:
+		_rest = true
+		return
+	_vel += g * delta
+	if _vel.length() > 40.0:
+		_vel = _vel.normalized() * 40.0
+	var gdir := g.normalized()
+	var move := _vel * delta
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(global_position - gdir * 0.5,
+		global_position + move + gdir * 0.35)
+	var p := get_tree().get_first_node_in_group("player")
+	if p != null:
+		q.exclude = [p.get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit:
+		global_position = hit.position - gdir * 0.1
+		_vel = Vector3.ZERO
+		_rest = true
+	else:
+		global_position += move
 
 ## Each ore/resource gets its own silhouette; everything else stays a cube.
 static func _resource_mesh(rid: String) -> Mesh:
