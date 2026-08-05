@@ -36,6 +36,7 @@ var _dialog_t := 0.0
 var _pcache = null
 var _mouth_dir := Vector3.UP
 var _mouth_e1 := Vector3.RIGHT
+var _roll := 0.0   # whole-colony spin around the mouth axis, radians
 
 const HUES: Array = [Color("#33ff99"), Color("#ffcf40"),
 	Color("#b388ff"), Color("#ff6a6a")]
@@ -74,17 +75,18 @@ func _wallc() -> Color:
 		"pixel": return Color("#2c2438")       # chunky pastel dark
 	return Color("#20242c")
 
-func build(b, dir: Vector3) -> void:
+func build(b, dir: Vector3, roll_deg: float = 0.0) -> void:
 	_b = b
 	_style = str(b.kind)
 	_mouth_dir = dir.normalized()
+	_roll = deg_to_rad(roll_deg)
 	var R: float = b.radius
 	var C: Vector3 = b.center
 	var u0 := dir.normalized()
 	var e1 := u0.cross(Vector3(0, 0, 1))
 	if e1.length() < 0.01:
 		e1 = u0.cross(Vector3(1, 0, 0))
-	e1 = e1.normalized()
+	e1 = e1.rotated(u0, _roll).normalized()
 	_mouth_e1 = e1
 	var e2 := u0.cross(e1).normalized()
 	var r1 := R - 13.0
@@ -115,6 +117,26 @@ func build(b, dir: Vector3) -> void:
 		add_child(cb9)
 		cb9.global_transform = Transform3D(_bup(u0), C + u0 * (R - 2.5))
 		cb9.translate_object_local(cspec[1])
+	# APRON: flush collision ring around the mouth. The mesh cut is
+	# ragged triangles that stretch metres past the square shaft -- this
+	# invisible floor means jumping at the crack lands you ON the planet,
+	# not through it into the hollow
+	var aout: float = clampf(4.8 + R * 0.14, 10.0, 30.0)
+	var aw := aout - 3.35
+	var amid := (aout + 3.35) * 0.5
+	for aspec in [[Vector3(aout * 2.0, 0.5, aw), Vector3(0, 0, amid)],
+			[Vector3(aout * 2.0, 0.5, aw), Vector3(0, 0, -amid)],
+			[Vector3(aw, 0.5, 6.7), Vector3(amid, 0, 0)],
+			[Vector3(aw, 0.5, 6.7), Vector3(-amid, 0, 0)]]:
+		var ab9 := StaticBody3D.new()
+		var acs := CollisionShape3D.new()
+		var abs9 := BoxShape3D.new()
+		abs9.size = aspec[0]
+		acs.shape = abs9
+		ab9.add_child(acs)
+		add_child(ab9)
+		ab9.global_transform = Transform3D(_bup(u0), C + u0 * (R - 0.27))
+		ab9.translate_object_local(aspec[1])
 	# THE SHAFT: surface -> story one -> story two, walls broken where
 	# the ring corridors cross
 	for span in [[R + 1.0, r1 + 2.6], [r1 - 2.6, r2 + 3.2]]:
@@ -259,12 +281,49 @@ func build(b, dir: Vector3) -> void:
 	add_child(out2)
 	out2.global_transform = Transform3D(_bup(u0), C + u0 * (r2 - 1.6) + e1 * 2.3)
 
+## One SEAMLESS chamfered slab: octagonal cross-section in X/Z (45
+## degree corner cuts of width c) extruded sy tall. Single mesh, flat
+## normals -- no strips, no seams.
+static func _cham_mesh(sx: float, sy: float, sz: float, c: float) -> ArrayMesh:
+	var hx := sx * 0.5
+	var hy := sy * 0.5
+	var hz := sz * 0.5
+	var pts := PackedVector2Array([
+		Vector2(hx - c, hz), Vector2(hx, hz - c), Vector2(hx, -hz + c),
+		Vector2(hx - c, -hz), Vector2(-hx + c, -hz), Vector2(-hx, -hz + c),
+		Vector2(-hx, hz - c), Vector2(-hx + c, hz)])
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := pts.size()
+	for i in range(1, n - 1):
+		st.add_vertex(Vector3(pts[0].x, hy, pts[0].y))
+		st.add_vertex(Vector3(pts[i + 1].x, hy, pts[i + 1].y))
+		st.add_vertex(Vector3(pts[i].x, hy, pts[i].y))
+	for i in range(1, n - 1):
+		st.add_vertex(Vector3(pts[0].x, -hy, pts[0].y))
+		st.add_vertex(Vector3(pts[i].x, -hy, pts[i].y))
+		st.add_vertex(Vector3(pts[i + 1].x, -hy, pts[i + 1].y))
+	for i in n:
+		var a2 := pts[i]
+		var b2 := pts[(i + 1) % n]
+		st.add_vertex(Vector3(a2.x, hy, a2.y))
+		st.add_vertex(Vector3(b2.x, -hy, b2.y))
+		st.add_vertex(Vector3(b2.x, hy, b2.y))
+		st.add_vertex(Vector3(a2.x, hy, a2.y))
+		st.add_vertex(Vector3(a2.x, -hy, a2.y))
+		st.add_vertex(Vector3(b2.x, -hy, b2.y))
+	st.generate_normals()
+	return st.commit()
+
 func _bup(up: Vector3) -> Basis:
 	var x := up.cross(Vector3(0, 0, 1))
 	if x.length() < 0.01:
 		x = up.cross(Vector3(1, 0, 0))
 	x = x.normalized()
-	return Basis(x, up, x.cross(up).normalized()).orthonormalized()
+	# whole-colony roll: every structure spins with the mouth so the
+	# square entrance can be lined up with the planet-mesh facets
+	return Basis(x, up, x.cross(up).normalized()).orthonormalized() \
+		.rotated(up.normalized(), _roll)
 
 ## One corridor tube segment: floor, ceiling, two walls (one openable
 ## for pods), plus a ceiling light strip. Single body, four shapes.
@@ -460,27 +519,134 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		cs.shape = bs
 		cs.position = spec[1]
 		body.add_child(cs)
-	# furniture: sleep shelf, desk slab, accent lamp
-	for fspec in [[Vector3(2.6, 0.35, 1.4), Vector3(1.6, -1.7, -2.2), Color("#3a4254"), 0.1],
-			[Vector3(2.0, 0.12, 1.0), Vector3(1.8, -0.9, 2.0), Color("#4a5266"), 0.1],
-			[Vector3(0.3, 0.9, 0.3), Vector3(-2.4, -1.5, 2.4), accent, 1.8]]:
-		var f := MeshInstance3D.new()
-		var fm := BoxMesh.new()
-		fm.size = fspec[0]
-		f.mesh = fm
-		f.position = fspec[1]
-		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
-		body.add_child(f)
+	# furniture, icosahedron-tech edition: a hover bunk riding a grav
+	# ring, a pedestal console with a tilted holo pane and a floating
+	# icosa core, an orb lamp on a halo. Alien, but clearly a HOME.
+	var gring := MeshInstance3D.new()
+	var grm := TorusMesh.new()
+	grm.inner_radius = 0.55
+	grm.outer_radius = 0.95
+	gring.mesh = grm
+	gring.position = Vector3(1.6, -2.1, -2.2)
+	gring.material_override = Destructible.make_material(accent, 2.0)
+	body.add_child(gring)
+	# bunk deck: one seamless chamfered slab, corners cut at 45 degrees
+	var bunk := MeshInstance3D.new()
+	bunk.mesh = _cham_mesh(2.6, 0.28, 1.4, 0.3)
+	bunk.position = Vector3(1.6, -1.55, -2.2)
+	bunk.material_override = Destructible.make_material(Color("#3a4254"), 0.25)
+	body.add_child(bunk)
+	# angled headboard leaning on the wall end
+	var hbd := MeshInstance3D.new()
+	var hbm := BoxMesh.new()
+	hbm.size = Vector3(0.12, 1.0, 1.4)
+	hbd.mesh = hbm
+	hbd.position = Vector3(2.92, -1.1, -2.2)
+	hbd.rotation_degrees = Vector3(0, 0, 12)
+	hbd.material_override = Surfaces.metal(Color("#4a5266"))
+	body.add_child(hbd)
+	var pillow := MeshInstance3D.new()
+	var pwm := SphereMesh.new()
+	pwm.radius = 0.3
+	pwm.height = 0.36
+	pillow.mesh = pwm
+	pillow.position = Vector3(0.6, -1.32, -2.2)
+	pillow.material_override = Destructible.make_material(
+		accent.lerp(Color.WHITE, 0.6), 0.4)
+	body.add_child(pillow)
+	var ped := MeshInstance3D.new()
+	var pdm := CylinderMesh.new()
+	pdm.top_radius = 0.5
+	pdm.bottom_radius = 0.32
+	pdm.height = 0.9
+	ped.mesh = pdm
+	ped.position = Vector3(1.8, -1.8, 2.0)
+	ped.material_override = Surfaces.metal(Color("#4a5266"))
+	body.add_child(ped)
+	var dtop := MeshInstance3D.new()
+	var dtm := CylinderMesh.new()
+	dtm.top_radius = 0.9
+	dtm.bottom_radius = 0.9
+	dtm.height = 0.08
+	dtop.mesh = dtm
+	dtop.position = Vector3(1.8, -1.32, 2.0)
+	dtop.material_override = Surfaces.metal(Color("#3a4254"))
+	body.add_child(dtop)
+	# holo pane: one seamless chamfered octagonal screen, tilted back
+	var holo := MeshInstance3D.new()
+	holo.mesh = _cham_mesh(1.3, 0.03, 0.75, 0.2)
+	holo.position = Vector3(1.8, -0.6, 2.55)
+	holo.rotation_degrees = Vector3(72, 0, 0)
+	holo.material_override = Destructible.make_material(accent, 2.4)
+	body.add_child(holo)
+	# twin angled struts: pedestal shoulder up to the pane's underside
+	for ss9 in [-0.45, 0.45]:
+		var strut := MeshInstance3D.new()
+		var stm9 := BoxMesh.new()
+		stm9.size = Vector3(0.07, 0.75, 0.07)
+		strut.mesh = stm9
+		strut.position = Vector3(1.8 + ss9, -1.0, 2.3)
+		strut.rotation_degrees = Vector3(24, 0, -32 * signf(ss9))
+		strut.material_override = Surfaces.metal(Color("#22262e"))
+		body.add_child(strut)
+	var core := MeshInstance3D.new()
+	var com := SphereMesh.new()
+	com.radius = 0.18
+	com.height = 0.36
+	com.radial_segments = 5
+	com.rings = 3
+	core.mesh = com
+	core.position = Vector3(1.8, -0.95, 2.0)
+	core.material_override = DatamoshStudio._fluid_material(accent)
+	body.add_child(core)
+	var halo := MeshInstance3D.new()
+	var hlm := TorusMesh.new()
+	hlm.inner_radius = 0.16
+	hlm.outer_radius = 0.28
+	halo.mesh = hlm
+	# bedside, not marooned mid-room: lamp lives with the sleep cluster
+	halo.position = Vector3(3.2, -1.5, -3.6)
+	halo.material_override = Surfaces.metal(Color("#22262e"))
+	body.add_child(halo)
+	var lampo := MeshInstance3D.new()
+	var lom := SphereMesh.new()
+	lom.radius = 0.22
+	lom.height = 0.44
+	lom.radial_segments = 5
+	lom.rings = 3
+	var lstem := MeshInstance3D.new()
+	var lsm := CylinderMesh.new()
+	lsm.top_radius = 0.025
+	lsm.bottom_radius = 0.025
+	lsm.height = 0.35
+	lstem.mesh = lsm
+	lstem.position = Vector3(3.2, -1.33, -3.6)
+	lstem.material_override = Surfaces.metal(Color("#22262e"))
+	body.add_child(lstem)
+	lampo.mesh = lom
+	lampo.position = Vector3(3.2, -1.15, -3.6)
+	lampo.material_override = Destructible.make_material(accent, 2.6)
+	body.add_child(lampo)
 	_tv(body, Vector3(4.55, -0.3, 2.6), 0.0)
 	# living details: rug, ceiling fixture, wall art, shelf with glow
 	# trinkets, a crystal plant -- someone LIVES here
 	var rug := MeshInstance3D.new()
-	var rugm := BoxMesh.new()
-	rugm.size = Vector3(4.6, 0.06, 3.4)
+	var rugm := CylinderMesh.new()
+	rugm.top_radius = 1.9
+	rugm.bottom_radius = 1.9
+	rugm.height = 0.05
 	rug.mesh = rugm
-	rug.position = Vector3(0.4, -2.2, 0.4)
+	rug.position = Vector3(0.4, -2.21, 0.4)
 	rug.material_override = Destructible.make_material(accent.darkened(0.55), 0.15)
 	body.add_child(rug)
+	var rugr := MeshInstance3D.new()
+	var rrm := TorusMesh.new()
+	rrm.inner_radius = 1.82
+	rrm.outer_radius = 1.94
+	rugr.mesh = rrm
+	rugr.position = Vector3(0.4, -2.2, 0.4)
+	rugr.material_override = Destructible.make_material(accent, 1.4)
+	body.add_child(rugr)
 	var cl := MeshInstance3D.new()
 	var clm := CylinderMesh.new()
 	clm.top_radius = 0.7
@@ -491,15 +657,16 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	cl.material_override = Destructible.make_material(Color("#f2ead8"), 1.6)
 	body.add_child(cl)
 	for ai in 2:
+		# wall art is ALIVE: fluid-glow panes with seamless chamfered
+		# corners -- the same liquid the species wears, framed
 		var art := MeshInstance3D.new()
-		var artm := BoxMesh.new()
-		artm.size = Vector3(0.08, 1.1, 1.4)
-		art.mesh = artm
+		art.mesh = _cham_mesh(1.1, 0.08, 1.4, 0.25)
 		art.position = Vector3(4.55, 0.4, -1.6 + 3.2 * float(ai))
+		art.rotation_degrees = Vector3(0, 0, 90)
 		if _style == "datamosh" and ai == 1:
 			art.rotation_degrees.x = 9.0   # one frame hangs WRONG. home.
-		art.material_override = Destructible.make_material(
-			accent.lerp(Color.WHITE, 0.25 * float(ai)), 0.7)
+		art.material_override = DatamoshStudio._fluid_material(
+			accent.lerp(HUES[ai % 4], 0.5))
 		body.add_child(art)
 	for si2 in 2:
 		var shl := MeshInstance3D.new()
@@ -510,25 +677,46 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		shl.material_override = Surfaces.metal(Color("#3a4254"))
 		body.add_child(shl)
 		for bi3 in 2:
+			# shelf trinkets: tiny icosahedrons. what ELSE would they
+			# keep on a shelf
 			var kn2 := MeshInstance3D.new()
-			var knm2 := BoxMesh.new()
-			knm2.size = Vector3(0.2, 0.24, 0.2)
+			var knm2 := SphereMesh.new()
+			knm2.radius = 0.14
+			knm2.height = 0.28
+			knm2.radial_segments = 5
+			knm2.rings = 3
 			kn2.mesh = knm2
-			kn2.position = Vector3(-4.5, 0.36 + 0.9 * float(si2),
+			kn2.position = Vector3(-4.5, 0.38 + 0.9 * float(si2),
 				2.0 + 1.1 * float(bi3))
 			kn2.material_override = Destructible.make_material(
 				HUES[(si2 * 2 + bi3) % 4], 1.2)
 			body.add_child(kn2)
-	var plant := MeshInstance3D.new()
-	var plm2 := CylinderMesh.new()
-	plm2.top_radius = 0.0
-	plm2.bottom_radius = 0.22
-	plm2.height = 1.0
-	plm2.radial_segments = 5
-	plant.mesh = plm2
-	plant.position = Vector3(4.1, -1.9, -4.1)
-	plant.material_override = Destructible.make_material(accent, 0.9)
-	body.add_child(plant)
+	# the house plant is a crystal colony: three icosahedrons budding
+	# off each other, potted on a low plinth in the corner
+	var plin := MeshInstance3D.new()
+	var plnm := CylinderMesh.new()
+	plnm.top_radius = 0.42
+	plnm.bottom_radius = 0.5
+	plnm.height = 0.16
+	plnm.radial_segments = 8
+	plin.mesh = plnm
+	plin.position = Vector3(4.1, -2.17, -4.1)
+	plin.material_override = Surfaces.metal(Color("#22262e"))
+	body.add_child(plin)
+	for pspec in [[0.3, Vector3(4.1, -1.82, -4.1)],
+			[0.2, Vector3(4.24, -1.44, -4.02)],
+			[0.13, Vector3(3.94, -1.52, -4.2)]]:
+		var plant := MeshInstance3D.new()
+		var plm2 := SphereMesh.new()
+		plm2.radius = float(pspec[0])
+		plm2.height = float(pspec[0]) * 2.0
+		plm2.radial_segments = 5
+		plm2.rings = 3
+		plant.mesh = plm2
+		plant.position = pspec[1]
+		plant.material_override = Destructible.make_material(
+			accent.lerp(Color.WHITE, 0.2), 1.1)
+		body.add_child(plant)
 	_spawn_resident(room_c + pdir * 0.4, pdir)
 
 ## A cafeteria hall: double-height, long tables, hanging light orbs,

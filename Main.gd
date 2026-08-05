@@ -41,8 +41,14 @@ var _dens: float = 1.0   # spawn-density multiplier (bscale worlds)
 var COLONY_DIRS := {
 	"Wireframe": Vector3(0.5, 0.6, -0.62).normalized(),
 	"Datamosh": Vector3(0.7, -0.5, 0.5).normalized(),
-	"Pixel": Vector3(-0.6, 0.55, 0.58).normalized(),
+	# Pixel's dir is EXACTLY a sphere-mesh quad center: the 4.8m cut takes
+	# that quad's two triangles and nothing else -- a clean square-ish
+	# hole barely bigger than the shaft, very Pixel
+	"Pixel": Vector3(-0.5646, 0.5163, 0.6439).normalized(),
 }
+# roll of the whole colony around its mouth axis, degrees -- used to
+# line the square entrance up with the planet-mesh facets it cuts
+var COLONY_ROLLS := {"Pixel": 59.5}
 
 func _n(base: int) -> int:
 	return maxi(1, int(round(float(base) * _dens)))
@@ -105,7 +111,8 @@ func _ready() -> void:
 			if cb != null:
 				var col9 := IcosaColony.new()
 				add_child(col9)
-				col9.build(cb, COLONY_DIRS[cname])
+				col9.build(cb, COLONY_DIRS[cname],
+					float(COLONY_ROLLS.get(cname, 0.0)))
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -213,6 +220,8 @@ func _ready() -> void:
 		_dish_test()
 	if OS.get_environment("CTD_TEST") == "24":
 		_colony_test()
+	if OS.get_environment("CTD_TEST") == "25":
+		_mouth_shot_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -607,6 +616,39 @@ func _colony_test() -> void:
 	print("COLONYTEST cafeteria drop: floor at radius %.1f (hall floor ~%.1f) %s" % [
 		cafr, r2 - 9.45 - 4.0, "PASS" if absf(cafr - (r2 - 9.45 - 4.0)) < 2.0 else "FAIL"])
 	print("COLONYTEST done")
+
+## Windowed: hover a camera over the Pixel colony mouth and screenshot
+## straight down -- checks the mesh-cut opening actually clears the
+## square entrance. CTD_SHOT names the png.
+func _mouth_shot_test() -> void:
+	await get_tree().create_timer(3.0).timeout
+	var b = Universe.body_named("Pixel")
+	var u0: Vector3 = COLONY_DIRS["Pixel"]
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.global_position = b.center + u0 * (b.radius + 30.0)
+	cam.look_at(b.center + u0 * b.radius, u0.cross(Vector3(0, 0, 1)).normalized())
+	cam.current = true
+	await get_tree().create_timer(1.0).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("MOUTHSHOT saved")
+	# second angle: inside a Wireframe apartment pod, corner view
+	var wb = Universe.body_named("Wireframe")
+	var wu: Vector3 = COLONY_DIRS["Wireframe"]
+	var we1 := wu.cross(Vector3(0, 0, 1)).normalized()
+	var aang := TAU * 3.0 / 28.0
+	var apdir := (wu * cos(aang) + we1 * sin(aang)).normalized()
+	var atang := (-wu * sin(aang) + we1 * cos(aang)).normalized()
+	var asidev := apdir.cross(atang).normalized() * -1.0
+	var arc: Vector3 = wb.center + apdir * (wb.radius - 13.0) + asidev * 7.8
+	var abas := Basis(asidev, apdir, atang * -1.0).orthonormalized()
+	cam.global_position = arc + abas * Vector3(-3.6, 1.7, -3.4)
+	cam.look_at(arc + abas * Vector3(1.7, -1.5, 0.8), apdir)
+	await get_tree().create_timer(0.6).timeout
+	var img2 := get_viewport().get_texture().get_image()
+	img2.save_png(OS.get_environment("CTD_SHOT").replace(".png", "_apt.png"))
+	print("MOUTHSHOT apt saved")
 
 func _dish_test() -> void:
 	await get_tree().process_frame
@@ -1530,25 +1572,26 @@ func _build_body(b) -> void:
 	mi.material_override = _planet_material(b.kind, b.color)
 	p.add_child(mi)
 	var col := CollisionShape3D.new()
-	var hole_dirs: Array = []
+	var hole_specs: Array = []   # [dir, cut radius in metres]
 	if MINE_DIRS.has(b.name):
-		hole_dirs.append(MINE_DIRS[b.name])
+		hole_specs.append([MINE_DIRS[b.name], 4.8])
 	if COLONY_DIRS.has(b.name):
-		hole_dirs.append(COLONY_DIRS[b.name])
-	if hole_dirs.size() > 0:
+		hole_specs.append([COLONY_DIRS[b.name], 4.8])
+	if hole_specs.size() > 0:
 		# Holed planet (mine mouths, colony mouths): BOTH the collider and
 		# the VISIBLE mesh are a shell with every mouth cut out.
-		# cut holes of CONSTANT ~5m radius regardless of planet size
+		# cut holes of near-CONSTANT radius regardless of planet size
 		# (a fixed angle made huge walk-through gaps on big planets)
-		var thresh := cos(4.8 / b.radius)   # matches the shaft's outer walls
+		for hs in hole_specs:
+			hs.append(cos(float(hs[1]) / b.radius))
 		var faces := sm.get_faces()
 		var kept := PackedVector3Array()
 		for i in range(0, faces.size(), 3):
 			var centroid := (faces[i] + faces[i + 1] + faces[i + 2]) / 3.0
 			var cn := centroid.normalized()
 			var cut := false
-			for hd in hole_dirs:
-				if cn.dot(hd) > thresh:
+			for hs in hole_specs:
+				if cn.dot(hs[0]) > float(hs[2]):
 					cut = true
 					break
 			if cut:
@@ -3937,6 +3980,26 @@ func _build_mine(b, dir: Vector3, res_id: String, res_n: int, ore_col: Color, or
 	]
 	for sspec in shaft_specs:
 		_mine_box(B, C + B * (Vector3(sspec[1].x, R - 6.5, sspec[1].z)), sspec[0], Color("#241436"), 0.2)
+
+	# APRON: flush collision ring around the mouth. The mesh cut is
+	# ragged triangles stretching past the square shaft; this invisible
+	# floor stops jumps at the crack from slipping into the hollow
+	var aout: float = clampf(4.8 + R * 0.14, 10.0, 30.0)
+	var aw := aout - 4.45
+	var amid := (aout + 4.45) * 0.5
+	for aspec in [[Vector3(aout * 2.0, 0.5, aw), Vector3(0, 0, amid)],
+			[Vector3(aout * 2.0, 0.5, aw), Vector3(0, 0, -amid)],
+			[Vector3(aw, 0.5, 8.9), Vector3(amid, 0, 0)],
+			[Vector3(aw, 0.5, 8.9), Vector3(-amid, 0, 0)]]:
+		var ab9 := StaticBody3D.new()
+		var acs := CollisionShape3D.new()
+		var abs9 := BoxShape3D.new()
+		abs9.size = aspec[0]
+		acs.shape = abs9
+		ab9.add_child(acs)
+		add_child(ab9)
+		ab9.global_transform = Transform3D(B, C + dir * (R - 0.27))
+		ab9.translate_object_local(aspec[1])
 
 	# chamber: floor, walls, ceiling with an 8x8 hole where the shaft lands
 	_mine_box(B, C + B * Vector3(0, cham_y - 6.0, 0), Vector3(36, 1, 36), Color("#241436"), 0.15)
