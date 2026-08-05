@@ -5076,15 +5076,20 @@ func _varnisolify(an: Animal) -> void:
 	var pals: Array = [["#3ae0c8", "#7a2a8f"], ["#e05a9a", "#2a2f6e"],
 		["#d8c84a", "#3a6a4a"], ["#ff8a3a", "#2a4a6e"], ["#b8e0e8", "#5a3a2a"]]
 	var pal: Array = pals[randi() % pals.size()]
+	# every individual gets its own silhouette too: one stretch vector
+	# applied to all its parts -- lanky, squat, towering, wide
+	var stretch := Vector3(randf_range(0.8, 1.2), randf_range(0.95, 1.6),
+		randf_range(0.8, 1.2))
 	var mi_i := 0
 	for c in an.find_children("*", "MeshInstance3D", true, false):
 		if c is MeshInstance3D:
 			c.material_override = Destructible.make_material(
 				Color(str(pal[mi_i % 2])), 0.3)
+			c.scale = c.scale * stretch
 			mi_i += 1
-	var picks: Array = [randi() % 5]
-	if randf() < 0.45:
-		picks.append((int(picks[0]) + 1 + randi() % 4) % 5)
+	# ALWAYS two distinct adornments: no plain animals on Varnisol
+	var p1 := randi() % 5
+	var picks: Array = [p1, (p1 + 1 + randi() % 4) % 5]
 	for pick in picks:
 		match int(pick):
 			0:

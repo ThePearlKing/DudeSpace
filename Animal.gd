@@ -211,6 +211,14 @@ func _physics_process(delta: float) -> void:
 			flat_home = Game.zone == "flat"   # follows you indoors and out
 	var g: float = _home.g_surf
 	var up := Universe.surface_up(_home, global_position)
+	# GRAVITY LEASH: land animals do not go to space. Pine colliders and
+	# steep terrain can catapult a hopper off move_and_slide -- anything
+	# wingless past 8m altitude gets set back on the grass.
+	if not _flier and not flat_home and orbit_t <= 0.0:
+		var alt9: float = global_position.distance_to(_home.center) - float(_home.radius)
+		if alt9 > 8.0:
+			global_position = _home.center + up * (float(_home.radius) + 1.2)
+			velocity = Vector3.ZERO
 	if flat_home:
 		# house interior: flat floor, flat gravity, no planet pulling
 		# it through the carpet
@@ -285,6 +293,8 @@ func _physics_process(delta: float) -> void:
 	if _fly_chase:
 		# any tamed animal sprouts the will to fly when you're overhead
 		v_up = minf(v_up + 14.0 * delta, 9.0)
+	if not _flier and not _fly_chase:
+		v_up = minf(v_up, 6.0)   # grounded lungs, grounded jumps
 	v_up -= g * delta * (0.4 if (_flier or _fly_chase) else 1.0)
 	velocity = _dir * spd + up * v_up
 	up_direction = up
