@@ -1510,7 +1510,7 @@ void fragment(){
 	float rim = pow(1.0 - abs(dot(normalize(NORMAL), normalize(VIEW))), 1.3);
 	float lick = fbm(n * 6.0 + vec3(0.0, TIME * 0.5, TIME * 0.3));
 	ALBEDO = vec3(0.0);
-	EMISSION = base * rim * (0.8 + lick * 2.6) * 2.6;
+	EMISSION = base * rim * (0.8 + lick * 2.6) * 3.8;
 	ALPHA = clamp(rim * (0.45 + lick * 1.0), 0.0, 1.0);
 }
 """
@@ -1860,7 +1860,17 @@ func _planet_material(kind: String, color: Color) -> Material:
 			return ShaderLib.make(kind, color)
 		"earth":
 			return _earth_material()
-		"luna", "mercury":
+		"luna":
+			# the Moon is BLINDING: hot white emission, blooms like a
+			# lamp hung in the night sky
+			var lwrap := StandardMaterial3D.new()
+			lwrap.albedo_color = Color("#eef0f6")
+			lwrap.emission_enabled = true
+			lwrap.emission = Color("#f8f8ff")
+			lwrap.emission_energy_multiplier = 2.4
+			lwrap.roughness = 0.9
+			return lwrap
+		"mercury":
 			return _rocky_material(color)
 		"harold":
 			# big planet, small grain: 6x tighter noise so the rock still
@@ -1950,7 +1960,7 @@ void fragment(){
 	vec3 surf = mix(cool, hot, smoothstep(0.3, 0.75, cells));
 	surf = mix(surf, vec3(1.0), pow(facing, 2.0) * 0.7);
 	ALBEDO = surf;
-	EMISSION = surf * (3.0 + pow(facing, 2.0) * 5.0 + cells * 1.5);
+	EMISSION = surf * (4.8 + pow(facing, 2.0) * 8.0 + cells * 2.4);
 }
 """
 			var smm := ShaderMaterial.new()
