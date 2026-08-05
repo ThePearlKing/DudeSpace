@@ -122,6 +122,7 @@ func _ready() -> void:
 		AudioServer.set_bus_send(bi, "Master")
 		AudioServer.add_bus_effect(bi, AudioEffectSpectrumAnalyzer.new())
 	_an = AudioServer.get_bus_effect_instance(bi, 0)
+	Settings.apply_radio_vol()   # the settings fader owns this bus
 	_spec_img = Image.create(192, 64, false, Image.FORMAT_RGB8)
 	_spec_img.fill(Color(0.015, 0.01, 0.0))
 	spec_tex = ImageTexture.create_from_image(_spec_img)
