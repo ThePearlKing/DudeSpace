@@ -465,8 +465,8 @@ static func bh_presence() -> AudioStreamWAV:
 	var buf := PackedFloat32Array()
 	buf.resize(render)
 	var voices: Array = [
-		[65.4, 0.5, 0.9, 0.0], [77.8, 0.7, 0.35, 2.1], [103.8, 0.4, 1.2, 4.0],
-		[138.6, 0.6, 0.7, 1.0], [51.9, 0.3, 1.5, 3.3]]
+		[110.0, 0.5, 0.9, 0.0], [130.8, 0.7, 0.35, 2.1], [174.6, 0.4, 1.2, 4.0],
+		[233.1, 0.6, 0.7, 1.0], [87.3, 0.3, 1.5, 3.3]]
 	for v in voices:
 		var f0: float = v[0]
 		var r1: float = v[1]
@@ -484,9 +484,9 @@ static func bh_presence() -> AudioStreamWAV:
 	# the drone stack: beating sub root, bare fifth, breathing pressure
 	for i in render:
 		var t2 := float(i) / SR
-		buf[i] += (sin(TAU * 32.7 * t2) + sin(TAU * 32.95 * t2)) * 0.13 \
-			+ sin(TAU * 49.0 * t2) * 0.07 * (0.6 + 0.4 * sin(TAU * 0.09 * t2 + 2.0)) \
-			+ sin(TAU * 24.5 * t2) * 0.1 * (0.5 + 0.5 * sin(TAU * 0.045 * t2)) \
+		buf[i] += (sin(TAU * 55.0 * t2) + sin(TAU * 55.4 * t2)) * 0.11 \
+			+ sin(TAU * 82.4 * t2) * 0.07 * (0.6 + 0.4 * sin(TAU * 0.09 * t2 + 2.0)) \
+			+ sin(TAU * 41.2 * t2) * 0.08 * (0.5 + 0.5 * sin(TAU * 0.045 * t2)) \
 			+ sin(TAU * 311.0 * t2) * 0.02 \
 			* (0.5 + 0.5 * sin(TAU * 0.21 * t2)) * (0.6 + 0.4 * sin(TAU * 5.0 * t2)) \
 			+ (randf() * 2.0 - 1.0) * 0.012
