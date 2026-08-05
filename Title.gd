@@ -330,14 +330,20 @@ func _roll_tip() -> void:
 ## Tutorial session: fresh throwaway world on the tutorial planet.
 ## Nothing it does is ever written to disk.
 func _start_tutorial() -> void:
-	# a MENU of lessons, not a single track
+	# a MENU of lessons, not a single track. It lives on its OWN
+	# CanvasLayer ABOVE the title UI -- parented to the 3D root it drew
+	# UNDER the buttons and looked like a pile-up instead of a popup.
+	var lay := CanvasLayer.new()
+	lay.layer = 30
+	add_child(lay)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
+	lay.add_child(dim)
 	var panel := PanelContainer.new()
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.position = Vector2(-190, -130)
+	OptionsPanel._glow(panel)
 	dim.add_child(panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
@@ -362,7 +368,7 @@ func _start_tutorial() -> void:
 	var back := Button.new()
 	back.text = "back"
 	back.custom_minimum_size = Vector2(380, 40)
-	back.pressed.connect(dim.queue_free)
+	back.pressed.connect(lay.queue_free)
 	col.add_child(back)
 
 func _process(delta: float) -> void:
