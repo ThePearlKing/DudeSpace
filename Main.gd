@@ -4624,8 +4624,10 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	var zback := -0.28
 	var apex := Vector3(0, cy, -0.2)
 	var stC := Color(0.541, 0.498, 0.439)
-	var mouth := Color(0.2, 0.17, 0.13)
-	var deep := Color(0.012, 0.01, 0.008)
+	# cut faces: cleaner, cooler grey than the weathered outside -- fresh
+	# stone where the tool went through, still fading to black at the apex
+	var mouth := Color(0.4, 0.38, 0.35)
+	var deep := Color(0.022, 0.022, 0.025)
 	var rectp: Array = []
 	var holep: Array = []
 	for i in N:
