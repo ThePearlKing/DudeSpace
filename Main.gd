@@ -605,7 +605,7 @@ func _colony_test() -> void:
 		C + caftang * 2.0)
 	var cafr: float = r2 - d5
 	print("COLONYTEST cafeteria drop: floor at radius %.1f (hall floor ~%.1f) %s" % [
-		cafr, r2 - 8.2 - 2.75, "PASS" if absf(cafr - (r2 - 8.2 - 2.75)) < 2.0 else "FAIL"])
+		cafr, r2 - 9.45 - 4.0, "PASS" if absf(cafr - (r2 - 9.45 - 4.0)) < 2.0 else "FAIL"])
 	print("COLONYTEST done")
 
 func _dish_test() -> void:

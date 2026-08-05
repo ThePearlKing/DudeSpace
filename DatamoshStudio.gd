@@ -29,6 +29,11 @@ var _jitter_t := 0.0
 var _cur_text := ""
 var _bubble_linger := 0.9
 var _bub_chars := -1   # letters currently shown (gate Label3D rebuilds)
+# remote viewership: colony TVs ping this while someone is watching, so
+# the show runs (and subtitles build) even with nobody at the studio.
+# The voice stays a 3D emitter AT the studio -- a TV across the galaxy
+# hears nothing, it only reads.
+var remote_watch := 0.0
 var _pcache = null     # cached player ref, validity-checked
 var _annoy := 0.0          # keeps count of your bullets. decays. slowly.
 var _annoy_cd := 0.0
@@ -526,6 +531,13 @@ void fragment() {
 	mat.set_shader_parameter("tint", Vector3(col.r, col.g, col.b))
 	return mat
 
+## What the current speaker has said SO FAR -- the same letter-by-letter
+## build the studio bubbles show. Remote TVs print this as subtitles.
+func subtitle() -> String:
+	if _talk == null or not _talk.playing or _cur_text == "":
+		return ""
+	return _cur_text.substr(0, maxi(0, _bub_chars))
+
 ## ---- the live show ----
 func _process(delta: float) -> void:
 	_t += delta
@@ -546,7 +558,8 @@ func _process(delta: float) -> void:
 	if _tv_vp != null:
 		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here \
 			else SubViewport.UPDATE_DISABLED
-	if not here:
+	remote_watch = maxf(0.0, remote_watch - delta)
+	if not here and remote_watch <= 0.0:
 		return
 	# the show never stops: queue segments, play turn by turn
 	if _turns.is_empty() and not _talk.playing:

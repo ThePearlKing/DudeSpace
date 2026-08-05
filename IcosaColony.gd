@@ -17,7 +17,7 @@ extends Node3D
 ## THE DROP: mouth -> story1 hatches -> shaft B -> story2 ceiling hatch
 ##   -> CAUGHT on story2's solid crossing floor. Nothing falls further.
 ## STORY 2 (r2 = R-24): one ring (e1). Cafeterias at i 3/10/17/24:
-##   floor chute down to halls at r2-8.2 (hatched ceilings).
+##   floor chute down to halls at r2-9.45 (hatched ceilings, 24x24x9).
 ## PREMIUM (r3): one penthouse under u0. Gate-entry ONLY.
 ## GATES (all cube): story1 COLONY EXIT -> surface (stands in a stub,
 ##   NEVER over a hatch). story2: COLONY EXIT -> surface, PENTHOUSE ->
@@ -523,7 +523,9 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	# the hall hangs BELOW the ring: drop through the floor hatch, land
 	# among the tables. A short chute bridges ring floor to hall roof.
 	var side := pdir.cross(tang).normalized()
-	var room_c := C + pdir * (r2 - 8.2)
+	# 24x24x9 hall (was 16x16x6.5): the roof TOP stays at the exact
+	# radius the chute expects (r2-4.95), the extra volume digs deeper
+	var room_c := C + pdir * (r2 - 9.45)
 	var bas := Basis(side, pdir, tang).orthonormalized()
 	for cwall in [[Vector3(0.5, 3.6, 6.0), Vector3(3.0, 0, 0)],
 			[Vector3(0.5, 3.6, 6.0), Vector3(-3.0, 0, 0)],
@@ -548,15 +550,15 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
 	var mat := Surfaces.plaster(Color("#232834"))
-	var specs: Array = [[Vector3(16.0, 0.5, 16.0), Vector3(0, -3.0, 0)],
-		[Vector3(0.4, 6.5, 16.0), Vector3(7.8, 0, 0)],
-		[Vector3(0.4, 6.5, 16.0), Vector3(-7.8, 0, 0)],
-		[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, 7.8)],
-		[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, -7.8)],
-		[Vector3(16.0, 0.5, 5.2), Vector3(0, 3.0, 5.4)],
-		[Vector3(16.0, 0.5, 5.2), Vector3(0, 3.0, -5.4)],
-		[Vector3(5.2, 0.5, 5.6), Vector3(-5.4, 3.0, 0)],
-		[Vector3(5.2, 0.5, 5.6), Vector3(5.4, 3.0, 0)]]
+	var specs: Array = [[Vector3(24.0, 0.5, 24.0), Vector3(0, -4.25, 0)],
+		[Vector3(0.4, 9.0, 24.0), Vector3(11.8, 0, 0)],
+		[Vector3(0.4, 9.0, 24.0), Vector3(-11.8, 0, 0)],
+		[Vector3(24.0, 9.0, 0.4), Vector3(0, 0, 11.8)],
+		[Vector3(24.0, 9.0, 0.4), Vector3(0, 0, -11.8)],
+		[Vector3(24.0, 0.5, 9.2), Vector3(0, 4.25, 7.4)],
+		[Vector3(24.0, 0.5, 9.2), Vector3(0, 4.25, -7.4)],
+		[Vector3(9.2, 0.5, 5.6), Vector3(-7.4, 4.25, 0)],
+		[Vector3(9.2, 0.5, 5.6), Vector3(7.4, 4.25, 0)]]
 	for spec in specs:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
@@ -574,36 +576,36 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 	# serving counter along one wall, bowls of something luminous
 	var cnt := MeshInstance3D.new()
 	var cntm := BoxMesh.new()
-	cntm.size = Vector3(2.0, 1.1, 12.0)
+	cntm.size = Vector3(2.0, 1.1, 18.0)
 	cnt.mesh = cntm
-	cnt.position = Vector3(6.4, -2.4, 0)
+	cnt.position = Vector3(10.6, -3.65, 0)
 	cnt.material_override = Surfaces.metal(Color("#454e62"))
 	body.add_child(cnt)
-	for bw in 4:
+	for bw in 6:
 		var bwl := MeshInstance3D.new()
 		var bwm := SphereMesh.new()
 		bwm.radius = 0.34
 		bwm.height = 0.34
 		bwm.is_hemisphere = true
 		bwl.mesh = bwm
-		bwl.position = Vector3(6.4, -1.82, -4.5 + 3.0 * float(bw))
+		bwl.position = Vector3(10.6, -3.07, -7.5 + 3.0 * float(bw))
 		bwl.material_override = Destructible.make_material(
 			HUES[bw % 4].lightened(0.2), 1.4)
 		body.add_child(bwl)
 	for wy in 2:
 		var stripe := MeshInstance3D.new()
 		var stm2 := BoxMesh.new()
-		stm2.size = Vector3(0.08, 0.16, 15.2)
+		stm2.size = Vector3(0.08, 0.16, 23.2)
 		stripe.mesh = stm2
-		stripe.position = Vector3(-7.7, -1.0 + 2.4 * float(wy), 0)
+		stripe.position = Vector3(-11.7, -1.4 + 2.8 * float(wy), 0)
 		stripe.material_override = Destructible.make_material(accent, 1.5)
 		body.add_child(stripe)
-	for ti in 3:
+	for ti in 4:
 		var tb := MeshInstance3D.new()
 		var tbm := BoxMesh.new()
-		tbm.size = Vector3(10.0, 0.25, 1.6)
+		tbm.size = Vector3(14.0, 0.25, 1.6)
 		tb.mesh = tbm
-		tb.position = Vector3(0, -1.9, -4.5 + 4.5 * float(ti))
+		tb.position = Vector3(0, -3.15, -7.5 + 5.0 * float(ti))
 		tb.material_override = Surfaces.metal(Color("#3a4254"))
 		body.add_child(tb)
 		# hanging FIXTURE: cord from the ceiling, smaller shade -- they
@@ -612,9 +614,9 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		var cdm := CylinderMesh.new()
 		cdm.top_radius = 0.03
 		cdm.bottom_radius = 0.03
-		cdm.height = 0.7
+		cdm.height = 1.4
 		cord.mesh = cdm
-		cord.position = Vector3(0, 2.55, -4.5 + 4.5 * float(ti))
+		cord.position = Vector3(0, 3.3, -7.5 + 5.0 * float(ti))
 		cord.material_override = Surfaces.metal(Color("#22262e"))
 		body.add_child(cord)
 		var orb := MeshInstance3D.new()
@@ -622,12 +624,14 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		om.radius = 0.26
 		om.height = 0.52
 		orb.mesh = om
-		orb.position = Vector3(0, 2.1, -4.5 + 4.5 * float(ti))
+		orb.position = Vector3(0, 2.4, -7.5 + 5.0 * float(ti))
 		orb.material_override = Destructible.make_material(accent, 2.6)
 		body.add_child(orb)
 	for ri in 3:
-		_spawn_resident(room_c + pdir * 0.6
-			+ tang * (-4.0 + 4.0 * float(ri)), pdir)
+		# hover height above the floor unchanged; keep the tang-0 one
+		# 2m clear of the COLONYTEST drop probe's offset line
+		_spawn_resident(room_c - pdir * 0.65
+			+ tang * (-6.0 + 6.0 * float(ri)), pdir)
 	# core gravity is INSANE: the lift takes you back UP to this hall's
 	# own entrance in the ring corridor -- not all the way topside
 	var lift := Gate.new().configure({
@@ -635,7 +639,7 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		"label": "BACK UP", "color": accent, "cube": true})
 	add_child(lift)
 	lift.global_transform = Transform3D(bas, room_c)
-	lift.translate_object_local(Vector3(-6.4, -2.6, 6.4))
+	lift.translate_object_local(Vector3(-10.4, -3.85, 10.4))
 
 ## A premium core suite: double the floor, gold trim, a glass slab in
 ## the floor looking at the naked center of the planet.
@@ -746,6 +750,21 @@ func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
 		_ensure_tv_feed()
 		m.albedo_texture = _tv_vp.get_texture()
 		scr.material_override = m
+		# radio subtitles: the station is a RADIO show, the TV relays it
+		# mute -- what the hosts are saying scrolls over the picture
+		var sub := Label3D.new()
+		sub.font_size = 22
+		sub.pixel_size = 0.004
+		sub.width = 340.0
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub.modulate = Color(1.0, 1.0, 0.85)
+		sub.outline_size = 10
+		sub.outline_modulate = Color(0, 0, 0, 0.9)
+		sub.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		sub.position = Vector3(0, -0.42, 0.02)
+		sub.no_depth_test = false
+		scr.add_child(sub)
+		_tv_subs.append(sub)
 	else:
 		# the other channel: scrolling colour bars with a rolling glitch
 		var sh := Shader.new()
@@ -765,6 +784,7 @@ void fragment(){
 	frame.add_child(scr)
 
 var _tv_vp: SubViewport = null
+var _tv_subs: Array = []   # subtitle Label3Ds, one per studio-feed set
 
 func _ensure_tv_feed() -> void:
 	if _tv_vp != null:
@@ -860,6 +880,17 @@ func _process(delta: float) -> void:
 			_b.center) < float(_b.radius) + 4.0
 		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
 			else SubViewport.UPDATE_DISABLED
+		# a watched TV UNPAUSES the station: ping the studio so the show
+		# keeps running, and relay its live captions. The voice stays a
+		# 3D emitter a whole planet away -- silent here, text only.
+		var st = get_tree().get_first_node_in_group("datamosh_studio")
+		var sub_text := ""
+		if inside and st != null:
+			st.remote_watch = 0.6
+			sub_text = str(st.subtitle())
+		for sl in _tv_subs:
+			if is_instance_valid(sl) and sl.text != sub_text:
+				sl.text = sub_text
 	if _pcache == null or not is_instance_valid(_pcache):
 		_pcache = get_tree().get_first_node_in_group("player")
 	if _pcache == null:
