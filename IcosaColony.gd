@@ -155,15 +155,14 @@ func build(b, dir: Vector3) -> void:
 		var ang := TAU * float(i) / float(NS)
 		var pdir := (u0 * cos(ang) + e1 * sin(ang)).normalized()
 		var tang := (-u0 * sin(ang) + e1 * cos(ang)).normalized()
-		# the crossing opens BOTH ways here: hatch in the ceiling from
-		# story one, hatch in the floor down to the premium core ring
+		# the crossing opens BOTH ways (story-one hatch above, premium
+		# core chute below); cafeteria segments open their floor too --
+		# the halls are a LOWER FLOOR now, not side rooms
+		var caf_here := i in [3, 10, 17, 24]
 		_tube_seg(C + pdir * r2, pdir, tang, 2.0 * PI * r2 / float(NS) + 0.8,
-			_wallc().darkened(0.2), accent, 0, i == 0, i == 0)
-	for dang_v in [PI * 0.25, PI * 0.75, PI * 1.25, PI * 1.75]:
-		var dang := float(dang_v)
-		var pdir := (u0 * cos(dang) + e1 * sin(dang)).normalized()
-		var tang := (-u0 * sin(dang) + e1 * cos(dang)).normalized()
-		_cafeteria(C, pdir, tang, r2, accent)
+			_wallc().darkened(0.2), accent, 0, i == 0, i == 0 or caf_here)
+		if caf_here:
+			_cafeteria(C, pdir, tang, r2, accent)
 	# exit gate at the story-one crossing, back to the mouth's doorstep
 	var out := Gate.new().configure({
 		"target": C + u0 * (R + 1.5) + e1 * 9.0, "zone": "",
@@ -173,12 +172,11 @@ func build(b, dir: Vector3) -> void:
 	# PREMIUM SUITES: a third, tiny ring hugging the core. Bigger rooms,
 	# gold trim, a window slab facing the exact center of the planet.
 	# location, location, location.
+	# ONE core penthouse, directly under the chute -- four sealed suites
+	# in a ring were unreachable (audit finding: no doors, chute ended
+	# on a roof). The chute now lands THROUGH its ceiling hatch.
 	var r3: float = maxf(10.0, R * 0.22)
-	for pang_v in [0.0, PI * 0.5, PI, PI * 1.5]:
-		var pang := float(pang_v)
-		var pdir3 := (u0 * cos(pang) + e2 * sin(pang)).normalized()
-		var tang3 := (-u0 * sin(pang) + e2 * cos(pang)).normalized()
-		_premium(C, pdir3, tang3, r3, accent)
+	_premium(C, u0, e2, r3, accent)
 	# drop chute continues: shaft three, story two -> the core ring
 	for sspec3 in [[Vector3(0.5, 1.0, 6.0), Vector3(3.0, 0, 0)],
 			[Vector3(0.5, 1.0, 6.0), Vector3(-3.0, 0, 0)],
@@ -239,10 +237,19 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 		parts.append([Vector3(5.6, 0.5, flank), Vector3(0, 2.2, -(hole + flank) * 0.5)])
 	elif not open_top:
 		parts.append([Vector3(5.6, 0.5, ln), Vector3(0, 2.2, 0)])
-	if open_side != -1:
-		parts.append([Vector3(0.4, 4.9, ln), Vector3(-2.8, 0, 0)])
-	if open_side != 1:
-		parts.append([Vector3(0.4, 4.9, ln), Vector3(2.8, 0, 0)])
+	# apartment segments get a real DOORWAY, not a missing wall: two
+	# flanks, a header, and a glowing frame around a 1.8m opening
+	for wsgn in [-1, 1]:
+		if open_side == wsgn:
+			var dfl := (ln - 1.8) * 0.5
+			parts.append([Vector3(0.4, 4.9, dfl),
+				Vector3(2.8 * float(wsgn), 0, (1.8 + dfl) * 0.5)])
+			parts.append([Vector3(0.4, 4.9, dfl),
+				Vector3(2.8 * float(wsgn), 0, -(1.8 + dfl) * 0.5)])
+			parts.append([Vector3(0.4, 1.3, 1.8),
+				Vector3(2.8 * float(wsgn), 1.8, 0)])
+		else:
+			parts.append([Vector3(0.4, 4.9, ln), Vector3(2.8 * float(wsgn), 0, 0)])
 	for spec in parts:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
@@ -309,17 +316,34 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		accent: Color, sgn: int = 1) -> void:
 	var side := pdir.cross(tang).normalized() * float(sgn)
-	var room_c := C + pdir * r1 + side * 6.2
+	var room_c := C + pdir * r1 + side * 7.8
 	var bas := Basis(side, pdir, tang).orthonormalized()
 	var body := StaticBody3D.new()
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
+	# the DOOR: a glowing frame at the corridor end plus a slid-open
+	# panel -- someone lives here and left it ajar
+	for dpost in [-1.0, 1.0]:
+		var dp := MeshInstance3D.new()
+		var dpm := BoxMesh.new()
+		dpm.size = Vector3(0.14, 3.4, 0.14)
+		dp.mesh = dpm
+		dp.position = Vector3(-4.9, -0.4, dpost * 1.0)
+		dp.material_override = Destructible.make_material(accent, 1.5)
+		body.add_child(dp)
+	var doorp := MeshInstance3D.new()
+	var doorm := BoxMesh.new()
+	doorm.size = Vector3(0.12, 3.2, 1.2)
+	doorp.mesh = doorm
+	doorp.position = Vector3(-4.85, -0.5, 1.5)   # slid mostly open
+	doorp.material_override = Surfaces.metal(Color("#3a4254"))
+	body.add_child(doorp)
 	var mat := Surfaces.plaster(Color("#2a2f3a"))
-	for spec in [[Vector3(7.0, 0.5, 7.0), Vector3(0, -2.2, 0)],
-			[Vector3(7.0, 0.5, 7.0), Vector3(0, 2.2, 0)],
-			[Vector3(0.4, 4.9, 7.0), Vector3(3.3, 0, 0)],
-			[Vector3(7.0, 4.9, 0.4), Vector3(0, 0, 3.3)],
-			[Vector3(7.0, 4.9, 0.4), Vector3(0, 0, -3.3)]]:
+	for spec in [[Vector3(10.0, 0.5, 10.0), Vector3(0, -2.5, 0)],
+			[Vector3(10.0, 0.5, 10.0), Vector3(0, 2.5, 0)],
+			[Vector3(0.4, 5.5, 10.0), Vector3(4.8, 0, 0)],
+			[Vector3(10.0, 5.5, 0.4), Vector3(0, 0, 4.8)],
+			[Vector3(10.0, 5.5, 0.4), Vector3(0, 0, -4.8)]]:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = spec[0]
@@ -344,24 +368,51 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		f.position = fspec[1]
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
+	_tv(body, Vector3(-4.5, -0.4, -3.4), Vector3(0, 180, 90))
 	_spawn_resident(room_c + pdir * 0.4, pdir)
 
 ## A cafeteria hall: double-height, long tables, hanging light orbs,
 ## and residents mid-conversation about things you'd need a run-up for.
 func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		accent: Color) -> void:
+	# the hall hangs BELOW the ring: drop through the floor hatch, land
+	# among the tables. A short chute bridges ring floor to hall roof.
 	var side := pdir.cross(tang).normalized()
-	var room_c := C + pdir * r2 + side * 10.5
+	var room_c := C + pdir * (r2 - 8.2)
 	var bas := Basis(side, pdir, tang).orthonormalized()
+	for cwall in [[Vector3(0.5, 3.6, 6.0), Vector3(3.0, 0, 0)],
+			[Vector3(0.5, 3.6, 6.0), Vector3(-3.0, 0, 0)],
+			[Vector3(6.0, 3.6, 0.5), Vector3(0, 0, 3.0)],
+			[Vector3(6.0, 3.6, 0.5), Vector3(0, 0, -3.0)]]:
+		var chb := StaticBody3D.new()
+		var chm := MeshInstance3D.new()
+		var chbm := BoxMesh.new()
+		chbm.size = cwall[0]
+		chm.mesh = chbm
+		chm.material_override = Surfaces.metal(_wallc())
+		chb.add_child(chm)
+		var chc := CollisionShape3D.new()
+		var chs := BoxShape3D.new()
+		chs.size = cwall[0]
+		chc.shape = chs
+		chb.add_child(chc)
+		add_child(chb)
+		chb.global_transform = Transform3D(_bup(pdir), C + pdir * (r2 - 4.0))
+		chb.translate_object_local(cwall[1])
 	var body := StaticBody3D.new()
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
 	var mat := Surfaces.plaster(Color("#232834"))
-	for spec in [[Vector3(16.0, 0.5, 16.0), Vector3(0, -3.0, 0)],
-			[Vector3(16.0, 0.5, 16.0), Vector3(0, 3.0, 0)],
-			[Vector3(0.4, 6.5, 16.0), Vector3(7.8, 0, 0)],
-			[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, 7.8)],
-			[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, -7.8)]]:
+	var specs: Array = [[Vector3(16.0, 0.5, 16.0), Vector3(0, -3.0, 0)],
+		[Vector3(0.4, 6.5, 16.0), Vector3(7.8, 0, 0)],
+		[Vector3(0.4, 6.5, 16.0), Vector3(-7.8, 0, 0)],
+		[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, 7.8)],
+		[Vector3(16.0, 6.5, 0.4), Vector3(0, 0, -7.8)],
+		[Vector3(16.0, 0.5, 5.2), Vector3(0, 3.0, 5.4)],
+		[Vector3(16.0, 0.5, 5.2), Vector3(0, 3.0, -5.4)],
+		[Vector3(5.2, 0.5, 5.6), Vector3(-5.4, 3.0, 0)],
+		[Vector3(5.2, 0.5, 5.6), Vector3(5.4, 3.0, 0)]]
+	for spec in specs:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = spec[0]
@@ -375,7 +426,6 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		cs.shape = bs
 		cs.position = spec[1]
 		body.add_child(cs)
-	# long tables + hanging light orbs
 	for ti in 3:
 		var tb := MeshInstance3D.new()
 		var tbm := BoxMesh.new()
@@ -407,8 +457,12 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 	add_child(body)
 	body.global_transform = Transform3D(bas, room_c)
 	var mat := Surfaces.plaster(Color("#2e2a3a"))
+	# ceiling in four pieces around a 5.2m landing hatch
 	for spec in [[Vector3(10.0, 0.5, 10.0), Vector3(0, -2.6, 0)],
-			[Vector3(10.0, 0.5, 10.0), Vector3(0, 2.6, 0)],
+			[Vector3(10.0, 0.5, 2.4), Vector3(0, 2.6, 3.8)],
+			[Vector3(10.0, 0.5, 2.4), Vector3(0, 2.6, -3.8)],
+			[Vector3(2.4, 0.5, 5.2), Vector3(-3.8, 2.6, 0)],
+			[Vector3(2.4, 0.5, 5.2), Vector3(3.8, 2.6, 0)],
 			[Vector3(0.4, 5.7, 10.0), Vector3(4.8, 0, 0)],
 			[Vector3(0.4, 5.7, 10.0), Vector3(-4.8, 0, 0)],
 			[Vector3(10.0, 5.7, 0.4), Vector3(0, 0, 4.8)],
@@ -426,7 +480,6 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		cs.shape = bs
 		cs.position = spec[1]
 		body.add_child(cs)
-	# gold trim ring + core-view glass slab set into the floor
 	for gy in [-2.3, 2.3]:
 		var trim := MeshInstance3D.new()
 		var trm := BoxMesh.new()
@@ -445,7 +498,6 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 	gmat.albedo_color = Color(0.6, 0.8, 1.0, 0.18)
 	glass.material_override = gmat
 	body.add_child(glass)
-	# premium bed + long desk + two lamps
 	for fspec in [[Vector3(3.4, 0.4, 2.0), Vector3(2.6, -2.1, -3.0), Color("#4a4266"), 0.15],
 			[Vector3(4.0, 0.14, 1.2), Vector3(2.4, -1.1, 3.2), Color("#5a5276"), 0.1],
 			[Vector3(0.32, 1.1, 0.32), Vector3(-3.8, -1.8, 3.8), accent, 2.0],
@@ -457,7 +509,66 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		f.position = fspec[1]
 		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
 		body.add_child(f)
+	_tv(body, Vector3(4.5, -0.6, 0), Vector3(0, 0, 90))
 	_spawn_resident(room_c + pdir * 0.4, pdir)
+
+## Apartment television: a shared colony feed of the Datamosh studio
+## (one SubViewport for the WHOLE colony, proximity-gated) or a
+## procedural test-pattern channel. It only renders with someone there.
+func _tv(body: Node3D, at: Vector3, rot: Vector3) -> void:
+	var frame := MeshInstance3D.new()
+	var fbm := BoxMesh.new()
+	fbm.size = Vector3(0.12, 0.9, 1.4)
+	frame.mesh = fbm
+	frame.position = at
+	frame.rotation_degrees = rot
+	frame.material_override = Surfaces.metal(Color("#14171c"))
+	body.add_child(frame)
+	var scr := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(1.24, 0.74)
+	scr.mesh = qm
+	scr.position = Vector3(-0.08, 0, 0)
+	scr.rotation_degrees = Vector3(0, 90, 0)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if randf() < 0.6:
+		_ensure_tv_feed()
+		m.albedo_texture = _tv_vp.get_texture()
+		scr.material_override = m
+	else:
+		# the other channel: scrolling colour bars with a rolling glitch
+		var sh := Shader.new()
+		sh.code = """
+shader_type spatial;
+render_mode unshaded;
+void fragment(){
+	float band = floor(fract(UV.x + TIME * 0.03) * 7.0);
+	vec3 col = vec3(fract(band * 0.37), fract(band * 0.61), fract(band * 0.83));
+	float roll = step(0.97, fract(UV.y * 1.0 - TIME * 0.4));
+	ALBEDO = mix(col * 0.8, vec3(1.0), roll);
+}
+"""
+		var sm2 := ShaderMaterial.new()
+		sm2.shader = sh
+		scr.material_override = sm2
+	frame.add_child(scr)
+
+var _tv_vp: SubViewport = null
+
+func _ensure_tv_feed() -> void:
+	if _tv_vp != null:
+		return
+	_tv_vp = SubViewport.new()
+	_tv_vp.size = Vector2i(220, 130)
+	_tv_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_tv_vp)
+	_tv_vp.world_3d = get_viewport().world_3d if is_inside_tree() else null
+	var cam := Camera3D.new()
+	_tv_vp.add_child(cam)
+	cam.global_position = DatamoshStudio.POS + Vector3(0, 0.4, 3.5)
+	cam.look_at(DatamoshStudio.POS + Vector3(0, -0.6, -4.2), Vector3.UP)
+	cam.cull_mask = 0xFFFFF & ~(1 << 9)
 
 func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	var a := MeshInstance3D.new()
@@ -505,6 +616,14 @@ func _process(delta: float) -> void:
 	if _dialog_t > 0.0:
 		return
 	_dialog_t = 0.2
+	# TV feed only renders with someone in the colony -- 220x130 once,
+	# shared by every screen, off the moment you leave the planet
+	if _tv_vp != null and _b != null:
+		var pv = get_tree().get_first_node_in_group("player")
+		var inside: bool = pv != null and pv.global_position.distance_to(
+			_b.center) < float(_b.radius) + 4.0
+		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
+			else SubViewport.UPDATE_DISABLED
 	if _pcache == null or not is_instance_valid(_pcache):
 		_pcache = get_tree().get_first_node_in_group("player")
 	if _pcache == null:
