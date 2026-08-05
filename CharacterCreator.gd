@@ -299,6 +299,26 @@ func _ready() -> void:
 		_rebuild())
 	pal.add_child(clr)
 
+	# brush size: 1px liner to 128px roller
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 8)
+	col.add_child(brow)
+	var blbl := Label.new()
+	blbl.text = "brush 7"
+	blbl.custom_minimum_size = Vector2(76, 0)
+	blbl.add_theme_font_size_override("font_size", 13)
+	brow.add_child(blbl)
+	var bsl := HSlider.new()
+	bsl.min_value = 1
+	bsl.max_value = 128
+	bsl.value = 7
+	bsl.custom_minimum_size = Vector2(220, 22)
+	bsl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bsl.value_changed.connect(func(v: float) -> void:
+		_pad.set_brush(int(v))
+		blbl.text = "brush %d" % int(v))
+	brow.add_child(bsl)
+
 	var start := Button.new()
 	start.text = "APPLY" if edit_mode else "START"
 	start.custom_minimum_size = Vector2(0, 46)
@@ -458,6 +478,10 @@ class _Pad extends Control:
 	var ink: Color = Color("#20140a")
 	var bg_color: Color = Color("#c8b89a")   # preview backdrop (real skin shows in 3D)
 	var _erasing: bool = false
+	var brush: int = 7   # stroke width in canvas pixels (1..128)
+
+	func set_brush(b: int) -> void:
+		brush = clampi(b, 1, 128)
 
 	func set_ink(c: Color) -> void:
 		ink = c
@@ -518,11 +542,13 @@ class _Pad extends Control:
 			return
 		var uv := (p / size).clamp(Vector2.ZERO, Vector2.ONE)
 		var px := Vector2i(uv * Vector2(127, 127))
-		for dx in range(-3, 4):
-			for dy in range(-3, 4):
+		var r := brush >> 1
+		for dx in range(-r, r + 1):
+			for dy in range(-r, r + 1):
 				var x := px.x + dx
 				var y := px.y + dy
-				if x >= 0 and x < 128 and y >= 0 and y < 128 and dx * dx + dy * dy <= 9:
+				if x >= 0 and x < 128 and y >= 0 and y < 128 \
+						and dx * dx + dy * dy <= r * r + r:
 					_img.set_pixel(x, y, Color(0, 0, 0, 0) if _erasing else ink)
 		_tex.update(_img)
 		queue_redraw()

@@ -13,6 +13,9 @@ var _reset_btn: Button
 var _reset_armed := false
 var _browse_idx: int = -1   # -1 = fresh canvas
 var _files: Array = []
+var _skin_imp: OptionButton
+
+const CURRENT_SKIN := "(current character)"
 
 const DIR := "user://human_faces"
 
@@ -116,6 +119,41 @@ func _ready() -> void:
 	cl.text = "clear"
 	cl.pressed.connect(func() -> void: _pad.clear())
 	inks.add_child(cl)
+
+	# brush size: 1px liner to 128px roller
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 8)
+	col.add_child(brow)
+	var blbl := Label.new()
+	blbl.text = "brush 7"
+	blbl.custom_minimum_size = Vector2(76, 0)
+	blbl.add_theme_font_size_override("font_size", 13)
+	brow.add_child(blbl)
+	var bsl := HSlider.new()
+	bsl.min_value = 1
+	bsl.max_value = 128
+	bsl.value = 7
+	bsl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bsl.value_changed.connect(func(v: float) -> void:
+		_pad.set_brush(int(v))
+		blbl.text = "brush %d" % int(v))
+	brow.add_child(bsl)
+
+	# import a face straight off one of your saved skins (or the dude
+	# you're wearing) -- edit it, Save new, and it joins the pool
+	# humanity draws from
+	var irow := HBoxContainer.new()
+	irow.add_theme_constant_override("separation", 8)
+	col.add_child(irow)
+	_skin_imp = OptionButton.new()
+	_skin_imp.custom_minimum_size = Vector2(200, 36)
+	irow.add_child(_skin_imp)
+	var ibtn := Button.new()
+	ibtn.text = "Import skin face"
+	ibtn.custom_minimum_size = Vector2(140, 36)
+	ibtn.pressed.connect(_import_skin)
+	irow.add_child(ibtn)
+	_refresh_skin_imports()
 
 	# the soul: personality sliders, saved with the face
 	var plbl := Label.new()
@@ -350,10 +388,37 @@ func _delete_face() -> void:
 	Sfx.play("explode", -20.0)
 	_refresh_files()
 
+func _refresh_skin_imports() -> void:
+	if _skin_imp == null:
+		return
+	_skin_imp.clear()
+	_skin_imp.add_item(CURRENT_SKIN)
+	var d := DirAccess.open(CharacterCreator.SKINS_DIR)
+	if d:
+		for f in d.get_files():
+			if f.ends_with(".png"):
+				_skin_imp.add_item(f.trim_suffix(".png"))
+
+## Pull a saved skin's face paint onto the canvas as a NEW face.
+func _import_skin() -> void:
+	if _skin_imp == null or _skin_imp.selected < 0:
+		return
+	var nm := _skin_imp.get_item_text(_skin_imp.selected)
+	var path := Save.paint_path(Save.current_slot) if nm == CURRENT_SKIN \
+		else "%s/%s.png" % [CharacterCreator.SKINS_DIR, nm]
+	if not FileAccess.file_exists(path):
+		Sfx.play("denied", -14.0)
+		return
+	_browse_idx = -1   # it lands as a fresh face: Save new adds it to the pool
+	_pad.load_png(path)
+	Sfx.play("click", -12.0)
+	_refresh_files()
+
 func open() -> void:
 	visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 	_refresh_files()
+	_refresh_skin_imports()
 
 func close_ui() -> void:
 	visible = false
