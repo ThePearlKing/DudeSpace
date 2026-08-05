@@ -348,6 +348,7 @@ var _door_frame: Node3D = null    # first frame clicked
 var _wreck_mode: bool = false     # DESTROY tool: clicks break furniture
 var _hwreck_mode: bool = false    # DELETE tool: one click demolishes houses/machines
 var _ring_snap: bool = true       # station docks curve around the planet (T)
+var _ghost_dock = null            # station preview's dock tf -- placement USES IT
 var _hwreck_hl: MeshInstance3D = null   # red preview box over the doomed target
 var _hwreck_target = null
 
@@ -772,9 +773,11 @@ func _update_ghost() -> void:
 					if d < ngd:
 						ngd = d
 						near_g = h
+		_ghost_dock = null
 		if near_g != null:
 			var dock = _station_dock_tf(near_g, foot)
 			if dock != null:
+				_ghost_dock = dock   # what you SEE is what gets placed
 				_ghost.global_transform = Transform3D(dock.basis,
 					dock.origin + dock.basis.y * 0.6)
 			else:
@@ -819,27 +822,12 @@ func _confirm_ghost() -> void:
 	if _ghost_cat == "house" and _ghost_kind == "station":
 		# SPACE ONLY, and stations SNAP to each other edge-to-edge
 		var hudn = get_tree().get_first_node_in_group("hud")
-		var near_st: House = null
-		var nd := 45.0
-		if not Input.is_key_pressed(KEY_CTRL):   # CTRL: place free, no dock
-			for h in get_tree().get_nodes_in_group("house"):
-				if h is House and h.kind == "station" and is_instance_valid(h):
-					var d: float = h.global_position.distance_to(base_pos)
-					if d < nd:
-						nd = d
-						near_st = h
 		var sbasis := tf.basis
 		var spos := base_pos
-		if near_st != null:
-			var dock = _station_dock_tf(near_st, base_pos)
-			if dock == null:
-				Sfx.play("denied")
-				if hudn:
-					hudn.flash("no free edge on that platform — hold CTRL to place free")
-				_cancel_ghost()
-				return
-			sbasis = dock.basis
-			spos = dock.origin
+		if _ghost_dock != null:
+			# the placement IS the preview -- same transform, no re-deriving
+			sbasis = _ghost_dock.basis
+			spos = _ghost_dock.origin
 		else:
 			var nb3 = Universe.nearest(base_pos)
 			# NEXT TO planets is the whole point (orbit!) -- just not
@@ -928,6 +916,7 @@ func _confirm_ghost() -> void:
 	_cancel_ghost()
 
 func _cancel_ghost() -> void:
+	_ghost_dock = null
 	if _ghost and is_instance_valid(_ghost):
 		_ghost.queue_free()
 	_ghost = null
