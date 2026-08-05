@@ -28,6 +28,8 @@ var _next_seg_t := 2.0
 var _jitter_t := 0.0
 var _cur_text := ""
 var _bubble_linger := 0.9
+var _bub_chars := -1   # letters currently shown (gate Label3D rebuilds)
+var _pcache = null     # cached player ref, validity-checked
 var _annoy := 0.0          # keeps count of your bullets. decays. slowly.
 var _annoy_cd := 0.0
 var _cooking_callout := false
@@ -473,7 +475,9 @@ func _process(delta: float) -> void:
 		_beacon_mat.emission_energy_multiplier = 3.0 if fmod(_t, 1.2) < 0.6 else 0.3
 	if _table != null:
 		_table.global_position.y = POS.y - 1.42 + sin(_t * 0.9) * 0.05
-	var p = get_tree().get_first_node_in_group("player")
+	if _pcache == null or not is_instance_valid(_pcache):
+		_pcache = get_tree().get_first_node_in_group("player")
+	var p = _pcache
 	var here: bool = p != null and p.global_position.distance_to(POS) < 40.0
 	if _tv_vp != null:
 		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here \
@@ -511,7 +515,9 @@ func _process(delta: float) -> void:
 			var tlen: float = maxf(0.2, _talk.stream.get_length() * 0.88)
 			var n := int(float(_cur_text.length()) \
 				* clampf(_talk.get_playback_position() / tlen, 0.0, 1.0))
-			bub.text = _cur_text.substr(0, n)
+			if n != _bub_chars:
+				_bub_chars = n   # rebuild only when a NEW letter lands
+				bub.text = _cur_text.substr(0, n)
 		elif i2 != _cur_host or not _talk.playing:
 			if bub.text != "" and (i2 != _cur_host or not _talk.playing):
 				_bubble_linger -= delta

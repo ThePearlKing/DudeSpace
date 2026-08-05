@@ -10,6 +10,14 @@ var _t: float = 0.0
 var _vel := Vector3.ZERO
 var _rest := false     # landed: physics off until further notice
 var _flat := false     # inside a pocket interior: gravity is plain DOWN
+var _p = null          # cached player (validity-checked before use)
+var _bh = null         # cached TIN 618 body (bodies live for the session)
+var _bh_looked := false
+
+func _player_ref():
+	if _p == null or not is_instance_valid(_p):
+		_p = get_tree().get_first_node_in_group("player")
+	return _p
 
 func setup(id_in: String, n: int) -> void:
 	id = id_in
@@ -60,7 +68,7 @@ func _physics_process(delta: float) -> void:
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(global_position - gdir * 0.5,
 		global_position + move + gdir * 0.35)
-	var p := get_tree().get_first_node_in_group("player")
+	var p = _player_ref()
 	if p != null:
 		q.exclude = [p.get_rid()]
 	var hit := space.intersect_ray(q)
@@ -135,7 +143,10 @@ func _process(delta: float) -> void:
 	_mesh.rotate_y(delta * 2.0)
 	_mesh.position.y = 0.5 + sin(_t * 2.5) * 0.1
 	# the black hole eats loose items too -- dropped loot drifts in and is gone
-	var bh = Universe.body_named("TIN 618")
+	if not _bh_looked:
+		_bh_looked = true
+		_bh = Universe.body_named("TIN 618")
+	var bh = _bh
 	if bh:
 		var bd: float = global_position.distance_to(bh.center)
 		if bd < bh.radius * 1.2:
@@ -146,7 +157,7 @@ func _process(delta: float) -> void:
 				* delta * (bh.radius * 6.0 - bd) * 0.05
 	if _t < 1.2:
 		return   # grace: a just-dropped item isn't instantly re-grabbed
-	var p := get_tree().get_first_node_in_group("player")
+	var p = _player_ref()
 	if p and Game.mode == Game.Mode.ON_FOOT and not Game.dead \
 			and global_position.distance_to(p.global_position) < 3.0:
 		var left := Inventory.give_no_drop(id, count)

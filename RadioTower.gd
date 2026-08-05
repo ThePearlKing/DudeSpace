@@ -48,6 +48,7 @@ var _beam_hue := 0.1
 var _beam_t := 0.0
 var _beam_prev := 0.0           # slow loudness average (beat reference)
 var _beam_flash := 0.0          # sudden-burst flash: pops on beats
+var _beam_rate := 0.0           # rebuild accumulator (30Hz cap)
 var _sauce_seen: float = -99.0
 var _good_t: float = -99.0
 var _bad_t: float = 0.0   # how long the signal has been junk
@@ -677,6 +678,12 @@ func _update_beam(delta: float) -> void:
 	_beam_env = maxf(loud, _beam_env - delta * 1.5)
 	_beam_hue = lerpf(_beam_hue, hue, minf(1.0, delta * 18.0))
 	_beam_t += delta
+	# 242 fresh vertices per rebuild: 30Hz is visually identical to
+	# per-frame and halves the cost
+	_beam_rate += delta
+	if _beam_rate < 1.0 / 30.0:
+		return
+	_beam_rate = 0.0
 	_beam_mesh.clear_surfaces()
 	if not active or _beam_env < 0.03:
 		return

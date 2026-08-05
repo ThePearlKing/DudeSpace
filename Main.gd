@@ -1049,21 +1049,28 @@ var _bgm: AudioStreamPlayer = null
 var _bgm_gap := 0.0
 var _bgm_order: Array = []
 
+var _rhot_t := 0.0
+var _rhot := false
+
 func _update_bgm(delta: float) -> void:
 	if _bgm == null:
 		return
-	# a radio playing within earshot owns the airspace: the soundtrack
-	# fades itself out and waits
-	var radio_hot := false
-	if _player != null:
-		for r in get_tree().get_nodes_in_group("radio"):
-			if r is RadioTower and is_instance_valid(r) \
-					and r.global_position.distance_to(_player.global_position) < 45.0 \
-					and ((r._talk != null and r._talk.playing) \
-					or (r._hiss != null and r._hiss.playing)):
-				# ANY radio noise counts -- static hiss included
-				radio_hot = true
-				break
+	# a radio playing within earshot owns the airspace. The group scan
+	# runs at 2.5Hz, not every frame -- radios don't teleport.
+	_rhot_t -= delta
+	if _rhot_t <= 0.0:
+		_rhot_t = 0.4
+		_rhot = false
+		if _player != null:
+			for r in get_tree().get_nodes_in_group("radio"):
+				if r is RadioTower and is_instance_valid(r) \
+						and r.global_position.distance_to(_player.global_position) < 45.0 \
+						and ((r._talk != null and r._talk.playing) \
+						or (r._hiss != null and r._hiss.playing)):
+					# ANY radio noise counts -- static hiss included
+					_rhot = true
+					break
+	var radio_hot := _rhot
 	if _bgm.stream_paused:
 		# the radio walked out of earshot: the song comes back mid-note
 		if not radio_hot:
@@ -3701,10 +3708,18 @@ var _stalker_cd := 0.0
 
 ## The stalker-thulhus answer wrath. Above 40 they gather (three of
 ## them, one at a time); below 25 they fold away. They only ever watch.
+var _stalker_scan_t := 0.0
+
 func _update_stalkers(delta: float) -> void:
 	if Game.tutorial_session or Game.dead:
 		return
 	_stalker_cd -= delta
+	# census at 2Hz: wrath doesn't change fast enough to justify a
+	# per-frame group scan
+	_stalker_scan_t -= delta
+	if _stalker_scan_t > 0.0:
+		return
+	_stalker_scan_t = 0.5
 	var live: Array = []
 	for st in get_tree().get_nodes_in_group("stalker"):
 		if is_instance_valid(st):

@@ -9,6 +9,7 @@ var _t := 0.0
 var _phase := 0.0
 var _tents: Array = []       # each: Array of segment Node3Ds, base first
 var _departing := false
+var _p = null   # cached player, validity-checked
 
 func _ready() -> void:
 	add_to_group("stalker")
@@ -94,7 +95,9 @@ func depart() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	var p = get_tree().get_first_node_in_group("player")
+	if _p == null or not is_instance_valid(_p):
+		_p = get_tree().get_first_node_in_group("player")
+	var p = _p
 	if p == null or not is_instance_valid(p):
 		queue_free()
 		return

@@ -8,6 +8,7 @@ var _health_fill: ColorRect
 var _prompt: Label
 var _hint: Label
 var _over: Label
+var _jet_on_shown := false   # last jet state painted (gate relayouts)
 var _flash: Label
 var _flash_t: float = 0.0
 var _slots: Array = []       # hotbar cell panels
@@ -390,14 +391,18 @@ func _process(delta: float) -> void:
 			parts.append("[🥗 SALAD]")
 		if Game.pet_following():
 			parts.append("[♥ PET +2%]")
-		_buff_lbl.text = "  ".join(parts)
+		var bt := "  ".join(parts)
+		if _buff_lbl.text != bt:
+			_buff_lbl.text = bt   # Label.text writes force relayout: gate them
 
 	# jetpack ON indicator
 	if Inventory.has_jetpack:
 		var p := get_tree().get_first_node_in_group("player")
 		var on: bool = p != null and p.has_method("jetting") and p.jetting()
-		_jet_lbl.text = "JET FUEL  [ON]" if on else "JET FUEL"
-		_jet_lbl.modulate = Color("#5aff8a") if on else Color("#7cd8ff")
+		if on != _jet_on_shown:
+			_jet_on_shown = on
+			_jet_lbl.text = "JET FUEL  [ON]" if on else "JET FUEL"
+			_jet_lbl.modulate = Color("#5aff8a") if on else Color("#7cd8ff")
 
 	if Game.dead:
 		return
