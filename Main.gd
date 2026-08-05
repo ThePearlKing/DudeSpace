@@ -1396,6 +1396,7 @@ func _notification(what: int) -> void:
 		RadioLib._ice_wav = null
 		RadioLib._custom.clear()
 		RadioLib._custom_loaded = false
+		EarthHuman._faces.clear()   # face textures held past teardown
 		var petc = get_tree().get_first_node_in_group("pet")
 		if petc != null and is_instance_valid(petc):
 			Save.set_pet(true, petc.genome, petc.staying)
