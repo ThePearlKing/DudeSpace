@@ -81,6 +81,57 @@ static func style_for(kind: String) -> Dictionary:
 
 static var _music_cache := {}
 
+# --- The SOUNDTRACK crate: the user's own tracks, dropped into
+# res://music (or user://music) as .ogg/.mp3/.wav. Loaded once; Main
+# plays them as background music out in the world. ---
+static var _custom: Array = []
+static var _custom_loaded := false
+
+static func _load_custom() -> void:
+	if _custom_loaded:
+		return
+	_custom_loaded = true
+	for base in ["res://music", "user://music"]:
+		var d := DirAccess.open(base)
+		if d == null:
+			continue
+		var files := d.get_files()
+		files.sort()
+		for f in files:
+			var fl := str(f).to_lower()
+			if not (fl.ends_with(".ogg") or fl.ends_with(".mp3") or fl.ends_with(".wav")):
+				continue
+			var path: String = str(base) + "/" + str(f)
+			var st: AudioStream = null
+			var res = ResourceLoader.load(path)
+			if res is AudioStream:
+				st = res
+			elif fl.ends_with(".ogg"):
+				st = AudioStreamOggVorbis.load_from_file(path)
+			elif fl.ends_with(".mp3"):
+				var mp := AudioStreamMP3.new()
+				mp.data = FileAccess.get_file_as_bytes(path)
+				if mp.data.size() > 0:
+					st = mp
+			elif fl.ends_with(".wav"):
+				st = AudioStreamWAV.load_from_file(path)
+			if st != null:
+				_custom.append(st)
+
+static func custom_count() -> int:
+	_load_custom()
+	return _custom.size()
+
+static func custom_track(i: int) -> AudioStream:
+	_load_custom()
+	if _custom.is_empty():
+		return null
+	return _custom[i % _custom.size()]
+
+static func custom_len(i: int) -> float:
+	var t := custom_track(i)
+	return t.get_length() if t != null else 0.0
+
 ## A seeded looping melody, ~9s, in the planet's style.
 static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 	var key := "%d_%s" % [seed_v, kind]

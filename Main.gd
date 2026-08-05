@@ -105,6 +105,14 @@ func _ready() -> void:
 		bhum.global_position = bhb2.center
 		bhum.play()
 
+	# BACKGROUND MUSIC: the user's own tracks (res://music) drift in and
+	# out while you're out in the world -- a soundtrack, not a station
+	if RadioLib.custom_count() > 0:
+		_bgm = AudioStreamPlayer.new()
+		_bgm.volume_db = -8.0
+		add_child(_bgm)
+		_bgm_gap = randf_range(8.0, 20.0)
+
 	_hud = HUD.new()
 	add_child(_hud)
 	add_child(InventoryUI.new())
@@ -996,7 +1004,27 @@ func _rift_test() -> void:
 
 var _pop_t: float = 30.0
 
+var _bgm: AudioStreamPlayer = null
+var _bgm_gap := 0.0
+var _bgm_order: Array = []
+
+func _update_bgm(delta: float) -> void:
+	if _bgm == null or _bgm.playing:
+		return
+	_bgm_gap -= delta
+	if _bgm_gap > 0.0:
+		return
+	# shuffled deck: every track plays once before any repeats
+	if _bgm_order.is_empty():
+		for i in RadioLib.custom_count():
+			_bgm_order.append(i)
+		_bgm_order.shuffle()
+	_bgm.stream = RadioLib.custom_track(int(_bgm_order.pop_back()))
+	_bgm.play()
+	_bgm_gap = randf_range(25.0, 60.0)   # breathing room between songs
+
 func _process(delta: float) -> void:
+	_update_bgm(delta)
 	_regen_crates(delta)
 	_regen_ore(delta)
 	_animate_avatars(delta)
