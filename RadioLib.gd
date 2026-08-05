@@ -211,14 +211,11 @@ static func music_loop(seed_v: int, kind: String) -> AudioStreamWAV:
 		# crossing swells, pitched low and molten. Frequencies snapped to
 		# whole cycles per loop so the seam stays silent.
 		var dur := float(total) / SR
-		# NOT the sun's exact voice (that bled together with the nearby
-		# star stations): lower base and a tight beating cluster, so it
-		# reads as molten metal groaning, not a neighbour's broadcast
-		var f0 := frng.randf_range(120.0, 190.0)
+		var f0 := frng.randf_range(220.0, 420.0)
 		var hphases: Array = []
 		for k in 4:
 			hphases.append(frng.randf() * TAU)
-		var hparts: Array = [1.0, 1.02, 2.31, 3.47]
+		var hparts: Array = [1.0, 2.76, 4.07, 5.43]
 		var hfreqs: Array = []
 		for k2 in hparts.size():
 			hfreqs.append(roundf(f0 * float(hparts[k2]) * dur) / dur)
