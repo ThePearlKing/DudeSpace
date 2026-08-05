@@ -289,6 +289,18 @@ func _take_hit(dmg: float) -> void:
 	if Game.dead:
 		chat_received.emit("SERVER", "%s was slain by %s" % [my_name(), attacker])
 
+## A player shot a WTH studio orb: everyone plays the same ping,
+## jitter, and scripted complaint (the shooter picked the words).
+func wth_hit(idx: int, plan: Array) -> void:
+	if active:
+		_wth_hit_rpc.rpc(idx, plan)
+
+@rpc("any_peer", "reliable")
+func _wth_hit_rpc(idx: int, plan: Array) -> void:
+	var st = get_tree().get_first_node_in_group("wth_studio")
+	if st != null and st.has_method("orb_hit_synced"):
+		st.orb_hit_synced(idx, plan)
+
 ## Where a peer's avatar stands right now (null if not rendered here).
 func avatar_position(peer_id: int):
 	var cs = get_tree().current_scene

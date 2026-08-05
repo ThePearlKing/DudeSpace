@@ -68,42 +68,86 @@ class _AlienShell extends StaticBody3D:
 
 ## A bullet meets an anchor: it DEFLECTS with a proper metallic ping,
 ## and only if THAT orb is mid-sentence does its voice jitter.
+## Every hit is BROADCAST: your friend's bullets ping, jitter, and get
+## complained about identically on every player's client -- the plan
+## (who says what) is chosen by the shooter and shipped as text, and
+## voices render deterministically from text, so everyone hears the
+## same words. Radios tuned to WTH get the ping, the jitter, and the
+## complaint pushed through their speaker too.
 func orb_hit(idx: int, at: Vector3) -> void:
+	var plan := _hit_plan(idx)
+	_apply_hit(idx, at, plan)
+	if Net.active:
+		Net.wth_hit(idx, plan)
+
+## Called via Net for OTHER players' shots: same effects, given plan.
+func orb_hit_synced(idx: int, plan: Array) -> void:
+	_annoy = minf(_annoy + 1.0, 12.0)
+	if plan.size() > 0:
+		_annoy_cd = 4.0
+	var at: Vector3 = POS
+	if idx >= 0 and idx < _aliens.size():
+		at = (_aliens[idx]["node"] as Node3D).global_position
+	_apply_hit(idx, at, plan)
+
+## Decide whether this hit triggers a callout, and script it as text.
+func _hit_plan(idx: int) -> Array:
+	_annoy = minf(_annoy + 1.0, 12.0)
+	if _annoy < 3.0 or _annoy_cd > 0.0 or _cooking_callout:
+		return []
+	_annoy_cd = 4.0
+	var bank: Array = ANNOY_WARN
+	if _annoy >= 9.0:
+		bank = ANNOY_FINAL
+	elif _annoy >= 6.0:
+		bank = ANNOY_ANGRY
+	var host := clampi(idx, 0, 3)
+	var plan: Array = [[host, str(bank[randi() % bank.size()])]]
+	var others: Array = [0, 1, 2, 3]
+	others.erase(host)
+	others.shuffle()
+	for oi in 1 + randi() % 2:
+		var oh := int(others[oi])
+		var opts: Array = ANNOY_PILE[oh]
+		plan.append([oh, str(opts[randi() % opts.size()])])
+	return plan
+
+func _apply_hit(idx: int, at: Vector3, plan: Array) -> void:
 	_play_ping(at)
 	if idx >= 0 and idx < _aliens.size():
 		_aliens[idx]["flash"] = 0.14   # the whole orb FLASHES at impact
 	if idx == _cur_host and _talk != null and _talk.playing:
 		_jitter_t = 0.05
 		_talk.pitch_scale = randf_range(0.55, 1.7)
-	# they keep count. shoot enough and the show STOPS to address you.
-	_annoy = minf(_annoy + 1.0, 12.0)
-	if _annoy >= 3.0 and _annoy_cd <= 0.0 and not _cooking_callout:
-		_annoy_cd = 4.0
-		var bank: Array = ANNOY_WARN
-		if _annoy >= 9.0:
-			bank = ANNOY_FINAL
-		elif _annoy >= 6.0:
-			bank = ANNOY_ANGRY
-		var line := str(bank[randi() % bank.size()])
-		var host := clampi(idx, 0, 3)
-		_cooking_callout = true
-		WorkerThreadPool.add_task(func() -> void:
-			var cooked: Array = []
-			var w = HumanVoice.render(line, RadioLib.ALIEN_HOSTS[host])
+	# radios tuned to WTH carry the assault live: ping + a jitter blip
+	for r in _tuned_radios():
+		_play_ping(r.global_position + r.global_transform.basis.y * 2.4)
+		if r._talk != null and r._talk.playing:
+			r._talk.pitch_scale = randf_range(0.6, 1.6)
+			get_tree().create_timer(0.06).timeout.connect(func() -> void:
+				if is_instance_valid(r) and r._talk != null:
+					r._talk.pitch_scale = 1.0)
+	if plan.is_empty():
+		return
+	_cooking_callout = true
+	WorkerThreadPool.add_task(func() -> void:
+		var cooked: Array = []
+		for entry in plan:
+			var w = HumanVoice.render(str(entry[1]),
+				RadioLib.ALIEN_HOSTS[int(entry[0])])
 			if w != null:
-				cooked.append([host, w, line])
-			# the others pile on: one or two reactions from OTHER hosts
-			var others: Array = [0, 1, 2, 3]
-			others.erase(host)
-			others.shuffle()
-			for oi in 1 + randi() % 2:
-				var oh := int(others[oi])
-				var opts: Array = ANNOY_PILE[oh]
-				var oline := str(opts[randi() % opts.size()])
-				var ow = HumanVoice.render(oline, RadioLib.ALIEN_HOSTS[oh])
-				if ow != null:
-					cooked.append([oh, ow, oline])
-			_callout_ready.call_deferred(cooked))
+				cooked.append([int(entry[0]), w, str(entry[1])])
+		_callout_ready.call_deferred(cooked))
+
+## Radios currently locked to the WTH station and making sound.
+func _tuned_radios() -> Array:
+	var out: Array = []
+	for r in get_tree().get_nodes_in_group("radio"):
+		if r is RadioTower and is_instance_valid(r) \
+				and r._cur_station >= 0 and r._cur_station < r.stations.size() \
+				and str(r.stations[r._cur_station].get("type", "")) == "alien":
+			out.append(r)
+	return out
 
 func _callout_ready(cooked: Array) -> void:
 	_cooking_callout = false
@@ -112,6 +156,21 @@ func _callout_ready(cooked: Array) -> void:
 	_talk.stop()   # the show interrupts ITSELF to tell you off
 	for ci in range(cooked.size() - 1, -1, -1):
 		_turns.push_front(cooked[ci])
+	# and every radio tuned to WTH airs the complaint verbatim
+	var bytes := PackedByteArray()
+	var gap := PackedByteArray()
+	gap.resize(int(22050 * 0.35) * 2)
+	for entry in cooked:
+		bytes.append_array((entry[1] as AudioStreamWAV).data)
+		bytes.append_array(gap)
+	var combined := AudioStreamWAV.new()
+	combined.format = AudioStreamWAV.FORMAT_16_BITS
+	combined.mix_rate = 22050
+	combined.data = bytes
+	for r in _tuned_radios():
+		if r._talk != null:
+			r._talk.stream = combined
+			r._talk.play()
 
 var _ping_wav: AudioStreamWAV = null
 
@@ -140,6 +199,7 @@ func _play_ping(at: Vector3) -> void:
 	pl.finished.connect(pl.queue_free)
 
 func _ready() -> void:
+	add_to_group("wth_studio")
 	_build_surface()
 	_build_studio()
 
