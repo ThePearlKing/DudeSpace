@@ -3913,6 +3913,11 @@ func collect_world() -> Array:
 			e["hroom_n"] = n.roommate_name
 			e["hoff"] = [n.room_offset.x, n.room_offset.y, n.room_offset.z]
 			e["hlinks"] = n.links.duplicate()
+			# yaw relative to the restore basis: docked/ring stations kept
+			# rotating on rejoin because only 'up' survived the save
+			var hrefb: Basis = _basis_from_up(up)
+			var hzz: Vector3 = hrefb.inverse() * n.global_transform.basis.z
+			e["hyaw"] = atan2(hzz.x, hzz.z)
 		if n is Furniture:
 			e["fkind"] = n.kind
 			# ACTUAL orientation, as yaw relative to the restore basis --
@@ -4022,6 +4027,8 @@ func restore_world() -> void:
 			n.global_transform = Transform3D(_basis_from_up(up), pos)
 			if n is Furniture:
 				n.rotate_object_local(Vector3.UP, float(e.get("fyaw", 0.0)))
+			if n is House:
+				n.rotate_object_local(Vector3.UP, float(e.get("hyaw", 0.0)))
 		if n is Machine:
 			n.buf = float(e.get("buf", 0.0))
 			var si = e.get("slot_in", null)

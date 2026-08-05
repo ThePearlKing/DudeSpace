@@ -484,7 +484,9 @@ func _build_exterior() -> void:
 	# FOUNDATION: a deep plug so the house never floats on curvature
 	var found := _box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0),
 		wall.darkened(0.35))
-	found.material_override = Surfaces.stone(wall.darkened(0.35))
+	# moonbase sits on an engineered metal plug -- bases aren't built on dirt
+	found.material_override = Surfaces.metal(Color("#5a6068")) if kind == "moonbase" \
+		else Surfaces.stone(wall.darkened(0.35))
 	# main shell (the moonbase is all domes; it skips the cottage)
 	if kind != "moonbase":
 		_box(self, Vector3(w, h, w), Vector3(0, h * 0.5, 0), wall)

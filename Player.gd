@@ -509,6 +509,14 @@ func _update_hwreck_preview() -> void:
 	var t: Node3D = _delete_target_under_crosshair() if _hwreck_mode else null
 	if t != null and not is_instance_valid(t):
 		t = null
+	# a FREED target compares equal to null, so 'did it change' never
+	# fired after a delete and the red box lingered. Purge stale refs
+	# explicitly before comparing.
+	if _hwreck_target != null and not is_instance_valid(_hwreck_target):
+		_hwreck_target = null
+		if _hwreck_hl and is_instance_valid(_hwreck_hl):
+			_hwreck_hl.queue_free()
+		_hwreck_hl = null
 	if t != _hwreck_target:
 		_hwreck_target = t
 		if _hwreck_hl and is_instance_valid(_hwreck_hl):
