@@ -235,16 +235,115 @@ func _build_station() -> void:
 		seam.position = Vector3(float(gx) * 5.2, 0.63, 0)
 		seam.material_override = dark
 		add_child(seam)
-	# under-trusses: it's built, not conjured
-	for tx in [-9.0, 0.0, 9.0]:
-		for tz in [-9.0, 0.0, 9.0]:
-			var truss := MeshInstance3D.new()
-			var tm := BoxMesh.new()
-			tm.size = Vector3(1.4, 2.6, 1.4)
-			truss.mesh = tm
-			truss.position = Vector3(tx, -1.9, tz)
-			truss.material_override = dark
-			add_child(truss)
+	# UNDERSIDE: this is a SPACE station -- no legs, nothing to stand
+	# on. Machinery belly instead: core module, pipe runs, tanks,
+	# radiator fins, thruster pods, antenna, running lights.
+	var hull := Surfaces.metal(Color("#565c66"))
+	var core := MeshInstance3D.new()
+	var corem := CylinderMesh.new()
+	corem.top_radius = 3.4
+	corem.bottom_radius = 2.6
+	corem.height = 2.2
+	core.mesh = corem
+	core.position = Vector3(0, -1.7, 0)
+	core.material_override = hull
+	add_child(core)
+	# pipe runs crossing the belly
+	for pspec in [[Vector3(0, -0.75, 5.5), 0.0], [Vector3(0, -0.75, -6.5), 0.0],
+			[Vector3(6.0, -0.95, 0), 90.0], [Vector3(-5.0, -0.95, 0), 90.0]]:
+		var pipe := MeshInstance3D.new()
+		var pm := CylinderMesh.new()
+		pm.top_radius = 0.22
+		pm.bottom_radius = 0.22
+		pm.height = 22.0
+		pipe.mesh = pm
+		pipe.position = pspec[0]
+		pipe.rotation_degrees = Vector3(90, float(pspec[1]), 0)
+		pipe.material_override = dark
+		add_child(pipe)
+	# spherical tanks in a cluster
+	for tspec in [[Vector3(-7.5, -1.6, -7.0), 1.15], [Vector3(-5.6, -1.4, -8.2), 0.85],
+			[Vector3(-8.6, -1.3, -5.2), 0.7]]:
+		var tank := MeshInstance3D.new()
+		var tkm := SphereMesh.new()
+		tkm.radius = float(tspec[1])
+		tkm.height = float(tspec[1]) * 2.0
+		tank.mesh = tkm
+		tank.position = tspec[0]
+		tank.material_override = Surfaces.metal(Color("#8d95a2"))
+		add_child(tank)
+	# radiator fins, slightly angled, faint heat glow on the edges
+	for fspec in [[Vector3(8.5, -2.0, 8.0), 30.0], [Vector3(10.2, -2.0, 5.6), 30.0],
+			[Vector3(6.8, -2.0, 10.2), 30.0]]:
+		var fin := MeshInstance3D.new()
+		var fnm := BoxMesh.new()
+		fnm.size = Vector3(3.4, 2.2, 0.1)
+		fin.mesh = fnm
+		fin.position = fspec[0]
+		fin.rotation_degrees = Vector3(0, float(fspec[1]), 12)
+		fin.material_override = Destructible.make_material(Color("#5a2f2a"), 0.5)
+		add_child(fin)
+	# corner thruster pods (nozzle down: station-keeping)
+	for tx in [-10.5, 10.5]:
+		for tz in [-10.5, 10.5]:
+			var pod := MeshInstance3D.new()
+			var pdm := CylinderMesh.new()
+			pdm.top_radius = 0.55
+			pdm.bottom_radius = 0.8
+			pdm.height = 1.3
+			pod.mesh = pdm
+			pod.position = Vector3(tx, -1.2, tz)
+			pod.material_override = hull
+			add_child(pod)
+			var noz := MeshInstance3D.new()
+			var nzm := CylinderMesh.new()
+			nzm.top_radius = 0.5
+			nzm.bottom_radius = 0.28
+			nzm.height = 0.5
+			noz.mesh = nzm
+			noz.position = Vector3(tx, -2.05, tz)
+			noz.material_override = Destructible.make_material(Color("#2a2f38"), 0.15)
+			add_child(noz)
+	# comms antenna hanging down off-center
+	var mast := MeshInstance3D.new()
+	var mm := CylinderMesh.new()
+	mm.top_radius = 0.06
+	mm.bottom_radius = 0.1
+	mm.height = 3.4
+	mast.mesh = mm
+	mast.position = Vector3(4.5, -2.9, -4.5)
+	mast.material_override = dark
+	add_child(mast)
+	var dish := MeshInstance3D.new()
+	var dsm := SphereMesh.new()
+	dsm.radius = 0.55
+	dsm.height = 0.5
+	dish.mesh = dsm
+	dish.position = Vector3(4.5, -4.6, -4.5)
+	dish.material_override = Surfaces.metal(Color("#8d95a2"))
+	add_child(dish)
+	# red running lights on the belly
+	for lspec in [Vector3(0, -2.9, 0), Vector3(-10.5, -2.1, 10.5), Vector3(10.5, -2.1, -10.5)]:
+		var rl := MeshInstance3D.new()
+		var rlm := SphereMesh.new()
+		rlm.radius = 0.16
+		rlm.height = 0.32
+		rl.mesh = rlm
+		rl.position = lspec
+		rl.material_override = Destructible.make_material(Color("#ff3a2a"), 2.6)
+		add_child(rl)
+	# greeble boxes: conduit junctions, service hatches
+	for gspec in [[Vector3(3.0, -0.9, -9.5), Vector3(1.6, 0.6, 1.1)],
+			[Vector3(-9.8, -0.8, 2.5), Vector3(1.1, 0.5, 2.2)],
+			[Vector3(9.0, -0.85, -2.0), Vector3(2.4, 0.55, 1.3)],
+			[Vector3(-2.5, -0.9, 9.8), Vector3(1.2, 0.6, 1.6)]]:
+		var gb := MeshInstance3D.new()
+		var gbm := BoxMesh.new()
+		gbm.size = gspec[1]
+		gb.mesh = gbm
+		gb.position = gspec[0]
+		gb.material_override = dark
+		add_child(gb)
 	# guard rails: ACTUAL railings -- posts every couple meters, a top
 	# bar at hip height and a mid bar. One container per side so docked
 	# neighbours can drop the shared edge and merge floors seamlessly.
