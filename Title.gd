@@ -411,6 +411,7 @@ void fragment(){
 	float storm = smoothstep(0.22, 0.0, length(n.xy - vec2(0.45, -0.25)));
 	col = mix(col, vec3(0.85, 0.4, 0.25), storm * 0.8);
 	ALBEDO = col; ROUGHNESS = 0.9;
+	EMISSION = col * 0.25;
 }
 """
 		"cont":
@@ -488,39 +489,14 @@ func _build_background() -> void:
 	light.light_energy = 1.2
 	add_child(light)
 
-	# the centerpiece: a slow-churning GAS GIANT with a dust ring
-	var giant_orbit := Node3D.new()
-	giant_orbit.rotation_degrees = Vector3(4, 0, -7)
-	add_child(giant_orbit)
-	var giant := MeshInstance3D.new()
-	var gm9 := SphereMesh.new()
-	gm9.radius = 2.4
-	gm9.height = 4.8
-	gm9.radial_segments = 48
-	gm9.rings = 32
-	giant.mesh = gm9
-	giant.material_override = _tp_mat("gas", Color("#c78a4e"))
-	giant.position = Vector3(-3.2, 0.6, -3.0)
-	giant_orbit.add_child(giant)
-	var gring := MeshInstance3D.new()
-	var grm := TorusMesh.new()
-	grm.inner_radius = 3.1
-	grm.outer_radius = 4.1
-	gring.mesh = grm
-	gring.scale = Vector3(1, 0.04, 1)
-	gring.material_override = Destructible.make_material(Color("#a8895e"), 0.35)
-	gring.position = giant.position
-	gring.rotation_degrees = Vector3(14, 0, 9)
-	giant_orbit.add_child(gring)
-	_orbits.append([giant_orbit, 0.016])
-
-	# a little solar system spins behind the menu -- every planet styled
-	# off its colour: living continents, circuit traces, banded dunes,
-	# candy marble
+	# the ORIGINAL little solar system, untouched layout -- same sizes,
+	# same colours, same orbits. Only the surfaces changed: flat plastic
+	# became living continents, dude-built circuit traces (two of those
+	# -- this IS the Dude system), banded dunes, candy marble.
 	for spec in [[7.0, 0.9, 0.10, Color("#2f7d32"), "cont"],
 			[11.0, 1.4, -0.06, Color("#0e3b2e"), "circuit"],
 			[15.0, 0.6, 0.14, Color("#c8a557"), "dune"],
-			[19.0, 1.1, -0.04, Color("#e8a3c0"), "swirl"]]:
+			[19.0, 1.1, -0.04, Color("#e8a3c0"), "circuit"]]:
 		var orbit := Node3D.new()
 		orbit.rotation_degrees = Vector3(randf_range(-14, 14), randf_range(0, 360), 0)
 		add_child(orbit)
@@ -534,28 +510,6 @@ func _build_background() -> void:
 		pl.material_override = _tp_mat(str(spec[4]), spec[3])
 		pl.position = Vector3(spec[0], 0, 0)
 		orbit.add_child(pl)
-		if str(spec[4]) == "dune":
-			# the dune world carries a thin tilted ring
-			var ring9 := MeshInstance3D.new()
-			var rt9 := TorusMesh.new()
-			rt9.inner_radius = 0.85
-			rt9.outer_radius = 1.15
-			ring9.mesh = rt9
-			ring9.scale = Vector3(1, 0.05, 1)
-			ring9.material_override = Destructible.make_material(Color("#d8bd88"), 0.4)
-			ring9.rotation_degrees = Vector3(24, 0, 12)
-			ring9.position = pl.position
-			orbit.add_child(ring9)
-		elif str(spec[4]) == "swirl":
-			# the candy world keeps a little grey moon
-			var moon9 := MeshInstance3D.new()
-			var mn9 := SphereMesh.new()
-			mn9.radius = 0.22
-			mn9.height = 0.44
-			moon9.mesh = mn9
-			moon9.material_override = Destructible.make_material(Color("#9a97a2"), 0.1)
-			moon9.position = pl.position + Vector3(1.7, 0.5, 0)
-			orbit.add_child(moon9)
 		_orbits.append([orbit, spec[2]])
 	# ...and Clawde the space invader crab tumbles through it all
 	var crab_orbit := Node3D.new()
@@ -585,17 +539,12 @@ func _build_background() -> void:
 	var pm := SphereMesh.new()
 	pm.radius = 3.0
 	pm.height = 6.0
-	pm.radial_segments = 40
-	pm.rings = 24
+	pm.radial_segments = 48
+	pm.rings = 32
 	planet.mesh = pm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#5a2d8f")
-	mat.metallic = 0.2
-	mat.roughness = 0.6
-	mat.emission_enabled = true
-	mat.emission = Color("#7a1dbe")
-	mat.emission_energy_multiplier = 0.3
-	planet.material_override = mat
+	# the OG purple giant, now DETAILED: churning banded gas, storm eye,
+	# same colour it always was
+	planet.material_override = _tp_mat("gas", Color("#5a2d8f"))
 	_bg_pivot.add_child(planet)
 	# a little moon
 	var moon := MeshInstance3D.new()
