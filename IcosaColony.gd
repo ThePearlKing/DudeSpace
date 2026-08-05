@@ -160,9 +160,21 @@ func build(b, dir: Vector3) -> void:
 				_apartment(C, pdir, tang, r1, accent, pod_side)
 	# sealed junction boxes at the two crossings of story one: four
 	# doorways, hatch above and below at the mouth, solid at the antipode
-	_junction_box(C + u0 * r1, u0, e1, accent, true, true)
-	_junction_box(C - u0 * r1, -u0, e1, accent, false, false)
-	_junction_box(C + u0 * r2, u0, e1, accent, true, true)
+	_junction_box(C + u0 * r1, u0, e1, accent, true, true, true)
+	_junction_box(C - u0 * r1, -u0, e1, accent, false, false, true)
+	_junction_box(C + u0 * r2, u0, e1, accent, true, true, false)
+	# CONNECTORS: skipping the crossing segments left ~5m of raw rock
+	# between each corridor end and the junction box -- bridge all of it
+	for con in [[u0 * r1, e1], [u0 * r1, -e1], [u0 * r1, e2], [u0 * r1, -e2],
+			[-u0 * r1, e1], [-u0 * r1, -e1], [-u0 * r1, e2], [-u0 * r1, -e2],
+			[u0 * r2, e1], [u0 * r2, -e1]]:
+		var cbase: Vector3 = con[0]
+		var cdir: Vector3 = (con[1] as Vector3).normalized()
+		var cup := (cbase as Vector3).normalized()
+		if cbase.length() < r1 + 1.0 and cbase.length() > r1 - 1.0:
+			pass
+		_tube_seg(C + cbase + cdir * 7.0, cup, cdir, 8.5,
+			_wallc(), accent, 0, false, false)
 	# STORY TWO: one ring, four cafeteria halls at the diagonals
 	for i in NS:
 		var ang := TAU * float(i) / float(NS)
@@ -223,7 +235,8 @@ func build(b, dir: Vector3) -> void:
 ## A sealed crossing chamber: 7m box, four 2.4m doorways facing the
 ## corridor directions, optional hatches above/below for the chute.
 func _junction_box(center: Vector3, up: Vector3, e1: Vector3,
-		accent: Color, top_open: bool, floor_open: bool) -> void:
+		accent: Color, top_open: bool, floor_open: bool,
+		four_way: bool = true) -> void:
 	var tang := up.cross(e1)
 	if tang.length() < 0.5:
 		tang = up.cross(Vector3(1, 0, 0))
@@ -244,11 +257,19 @@ func _junction_box(center: Vector3, up: Vector3, e1: Vector3,
 			parts.append([Vector3(0.9, 0.5, 5.2), Vector3(-3.05, yy, 0)])
 		else:
 			parts.append([Vector3(7.0, 0.5, 7.0), Vector3(0, yy, 0)])
-	# four walls, each with a 2.4m doorway to its corridor
+	# walls: doorways face the corridors; a two-way junction seals the
+	# crossing axis solid instead of opening doors into raw rock
 	for wspec in [[Vector3(1.0, 0, 0), Vector3(0, 0, 1.0)],
 			[Vector3(0, 0, 1.0), Vector3(1.0, 0, 0)]]:
 		var ax: Vector3 = wspec[0]
 		var lat: Vector3 = wspec[1]
+		var doored: bool = four_way or ax.z > 0.5
+		if not doored:
+			for sgn8 in [-1.0, 1.0]:
+				parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * 7.0,
+					5.3, absf(ax.z) * 0.5 + absf(lat.z) * 7.0),
+					ax * 3.25 * sgn8])
+			continue
 		for sgn9 in [-1.0, 1.0]:
 			var wl := 2.05
 			parts.append([Vector3(absf(ax.x) * 0.5 + absf(lat.x) * wl,
@@ -683,6 +704,16 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		trim.position = Vector3(0, gy, 4.6)
 		trim.material_override = Destructible.make_material(Color("#ffd94a"), 1.2)
 		body.add_child(trim)
+	# the TRAPDOOR: a glowing grate lying across the ceiling hatch --
+	# no collision, you drop straight through the flap
+	for gb2 in 4:
+		var bar9 := MeshInstance3D.new()
+		var brm9 := BoxMesh.new()
+		brm9.size = Vector3(5.0, 0.06, 0.18)
+		bar9.mesh = brm9
+		bar9.position = Vector3(0, 2.62, -1.9 + 1.25 * float(gb2))
+		bar9.material_override = Destructible.make_material(accent, 1.1)
+		body.add_child(bar9)
 	var glass := MeshInstance3D.new()
 	var glm := BoxMesh.new()
 	glm.size = Vector3(3.4, 0.15, 3.4)
