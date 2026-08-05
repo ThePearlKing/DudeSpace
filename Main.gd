@@ -4674,9 +4674,11 @@ func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	plate.material_override = pmat
 	root.add_child(plate)
 	# six pictograms ringing the mouth
+	# ring nudged up + tightened so the bottom glyph clears the diamond
+	# tier instead of sinking into it
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
-		_h_glyph(root, g, Vector3(cos(ga) * 1.65, cy + sin(ga) * 1.65, 1.84))
+		_h_glyph(root, g, Vector3(cos(ga) * 1.5, cy + 0.2 + sin(ga) * 1.5, 1.84))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
