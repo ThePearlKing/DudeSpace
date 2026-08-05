@@ -123,8 +123,11 @@ func close_ui() -> void:
 func _page(dir: int) -> void:
 	_month += dir
 	if _month < 0:
+		if _year <= 1:
+			_month = 0   # time starts at January, Year 1. nothing before.
+			return
 		_month = 11
-		_year = maxi(1, _year - 1)
+		_year -= 1
 	elif _month > 11:
 		_month = 0
 		_year += 1
