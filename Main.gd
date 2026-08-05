@@ -2258,6 +2258,9 @@ func _populate(b) -> void:
 				dmm.height = dr * 0.6
 				dm4.mesh = dmm
 				dm4.material_override = Surfaces.stone(Color("#988c7d"))
+				var msh2 := SphereShape3D.new()
+				msh2.radius = dr * 0.82
+				_rockify(dm4, msh2)
 				add_child(dm4)
 				var dd := _h_dir(hrng)
 				dm4.global_transform = Transform3D(_basis_from_up(dd),
@@ -2275,6 +2278,9 @@ func _populate(b) -> void:
 					seg.mesh = sgm
 					seg.material_override = Surfaces.stone(
 						Color("#7d7266").lightened(hrng.randf() * 0.12))
+					var hsh := BoxShape3D.new()
+					hsh.size = sgm.size
+					_rockify(seg, hsh)
 					add_child(seg)
 					seg.global_transform = Transform3D(hb,
 						b.center + hd * (b.radius + hy + sgm.size.y * 0.5))
@@ -2288,6 +2294,9 @@ func _populate(b) -> void:
 					hrng.randf_range(1.4, 2.6))
 				rg.mesh = rgm
 				rg.material_override = Surfaces.stone(Color("#6f655a"))
+				var rsh := BoxShape3D.new()
+				rsh.size = rgm.size
+				_rockify(rg, rsh)
 				add_child(rg)
 				var rd9 := _h_dir(hrng)
 				rg.global_transform = Transform3D(_basis_from_up(rd9),
@@ -2306,6 +2315,9 @@ func _populate(b) -> void:
 					slab.mesh = slm
 					slab.material_override = Surfaces.stone(
 						Color("#7d7266").lightened(float(lyr) * 0.07))
+					var ssh := BoxShape3D.new()
+					ssh.size = slm.size
+					_rockify(slab, ssh)
 					add_child(slab)
 					slab.global_transform = Transform3D(mb,
 						b.center + md * (b.radius + mh + slm.size.y * 0.35))
@@ -2318,17 +2330,17 @@ func _populate(b) -> void:
 			var bnoise := FastNoiseLite.new()
 			bnoise.seed = 618
 			bnoise.frequency = 1.0
-			var spikes_left := _n(110)
-			var boulders_left := _n(26)
-			var shards_left := _n(22)
-			var dunes_left := _n(22)
-			for i in 2200:
+			var spikes_left := _n(150)
+			var boulders_left := _n(40)
+			var shards_left := _n(34)
+			var dunes_left := _n(34)
+			for i in 3400:
 				if spikes_left <= 0 and boulders_left <= 0 \
 						and shards_left <= 0 and dunes_left <= 0:
 					break
 				var cd := _h_dir(hrng)
 				var nv := bnoise.get_noise_3d(cd.x * 1.4, cd.y * 1.4, cd.z * 1.4)
-				if nv > 0.24 and spikes_left > 0:
+				if nv > 0.18 and spikes_left > 0:
 					# spike FOREST: blobby dense patches of needle clusters
 					var cluster := 4 + hrng.randi() % 3
 					spikes_left -= cluster
@@ -2350,6 +2362,9 @@ func _populate(b) -> void:
 						bo.mesh = bom
 						bo.material_override = Surfaces.stone(
 							Color("#786d60").lightened(hrng.randf() * 0.1))
+						var bsh := SphereShape3D.new()
+						bsh.radius = br2 * 0.9
+						_rockify(bo, bsh)
 						add_child(bo)
 						bo.global_transform = Transform3D(gb2,
 							b.center + cd * (b.radius + br2 * 0.35))
@@ -2367,6 +2382,9 @@ func _populate(b) -> void:
 							hrng.randf_range(0.35, 0.6), hrng.randf_range(2.0, 4.2))
 						pl.mesh = plm
 						pl.material_override = Surfaces.stone(Color("#6a6156"))
+						var psh := BoxShape3D.new()
+						psh.size = plm.size
+						_rockify(pl, psh)
 						add_child(pl)
 						pl.global_transform = Transform3D(pb2,
 							b.center + cd * (b.radius + 0.1))
@@ -2385,6 +2403,10 @@ func _populate(b) -> void:
 					dum.height = hrng.randf_range(9.0, 16.0)
 					du.mesh = dum
 					du.material_override = Surfaces.stone(Color("#9a8e7f"))
+					var dsh := CapsuleShape3D.new()
+					dsh.radius = dum.radius
+					dsh.height = dum.height
+					_rockify(du, dsh)
 					add_child(du)
 					du.global_transform = Transform3D(db2,
 						b.center + cd * (b.radius - dum.radius * 0.45))
@@ -4454,6 +4476,15 @@ func _spawn_starship() -> void:
 func _surface_dir() -> Vector3:
 	return Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)).normalized()
 
+## Give a decorative mesh a real body: StaticBody3D + shape riding the
+## mesh's transform, so Harold's geology is climbable, not a hologram.
+func _rockify(mi: MeshInstance3D, shape: Shape3D) -> void:
+	var sb := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	sb.add_child(cs)
+	mi.add_child(sb)
+
 ## One carved rock needle at `alt` along `cd` (base shards only when
 ## it stands on actual ground).
 func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
@@ -4472,6 +4503,10 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 		nk.mesh = nkm
 		nk.material_override = Surfaces.stone(
 			Color("#6f655a").lightened(float(sg) * 0.06))
+		var nsh := CylinderShape3D.new()
+		nsh.radius = maxf(0.12, nkm.bottom_radius * 0.8)
+		nsh.height = nkm.height
+		_rockify(nk, nsh)
 		add_child(nk)
 		nk.global_transform = Transform3D(sb8,
 			b.center + cd * (alt + sh8 + nkm.height * 0.5 - 0.4))
@@ -4484,6 +4519,9 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 			lshm.size = Vector3(0.5, hrng.randf_range(1.6, 3.0), 0.5)
 			lsh.mesh = lshm
 			lsh.material_override = Surfaces.stone(Color("#665c50"))
+			var lbs := BoxShape3D.new()
+			lbs.size = lshm.size
+			_rockify(lsh, lbs)
 			add_child(lsh)
 			lsh.global_transform = Transform3D(sb8,
 				b.center + cd * (alt + lshm.size.y * 0.3))
