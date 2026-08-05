@@ -124,6 +124,14 @@ class _MapView extends Control:
 		owner_ui._last_scale = scale
 		var origin := Vector3(me.x + owner_ui.pan.x, 0, me.z + owner_ui.pan.y)
 
+		# solar system names floating over their clusters
+		for sysspec in [["DUDE SYSTEM", Vector2(0, 900)],
+				["SOL SYSTEM", Vector2(-52000, 14000)],
+				["TRIS SYSTEM", Vector2(52000, -15000)],
+				["SHADER SYSTEM", Vector2(0, -24800)]]:
+			var syp: Vector2 = c + (Vector2(sysspec[1]) - Vector2(origin.x, origin.z)) * scale
+			draw_string(font, syp + Vector2(-110, -46), str(sysspec[0]),
+				HORIZONTAL_ALIGNMENT_CENTER, 220, 19, Color(1, 1, 1, 0.3))
 		for b in Universe.bodies:
 			var p: Vector3 = b.center
 			var sp := c + Vector2(p.x - origin.x, p.z - origin.z) * scale

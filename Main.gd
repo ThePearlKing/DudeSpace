@@ -2052,7 +2052,10 @@ func _populate(b) -> void:
 		"life":
 			_register_crates(b, 10, 7)
 			_spawn_flora(b)
-			_build_mine(b, MINE_DIRS["Verdant"], "raw_ingot", 4, Color("#a24bff"))
+			# Verdant digs COAL: the mine carries it, and dirt mounds on
+			# the surface have lumps sticking out
+			_build_mine(b, MINE_DIRS["Verdant"], "coal", 3, Color("#26262c"))
+			_spawn_res_nodes(b, 8, "coal", 2)
 		"pixel", "wth", "wob", "wireframe", "contrast":
 			_register_crates(b, 18, 40)
 			# prism shards: ONLY grow under shader light
@@ -2462,6 +2465,7 @@ func _populate(b) -> void:
 			_spawn_res_nodes(b, 10, "sulfur", 3)   # sulfur crusts the springs
 		"varnisol":
 			# Varnisol: the gentle one. Pine woods, a big lake, wildlife.
+			_spawn_res_nodes(b, 7, "coal", 2)   # forest coal under the pines
 			var grove := _surface_dir()
 			for i in _n(34):
 				var pd := (grove + Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2),
@@ -3306,14 +3310,35 @@ func _dress_ore(nd: Node3D, res: String, s: float) -> void:
 	var scol := surf.darkened(0.22)
 	var look: Dictionary = RES_LOOK.get(res, {"col": Color("#c0c0c0")})
 	var glow: Color = look["col"]
+	# green worlds keep coal in DIRT: a soil mound with glossy black
+	# lumps sticking out, instead of crystal shards
+	var dirt_coal: bool = res == "coal" and b != null \
+		and str(b.kind) in ["life", "varnisol", "earth"]
 	# NO boulder: the old base rock is flattened into a flush terrain
 	# pad, so the crystals rise straight out of the ground
-	var rock_mat := Surfaces.stone(scol)
+	var rock_mat := Surfaces.stone(Color("#5a4630") if dirt_coal else scol)
 	for ch in nd.get_children():
 		if ch is MeshInstance3D:
 			ch.material_override = rock_mat
-			ch.scale = Vector3(1.15, 0.16, 1.15)
-			ch.position.y -= s * 0.28
+			ch.scale = Vector3(1.15, 0.22 if dirt_coal else 0.16, 1.15)
+			ch.position.y -= s * (0.24 if dirt_coal else 0.28)
+	if dirt_coal:
+		var gloss := StandardMaterial3D.new()
+		gloss.albedo_color = Color("#0c0c10")
+		gloss.roughness = 0.15
+		gloss.metallic = 0.35
+		for i in rng.randi_range(5, 7):
+			var lump := MeshInstance3D.new()
+			var lm := BoxMesh.new()
+			var ls := s * rng.randf_range(0.2, 0.38)
+			lm.size = Vector3(ls, ls, ls)
+			lump.mesh = lm
+			lump.material_override = gloss
+			lump.position = Vector3(rng.randf_range(-0.45, 0.45) * s,
+				rng.randf_range(0.0, 0.2) * s, rng.randf_range(-0.45, 0.45) * s)
+			lump.rotation = Vector3(rng.randf() * TAU, rng.randf() * TAU, rng.randf() * TAU)
+			nd.add_child(lump)
+		return
 	# shards: surface-tinted crystal prisms with a faint ore-colored
 	# inner light (ultima/prism keep their true materials -- they ARE glow)
 	var shard_mat := StandardMaterial3D.new()
