@@ -36,6 +36,14 @@ var MINE_DIRS := {
 }
 var _dens: float = 1.0   # spawn-density multiplier (bscale worlds)
 
+## The icosahedron apartment colonies bore into the BIGGEST shader
+## planets. One mouth each; the tunnels do the rest.
+var COLONY_DIRS := {
+	"Wireframe": Vector3(0.5, 0.6, -0.62).normalized(),
+	"Datamosh": Vector3(0.7, -0.5, 0.5).normalized(),
+	"Pixel": Vector3(-0.6, 0.55, 0.58).normalized(),
+}
+
 func _n(base: int) -> int:
 	return maxi(1, int(round(float(base) * _dens)))
 
@@ -90,6 +98,14 @@ func _ready() -> void:
 	if not Game.tutorial_session:
 		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
 	add_child(DatamoshStudio.new())  # the DATAMOSH station: hole, mast, studio
+	if not Game.tutorial_session:
+		# icosahedron apartment colonies inside the big shader planets
+		for cname in COLONY_DIRS:
+			var cb = Universe.body_named(str(cname))
+			if cb != null:
+				var col9 := IcosaColony.new()
+				add_child(col9)
+				col9.build(cb, COLONY_DIRS[cname])
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -1446,19 +1462,29 @@ func _build_body(b) -> void:
 	mi.material_override = _planet_material(b.kind, b.color)
 	p.add_child(mi)
 	var col := CollisionShape3D.new()
+	var hole_dirs: Array = []
 	if MINE_DIRS.has(b.name):
-		# Mined planet: BOTH the collider and the VISIBLE mesh are a shell
-		# with the mouth cut out -- you can see straight down the shaft.
-		var mdir: Vector3 = MINE_DIRS[b.name]
-		# cut a hole of CONSTANT ~5m radius regardless of planet size
+		hole_dirs.append(MINE_DIRS[b.name])
+	if COLONY_DIRS.has(b.name):
+		hole_dirs.append(COLONY_DIRS[b.name])
+	if hole_dirs.size() > 0:
+		# Holed planet (mine mouths, colony mouths): BOTH the collider and
+		# the VISIBLE mesh are a shell with every mouth cut out.
+		# cut holes of CONSTANT ~5m radius regardless of planet size
 		# (a fixed angle made huge walk-through gaps on big planets)
 		var thresh := cos(4.8 / b.radius)   # matches the shaft's outer walls
 		var faces := sm.get_faces()
 		var kept := PackedVector3Array()
 		for i in range(0, faces.size(), 3):
 			var centroid := (faces[i] + faces[i + 1] + faces[i + 2]) / 3.0
-			if centroid.normalized().dot(mdir) > thresh:
-				continue   # cut the mouth
+			var cn := centroid.normalized()
+			var cut := false
+			for hd in hole_dirs:
+				if cn.dot(hd) > thresh:
+					cut = true
+					break
+			if cut:
+				continue   # cut this mouth
 			kept.append(faces[i])
 			kept.append(faces[i + 1])
 			kept.append(faces[i + 2])
