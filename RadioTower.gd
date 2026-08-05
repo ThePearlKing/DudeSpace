@@ -683,14 +683,13 @@ func _update_beam(delta: float) -> void:
 	side = side.normalized()
 	var col := Color.from_hsv(_beam_hue, 0.85, 1.0)
 	_beam_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
-	for i in 41:
-		var t := float(i) / 40.0
-		var swell := sin(PI * minf(t * 3.0, 1.0))   # eases out of the feed
-		var wob := sin(t * 26.0 - _beam_t * 14.0) \
-			* (0.1 + 0.45 * _beam_env) * swell
+	for i in 61:
+		var t := float(i) / 60.0
+		# one clean THIN sine, full amplitude the whole way out
+		var wob := sin(t * 30.0 - _beam_t * 14.0) * (0.12 + 0.35 * _beam_env)
 		var p := origin + dirn * (t * 9.0) + side * wob
 		var a := (1.0 - t) * (0.1 + 0.55 * _beam_env)
-		var w := 0.05 + 0.09 * _beam_env * (1.0 - t * 0.6)
+		var w := 0.03
 		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
 		_beam_mesh.surface_add_vertex(p - side * w)
 		_beam_mesh.surface_set_color(Color(col.r, col.g, col.b, a))
