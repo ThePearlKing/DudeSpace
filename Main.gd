@@ -211,6 +211,8 @@ func _ready() -> void:
 		_nuke_test()
 	if OS.get_environment("CTD_TEST") == "22":
 		_dish_test()
+	if OS.get_environment("CTD_TEST") == "24":
+		_colony_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -543,6 +545,69 @@ func _repopulate() -> void:
 ## WHICH camera is live + where it looks for the funeral shot.
 ## CTD_TEST=22: watch a freshly-restored radio's dish for the startup
 ## ratchet -- sample a rim point at 50ms and print every jump.
+## CTD_TEST=24: geometric connectivity probes for the icosahedron
+## colony on Wireframe. Rays prove the drop path, both rings, the
+## catch floor and leak-tightness of the crossing chamber.
+func _colony_test() -> void:
+	print("COLONYTEST starting")
+	await get_tree().process_frame
+	await get_tree().create_timer(3.0).timeout
+	print("COLONYTEST probing")
+	var b = Universe.body_named("Wireframe")
+	var u0: Vector3 = COLONY_DIRS["Wireframe"]
+	var C: Vector3 = b.center
+	var R: float = b.radius
+	var r1 := R - 13.0
+	var r2 := R - 24.0
+	var e1 := u0.cross(Vector3(0, 0, 1)).normalized()
+	var e2 := u0.cross(e1).normalized()
+	var space := _player.get_world_3d().direct_space_state
+	var cast := func(from: Vector3, to: Vector3) -> float:
+		var q := PhysicsRayQueryParameters3D.create(from, to)
+		var hit := space.intersect_ray(q)
+		if hit.is_empty():
+			return -1.0
+		return (hit["position"] as Vector3).distance_to(from)
+	# 1. THE DROP: from inside the mouth straight down -- must be caught
+	# at story two's solid crossing floor, not the core
+	var d1: float = cast.call(C + u0 * (R - 1.0), C)
+	var caught: float = (R - 1.0) - d1
+	print("COLONYTEST drop: hit at radius %.1f (story2 floor expected ~%.1f) %s" % [
+		caught, r2 - 2.45, "PASS" if absf(caught - (r2 - 2.45)) < 1.5 else "FAIL"])
+	# 2. ring A clear along its corridor from the crossing
+	var d2: float = cast.call(C + u0 * r1 + e1 * 3.0, C + u0 * r1 + e1 * 30.0)
+	print("COLONYTEST ringA path: first hit %.1fm (want none <8) %s" % [d2,
+		"PASS" if d2 < 0.0 or d2 > 8.0 else "FAIL"])
+	# 3. ring B THROUGH the crossing (stub + window + tube alignment)
+	var d3: float = cast.call(C + u0 * r1 + e2 * 12.0, C + u0 * r1 - e2 * 12.0)
+	print("COLONYTEST ringB through-crossing: first hit %.1fm (want none <20) %s" % [d3,
+		"PASS" if d3 < 0.0 or d3 > 20.0 else "FAIL"])
+	# 4. leak sweep: diagonal + random rays from crossing center must ALL
+	# hit structure within 15m (nothing opens into the hollow planet)
+	var leaks := 0
+	for i in 24:
+		var ang := TAU * float(i) / 24.0
+		var dirv := (e1 * cos(ang) + e2 * sin(ang)).normalized()
+		if absf(dirv.dot(e1)) > 0.92 or absf(dirv.dot(e2)) > 0.92:
+			continue   # corridor axes are SUPPOSED to run long
+		var dl: float = cast.call(C + u0 * r1, C + u0 * r1 + dirv * 15.0)
+		if dl < 0.0:
+			leaks += 1
+	print("COLONYTEST leak sweep: %d open diagonals (want 0) %s" % [leaks,
+		"PASS" if leaks == 0 else "FAIL"])
+	# 5. cafeteria drop from its ring segment. Offset sideways 2m: a
+	# resident's collision shell floats dead-center under the hatch and
+	# the probe must measure the floor, not an alien's head.
+	var cafang := TAU * 3.0 / 28.0
+	var cafdir := (u0 * cos(cafang) + e1 * sin(cafang)).normalized()
+	var caftang := (-u0 * sin(cafang) + e1 * cos(cafang)).normalized()
+	var d5: float = cast.call(C + cafdir * r2 + caftang * 2.0,
+		C + caftang * 2.0)
+	var cafr: float = r2 - d5
+	print("COLONYTEST cafeteria drop: floor at radius %.1f (hall floor ~%.1f) %s" % [
+		cafr, r2 - 8.2 - 2.75, "PASS" if absf(cafr - (r2 - 8.2 - 2.75)) < 2.0 else "FAIL"])
+	print("COLONYTEST done")
+
 func _dish_test() -> void:
 	await get_tree().process_frame
 	await get_tree().create_timer(1.0).timeout
