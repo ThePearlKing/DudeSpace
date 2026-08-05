@@ -4776,9 +4776,16 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 					(a4 + b4) * 0.5, rad_to_deg((b4 - a4).angle()))
 		3:
 			# the pyramid
-			bar.call(Vector2(0.56, 0.05), Vector2(0, -0.2), 0.0)
-			bar.call(Vector2(0.62, 0.05), Vector2(-0.14, 0.02), 62.0)
-			bar.call(Vector2(0.62, 0.05), Vector2(0.14, 0.02), -62.0)
+			# exact endpoints: the sides MEET the base corners instead of
+			# skidding past them
+			var tA := Vector2(0, 0.3)
+			var tB := Vector2(-0.28, -0.2)
+			var tC := Vector2(0.28, -0.2)
+			for pr in [[tA, tB], [tB, tC], [tC, tA]]:
+				var a5: Vector2 = pr[0]
+				var b5: Vector2 = pr[1]
+				bar.call(Vector2(a5.distance_to(b5) - 0.01, 0.05), (a5 + b5) * 0.5,
+					rad_to_deg((b5 - a5).angle()))
 		4:
 			# the noodle god: the eye and its four reaching arms
 			ring.call(0.16, 0.22, 0.0)
