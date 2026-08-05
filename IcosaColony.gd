@@ -627,7 +627,9 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	lampo.position = Vector3(3.2, -1.15, -3.6)
 	lampo.material_override = Destructible.make_material(accent, 2.6)
 	body.add_child(lampo)
-	_tv(body, Vector3(4.55, -0.3, 2.6), 0.0)
+	# TV dead-center on the wall, between the two fluid-glow art panes
+	# (it used to overlap the right pane)
+	_tv(body, Vector3(4.55, -0.3, 0.0), 0.0)
 	# living details: rug, ceiling fixture, wall art, shelf with glow
 	# trinkets, a crystal plant -- someone LIVES here
 	var rug := MeshInstance3D.new()
@@ -989,6 +991,7 @@ void fragment(){
 	frame.add_child(scr)
 
 var _tv_vp: SubViewport = null
+var _tv_cam: Camera3D = null
 var _tv_subs: Array = []   # subtitle Label3Ds, one per studio-feed set
 
 func _ensure_tv_feed() -> void:
@@ -999,11 +1002,11 @@ func _ensure_tv_feed() -> void:
 	_tv_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_tv_vp)
 	_tv_vp.world_3d = get_viewport().world_3d if is_inside_tree() else null
-	var cam := Camera3D.new()
-	_tv_vp.add_child(cam)
-	cam.global_position = DatamoshStudio.POS + Vector3(0, 0.4, 3.5)
-	cam.look_at(DatamoshStudio.POS + Vector3(0, -0.6, -4.2), Vector3.UP)
-	cam.cull_mask = 0xFFFFF & ~(1 << 9)
+	_tv_cam = Camera3D.new()
+	_tv_vp.add_child(_tv_cam)
+	_tv_cam.global_position = DatamoshStudio.POS + Vector3(0, 0.4, 3.5)
+	_tv_cam.look_at(DatamoshStudio.POS + Vector3(0, -0.6, -4.2), Vector3.UP)
+	_tv_cam.cull_mask = 0xFFFFF & ~(1 << 9)
 
 func _spawn_resident(at: Vector3, up: Vector3) -> void:
 	var a := MeshInstance3D.new()
@@ -1071,6 +1074,21 @@ func _process(delta: float) -> void:
 			var lb9: Label3D = r["lbl"]
 			if is_instance_valid(lb9):
 				lb9.global_position = nd.global_position + (r["up"] as Vector3) * 1.1
+	# COLONY CCTV: with someone in the colony the shared TV camera stops
+	# watching the news room and watches YOU -- hovering beside the
+	# player, upright in the planet's gravity. Updated per frame so the
+	# picture tracks smoothly.
+	if _tv_cam != null and _b != null and _pcache != null \
+			and is_instance_valid(_pcache):
+		var ppos9: Vector3 = _pcache.global_position
+		if ppos9.distance_to(_b.center) < float(_b.radius) + 4.0:
+			var up9: Vector3 = (ppos9 - (_b.center as Vector3)).normalized()
+			var east9: Vector3 = up9.cross(Vector3(0, 0, 1))
+			if east9.length() < 0.01:
+				east9 = up9.cross(Vector3(1, 0, 0))
+			east9 = east9.normalized()
+			_tv_cam.global_position = ppos9 + up9 * 1.7 + east9 * 2.4
+			_tv_cam.look_at(ppos9 + up9 * 0.55, up9)
 	# dialog: the nearest resident to the player speaks, rotating
 	# through its shuffled deck. checked at 5Hz, not per frame.
 	_dialog_t -= delta

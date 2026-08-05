@@ -56,7 +56,7 @@ func toggle_freecam() -> void:
 		_fc = null
 		_camera.current = true
 		if _hand:
-			_hand.visible = _view_mode == 0
+			_hand.visible = _view_mode == 0 and not Game.hud_hidden
 		_apply_body_vis()
 
 func _apply_body_vis() -> void:
@@ -187,7 +187,7 @@ func refresh_look() -> void:
 	if _hand and is_instance_valid(_hand):
 		_hand.queue_free()
 	_build_hand()
-	_hand.visible = _view_mode == 0
+	_hand.visible = _view_mode == 0 and not Game.hud_hidden
 	_update_held()
 
 func _toggle_view() -> void:
@@ -203,7 +203,7 @@ func _toggle_view() -> void:
 			_camera.position = Vector3(0, 1.4, -6.0)
 			_camera.rotation = Vector3(0, PI, 0)
 	if _hand:
-		_hand.visible = _view_mode == 0
+		_hand.visible = _view_mode == 0 and not Game.hud_hidden
 	if _body:
 		_apply_body_vis()
 
@@ -2546,7 +2546,7 @@ func respawn_at(pos: Vector3, up: Vector3) -> void:
 	visible = true
 	set_physics_process(true)
 	if _hand:
-		_hand.visible = _view_mode == 0
+		_hand.visible = _view_mode == 0 and not Game.hud_hidden
 	if _body:
 		_apply_body_vis()
 	_camera.current = true

@@ -20,7 +20,8 @@ func set_rocket(r: Rocket) -> void:
 	_view.rocket = r
 
 func _process(_delta: float) -> void:
-	visible = Game.mode == Game.Mode.IN_ROCKET and not Game.trapped
+	visible = Game.mode == Game.Mode.IN_ROCKET and not Game.trapped \
+		and not Game.hud_hidden
 	if visible:
 		for r in get_tree().get_nodes_in_group("rocket"):
 			if r is Rocket and r.piloted:

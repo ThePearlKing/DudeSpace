@@ -21,6 +21,7 @@ var wrath: float = 0.0          # rises ONLY from unholy acts (hidden meter)
 var health: float = HEALTH_MAX
 var dead: bool = false
 var trapped: bool = false       # caught by TIN 618
+var hud_hidden: bool = false    # F1 clean-screenshot mode: no HUD, no hand
 var dilation: float = 1.0       # time-dilation factor near the black hole
 var _since_hit: float = 0.0
 var _salad_t: float = -1.0   # seconds since eating a salad (-1 = none)

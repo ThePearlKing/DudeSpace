@@ -1115,6 +1115,16 @@ func _map_pick_test() -> void:
 		print("MAPTEST body_at says: ", m.body_at(ev.position))
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	# F1: toggle clean-screenshot mode -- HUD and hand vanish, F1 again
+	# brings them back
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F1:
+		Game.hud_hidden = not Game.hud_hidden
+		if _hud:
+			_hud.visible = not Game.hud_hidden
+		var pl9 = get_tree().get_first_node_in_group("player")
+		if pl9 != null and pl9._hand:
+			pl9._hand.visible = pl9._view_mode == 0 and not Game.hud_hidden
 	# F12: screenshot into user://screenshots, timestamped
 	if event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode == KEY_F12:
