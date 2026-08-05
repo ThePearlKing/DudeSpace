@@ -2243,86 +2243,90 @@ func _populate(b) -> void:
 			_spawn_res_nodes(b, 5, "uranium", 1)   # sun-baked pitchblende
 		"harold":
 			# HAROLD: dusty, rocky, quietly interesting. No craters --
-			# he's had enough impacts for one lifetime.
+			# he's had enough impacts for one lifetime. Geology is SEEDED:
+			# spikes, highlands and mounds sit in the same spots every run,
+			# like Earth's fixed features.
+			var hrng := RandomNumberGenerator.new()
+			hrng.seed = 618
 			_spawn_rocks(b, 90, Color("#83786c"))   # rubble EVERYWHERE
 			for i in _n(14):
 				# dust drifts: soft half-buried mounds
 				var dm4 := MeshInstance3D.new()
 				var dmm := SphereMesh.new()
-				var dr := randf_range(2.0, 5.5)
+				var dr := hrng.randf_range(2.0, 5.5)
 				dmm.radius = dr
 				dmm.height = dr * 0.6
 				dm4.mesh = dmm
 				dm4.material_override = Surfaces.stone(Color("#988c7d"))
 				add_child(dm4)
-				var dd := _surface_dir()
+				var dd := _h_dir(hrng)
 				dm4.global_transform = Transform3D(_basis_from_up(dd),
 					b.center + dd * (b.radius - dr * 0.25))
 			for i in _n(8):
 				# hoodoos: wind-carved stacked spires
-				var hd := _surface_dir()
+				var hd := _h_dir(hrng)
 				var hb := _basis_from_up(hd)
 				var hy := 0.0
-				for st9 in 3 + randi() % 3:
+				for st9 in 3 + hrng.randi() % 3:
 					var seg := MeshInstance3D.new()
 					var sgm := BoxMesh.new()
-					var sw9 := randf_range(1.0, 2.0) * (1.0 - float(st9) * 0.16)
-					sgm.size = Vector3(sw9, randf_range(0.8, 1.6), sw9)
+					var sw9 := hrng.randf_range(1.0, 2.0) * (1.0 - float(st9) * 0.16)
+					sgm.size = Vector3(sw9, hrng.randf_range(0.8, 1.6), sw9)
 					seg.mesh = sgm
 					seg.material_override = Surfaces.stone(
-						Color("#7d7266").lightened(randf() * 0.12))
+						Color("#7d7266").lightened(hrng.randf() * 0.12))
 					add_child(seg)
 					seg.global_transform = Transform3D(hb,
 						b.center + hd * (b.radius + hy + sgm.size.y * 0.5))
-					seg.rotate_object_local(Vector3.UP, randf() * TAU)
+					seg.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 					hy += sgm.size.y * 0.92
 			for i in _n(6):
 				# windswept ridges half-buried in the dust
 				var rg := MeshInstance3D.new()
 				var rgm := BoxMesh.new()
-				rgm.size = Vector3(randf_range(6.0, 12.0), randf_range(1.0, 2.0),
-					randf_range(1.4, 2.6))
+				rgm.size = Vector3(hrng.randf_range(6.0, 12.0), hrng.randf_range(1.0, 2.0),
+					hrng.randf_range(1.4, 2.6))
 				rg.mesh = rgm
 				rg.material_override = Surfaces.stone(Color("#6f655a"))
 				add_child(rg)
-				var rd9 := _surface_dir()
+				var rd9 := _h_dir(hrng)
 				rg.global_transform = Transform3D(_basis_from_up(rd9),
 					b.center + rd9 * (b.radius + 0.3))
-				rg.rotate_object_local(Vector3.UP, randf() * TAU)
+				rg.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 			for i in _n(10):
 				# highlands: broad raised slabs -- terrain that climbs
-				var md := _surface_dir()
+				var md := _h_dir(hrng)
 				var mb := _basis_from_up(md)
 				var mh := 0.0
-				for lyr in 2 + randi() % 2:
+				for lyr in 2 + hrng.randi() % 2:
 					var slab := MeshInstance3D.new()
 					var slm := BoxMesh.new()
-					var sw2 := randf_range(9.0, 18.0) * (1.0 - float(lyr) * 0.28)
-					slm.size = Vector3(sw2, randf_range(1.6, 3.0), sw2 * randf_range(0.7, 1.0))
+					var sw2 := hrng.randf_range(9.0, 18.0) * (1.0 - float(lyr) * 0.28)
+					slm.size = Vector3(sw2, hrng.randf_range(1.6, 3.0), sw2 * hrng.randf_range(0.7, 1.0))
 					slab.mesh = slm
 					slab.material_override = Surfaces.stone(
 						Color("#7d7266").lightened(float(lyr) * 0.07))
 					add_child(slab)
 					slab.global_transform = Transform3D(mb,
 						b.center + md * (b.radius + mh + slm.size.y * 0.35))
-					slab.rotate_object_local(Vector3.UP, randf() * TAU)
+					slab.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 					mh += slm.size.y * 0.8
 			# SPIKE BIOME: one region bristling with tall carved rock needles
-			var spike_dir := _surface_dir()
+			var spike_dir := _h_dir(hrng)
 			for i in _n(38):
-				var sd8: Vector3 = (spike_dir + Vector3(randf_range(-0.4, 0.4),
-					randf_range(-0.4, 0.4), randf_range(-0.4, 0.4))).normalized()
+				var sd8: Vector3 = (spike_dir + Vector3(hrng.randf_range(-0.4, 0.4),
+					hrng.randf_range(-0.4, 0.4), hrng.randf_range(-0.4, 0.4))).normalized()
 				var sb8 := _basis_from_up(sd8)
-				var segs := 3 + randi() % 3
+				var segs := 3 + hrng.randi() % 3
 				var sh8 := 0.0
-				var bw := randf_range(1.4, 2.6)
+				var bw := hrng.randf_range(1.4, 2.6)
 				for sg in segs:
 					var nk := MeshInstance3D.new()
 					var nkm := CylinderMesh.new()
 					var frac := 1.0 - float(sg) / float(segs)
 					nkm.bottom_radius = bw * frac
 					nkm.top_radius = bw * maxf(0.06, frac - 1.0 / float(segs)) * 0.8
-					nkm.height = randf_range(2.2, 4.6)
+					nkm.height = hrng.randf_range(2.2, 4.6)
 					nkm.radial_segments = 6
 					nk.mesh = nkm
 					nk.material_override = Surfaces.stone(
@@ -2330,28 +2334,28 @@ func _populate(b) -> void:
 					add_child(nk)
 					nk.global_transform = Transform3D(sb8,
 						b.center + sd8 * (b.radius + sh8 + nkm.height * 0.5 - 0.4))
-					nk.rotate_object_local(Vector3.UP, randf() * TAU)
+					nk.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 					sh8 += nkm.height * 0.94
 				# base shards leaning on the needle
 				for sh9 in 2:
 					var lsh := MeshInstance3D.new()
 					var lshm := BoxMesh.new()
-					lshm.size = Vector3(0.5, randf_range(1.6, 3.0), 0.5)
+					lshm.size = Vector3(0.5, hrng.randf_range(1.6, 3.0), 0.5)
 					lsh.mesh = lshm
 					lsh.material_override = Surfaces.stone(Color("#665c50"))
 					add_child(lsh)
 					lsh.global_transform = Transform3D(sb8,
 						b.center + sd8 * (b.radius + lshm.size.y * 0.3))
-					lsh.rotate_object_local(Vector3.RIGHT, randf_range(-0.5, 0.5))
-					lsh.rotate_object_local(Vector3.BACK, randf_range(-0.5, 0.5))
-					lsh.position += sb8 * Vector3(randf_range(-2.2, 2.2), 0,
-						randf_range(-2.2, 2.2))
+					lsh.rotate_object_local(Vector3.RIGHT, hrng.randf_range(-0.5, 0.5))
+					lsh.rotate_object_local(Vector3.BACK, hrng.randf_range(-0.5, 0.5))
+					lsh.position += sb8 * Vector3(hrng.randf_range(-2.2, 2.2), 0,
+						hrng.randf_range(-2.2, 2.2))
 			_spawn_res_nodes(b, 8, "coal", 2)
 			_spawn_res_nodes(b, 5, "uranium", 1)
 			# one bench, facing the black hole. he sits sometimes.
 			var bhh = Universe.body_named("TIN 618")
 			if bhh != null:
-				var bd9 := _surface_dir()
+				var bd9 := _h_dir(hrng)
 				var bb9 := _basis_from_up(bd9)
 				var bpos: Vector3 = b.center + bd9 * b.radius
 				var bench := Bench.new()
