@@ -4424,6 +4424,26 @@ func restore_world() -> void:
 				n2.connect_wire(dst2, "item", fport)
 	_world_load_ok = true   # reached the end: this session may save the world
 
+	# third pass: saved house links get their doorways and hallways
+	# re-cut -- the data always survived rejoins, the holes didn't
+	var relinked := {}
+	for n5 in made:
+		if not (n5 is House):
+			continue
+		for lv2 in n5.links:
+			var partner: House = null
+			for n6 in made:
+				if n6 is House and n6.slot == int(lv2):
+					partner = n6
+					break
+			if partner == null:
+				continue
+			var pk := "%d_%d" % [mini(n5.slot, partner.slot), maxi(n5.slot, partner.slot)]
+			if relinked.has(pk):
+				continue
+			relinked[pk] = true
+			n5.call_deferred("relink", partner)
+
 func _spawn_world_obj(id: String) -> Node3D:
 	match id:
 		"chest": return Chest.new()

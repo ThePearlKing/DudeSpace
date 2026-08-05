@@ -484,6 +484,8 @@ func _build_exterior() -> void:
 	# FOUNDATION: a deep plug so the house never floats on curvature
 	var found := _box(self, Vector3(w + 0.6, 6.0, w + 0.6), Vector3(0, -3.0, 0),
 		wall.darkened(0.35))
+	_found = found
+	call_deferred("_fit_foundation")
 	# moonbase sits on an engineered metal plug -- bases aren't built on dirt
 	found.material_override = Surfaces.metal(Color("#5a6068")) if kind == "moonbase" \
 		else Surfaces.stone(wall.darkened(0.35))
@@ -1409,6 +1411,22 @@ func enter(p: Node3D) -> void:
 	Sfx.play("click", -12.0)
 
 var exit_pad := Vector3.ZERO   # interior LEAVE HOUSE button position
+var _found: MeshInstance3D = null   # foundation plug (shortened on decks)
+
+## On a station deck the 6m foundation plug would hang out the platform's
+## belly -- shrink it to just bite the 1.2m deck.
+func _fit_foundation() -> void:
+	if _found == null or not is_instance_valid(_found) or kind == "station":
+		return
+	for h in get_tree().get_nodes_in_group("house"):
+		if h is House and h.kind == "station" and is_instance_valid(h):
+			var lrel: Vector3 = h.global_transform.basis.inverse() \
+				* (global_position - h.global_position)
+			if absf(lrel.x) < 13.5 and absf(lrel.z) < 13.5 \
+					and lrel.y > -0.5 and lrel.y < 5.0:
+				_found.scale = Vector3(1, 0.25, 1)
+				_found.position = Vector3(0, -0.72, 0)
+				return
 
 func exit_to_door(p: Node3D) -> void:
 	Game.zone = ""
@@ -1833,20 +1851,31 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 	var mid := (fa_p + fb_p) * 0.5 + Vector3(0, 1.35, 0)
 	var dirv := (fb_p - fa_p)
 	dirv.y = 0.0
-	# SEAMLESS: run the tube long enough to bite through both walls,
-	# floor top flush with the room floors
-	var L := dirv.length() + 2.8
+	# SEAMLESS: bite JUST through each wall (~0.4 per side) -- the old
+	# +2.8 ran the tube a meter into both rooms, walling off any ports
+	# that lived near the doorway
+	var L := dirv.length() + 0.8
 	if dirv.length() < 0.1:
 		return
 	dirv = dirv.normalized()
 	var xr := dirv.cross(Vector3.UP).normalized()
 	var gray := Surfaces.metal(Color("#8a9098"))
-	for spec in [
+	# side walls are SPLIT around a real opening at the center of each
+	# side -- the porthole is a hole in the wall, not a pane buried
+	# inside a solid box (which is why nobody ever saw them)
+	var hh9 := 0.48
+	var specs9: Array = [
 		[Vector3(2.6, 0.3, L), Vector3(0, -1.3, 0)],
 		[Vector3(2.6, 0.3, L), Vector3(0, 1.55, 0)],
-		[Vector3(0.3, 3.1, L), Vector3(-1.3, 0, 0)],
-		[Vector3(0.3, 3.1, L), Vector3(1.3, 0, 0)],
-	]:
+	]
+	for sx9 in [-1.3, 1.3]:
+		specs9.append([Vector3(0.3, 1.55 - hh9, L), Vector3(sx9, hh9 + (1.55 - hh9) * 0.5, 0)])
+		specs9.append([Vector3(0.3, 1.55 - hh9, L), Vector3(sx9, -hh9 - (1.55 - hh9) * 0.5, 0)])
+		var segl := L * 0.5 - hh9
+		if segl > 0.05:
+			specs9.append([Vector3(0.3, hh9 * 2.0, segl), Vector3(sx9, 0.0, hh9 + segl * 0.5)])
+			specs9.append([Vector3(0.3, hh9 * 2.0, segl), Vector3(sx9, 0.0, -hh9 - segl * 0.5)])
+	for spec in specs9:
 		var b3 := StaticBody3D.new()
 		var mi3 := MeshInstance3D.new()
 		var m3 := BoxMesh.new()
@@ -1927,7 +1956,8 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 		rim.mesh = rt
 		rim.material_override = Surfaces.metal(Color("#6a7078"))
 		_iroot.add_child(rim)
-		rim.global_transform = Transform3D(pbasis, ppos)
+		# rim frames the cut opening from inside the corridor
+		rim.global_transform = Transform3D(pbasis, mid + xr * (1.14 * pside))
 		var pv := _mk_view(Vector2i(180, 180))
 		var pcam: Camera3D = pv[1]
 		if ext_lat != Vector3.ZERO:
@@ -1962,6 +1992,36 @@ func build_link_visuals(other, fa_n: Node3D = null, fb_n: Node3D = null) -> void
 			oglass.mesh = gcm
 			oglass.material_override = Surfaces.portal(Color("#2a4a66"))
 			orim.add_child(oglass)
+
+## Rebuild a SAVED connection without moving anything: rejoining kept
+## the link data, but walls are rebuilt fresh every session and nothing
+## was re-cutting the doorways or hallways. This does.
+func relink(other) -> void:
+	if other == null or not is_instance_valid(other):
+		return
+	var bd := 1e9
+	var fa_n: Node3D = null
+	var fb_n: Node3D = null
+	for fa in get_tree().get_nodes_in_group("doorframe"):
+		if not (fa is Node3D) \
+				or fa.global_position.distance_to(room_center()) > room_size().length():
+			continue
+		for fb in get_tree().get_nodes_in_group("doorframe"):
+			if fb == fa or not (fb is Node3D) \
+					or fb.global_position.distance_to(other.room_center()) > other.room_size().length():
+				continue
+			var d: float = fa.global_position.distance_to(fb.global_position)
+			if d < bd:
+				bd = d
+				fa_n = fa
+				fb_n = fb
+	if fa_n == null or fb_n == null:
+		return
+	fa_n.set_meta("linked", true)
+	fb_n.set_meta("linked", true)
+	cut_doorway(fa_n)
+	other.cut_doorway(fb_n)
+	build_link_visuals(other, fa_n, fb_n)
 
 ## Would docking `other` through these two frames work? Returns
 ## {ok, reason, delta, moving} -- the door tool asks BEFORE cutting.

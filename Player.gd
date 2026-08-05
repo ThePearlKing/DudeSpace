@@ -82,6 +82,11 @@ func _ready() -> void:
 	cap.radius = 0.4
 	col.shape = cap
 	add_child(col)
+	# stairs are SLOPES: the ramp colliders over staircases run steeper
+	# than the 45-degree default, which made the engine treat them as
+	# walls -- that was the never-fixed 'i still have to jump' bug
+	floor_max_angle = deg_to_rad(66.0)
+	floor_snap_length = 0.6
 
 	_head = Node3D.new()
 	_head.position = Vector3(0, 0.7, 0)
