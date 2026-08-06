@@ -100,7 +100,7 @@ func build(b, dir: Vector3, roll_deg: float = 0.0) -> void:
 	tm.inner_radius = 3.4
 	tm.outer_radius = 4.6
 	rim.mesh = tm
-	rim.material_override = Destructible.make_material(accent, 1.6)
+	rim.material_override = Surfaces.cached_emissive(accent, 1.6)
 	add_child(rim)
 	rim.global_transform = Transform3D(_bup(u0), C + u0 * (R + 0.1))
 	# COLLAR: the mesh cut is a ragged triangle bigger than the shaft --
@@ -169,7 +169,7 @@ func build(b, dir: Vector3, roll_deg: float = 0.0) -> void:
 		var gm := BoxMesh.new()
 		gm.size = Vector3(0.12, ln, 0.12)
 		gs.mesh = gm
-		gs.material_override = Destructible.make_material(accent, 1.8)
+		gs.material_override = Surfaces.cached_emissive(accent, 1.8)
 		add_child(gs)
 		gs.global_transform = Transform3D(_bup(u0), C + u0 * mid)
 		gs.translate_object_local(Vector3(2.7, 0, 2.7))
@@ -400,7 +400,7 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 		sm.size = Vector3(0.5, 0.08, ln * 0.8)
 		strip.mesh = sm
 		strip.position = Vector3(0, 1.9, 0)
-		strip.material_override = Destructible.make_material(accent, 2.2)
+		strip.material_override = Surfaces.cached_emissive(accent, 2.2)
 		body.add_child(strip)
 	match _style:
 		"wireframe":
@@ -413,7 +413,7 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 					rbm9.size = Vector3(0.07, 0.07, ln)
 					rail9.mesh = rbm9
 					rail9.position = Vector3(ex9, ey9, 0)
-					rail9.material_override = Destructible.make_material(accent, 1.4)
+					rail9.material_override = Surfaces.cached_emissive(accent, 1.4)
 					body.add_child(rail9)
 		"pixel":
 			# chunky pixel-art mural on the solid wall, dead pixels
@@ -433,7 +433,7 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 						dot9.position = Vector3(2.55 * float(msgn9),
 							-0.66 + px9 * float(gy9),
 							(float(gx9) - 2.5) * px9)
-						dot9.material_override = Destructible.make_material(
+						dot9.material_override = Surfaces.cached_emissive(
 							[Color("#ff66aa"), accent,
 							Color("#ffd0e8")][(gx9 + gy9 * 3) % 3], 1.2)
 						body.add_child(dot9)
@@ -447,7 +447,7 @@ func _tube_seg(center: Vector3, up: Vector3, along: Vector3, ln: float,
 				gl9.position = Vector3(-2.5, 0.4, 0)
 				gl9.rotation_degrees = Vector3(randf_range(-14, 14),
 					randf_range(-14, 14), randf_range(-14, 14))
-				gl9.material_override = Destructible.make_material(
+				gl9.material_override = Surfaces.cached_emissive(
 					accent.darkened(0.4), 0.8)
 				body.add_child(gl9)
 
@@ -492,7 +492,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		dpm.size = Vector3(0.14, 3.4, 0.14)
 		dp.mesh = dpm
 		dp.position = Vector3(-4.9, -0.4, dpost * 1.0)
-		dp.material_override = Destructible.make_material(accent, 1.5)
+		dp.material_override = Surfaces.cached_emissive(accent, 1.5)
 		body.add_child(dp)
 	var doorp := MeshInstance3D.new()
 	var doorm := BoxMesh.new()
@@ -529,13 +529,13 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	grm.outer_radius = 0.95
 	gring.mesh = grm
 	gring.position = Vector3(1.6, -2.1, -2.2)
-	gring.material_override = Destructible.make_material(accent, 2.0)
+	gring.material_override = Surfaces.cached_emissive(accent, 2.0)
 	body.add_child(gring)
 	# bunk deck: one seamless chamfered slab, corners cut at 45 degrees
 	var bunk := MeshInstance3D.new()
 	bunk.mesh = _cham_mesh(2.6, 0.28, 1.4, 0.3)
 	bunk.position = Vector3(1.6, -1.55, -2.2)
-	bunk.material_override = Destructible.make_material(Color("#3a4254"), 0.25)
+	bunk.material_override = Surfaces.cached_emissive(Color("#3a4254"), 0.25)
 	body.add_child(bunk)
 	# angled headboard leaning on the wall end
 	var hbd := MeshInstance3D.new()
@@ -552,7 +552,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	pwm.height = 0.36
 	pillow.mesh = pwm
 	pillow.position = Vector3(0.6, -1.32, -2.2)
-	pillow.material_override = Destructible.make_material(
+	pillow.material_override = Surfaces.cached_emissive(
 		accent.lerp(Color.WHITE, 0.6), 0.4)
 	body.add_child(pillow)
 	var ped := MeshInstance3D.new()
@@ -578,7 +578,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	holo.mesh = _cham_mesh(1.3, 0.03, 0.75, 0.2)
 	holo.position = Vector3(1.8, -0.6, 2.55)
 	holo.rotation_degrees = Vector3(72, 0, 0)
-	holo.material_override = Destructible.make_material(accent, 2.4)
+	holo.material_override = Surfaces.cached_emissive(accent, 2.4)
 	body.add_child(holo)
 	# twin angled struts: pedestal shoulder up to the pane's underside
 	for ss9 in [-0.45, 0.45]:
@@ -626,7 +626,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	body.add_child(lstem)
 	lampo.mesh = lom
 	lampo.position = Vector3(3.2, -1.15, -3.6)
-	lampo.material_override = Destructible.make_material(accent, 2.6)
+	lampo.material_override = Surfaces.cached_emissive(accent, 2.6)
 	body.add_child(lampo)
 	# TV dead-center on the wall, between the two fluid-glow art panes
 	# (it used to overlap the right pane)
@@ -640,7 +640,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	rugm.height = 0.05
 	rug.mesh = rugm
 	rug.position = Vector3(0.4, -2.21, 0.4)
-	rug.material_override = Destructible.make_material(accent.darkened(0.55), 0.15)
+	rug.material_override = Surfaces.cached_emissive(accent.darkened(0.55), 0.15)
 	body.add_child(rug)
 	var rugr := MeshInstance3D.new()
 	var rrm := TorusMesh.new()
@@ -648,7 +648,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	rrm.outer_radius = 1.94
 	rugr.mesh = rrm
 	rugr.position = Vector3(0.4, -2.2, 0.4)
-	rugr.material_override = Destructible.make_material(accent, 1.4)
+	rugr.material_override = Surfaces.cached_emissive(accent, 1.4)
 	body.add_child(rugr)
 	var cl := MeshInstance3D.new()
 	var clm := CylinderMesh.new()
@@ -657,7 +657,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 	clm.height = 0.1
 	cl.mesh = clm
 	cl.position = Vector3(0, 2.15, 0)
-	cl.material_override = Destructible.make_material(Color("#f2ead8"), 1.6)
+	cl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 1.6)
 	body.add_child(cl)
 	for ai in 2:
 		# wall art is ALIVE: fluid-glow panes with seamless chamfered
@@ -691,7 +691,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 			kn2.mesh = knm2
 			kn2.position = Vector3(-4.5, 0.38 + 0.9 * float(si2),
 				2.0 + 1.1 * float(bi3))
-			kn2.material_override = Destructible.make_material(
+			kn2.material_override = Surfaces.cached_emissive(
 				HUES[(si2 * 2 + bi3) % 4], 1.2)
 			body.add_child(kn2)
 	# the house plant is a crystal colony: three icosahedrons budding
@@ -717,7 +717,7 @@ func _apartment(C: Vector3, pdir: Vector3, tang: Vector3, r1: float,
 		plm2.rings = 3
 		plant.mesh = plm2
 		plant.position = pspec[1]
-		plant.material_override = Destructible.make_material(
+		plant.material_override = Surfaces.cached_emissive(
 			accent.lerp(Color.WHITE, 0.2), 1.1)
 		body.add_child(plant)
 	_spawn_resident(room_c + pdir * 0.4, pdir)
@@ -795,7 +795,7 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		bwm.is_hemisphere = true
 		bwl.mesh = bwm
 		bwl.position = Vector3(10.6, -3.07, -7.5 + 3.0 * float(bw))
-		bwl.material_override = Destructible.make_material(
+		bwl.material_override = Surfaces.cached_emissive(
 			HUES[bw % 4].lightened(0.2), 1.4)
 		body.add_child(bwl)
 	for wy in 2:
@@ -804,7 +804,7 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		stm2.size = Vector3(0.08, 0.16, 23.2)
 		stripe.mesh = stm2
 		stripe.position = Vector3(-11.7, -1.4 + 2.8 * float(wy), 0)
-		stripe.material_override = Destructible.make_material(accent, 1.5)
+		stripe.material_override = Surfaces.cached_emissive(accent, 1.5)
 		body.add_child(stripe)
 	for ti in 4:
 		var tb := MeshInstance3D.new()
@@ -831,7 +831,7 @@ func _cafeteria(C: Vector3, pdir: Vector3, tang: Vector3, r2: float,
 		om.height = 0.52
 		orb.mesh = om
 		orb.position = Vector3(0, 2.4, -7.5 + 5.0 * float(ti))
-		orb.material_override = Destructible.make_material(accent, 2.6)
+		orb.material_override = Surfaces.cached_emissive(accent, 2.6)
 		body.add_child(orb)
 	for ri in 3:
 		# hover height above the floor unchanged; keep the tang-0 one
@@ -887,7 +887,7 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		trm.size = Vector3(9.6, 0.1, 0.1)
 		trim.mesh = trm
 		trim.position = Vector3(0, gy, 4.6)
-		trim.material_override = Destructible.make_material(Color("#ffd94a"), 1.2)
+		trim.material_override = Surfaces.cached_emissive(Color("#ffd94a"), 1.2)
 		body.add_child(trim)
 	# the TRAPDOOR: a glowing grate lying across the ceiling hatch --
 	# no collision, you drop straight through the flap
@@ -897,7 +897,7 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		brm9.size = Vector3(5.0, 0.06, 0.18)
 		bar9.mesh = brm9
 		bar9.position = Vector3(0, 2.62, -1.9 + 1.25 * float(gb2))
-		bar9.material_override = Destructible.make_material(accent, 1.1)
+		bar9.material_override = Surfaces.cached_emissive(accent, 1.1)
 		body.add_child(bar9)
 	var glass := MeshInstance3D.new()
 	var glm := BoxMesh.new()
@@ -918,7 +918,7 @@ func _premium(C: Vector3, pdir: Vector3, tang: Vector3, r3: float,
 		fm.size = fspec[0]
 		f.mesh = fm
 		f.position = fspec[1]
-		f.material_override = Destructible.make_material(fspec[2], float(fspec[3]))
+		f.material_override = Surfaces.cached_emissive(fspec[2], float(fspec[3]))
 		body.add_child(f)
 	_tv(body, Vector3(4.6, -0.4, 0), 0.0)
 	# back up to the story-two junction you dropped in from
@@ -944,7 +944,7 @@ func _tv(body: Node3D, at: Vector3, yaw_deg: float) -> void:
 	var frame := MeshInstance3D.new()
 	frame.mesh = _cham_mesh(1.06, 0.08, 1.66, 0.14)
 	frame.rotation_degrees = Vector3(0, 0, 90)
-	frame.material_override = Destructible.make_material(
+	frame.material_override = Surfaces.cached_emissive(
 		(_b.color as Color) if _b != null else Color("#33ff99"), 1.8)
 	tvroot.add_child(frame)
 	var scr := MeshInstance3D.new()

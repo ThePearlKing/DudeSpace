@@ -300,6 +300,8 @@ func _boot() -> void:
 		_mouth_shot_test()
 	if OS.get_environment("CTD_TEST") == "26":
 		_mainframe_test()
+	if OS.get_environment("CTD_TEST") == "28":
+		_readme_shots()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -843,6 +845,62 @@ func _mainframe_test() -> void:
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
 ## straight down -- checks the mesh-cut opening actually clears the
+## CTD_TEST=28: the README tour. Flies a camera to every showpiece and
+## saves docs/shots/*.png.
+func _readme_shots() -> void:
+	# shot rig runs in a small window that never steals the screen
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	await get_tree().create_timer(3.0).timeout
+	DirAccess.make_dir_recursive_absolute("res://docs/shots")
+	var cam := Camera3D.new()
+	cam.far = 60000.0
+	add_child(cam)
+	cam.current = true
+	var mb = Universe.body_named("Big Computer")
+	var mu: Vector3 = MAINFRAME_DIR
+	var me1 := mu.cross(Vector3(0, 0, 1)).normalized()
+	var me2 := mu.cross(me1).normalized()
+	var mrF: float = mb.radius - 16.0
+	var eb = Universe.body_named("Earth")
+	var hb = Universe.body_named("Harold")
+	var bh = Universe.body_named("TIN 618")
+	var wb = Universe.body_named("Big Water")
+	var db = Universe.body_named("Datamosh")
+	var mdd := (mu * cos(0.115 + 5.0 * 4.6 / mrF)
+		+ me1 * sin(0.115 + 5.0 * 4.6 / mrF)).normalized()
+	var cpd := (mu * cos(1.3708) + me1 * sin(1.3708)).normalized()
+	var shots: Array = [
+		["big_computer_orbit", mb.center + mu * (mb.radius + 150.0)
+			+ me1 * 60.0, mb.center, mu.cross(me1)],
+		["control_deck", mb.center + (mu * cos(0.115) + me1 * sin(0.115))
+			.normalized() * (mrF + 2.2), mb.center + mdd * (mrF + 2.0),
+			(mu * cos(0.3) + me1 * sin(0.3)).normalized()],
+		["reactor_cavern", mb.center + cpd * (mrF + 1.8)
+			- (-mu * sin(1.3708) + me1 * cos(1.3708)) * 12.0,
+			mb.center + cpd * (mb.radius - 25.0), cpd],
+		["cockpit", mb.center - mu * (mrF + 2.0) + me1 * 8.0,
+			mb.center - mu * (mrF + 3.0), -mu],
+		["earth", eb.center + Vector3(1, 0.35, 0.4).normalized()
+			* (eb.radius + 130.0), eb.center, Vector3(0, 1, 0)],
+		["black_hole_harold", hb.center + Vector3(0, 0.25, 1).normalized()
+			* (hb.radius + 220.0), bh.center, Vector3(0, 1, 0)],
+		["big_water", wb.center + Vector3(0.4, 0.6, 0.6).normalized()
+			* (wb.radius + 160.0), wb.center, Vector3(0, 1, 0)],
+		["datamosh", db.center + Vector3(0.2, 0.5, 0.9).normalized()
+			* (db.radius + 170.0), db.center, Vector3(0, 1, 0)],
+	]
+	for sh9 in shots:
+		cam.global_position = sh9[1]
+		cam.look_at(sh9[2], sh9[3])
+		await get_tree().create_timer(0.35).timeout
+		var img := get_viewport().get_texture().get_image()
+		img.save_png("res://docs/shots/%s.png" % str(sh9[0]))
+		print("READMESHOT ", sh9[0])
+	print("READMESHOT done")
+	get_tree().quit()
+	get_tree().quit()
+
 ## square entrance. CTD_SHOT names the png.
 func _mouth_shot_test() -> void:
 	await get_tree().create_timer(3.0).timeout
@@ -1888,6 +1946,24 @@ func _build_body(b) -> void:
 		p.add_child(col)   # gas giants have NO surface. you fall in.
 	else:
 		col.free()   # orphaned colliders leak Jolt RIDs at exit
+		# INSIDE a gas giant it is actually gas now: three nested haze
+		# shells (backface) thicken toward a blind opaque core
+		for gs9 in [[0.985, 0.45], [0.8, 0.75], [0.55, 1.0]]:
+			var haze := MeshInstance3D.new()
+			var hzm := SphereMesh.new()
+			hzm.radius = b.radius * float(gs9[0])
+			hzm.height = hzm.radius * 2.0
+			hzm.radial_segments = 32
+			hzm.rings = 16
+			haze.mesh = hzm
+			var hmat9 := StandardMaterial3D.new()
+			hmat9.cull_mode = BaseMaterial3D.CULL_FRONT
+			hmat9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			hmat9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			hmat9.albedo_color = Color(b.color.r, b.color.g, b.color.b,
+				float(gs9[1]))
+			haze.material_override = hmat9
+			p.add_child(haze)
 	p.set_meta("body_name", b.name)   # the apple cinematic needs to find these
 	add_child(p)
 	p.global_position = b.center
@@ -2328,10 +2404,8 @@ void fragment(){
 			var osh := Shader.new()
 			osh.code = preload("res://Title.gd")._TP_NOISE + """
 uniform vec3 base : source_color;
-varying vec3 wn;
-void vertex(){ wn = normalize(VERTEX); }
 void fragment(){
-	vec3 n = normalize(wn);
+	vec3 n = normalize(vn);
 	float sw = fbm(n * 6.0 + vec3(TIME * 0.05, 0.0, TIME * 0.03));
 	float sw2 = fbm(n * 17.0 - vec3(0.0, TIME * 0.08, 0.0));
 	vec3 deep = base * 0.45;

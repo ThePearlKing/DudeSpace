@@ -121,6 +121,46 @@ static func wood(c: Color) -> ShaderMaterial:
 static func stone(c: Color) -> ShaderMaterial:
 	return mat(STONE, c, 4.0, 0.95)
 
+# ---- the PART SYSTEM caches: one material per (color,emit), one mesh
+# and one shape per size. A facility of ten thousand boxes compiles a
+# few dozen shader pipelines instead of ten thousand, and shares mesh
+# and shape RIDs instead of allocating per part. Roblox rules.
+static var _em_cache := {}
+static var _bm_cache := {}
+static var _bs_cache := {}
+
+static func cached_emissive(c: Color, emit: float) -> StandardMaterial3D:
+	var key := c.to_html(true) + ("_%.2f" % emit)
+	if _em_cache.has(key):
+		return _em_cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = emit
+	m.metallic = 0.1
+	m.roughness = 0.6
+	_em_cache[key] = m
+	return m
+
+static func box_mesh(size: Vector3) -> BoxMesh:
+	var key := "%.2f_%.2f_%.2f" % [size.x, size.y, size.z]
+	if _bm_cache.has(key):
+		return _bm_cache[key]
+	var bm := BoxMesh.new()
+	bm.size = size
+	_bm_cache[key] = bm
+	return bm
+
+static func box_shape(size: Vector3) -> BoxShape3D:
+	var key := "%.2f_%.2f_%.2f" % [size.x, size.y, size.z]
+	if _bs_cache.has(key):
+		return _bs_cache[key]
+	var bs := BoxShape3D.new()
+	bs.size = size
+	_bs_cache[key] = bs
+	return bs
+
 static func metal(c: Color) -> ShaderMaterial:
 	return mat(METAL, c, 10.0, 0.7)
 
