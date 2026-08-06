@@ -5509,7 +5509,9 @@ void fragment() {
 		var ga := TAU * float(g) / 6.0 + 0.26
 		_h_glyph(root, g, Vector3(cos(ga) * 1.5, cy + 0.2 + sin(ga) * 1.5, 1.84))
 	# and up TOP, alone on the big crown tier: the circle with weird
-	# lines. the dudes carved their machine planet before it had a name.
+	# lines. NOBODY carved these -- the stele reflects what it points
+	# at; the glyphs are a magical relation to the location of each
+	# piece. This one faces the machine planet.
 	_h_glyph(root, 6, Vector3(0, 9.9, 1.55))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
