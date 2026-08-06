@@ -907,8 +907,14 @@ void fragment(){
 ## for the whole six-minute afterglow. Planets still occlude them:
 ## the universe cracks BEHIND the world.
 var _skyfx: Array = []   # nodes that track the player like a skybox
+var _sky_tweens: Array = []   # every looped show tween -- killed on clear,
+							  # or they step freed targets forever
 
 func mono_sky_clear() -> void:
+	for tw9 in _sky_tweens:
+		if tw9 != null and (tw9 as Tween).is_valid():
+			(tw9 as Tween).kill()
+	_sky_tweens.clear()
 	for n in get_tree().get_nodes_in_group("mono_sky"):
 		if is_instance_valid(n):
 			n.queue_free()
@@ -968,6 +974,7 @@ func sky_shatter() -> void:
 		fall.parallel().tween_property(smat, "albedo_color:a", 0.0,
 			rng9.randf_range(9.0, 16.0))
 		var spin9 := create_tween().set_loops()
+		_sky_tweens.append(spin9)
 		spin9.tween_property(shard, "rotation",
 			Vector3(TAU * rng9.randf_range(0.2, 0.7),
 			TAU * rng9.randf_range(0.2, 0.7), 0), 8.0).as_relative()
@@ -1017,6 +1024,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 		if shell == 1:
 			skyp.add_child(host)
 			var ctw := create_tween().set_loops()
+			_sky_tweens.append(ctw)
 			ctw.tween_property(host, "rotation:y", -TAU, 300.0).as_relative()
 		for i in n9:
 			var t9 := MeshInstance3D.new()
@@ -1036,9 +1044,11 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 				sin(ph) * cos(lat)) * rad9
 			tris.append(t9)
 			var st9 := create_tween().set_loops()
+			_sky_tweens.append(st9)
 			st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0),
 				11.0 + 3.0 * fmod(float(i) * 0.7, 1.0)).as_relative()
 			var brt := create_tween().set_loops()
+			_sky_tweens.append(brt)
 			brt.tween_property(tmat, "emission_energy_multiplier", 2.2,
 				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)).from(0.6) \
 				.set_trans(Tween.TRANS_SINE)
@@ -1046,6 +1056,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)) \
 				.set_trans(Tween.TRANS_SINE)
 	var wheel := create_tween().set_loops()
+	_sky_tweens.append(wheel)
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
 	# lifecycle: demo = 30s and gone; the real thing lingers six minutes
 	var hold := 26.0 if linger else 4.0
@@ -1065,6 +1076,10 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN))
 	life.tween_interval(fade9 + 2.0)
 	life.tween_callback(func() -> void:
+		for tw9 in _sky_tweens:
+			if tw9 != null and (tw9 as Tween).is_valid():
+				(tw9 as Tween).kill()
+		_sky_tweens.clear()
 		if is_instance_valid(crack):
 			crack.queue_free()
 		if is_instance_valid(skyp):
