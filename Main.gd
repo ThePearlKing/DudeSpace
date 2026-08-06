@@ -1045,51 +1045,84 @@ func _sky_detonate() -> void:
 	bmat.emission = Color(0.25, 0.6, 1.0)
 	bmat.emission_energy_multiplier = 1.6
 	bmat.render_priority = -3
+	bmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var b_lrad := Universe.BOUNDARY - 900.0
-	var b_side := Universe.BOUNDARY * 0.058
-	var edge_mesh := BoxMesh.new()
-	edge_mesh.size = Vector3(b_side * 1.02, b_side * 0.018, b_side * 0.018)
-	var NB := 520
-	for i in NB:
-		var ky := 1.0 - 2.0 * (float(i) + 0.5) / float(NB)
-		var kr := sqrt(maxf(0.0, 1.0 - ky * ky))
-		var kphi := PI * (1.0 + sqrt(5.0)) * float(i)
-		var dir9 := Vector3(cos(kphi) * kr, ky, sin(kphi) * kr)
-		var tx := dir9.cross(Vector3(0, 1, 0))
-		if tx.length() < 0.01:
-			tx = dir9.cross(Vector3(1, 0, 0))
-		tx = tx.normalized()
-		var tz := tx.cross(dir9).normalized()
+	# a TRUE geodesic shell: an icosphere (frequency 8, 1280 faces) so
+	# every triangle SHARES its edges with its neighbours -- one perfect
+	# unbroken ball of triangles, dead still. Then it falls apart.
+	var phi9 := (1.0 + sqrt(5.0)) * 0.5
+	var iv9: Array = [Vector3(-1, phi9, 0), Vector3(1, phi9, 0),
+		Vector3(-1, -phi9, 0), Vector3(1, -phi9, 0),
+		Vector3(0, -1, phi9), Vector3(0, 1, phi9),
+		Vector3(0, -1, -phi9), Vector3(0, 1, -phi9),
+		Vector3(phi9, 0, -1), Vector3(phi9, 0, 1),
+		Vector3(-phi9, 0, -1), Vector3(-phi9, 0, 1)]
+	var ifc9: Array = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10],
+		[0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6],
+		[7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+		[4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
+	var FQ := 8
+	var mk_plate := func(pa: Vector3, pb: Vector3, pc: Vector3) -> void:
+		var cen := ((pa + pb + pc) / 3.0)
+		var fn9 := (pb - pa).cross(pc - pa).normalized()
+		var st9 := SurfaceTool.new()
+		st9.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for eg in [[pa, pb], [pb, pc], [pc, pa]]:
+			var e0: Vector3 = (eg[0] as Vector3) - cen
+			var e1: Vector3 = (eg[1] as Vector3) - cen
+			var sd := fn9.cross(e1 - e0).normalized() \
+				* (e1 - e0).length() * 0.022
+			st9.add_vertex(e0 - sd)
+			st9.add_vertex(e0 + sd)
+			st9.add_vertex(e1 + sd)
+			st9.add_vertex(e0 - sd)
+			st9.add_vertex(e1 + sd)
+			st9.add_vertex(e1 - sd)
 		var plate := Node3D.new()
 		bshell.add_child(plate)
-		plate.position = dir9 * b_lrad
-		plate.transform.basis = Basis(tx, dir9, tz).orthonormalized()
-		plate.rotate_object_local(Vector3(0, 1, 0), brng.randf() * TAU)
-		for e9 in 3:
-			var va := Vector3(cos(TAU * (float(e9) + 0.25) / 3.0), 0,
-				sin(TAU * (float(e9) + 0.25) / 3.0)) * b_side * 0.577
-			var vb := Vector3(cos(TAU * (float(e9) + 1.25) / 3.0), 0,
-				sin(TAU * (float(e9) + 1.25) / 3.0)) * b_side * 0.577
-			var ed := MeshInstance3D.new()
-			ed.mesh = edge_mesh
-			ed.material_override = bmat
-			ed.extra_cull_margin = 16384.0
-			plate.add_child(ed)
-			ed.position = (va + vb) * 0.5
-			ed.rotation.y = -atan2((vb - va).z, (vb - va).x)
-		var away := (dir9 * (0.8 if brng.randf() < 0.5 else -0.45)
-			+ tx * brng.randf_range(-0.6, 0.6)
-			+ tz * brng.randf_range(-0.6, 0.6)).normalized()
+		plate.position = cen
+		var pm9 := MeshInstance3D.new()
+		pm9.mesh = st9.commit()
+		pm9.material_override = bmat
+		pm9.extra_cull_margin = 16384.0
+		plate.add_child(pm9)
+		# the FALL: perfectly still for a breath, then off it goes
+		var dirn := cen.normalized()
+		var txn := dirn.cross(Vector3(0, 1, 0))
+		if txn.length() < 0.01:
+			txn = dirn.cross(Vector3(1, 0, 0))
+		txn = txn.normalized()
+		var tzn := txn.cross(dirn).normalized()
+		var away := (dirn * (0.8 if brng.randf() < 0.5 else -0.45)
+			+ txn * brng.randf_range(-0.6, 0.6)
+			+ tzn * brng.randf_range(-0.6, 0.6)).normalized()
 		var sc9 := plate.create_tween()
-		sc9.tween_interval(brng.randf_range(0.3, 1.5))
+		sc9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
 		sc9.tween_property(plate, "position",
 			away * Universe.BOUNDARY * brng.randf_range(0.2, 0.55),
 			brng.randf_range(5.0, 9.0)) \
 			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		var tb9 := plate.create_tween()
+		tb9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
 		tb9.tween_property(plate, "rotation",
 			Vector3(brng.randf_range(-2.0, 2.0), brng.randf_range(-2.0, 2.0),
 				brng.randf_range(-1.0, 1.0)), 8.0).as_relative()
+	for f9 in ifc9:
+		var A9 := (iv9[(f9 as Array)[0]] as Vector3).normalized()
+		var B9 := (iv9[(f9 as Array)[1]] as Vector3).normalized()
+		var C9 := (iv9[(f9 as Array)[2]] as Vector3).normalized()
+		var pt := func(i9: int, j9: int) -> Vector3:
+			var w0 := 1.0 - float(i9) / float(FQ)
+			var w2 := float(j9) / float(FQ)
+			var w1 := 1.0 - w0 - w2
+			return (A9 * w0 + B9 * w1 + C9 * w2).normalized() * b_lrad
+		for i9 in FQ:
+			for j9 in i9 + 1:
+				mk_plate.call(pt.call(i9, j9), pt.call(i9 + 1, j9),
+					pt.call(i9 + 1, j9 + 1))
+				if j9 < i9:
+					mk_plate.call(pt.call(i9, j9), pt.call(i9 + 1, j9 + 1),
+						pt.call(i9, j9 + 1))
 	var bf9 := create_tween()
 	_sky_tweens.append(bf9)
 	bf9.tween_interval(1.4)
@@ -2873,6 +2906,11 @@ func _drive_edge_cutscene(delta: float) -> void:
 			r._cine_fov = 0.0
 			if _hud:
 				_hud.flash("the white zone refused you. all the way home.")
+			var nt9 := create_tween()
+			nt9.tween_interval(3.4)
+			nt9.tween_callback(func() -> void:
+				if _hud:
+					_hud.flash("NUCLEAR ENGINE available -- Rocket 2.0 ship part, bought with uranium. it can win."))
 			_wcut = 0
 			_wcut_r = null
 	else:
