@@ -339,13 +339,7 @@ void fragment(){
 	var awxf := Transform3D(abas, _C + _u0 * (_rF + 3.25))
 	# -Z wall: a PROPER 2.4x3.0 doorway to the service hallway, plus a
 	# little grated wall vent with a fan turning in the duct behind it
-	# left section carries the ATRIUM AIRLOCK out into the hollow
-	_plate(Vector3(2.2, 7.0, 0.5), awxf, Vector3(-5.2, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(0.7, 7.0, 0.5), awxf, Vector3(-1.55, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(2.2, 4.2, 0.5), awxf, Vector3(-3.0, 1.4, -6.05), STEEL, 0.0)
-	_airlock(Transform3D(abas * Basis(Vector3(0, 1, 0), PI),
-		Transform3D(abas, _C + _u0 * _rF)
-		.translated_local(Vector3(-3.0, 0, -6.05)).origin))
+	_plate(Vector3(5.1, 7.0, 0.5), awxf, Vector3(-3.75, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.4, 4.0, 0.5), awxf, Vector3(0, 1.75, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.15, 7.0, 0.5), awxf, Vector3(2.275, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(1.3, 4.1, 0.5), awxf, Vector3(3.9, 1.45, -6.05), STEEL, 0.0)
@@ -1468,7 +1462,21 @@ func _rings() -> void:
 	# now a real hallway; ventilation becomes a secret system) ---
 	_hall(0, 5.682, 6.185, [])
 	# --- ring B east: atrium +X -> medbay/gym/archive -> cockpit ---
-	_hall(1, 0.098, 2.897, [[0.75, -1.0], [1.5, 1.0], [1.92, 1.0], [2.3, -1.0]])
+	# aE: exact centre of ring B east segment 15 -- the FIRST top-floor
+	# airlock lives here, facing real void (its old atrium spot opened
+	# into the northwest hallway with the elevator parked on top of it)
+	var aE := 0.098 + 2.3 / _rF + (((2.897 - 0.098) * _rF - 4.6) / 40.0) \
+		/ _rF * 15.0
+	_hall(1, 0.098, 2.897, [[0.75, -1.0], [1.5, 1.0], [1.92, 1.0],
+		[2.3, -1.0], [aE, -1.0]])
+	var efb := _abas9(1, aE)
+	_airlock(Transform3D(efb * Basis(Vector3(0, 1, 0), -PI * 0.5),
+		Transform3D(efb, _C + _aup9(1, aE) * _rF)
+		.translated_local(Vector3(-3.05, 0, 0)).origin))
+	var eawx := Transform3D(efb, _C + _aup9(1, aE) * (_rF + 2.25))
+	_plate(Vector3(0.5, 5.5, 1.2), eawx, Vector3(-3.05, 0, 1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 1.2), eawx, Vector3(-3.05, 0, -1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 1.95, 3.1), eawx, Vector3(-3.05, 1.8, 0), STEEL, 0.0)
 	var mb := _ring_room(1, 0.75, -1.0, "MEDBAY", 2)
 	_dress_medbay(mb)
 	var gy := _ring_room(1, 1.5, 1.0, "GYMNASIUM", 2)
@@ -3945,11 +3953,9 @@ func _lower_floors() -> void:
 	var mains: Array = ["ATRIUM", "DATA VAULT", "UNDERCROFT", "CORE VIEW"]
 	# stop 0: atrium corner cabin
 	var abas := _fr(0.0)
-	# +X/+Z corner: clear of the airlock wall, the vent duct, the bunk
-	# door AND the surface gate (which owns the opposite corner)
-	var a_xf := Transform3D(abas * Basis(Vector3(0, 1, 0), PI * 1.25),
+	var a_xf := Transform3D(abas * Basis(Vector3(0, 1, 0), PI * 0.25),
 		Transform3D(abas, _C + _u0 * _rF)
-		.translated_local(Vector3(4.3, 0, 4.3)).origin)
+		.translated_local(Vector3(-4.3, 0, -4.3)).origin)
 	_lift_cabin(0, 0, a_xf, "ELEVATOR", mains)
 	# stop 1: DATA VAULT, radius 52 under the northwest hallway
 	var vd := _sdir(-0.35, 0.0)
