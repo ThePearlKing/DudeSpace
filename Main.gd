@@ -2822,9 +2822,6 @@ func _dark_ambience() -> AudioStreamWAV:
 		# the wrong interval: a minor second grinding at the pace of dread
 		v += 0.05 * sin(TAU * (880.0 / secs) * ts)
 		v += 0.05 * sin(TAU * (932.0 / secs) * ts)
-		# a heartbeat that is not yours, every eight seconds
-		var hb := fmod(ts, 8.0)
-		v += 0.22 * exp(-hb * 9.0) * sin(TAU * 38.0 * hb)
 		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
 		data[i * 2] = s9 & 0xFF
 		data[i * 2 + 1] = (s9 >> 8) & 0xFF
