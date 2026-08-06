@@ -125,6 +125,10 @@ func _build() -> void:
 			parent = seg
 		_tents.append(segs)
 
+var _departing := false
+func depart() -> void:
+	_departing = true
+
 func take_damage(d: float, _from: Vector3) -> void:
 	if _dead:
 		return
@@ -146,6 +150,11 @@ func take_damage(d: float, _from: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if _departing:
+		scale = scale * maxf(0.0, 1.0 - delta * 1.1)
+		if scale.x < 0.04:
+			queue_free()
+		return
 	_strike_cd = maxf(0.0, _strike_cd - delta)
 	_lunge = maxf(0.0, _lunge - delta)
 	if _p == null or not is_instance_valid(_p):

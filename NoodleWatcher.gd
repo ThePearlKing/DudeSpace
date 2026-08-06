@@ -124,6 +124,14 @@ func _process(delta: float) -> void:
 	# the grudge is old enough, the lights start going OUT. an angry god
 	# glows. an ancient one is a silhouette blotting out the stars.
 	var w: float = Game.wrath / Game.WRATH_MAX
+	# beyond the edge the god cannot reach you; past the eighth monolith
+	# he has nothing left to police. Either way: he WATCHES -- and with
+	# the sky broken he watches FURIOUS -- but he does not act.
+	var untouchable: bool = Game.zone == "" \
+		and p.global_position.length() > Universe.BOUNDARY
+	var sky_broken: bool = Game.monolith_stage >= 8
+	if sky_broken:
+		w = maxf(w, 0.85)   # the stare of a god who lost
 	# after it kills you (or anything does), it BROODS: a few minutes of
 	# locked red silence. still watching. still angry. not acting.
 	var standby := Game.playtime < Game.god_standby_until
@@ -188,7 +196,8 @@ func _process(delta: float) -> void:
 		return
 
 	# --- the eldritch ambience: it gets under your skin and STAYS there ---
-	if Game.wrath >= 60.0 and not Game.dead:
+	if Game.wrath >= 60.0 and not Game.dead and not untouchable \
+			and not sky_broken:
 		# your view drifts, gently, wrongly -- like something else is
 		# steering by a degree. maddening on purpose.
 		if p is CharacterBody3D and "_look" in p and Game.mode == Game.Mode.ON_FOOT:
@@ -201,7 +210,8 @@ func _process(delta: float) -> void:
 			Sfx.play("hurt" if randf() < 0.5 else "denied", randf_range(-30.0, -24.0))
 
 	# --- telepathic mischief: annoying, damaging, never a death sentence ---
-	if Game.wrath < 30.0 or Game.dead or Game.mode != Game.Mode.ON_FOOT:
+	if Game.wrath < 30.0 or Game.dead or Game.mode != Game.Mode.ON_FOOT \
+			or untouchable or sky_broken:
 		return
 	_mischief_t -= delta
 	if _mischief_t > 0.0:

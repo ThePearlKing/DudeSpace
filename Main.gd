@@ -4839,6 +4839,14 @@ func _update_stalkers(delta: float) -> void:
 	for st in get_tree().get_nodes_in_group("stalker"):
 		if is_instance_valid(st):
 			live.append(st)
+	var no_stalk: bool = Game.monolith_stage >= 8 or (_player != null
+		and Game.zone == ""
+		and _player.global_position.length() > Universe.BOUNDARY)
+	if no_stalk:
+		for st9 in live:
+			if st9.has_method("depart"):
+				st9.depart()
+		return
 	if Game.wrath >= 55.0:
 		# deep wrath: the BIG one surfaces (one at a time is plenty)
 		if get_tree().get_nodes_in_group("big_stalker").is_empty() \
