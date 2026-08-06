@@ -1403,12 +1403,12 @@ func _make_held_model(id: String) -> void:
 		return
 	var col := _held_color(id)
 	var dark := Color("#2a2a30")
-	if id == "ytetra" or id == "ltetra":
+	if id in Monolith.ITEM_IDS:
 		# a chain tetrahedron in your hand, glowing its own color
 		var tmi := MeshInstance3D.new()
 		tmi.mesh = MainframeComplex._tetra_mesh(0.2)
 		tmi.material_override = Destructible.make_material(
-			Color("#ffd23f") if id == "ytetra" else Color("#b6ff3f"), 1.8)
+			Game.MONO_COLORS[Monolith.ITEM_IDS.find(id)], 1.8)
 		_held.add_child(tmi)
 		return
 	if Inventory.weapons.has(id):

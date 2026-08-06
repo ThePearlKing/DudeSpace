@@ -117,7 +117,8 @@ func _fault_roll(delta: float) -> void:
 	var sys: String = healthy[randi() % healthy.size()]
 	_faults[sys] = true
 	_fault_light(sys)
-	Sfx.play("denied", -10.0)
+	if _on_site():
+		Sfx.play("denied", -10.0)
 	_hud_flash("FAULT: %s OFFLINE -- repair box on the hull outside (2 iridium)"
 		% sys.to_upper())
 
@@ -2853,7 +2854,16 @@ func _tetra_socket_use() -> void:
 		Sfx.play("denied", -14.0)
 		_hud_flash("no specimen in inventory")
 
+func _on_site() -> bool:
+	var pl0 = get_tree().get_first_node_in_group("player")
+	return pl0 != null and is_instance_valid(pl0) \
+		and pl0.global_position.distance_to(_C) < float(_b.radius) + 40.0
+
 func _hud_flash(t: String) -> void:
+	# the facility only talks to people IN it -- 'ELEVATOR OFFLINE'
+	# meant nothing to a player half a universe away
+	if not _on_site():
+		return
 	var m9 = get_tree().current_scene
 	if m9 != null:
 		var h9 = m9.get("_hud")

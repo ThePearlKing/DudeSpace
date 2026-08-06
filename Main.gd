@@ -192,6 +192,32 @@ func _boot() -> void:
 			_earth_monolith._root.global_position = \
 				(eb9.center as Vector3) + _earth_monolith.dir \
 				* (float(eb9.radius) - Monolith.RISE_DEPTH)
+	# THE REST OF THE CHAIN: every remaining stele EXISTS on its planet
+	# now -- identical monuments, buried until their turn. There is no
+	# way to get their tetrahedra yet; the crowns wear placeholders.
+	var chain_dirs := {
+		"Euclid": Vector3(0.9, 0.1, 0.42),
+		"Undros": Vector3(0.3, 0.8, 0.5),
+		"Mars": Vector3(0.2, 0.75, -0.6),
+		"Wobble": Vector3(-0.5, 0.6, 0.6),
+		"Crystalia": Vector3(0.6, 0.5, -0.6),
+		"Requiem": Vector3(0, 1, 0),
+	}
+	for st9 in range(2, 8):
+		var pname9: String = Game.MONO_PLANETS[st9]
+		var pb9 = Universe.body_named(pname9)
+		if pb9 == null or not chain_dirs.has(pname9):
+			continue
+		var mono9 := Monolith.new()
+		add_child(mono9)
+		mono9.stage = st9
+		mono9.risen = Game.monolith_stage >= st9
+		_build_monument(pb9, (chain_dirs[pname9] as Vector3).normalized(),
+			mono9)
+		mono9.add_to_group("chain_stele")
+		if not mono9.risen:
+			mono9._root.global_position = (pb9.center as Vector3) \
+				+ mono9.dir * (float(pb9.radius) - Monolith.RISE_DEPTH)
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -1109,6 +1135,12 @@ func _sky_detonate() -> void:
 		pm9.material_override = bmat
 		pm9.extra_cull_margin = 16384.0
 		plate.add_child(pm9)
+		# each shard dies on its own clock, up to ~3s apart
+		var pfd := pm9.create_tween()
+		pfd.tween_interval(1.4 + brng.randf() * 3.0)
+		pfd.tween_property(pm9, "transparency", 1.0,
+			4.5 + brng.randf() * 2.0)
+		pfd.tween_callback(pm9.hide)
 		# the FALL: perfectly still for a breath, then off it goes
 		var dirn := cen.normalized()
 		var txn := dirn.cross(Vector3(0, 1, 0))
@@ -1148,9 +1180,7 @@ func _sky_detonate() -> void:
 						pt.call(i9, j9 + 1))
 	var bf9 := create_tween()
 	_sky_tweens.append(bf9)
-	bf9.tween_interval(1.4)
-	bf9.tween_property(bmat, "albedo_color:a", 0.0, 7.5)
-	bf9.parallel().tween_property(bmat, "emission_energy_multiplier", 0.0, 7.5)
+	bf9.tween_interval(12.0)
 	bf9.tween_callback(func() -> void:
 		if is_instance_valid(bshell):
 			bshell.queue_free())
@@ -4807,7 +4837,7 @@ func _populate(b) -> void:
 		"mars":
 			# rust, ruins of exploration, and iridium under the dust --
 			# the RICHEST iridium veins anywhere are down this shaft
-			_build_mine(b, MINE_DIRS["Mars"], "raw_irid", 7, Color("#2a8f6a"), 22)
+			_build_mine(b, MINE_DIRS["Mars"], "raw_irid", 3, Color("#2a8f6a"), 14)
 			for i in _n(8):
 				_crater(b, _surface_dir(), randf_range(1.2, 3.5), Color("#a5502f"))
 			_spawn_res_nodes(b, 10, "raw_irid", 2)
@@ -7268,6 +7298,10 @@ func _on_monolith_advanced() -> void:
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
 			and not _earth_monolith.risen:
 		_earth_monolith.rise()
+	for cm9 in get_tree().get_nodes_in_group("chain_stele"):
+		if cm9 is Monolith and cm9.stage <= Game.monolith_stage \
+				and not cm9.risen:
+			cm9.rise()
 	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
 		if tr9.has_method("refresh"):
 			tr9.refresh()
@@ -7468,7 +7502,8 @@ void fragment() {
 	# relation to the location of each piece. Harold's faces the
 	# machine planet; Earth's shows a little house, because the lime
 	# piece waits under a roof on Earth.
-	_h_glyph(root, 7 if mono.stage == 1 else 6, Vector3(0, 9.9, 1.55))
+	_h_glyph(root, 6 if mono.stage == 0 else (7 if mono.stage == 1 else 8),
+		Vector3(0, 9.9, 1.55))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
@@ -7599,6 +7634,11 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.045, 0.045), Vector2(0.02, 0.26), 0.0)
 			for pi3 in 3:
 				bar.call(Vector2(0.05, 0.24), Vector2(-0.14 + 0.14 * float(pi3), 0.16), 0.0)
+		8:
+			# PLACEHOLDER: a ring holding a single silent bar. The stele
+			# has not decided what it points at yet.
+			ring.call(0.3, 0.38, 0.0)
+			bar.call(Vector2(0.3, 0.05), Vector2.ZERO, 0.0)
 		7:
 			# HAROLD'S HOUSE: the lime piece hides under a roof. Ground
 			# line, two walls, a gable, a door, and the crooked chimney

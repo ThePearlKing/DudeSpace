@@ -18,6 +18,10 @@ var _show_tweens: Array = []   # looped tweens killed at cleanup -- a
                                # freed target + set_loops = infinite-loop spam
 
 const RISE_DEPTH := 14.0
+# socket geometry in ROOT space -- Harold's bespoke monument keeps the
+# tuned defaults; generic steles override in build_stele()
+var sock_local := Vector3(0, 6.35, 1.8)   # the mouth plane
+var seat_local := Vector3(0, 6.35, 1.44)  # face flush: 1.8 - size/3 - hair
 const ITEM_IDS := ["ytetra", "ltetra", "otetra", "btetra", "rtetra",
 	"ptetra", "ctetra", "wtetra"]
 
@@ -97,6 +101,10 @@ func build_stele(b, d: Vector3) -> void:
 	dir = d.normalized()
 	stage = stage_of_planet(b.name)
 	var bas := _bup(dir)
+	# the generic socket: mouth face at z 1.1, tetra face flush there
+	# (centroid-to-face = size/3 = 0.343 for the 1.03 piece)
+	sock_local = Vector3(0, 5.4, 1.1)
+	seat_local = Vector3(0, 5.4, 0.757)
 	_root = Node3D.new()
 	add_child(_root)
 	_root.global_transform = Transform3D(bas,
@@ -206,7 +214,7 @@ func activate() -> void:
 	var bas := _bup(dir)
 	var top: Vector3 = (body.center as Vector3) + dir * float(body.radius)
 	var sock_pos: Vector3 = _root.global_transform \
-		.translated_local(Vector3(0, 6.35, 1.8)).origin if _root != null else top
+		.translated_local(sock_local).origin if _root != null else top
 	# 1. the tetrahedron flies to the FRONT of the socket, aligns its
 	# FACE to the triangular mouth, and slides IN -- a machined fit
 	var mbas: Basis = _root.global_transform.basis if _root != null else bas
@@ -215,12 +223,16 @@ func activate() -> void:
 	tet.mesh = MainframeComplex._tetra_mesh(1.03)
 	tet.material_override = Destructible.make_material(col.lightened(0.2), 2.0)
 	add_child(tet)
-	var v0 := Vector3(1, 1, 1).normalized()
-	var v1 := (Vector3(1, -1, -1) - Vector3(1, 1, 1) / 3.0).normalized()
-	var S := Basis(v1.cross(v0).normalized(), v1, v0).orthonormalized()
-	var T := Basis(Vector3(0, 1, 0).cross(Vector3(0, 0, -1)), Vector3(0, 1, 0),
-		Vector3(0, 0, -1)).orthonormalized()
-	tet.global_transform = Transform3D(mbas * (T * S.inverse()),
+	# EXACT machining: apex points straight into the mouth (-Z), the
+	# opposite face sits flush in the mouth plane, one face-vertex
+	# straight up. The old basis used a non-perpendicular axis pair and
+	# orthonormalization skewed the whole thing ~35 degrees off.
+	var a1 := Vector3(1, 1, 1).normalized()
+	var a2p := (Vector3(1, -1, -1)
+		- a1 * Vector3(1, -1, -1).dot(a1)).normalized()
+	var A9 := Basis(a2p.cross(a1), a2p, a1).orthonormalized()
+	var B9 := Basis(Vector3(-1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, -1))
+	tet.global_transform = Transform3D(mbas * (B9 * A9.inverse()),
 		sock_pos + mouth_out * 5.0 + (mbas * Vector3(0, 1, 0)) * 1.2)
 	var tw0 := create_tween()
 	tw0.tween_property(tet, "global_position", sock_pos + mouth_out * 1.4, 2.0) \
@@ -228,7 +240,7 @@ func activate() -> void:
 	Sfx.play("learn", -8.0)
 	await tw0.finished
 	var seat: Vector3 = _root.global_transform \
-		.translated_local(Vector3(0, 6.35, 0.62)).origin if _root != null \
+		.translated_local(seat_local).origin if _root != null \
 		else sock_pos
 	var tw1 := create_tween()
 	tw1.tween_property(tet, "global_position", seat, 1.8) \
@@ -393,7 +405,27 @@ func _planet_pictogram(parent: Node3D, mat: Material,
 	ring.mesh = rm
 	ring.material_override = mat
 	parent.add_child(ring)
-	if pname != "Earth":
+	if pname == "Euclid":
+		# EUCLID, recognizably: the tiny temple crowning the north pole,
+		# the sealed pyramid under the south
+		for tb9 in [[Vector3(1.7, 0.06, 0.3), Vector3(0, 0, -2.05)],
+				[Vector3(1.25, 0.06, 0.3), Vector3(0, 0, -2.4)],
+				[Vector3(0.8, 0.06, 0.35), Vector3(0, 0, -2.75)],
+				[Vector3(0.14, 0.06, 0.5), Vector3(-0.45, 0, -1.6)],
+				[Vector3(0.14, 0.06, 0.5), Vector3(0.45, 0, -1.6)]]:
+			var tm9 := MeshInstance3D.new()
+			tm9.mesh = Surfaces.box_mesh(tb9[0] as Vector3)
+			tm9.material_override = mat
+			tm9.position = tb9[1] as Vector3
+			parent.add_child(tm9)
+		for pyi in 5:
+			var pw9 := 2.0 - 0.4 * float(pyi)
+			var pm9 := MeshInstance3D.new()
+			pm9.mesh = Surfaces.box_mesh(Vector3(pw9, 0.06, 0.34))
+			pm9.material_override = mat
+			pm9.position = Vector3(0, 0, 2.75 - 0.34 * float(pyi))
+			parent.add_child(pm9)
+	if pname != "Earth" and pname != "Euclid":
 		for i in 3:
 			var band := MeshInstance3D.new()
 			var bm2 := BoxMesh.new()

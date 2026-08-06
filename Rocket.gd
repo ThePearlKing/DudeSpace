@@ -24,6 +24,8 @@ var force_locked: bool = false  # a cutscene owns the ship: player input dies
 var edge_won: bool = false      # this ship has beaten the white zone's edge
 var _cine_shake := 0.0          # cutscene camera violence
 var _cine_fov := 0.0
+var _mk2_noz: Node3D = null     # the Engine Mk2's visible bell
+var _mk2_dressed := false
 # the hyperdrive drinks ULTIMA, not rocket fuel: a shipboard charge
 # measured in crystals. Empty tank = the drive is a paperweight until
 # you feed it (holding H auto-loads crystals from your inventory).
@@ -53,6 +55,7 @@ var _cam_up_s := Vector3.UP   # smoothed camera reference (no SOI snap)
 
 func _ready() -> void:
 	add_to_group("rocket")
+	call_deferred("_dress_engine")
 	_build_body()
 
 	# free-orbit camera: a world-space pivot at the ship that the mouse
@@ -181,6 +184,46 @@ func _add_mesh(m: Mesh, pos: Vector3, rot_deg: Vector3) -> void:
 
 # ------------------------------------------------------------- boarding
 
+## the Engine Mk2 SHOWS: a fat dark bell with a burning throat bolted
+## onto the tail -- on the 1.0 and the 2.0 alike
+func _dress_engine() -> void:
+	_mk2_dressed = Inventory.engine_mk2
+	if _mk2_noz != null and is_instance_valid(_mk2_noz):
+		_mk2_noz.queue_free()
+		_mk2_noz = null
+	if not _mk2_dressed:
+		return
+	_mk2_noz = Node3D.new()
+	add_child(_mk2_noz)
+	_mk2_noz.position = Vector3(0, 0, 2.9 if mk2 else 2.6)
+	var bell := MeshInstance3D.new()
+	var bcm := CylinderMesh.new()
+	bcm.top_radius = 0.9
+	bcm.bottom_radius = 0.5
+	bcm.height = 1.2
+	bell.mesh = bcm
+	bell.material_override = Destructible.make_material(Color("#2a2a30"), 0.5)
+	bell.rotation_degrees = Vector3(90, 0, 0)
+	_mk2_noz.add_child(bell)
+	var thr := MeshInstance3D.new()
+	var tcm := CylinderMesh.new()
+	tcm.top_radius = 0.72
+	tcm.bottom_radius = 0.72
+	tcm.height = 0.1
+	thr.mesh = tcm
+	thr.material_override = Destructible.make_material(Color("#ff8c42"), 2.2)
+	thr.rotation_degrees = Vector3(90, 0, 0)
+	thr.position = Vector3(0, 0, 0.5)
+	_mk2_noz.add_child(thr)
+	var rim := MeshInstance3D.new()
+	var rcm := TorusMesh.new()
+	rcm.inner_radius = 0.86
+	rcm.outer_radius = 0.98
+	rim.mesh = rcm
+	rim.material_override = Destructible.make_material(Color("#ff8c42"), 1.2)
+	rim.position = Vector3(0, 0, 0.58)
+	_mk2_noz.add_child(rim)
+
 func board(p: Player) -> void:
 	# lifting off: the parked mirror on other machines comes with us
 	Net.broadcast_remove(global_position)
@@ -276,6 +319,8 @@ var _overdrive_until := 0.0   # 20x burst active until this REAL ms
 var _overdrive_cd := 0.0      # next burst allowed at this REAL ms
 
 func _physics_process(delta: float) -> void:
+	if _mk2_dressed != Inventory.engine_mk2:
+		_dress_engine()
 	if not piloted or Game.dead:
 		return
 	_cam.fov = Settings.fov + _cine_fov
