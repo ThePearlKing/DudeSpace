@@ -2926,6 +2926,7 @@ func _drive_edge_cutscene(delta: float) -> void:
 		else:
 			r.edge_won = true
 			Game.white_beaten = true
+			_white_force_break(r.global_position)
 			r.force_locked = false
 			r._cine_shake = 0.0
 			r._cine_fov = 0.0
@@ -2936,6 +2937,95 @@ func _drive_edge_cutscene(delta: float) -> void:
 				_hud.flash("THE NUCLEAR ENGINE WINS. THE DARK IS YOURS.")
 			_wcut = 0
 			_wcut_r = null
+
+## the moment the nuclear engine wins: the invisible force becomes
+## VISIBLE for one second -- a vast white membrane flashing across the
+## whole edge -- then it tears at the breach and dies. Disabled, shown.
+func _white_force_break(at: Vector3) -> void:
+	# 1. the membrane: the entire force-sphere lights up and bleeds out
+	var mem := MeshInstance3D.new()
+	var msm := SphereMesh.new()
+	msm.radius = Universe.BOUNDARY * 1.47
+	msm.height = msm.radius * 2.0
+	msm.radial_segments = 48
+	msm.rings = 24
+	mem.mesh = msm
+	var mmat := StandardMaterial3D.new()
+	mmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mmat.albedo_color = Color(1, 1, 1, 0.0)
+	mmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mem.material_override = mmat
+	mem.extra_cull_margin = 999999.0
+	add_child(mem)
+	mem.global_position = Vector3.ZERO
+	var mt := mem.create_tween()
+	mt.tween_property(mmat, "albedo_color:a", 0.22, 0.15)
+	mt.tween_property(mmat, "albedo_color:a", 0.0, 2.6)
+	mt.tween_callback(mem.queue_free)
+	# 2. the tear: two shock rings blasting outward from the breach
+	var rd := at.normalized()
+	var rb := _basis_from_up(rd)
+	for k9 in 2:
+		var ring := MeshInstance3D.new()
+		var tm9 := TorusMesh.new()
+		tm9.inner_radius = 0.9
+		tm9.outer_radius = 1.0
+		ring.mesh = tm9
+		var rmat := StandardMaterial3D.new()
+		rmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		rmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		rmat.albedo_color = Color(1, 1, 1, 0.85)
+		rmat.emission_enabled = true
+		rmat.emission = Color(1, 1, 1)
+		rmat.emission_energy_multiplier = 2.0
+		ring.material_override = rmat
+		ring.extra_cull_margin = 999999.0
+		add_child(ring)
+		ring.global_transform = Transform3D(rb, at)
+		ring.scale = Vector3.ONE * 40.0
+		var rt9 := ring.create_tween()
+		rt9.tween_interval(0.12 * float(k9))
+		rt9.tween_property(ring, "scale",
+			Vector3.ONE * (5200.0 - 1600.0 * float(k9)), 2.2) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		rt9.parallel().tween_property(rmat, "albedo_color:a", 0.0, 2.2)
+		rt9.tween_callback(ring.queue_free)
+	# 3. torn scraps of the force, fleeing the hole
+	var srng := RandomNumberGenerator.new()
+	srng.seed = 777
+	for i in 26:
+		var sc := MeshInstance3D.new()
+		var pm := PrismMesh.new()
+		pm.size = Vector3(srng.randf_range(60.0, 180.0),
+			srng.randf_range(60.0, 200.0), 4.0)
+		sc.mesh = pm
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smat.albedo_color = Color(1, 1, 1, 0.8)
+		sc.material_override = smat
+		sc.extra_cull_margin = 999999.0
+		add_child(sc)
+		sc.global_position = at
+		sc.rotation = Vector3(srng.randf() * TAU, srng.randf() * TAU, 0)
+		var dirn := (rd + Vector3(srng.randf_range(-0.9, 0.9),
+			srng.randf_range(-0.9, 0.9),
+			srng.randf_range(-0.9, 0.9))).normalized()
+		var st9 := sc.create_tween()
+		st9.tween_property(sc, "global_position",
+			at + dirn * srng.randf_range(1500.0, 4200.0),
+			srng.randf_range(1.4, 2.6)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		st9.parallel().tween_property(smat, "albedo_color:a", 0.0,
+			srng.randf_range(1.4, 2.6))
+		st9.tween_callback(sc.queue_free)
+	if _hud:
+		var ft9 := create_tween()
+		ft9.tween_interval(2.2)
+		ft9.tween_callback(func() -> void:
+			if _hud:
+				_hud.flash("the force at the edge is BROKEN. it will not push anyone again"))
 
 func _dark_ambience() -> AudioStreamWAV:
 	var rate := 22050
