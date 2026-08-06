@@ -2038,13 +2038,13 @@ func _use_selected() -> void:
 			if Inventory.engine_mk2:
 				Sfx.play("denied")
 				if hudm:
-					hudm.flash("the Mk2 is already fitted -- every burn is +60%%")
+					hudm.flash("the Mk2 is already fitted -- every burn is +60%")
 			elif rm2 and rm2 is Rocket:
 				Inventory.engine_mk2 = true
 				Inventory.clear_slot(slot)
 				Sfx.play("learn")
 				if hudm:
-					hudm.flash("ENGINE MK2 fitted: +60%% thrust, forever")
+					hudm.flash("ENGINE MK2 fitted: +60% thrust, forever")
 			else:
 				Sfx.play("denied")
 				if hudm:
