@@ -2003,6 +2003,8 @@ func _update_bgm(delta: float) -> void:
 	if _bgm.playing:
 		# songs breathe: ~3s fade-in, ~4s fade-out at the natural end
 		var want_db := -8.0
+		if _outside_white:
+			want_db = -60.0   # your music belongs to the universe
 		var pos9 := _bgm.get_playback_position()
 		var len9: float = _bgm.stream.get_length() if _bgm.stream != null else 0.0
 		if pos9 < 3.0:
@@ -2145,6 +2147,9 @@ func _process(delta: float) -> void:
 		var outside := pos.length() > Universe.BOUNDARY
 		if outside != _outside_white:
 			_outside_white = outside
+			if _env_ref != null:
+				_env_ref.glow_intensity = 1.9 if outside else 0.8
+				_env_ref.glow_bloom = 0.5 if outside else 0.25
 			if outside:
 				if _void_amb == null:
 					_void_amb = AudioStreamPlayer.new()
@@ -2154,17 +2159,10 @@ func _process(delta: float) -> void:
 				_void_amb.play()
 				var vtw := create_tween()
 				vtw.tween_property(_void_amb, "volume_db", -7.0, 3.0)
-				# your music belongs to the universe. it stays behind.
-				if _bgm != null and _bgm.playing:
-					var btw := create_tween()
-					btw.tween_property(_bgm, "volume_db", -60.0, 2.5)
 			elif _void_amb != null and _void_amb.playing:
 				var vtw2 := create_tween()
 				vtw2.tween_property(_void_amb, "volume_db", -60.0, 2.0)
 				vtw2.tween_callback(_void_amb.stop)
-				if _bgm != null and _bgm.playing:
-					var btw2 := create_tween()
-					btw2.tween_property(_bgm, "volume_db", -8.0, 2.5)
 
 	# the cracked sky follows you like a skybox
 	for fx in _skyfx:
@@ -2198,13 +2196,11 @@ func _process(delta: float) -> void:
 	if Game.zone == "" and pos.length() > Universe.BOUNDARY \
 			and Game.monolith_stage < 8:
 		# crossing the edge ANGERS the god -- but the colossal hand only
-		# comes when he is already SUPER angry. Below that, the deep
-		# just keeps shoving you home and the wrath keeps climbing until
-		# one day the fling is earned.
+		# comes when he is already SUPER angry. Once you are OUT, space
+		# itself lets you be: no shove follows you (leaving your rocket
+		# out there used to catapult you home), only the wrath ledger
+		# and, eventually, the hand.
 		var node := _active_node()
-		if node != null and "velocity" in node:
-			node.velocity += -pos.normalized() * 25.0 \
-				* get_physics_process_delta_time()
 		if not _threw_back:
 			_threw_back = true
 			Game.anger(15.0)
