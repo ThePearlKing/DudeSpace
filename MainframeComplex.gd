@@ -4427,8 +4427,22 @@ func _airlock(xf: Transform3D) -> void:
 	alb.outline_modulate = Color(0, 0, 0, 0.9)
 	root.add_child(alb)
 	alb.position = Vector3(0, 4.1, 0.45)
-	# outside landing ledge
+	# outside landing ledge with GLOWING guard rails down both sides --
+	# the far end stays open: that is the jump
 	mk.call(Vector3(3.4, 0.4, 2.6), Vector3(0, -0.2, 1.6), STEEL, 0.0)
+	for rs9 in [-1.0, 1.0]:
+		mk.call(Vector3(0.12, 1.1, 2.6), Vector3(rs9 * 1.64, 0.55, 1.6),
+			STEEL, 0.0)
+		for rg9 in [[Vector3(0.14, 0.1, 2.6), Vector3(rs9 * 1.64, 1.12, 1.6)],
+				[Vector3(0.14, 0.08, 2.6), Vector3(rs9 * 1.64, 0.55, 1.6)]]:
+			var rgm9 := MeshInstance3D.new()
+			var rgb9 := BoxMesh.new()
+			rgb9.size = rg9[0]
+			rgm9.mesh = rgb9
+			rgm9.material_override = Surfaces.cached_emissive(
+				Color("#7df9ff"), 2.4)
+			root.add_child(rgm9)
+			rgm9.position = rg9[1]
 	# THE DOOR: slides right into the wall pocket. F from either side.
 	var door := Airlock.new()
 	var dmi := MeshInstance3D.new()
