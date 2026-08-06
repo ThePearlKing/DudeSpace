@@ -273,7 +273,10 @@ func build(b, dir: Vector3) -> void:
 	_spins.append({"node": vhub, "rate": 5.0})
 	_plate(Vector3(1.3, 7.0, 0.5), awxf, Vector3(5.65, 0, 6.05), STEEL, 0.0)
 	_plate(Vector3(1.3, 7.0, 0.5), awxf, Vector3(-5.65, 0, 6.05), STEEL, 0.0)
-	_plate(Vector3(0.5, 7.0, 12.6), awxf, Vector3(6.05, 0, 0), STEEL, 0.0)
+	# +X wall: 2.4m doorway to ring B east (medbay, gym, archive)
+	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(6.05, 0, 3.65), STEEL, 0.0)
+	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(6.05, 0, -3.65), STEEL, 0.0)
+	_plate(Vector3(0.5, 2.15, 2.4), awxf, Vector3(6.05, 2.42, 0), STEEL, 0.0)
 	# -X wall: 2.4m doorway to the bunk nook
 	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(-6.05, 0, 3.65), STEEL, 0.0)
 	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(-6.05, 0, -3.65), STEEL, 0.0)
@@ -289,7 +292,9 @@ func build(b, dir: Vector3) -> void:
 		Vector3(0, 0, 5.7), 180.0)
 	_sign("BUNKS", abas, _C + _u0 * (_rF + 4.4),
 		Vector3(-5.6, 0, 0), 90.0)
-	_sign("VENTILATION", abas, _C + _u0 * (_rF + 3.4),
+	_sign("MEDBAY / GYM", abas, _C + _u0 * (_rF + 4.4),
+		Vector3(5.6, 0, 0), -90.0)
+	_sign("ASSEMBLY / GENERATOR", abas, _C + _u0 * (_rF + 3.4),
 		Vector3(0, 0, -5.7), 0.0)
 	# atrium light
 	var al := MeshInstance3D.new()
@@ -478,12 +483,16 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(6.3, 12.5, 0.5), cwxf, Vector3(8.15, 0, -11.3), STEEL, 0.0)
 	_plate(Vector3(6.3, 12.5, 0.5), cwxf, Vector3(-8.15, 0, -11.3), STEEL, 0.0)
 	_plate(Vector3(10.6, 6.5, 0.5), cwxf, Vector3(0, 3.0, -11.3), STEEL, 0.0)
-	_plate(Vector3(22.6, 12.5, 0.5), cwxf, Vector3(0, 0, 11.3), STEEL, 0.0)
 	# +X wall: doorway to COMMUNICATIONS
 	_plate(Vector3(0.5, 12.5, 10.1), cwxf, Vector3(11.3, 0, 6.25), STEEL, 0.0)
 	_plate(Vector3(0.5, 12.5, 10.1), cwxf, Vector3(11.3, 0, -6.25), STEEL, 0.0)
 	_plate(Vector3(0.5, 9.5, 2.4), cwxf, Vector3(11.3, 1.5, 0), STEEL, 0.0)
 	_plate(Vector3(0.5, 12.5, 22.6), cwxf, Vector3(-11.3, 0, 0), STEEL, 0.0)
+	# +Z wall grows a ring doorway: the hallway EAST continues past the
+	# core all the way around the planet
+	_plate(Vector3(10.1, 12.5, 0.5), cwxf, Vector3(6.25, 0, 11.3), STEEL, 0.0)
+	_plate(Vector3(10.1, 12.5, 0.5), cwxf, Vector3(-6.25, 0, 11.3), STEEL, 0.0)
+	_plate(Vector3(2.4, 9.5, 0.5), cwxf, Vector3(0, 1.5, 11.3), STEEL, 0.0)
 	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 5.7),
 		Vector3(10.7, 0, 0), -90.0)
 	# fusion assembly: plinth, plasma heart in a translucent sleeve,
@@ -679,6 +688,8 @@ func build(b, dir: Vector3) -> void:
 	# ---- the wings ----
 	_service_wing()
 	_comms_room(cb, ac)
+	# ---- the planet-wide hallway rings + their rooms ----
+	_rings()
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
 		var aang := TAU * float(an9) / 4.0 + 0.5
@@ -846,10 +857,18 @@ func _bunk_wing() -> void:
 			_deco_box(Vector3(2.6, 0.08, 0.5),
 				Transform3D(fb, _C + up * (_rF + 3.15)), Vector3.ZERO,
 				Color("#f2ead8"), 2.0)
-	# END CAP: the corridor stops HERE, sealed -- no hole into the rock
+	# the corridor no longer dead-ends: a doorway through to ring B west
+	# (kitchen, trophy hall, the cockpit beyond)
 	var bend := -(_a0 + _step * 4.0)
 	var cxf9 := Transform3D(_fx(bend), _C + _pdx(bend) * (_rF + 1.6))
-	_plate(Vector3(0.4, 3.9, 3.9), cxf9, Vector3(-2.65, 0, 0), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.9, 0.95), cxf9, Vector3(-2.65, 0, 1.475), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.9, 0.95), cxf9, Vector3(-2.65, 0, -1.475), STEEL, 0.0)
+	_plate(Vector3(0.4, 1.05, 2.0), cxf9, Vector3(-2.65, 1.425, 0), STEEL, 0.0)
+	# collar: the ring hallway is taller and wider than the bunk
+	# corridor -- plate over the size difference so the joint is sealed
+	_plate(Vector3(0.4, 1.6, 6.4), cxf9, Vector3(-2.65, 2.75, 0), STEEL, 0.0)
+	_plate(Vector3(0.4, 5.5, 1.2), cxf9, Vector3(-2.65, 0.65, 2.55), STEEL, 0.0)
+	_plate(Vector3(0.4, 5.5, 1.2), cxf9, Vector3(-2.65, 0.65, -2.55), STEEL, 0.0)
 	# chute + the SPECIAL DUDES deck
 	var b4 := -(_a0 + _step * 4.0)
 	var fb4 := _fx(b4)
@@ -938,6 +957,441 @@ func _bunk_wing() -> void:
 	add_child(bg)
 	bg.global_transform = Transform3D(fb4, _C + up4 * (rV + 1.3))
 	bg.translate_object_local(Vector3(0, 0, 4.6))
+
+## ==================== THE RINGS: planet-wide hallways ====================
+## Two great-circle hallway rings cross at the atrium and at the antipode
+## cockpit. Ring A follows the deck's arc family (_fr, lateral = e2),
+## ring B the bunk family (_fx, lateral = e1). 6m wide, 4.5 tall.
+
+## fam 0: X = e2 lateral, Z = arc tangent (the _fr family unchanged).
+## fam 1: X = e1 lateral, Y radial, Z = MINUS the arc tangent -- keeps
+## X as "sideways" in both families so every builder shares math.
+func _abas9(fam: int, a: float) -> Basis:
+	if fam == 0:
+		return _fr(a)
+	var upb := _pdx(a)
+	var tb := (-_u0 * sin(a) + _e2 * cos(a)).normalized()
+	return Basis(_e1, upb, -tb).orthonormalized()
+
+func _aup9(fam: int, a: float) -> Vector3:
+	return _pdir(a) if fam == 0 else _pdx(a)
+
+static func _awrap(d: float) -> float:
+	return fposmod(d + PI, TAU) - PI
+
+## hallway segments from a_from to a_to. doors: [[a_center, side], ...]
+## -- segments overlapping a door centre skip that side's wall (the
+## room's own doorway wall stands 10cm behind the gap).
+func _hall(fam: int, a_from: float, a_to: float, doors: Array) -> void:
+	var m := (a_to - a_from) * _rF
+	var n := maxi(1, int(ceil((m - 0.4) / 4.3)))
+	var st2 := ((m - 4.6) / float(n - 1)) / _rF if n > 1 else 0.0
+	for k in n:
+		var a := a_from + 2.3 / _rF + st2 * float(k)
+		var fb := _abas9(fam, a)
+		var up := _aup9(fam, a)
+		_plate(Vector3(6.6, 0.5, 5.0), Transform3D(fb, _C + up * (_rF - 0.25)),
+			Vector3.ZERO, DARK, 0.0)
+		_plate(Vector3(6.6, 0.5, 5.0), Transform3D(fb, _C + up * (_rF + 4.75)),
+			Vector3.ZERO, DARK, 0.0)
+		var wxf := Transform3D(fb, _C + up * (_rF + 2.25))
+		for ws in [1.0, -1.0]:
+			var door := false
+			for d in doors:
+				if float(d[1]) == ws and absf(_awrap(a - float(d[0]))) * _rF < 2.4:
+					door = true
+			if not door:
+				_plate(Vector3(0.5, 5.5, 5.0), wxf, Vector3(ws * 3.05, 0, 0), STEEL, 0.0)
+				_deco_box(Vector3(0.06, 0.16, 5.0), wxf,
+					Vector3(ws * 2.72, -1.3, 0), AMBER, 1.6)
+		# rib + every-other ceiling light
+		_deco_box(Vector3(0.2, 4.5, 0.2), wxf, Vector3(2.62, 0, 2.3), STEEL, 0.0)
+		_deco_box(Vector3(0.2, 4.5, 0.2), wxf, Vector3(-2.62, 0, 2.3), STEEL, 0.0)
+		_deco_box(Vector3(5.44, 0.2, 0.2), wxf, Vector3(0, 2.15, 2.3), STEEL, 0.0)
+		if k % 2 == 0:
+			_deco_box(Vector3(0.5, 0.08, 3.0),
+				Transform3D(fb, _C + up * (_rF + 4.35)), Vector3.ZERO,
+				Color("#f2ead8"), 2.2)
+
+## a standard side room hanging off a ring hallway at angle ac, side s.
+## Interior ~9m lateral x 9.6 arc x 4.5 tall, 2.4x3.0 doorway. Returns
+## {fb, up, cx} for the dressing pass.
+func _ring_room(fam: int, ac: float, s: float, name: String) -> Dictionary:
+	var fb := _abas9(fam, ac)
+	var up := _aup9(fam, ac)
+	_plate(Vector3(9.7, 0.5, 9.6), Transform3D(fb, _C + up * (_rF - 0.25)),
+		Vector3(s * 8.3, 0, 0), DARK, 0.0)
+	_plate(Vector3(9.7, 0.5, 9.6), Transform3D(fb, _C + up * (_rF + 4.75)),
+		Vector3(s * 8.3, 0, 0), DARK, 0.0)
+	var wxf := Transform3D(fb, _C + up * (_rF + 2.25))
+	# near wall with the doorway
+	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 3.55, 0, 3.0), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 3.55, 0, -3.0), STEEL, 0.0)
+	_plate(Vector3(0.5, 2.0, 2.4), wxf, Vector3(s * 3.55, 1.75, 0), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
+	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, 4.55), STEEL, 0.0)
+	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, -4.55), STEEL, 0.0)
+	var rl := MeshInstance3D.new()
+	var rlm := CylinderMesh.new()
+	rlm.top_radius = 0.8
+	rlm.bottom_radius = 0.8
+	rlm.height = 0.08
+	rl.mesh = rlm
+	rl.material_override = Destructible.make_material(Color("#f2ead8"), 1.9)
+	add_child(rl)
+	rl.global_transform = Transform3D(fb, _C + up * (_rF + 4.45))
+	rl.translate_object_local(Vector3(s * 8.3, 0, 0))
+	_sign(name, fb, _C + up * (_rF + 3.6), Vector3(s * 2.7, 0, 0),
+		90.0 if s < 0.0 else -90.0)
+	return {"fb": fb, "up": up, "cx": s * 8.3}
+
+## a big room sitting ON a ring: the hallway enters through a doorway in
+## each end wall. half_arc/half_lat in meters, h interior height.
+func _big_room(fam: int, ac: float, half_arc: float, half_lat: float,
+		h: float, name: String) -> Dictionary:
+	var fb := _abas9(fam, ac)
+	var up := _aup9(fam, ac)
+	_arc_floor_f(fam, ac, half_lat * 2.0 + 0.6, half_arc * 2.0 + 0.8,
+		_rF - 0.25, 0.0)
+	_arc_floor_f(fam, ac, half_lat * 2.0 + 0.6, half_arc * 2.0 + 0.8,
+		_rF + h + 0.25, 0.0)
+	# curved side walls, strip by strip
+	var m := half_arc * 2.0
+	var n := maxi(1, int(ceil((m - 0.4) / 4.3)))
+	var st2 := ((m - 4.6) / float(n - 1)) / _rF if n > 1 else 0.0
+	for k in n:
+		var a := ac + st2 * (float(k) - float(n - 1) * 0.5)
+		var wxk := Transform3D(_abas9(fam, a), _C + _aup9(fam, a) * (_rF + h * 0.5))
+		_plate(Vector3(0.5, h + 1.0, 4.6), wxk, Vector3(half_lat + 0.25, 0, 0), STEEL, 0.0)
+		_plate(Vector3(0.5, h + 1.0, 4.6), wxk, Vector3(-half_lat - 0.25, 0, 0), STEEL, 0.0)
+		if k % 2 == 0:
+			_deco_box(Vector3(1.0, 0.08, 3.0),
+				Transform3D(_abas9(fam, a), _C + _aup9(fam, a) * (_rF + h - 0.15)),
+				Vector3.ZERO, Color("#f2ead8"), 2.2)
+	# end walls with ring doorways
+	for es in [1.0, -1.0]:
+		var ae: float = ac + es * half_arc / _rF
+		var eb := _abas9(fam, ae)
+		var eu := _aup9(fam, ae)
+		var exf := Transform3D(eb, _C + eu * (_rF + h * 0.5))
+		var fl := half_lat + 0.3 - 1.2
+		_plate(Vector3(fl, h + 1.0, 0.5), exf, Vector3(1.2 + fl * 0.5, 0, 0), STEEL, 0.0)
+		_plate(Vector3(fl, h + 1.0, 0.5), exf, Vector3(-1.2 - fl * 0.5, 0, 0), STEEL, 0.0)
+		_plate(Vector3(2.4, h - 2.5, 0.5), exf, Vector3(0, 1.75, 0), STEEL, 0.0)
+		_sign(name, eb, _C + eu * (_rF + 3.7), Vector3(0, 0, es * 0.8),
+			0.0 if es > 0.0 else 180.0)
+	return {"fb": fb, "up": up}
+
+## _arc_floor generalised to either arc family
+func _arc_floor_f(fam: int, a_c: float, width: float, len_z: float,
+		rad: float, xoff: float) -> void:
+	var n := maxi(1, int(ceil((len_z - 0.4) / 4.3)))
+	var stp := ((len_z - 4.6) / float(n - 1)) / rad if n > 1 else 0.0
+	for k in n:
+		var a := a_c + stp * (float(k) - float(n - 1) * 0.5)
+		_plate(Vector3(width, 0.5, 4.6),
+			Transform3D(_abas9(fam, a), _C + _aup9(fam, a) * rad),
+			Vector3(xoff, 0, 0), DARK, 0.0)
+
+## a plate frame whose floor follows the sphere in BOTH directions:
+## grid of tilted tiles around direction dc (used for the cockpit cap)
+func _cap_tiles(half_n: int, rad: float, pitch: float, mat_col: Color) -> void:
+	for i in range(-half_n, half_n + 1):
+		for j in range(-half_n, half_n + 1):
+			var dirv := (-_u0 + _e1 * (float(i) * pitch / rad)
+				+ _e2 * (float(j) * pitch / rad)).normalized()
+			var ex := (_e2 - dirv * dirv.dot(_e2)).normalized()
+			var tb := Basis(ex, dirv, ex.cross(dirv)).orthonormalized()
+			_plate(Vector3(pitch + 0.7, 0.5, pitch + 0.7),
+				Transform3D(tb, _C + dirv * rad), Vector3.ZERO, mat_col, 0.0)
+
+## the cockpit SHELL at the antipode: spherical-cap floor + ceiling,
+## octagon walls, four ring doorways. Dressing arrives in the cockpit
+## pass -- this guarantees the rings land somewhere sealed.
+func _cockpit_shell() -> void:
+	_cap_tiles(3, _rF - 0.25, 5.2, DARK)
+	_cap_tiles(3, _rF + 8.25, 5.2, DARK)
+	for w in 8:
+		var wang := TAU * float(w) / 8.0
+		var latv := _e1 * cos(wang) + _e2 * sin(wang)
+		var dirw := (-_u0 * cos(15.0 / _rF) + latv * sin(15.0 / _rF)).normalized()
+		var tz := (-latv + dirw * dirw.dot(latv)).normalized()
+		var wb := Basis(dirw.cross(tz), dirw, tz).orthonormalized()
+		var wxf := Transform3D(wb, _C + dirw * (_rF + 4.0))
+		if w % 2 == 0:
+			# ring doorway wall: flanks + header, 2.4x3.0 opening
+			_plate(Vector3(5.5, 9.0, 0.6), wxf, Vector3(3.95, 0, 0), STEEL, 0.0)
+			_plate(Vector3(5.5, 9.0, 0.6), wxf, Vector3(-3.95, 0, 0), STEEL, 0.0)
+			_plate(Vector3(2.4, 5.5, 0.6), wxf, Vector3(0, 1.75, 0), STEEL, 0.0)
+			_sign("PLANET CONTROL", wb,
+				_C + dirw * (_rF + 3.7), Vector3(0, 0, -0.9), 180.0)
+		else:
+			_plate(Vector3(13.4, 9.0, 0.6), wxf, Vector3.ZERO, STEEL, 0.0)
+
+## ring A: east from the reactor, around the antipode, back in through
+## the generator/assembly wing. Ring B: both directions out of the
+## atrium, meeting at the cockpit, swallowing the old bunk end cap.
+func _rings() -> void:
+	# --- ring A east: reactor far wall -> DUDE A.I -> cockpit ---
+	_hall(0, 1.489, 2.47, [[1.75, 1.0], [2.02, -1.0]])
+	var tr := _ring_room(0, 1.75, 1.0, "TAPE ARCHIVE")
+	_dress_tape(tr)
+	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM")
+	_dress_farm(nf)
+	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.")
+	set_meta("ai_room_a", 2.685)
+	# --- ring A west: cockpit -> server hall 2 -> generator wing ---
+	_hall(0, 3.383, 3.63, [])
+	var s2 := _big_room(0, 3.775, 9.0, 8.0, 6.5, "SERVER HALL 2")
+	set_meta("server2_a", 3.775)
+	_hall(0, 3.92, 5.172, [[4.35, -1.0], [4.75, 1.0]])
+	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE")
+	_dress_storage(st9)
+	var wk := _ring_room(0, 4.75, 1.0, "WORKSHOP")
+	_dress_workshop(wk)
+	# --- ring A northwest: assembly -> atrium (the old crawl tube is
+	# now a real hallway; ventilation becomes a secret system) ---
+	_hall(0, 5.682, 6.185, [])
+	# --- ring B east: atrium +X -> medbay/gym/archive -> cockpit ---
+	_hall(1, 0.098, 2.897, [[0.75, -1.0], [1.5, 1.0], [2.3, -1.0]])
+	var mb := _ring_room(1, 0.75, -1.0, "MEDBAY")
+	_dress_medbay(mb)
+	var gy := _ring_room(1, 1.5, 1.0, "GYMNASIUM")
+	_dress_gym(gy)
+	var ar := _ring_room(1, 2.3, -1.0, "ARCHIVE")
+	_dress_archive(ar)
+	# --- ring B west: cockpit -> kitchen/trophy hall -> bunk wing ---
+	_hall(1, 3.383, 5.578, [[4.0, 1.0], [4.8, -1.0]])
+	var kt := _ring_room(1, 4.0, 1.0, "KITCHEN")
+	_dress_kitchen(kt)
+	var tp := _ring_room(1, 4.8, -1.0, "TROPHY HALL")
+	_dress_trophy(tp)
+	_cockpit_shell()
+
+func _dress_tape(r: Dictionary) -> void:
+	# reel-to-reel tape banks: cabinets with two spinning reels each
+	for rz in [-3.0, 0.0, 3.0]:
+		for rs in [-1.0, 1.0]:
+			var off := Vector3(float(r["cx"]) + rs * 3.4, 0, rz)
+			_plate(Vector3(1.6, 3.0, 1.0), Transform3D(r["fb"] as Basis,
+				_C + (r["up"] as Vector3) * (_rF + 1.5)), off, Color("#12161c"), 0.0)
+			for rr in [-0.4, 0.4]:
+				var reel := MeshInstance3D.new()
+				var rm9 := TorusMesh.new()
+				rm9.inner_radius = 0.12
+				rm9.outer_radius = 0.3
+				reel.mesh = rm9
+				reel.material_override = Surfaces.metal(Color("#4a5266"))
+				add_child(reel)
+				reel.global_transform = Transform3D(r["fb"] as Basis,
+					_C + (r["up"] as Vector3) * (_rF + 2.2))
+				reel.translate_object_local(off + Vector3(rr, 0, -rs * 0.56))
+				reel.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+				_spins.append({"node": reel, "rate": 2.0 + rr})
+	_chatter(Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.5)).origin, 131, -10.0)
+
+func _dress_farm(r: Dictionary) -> void:
+	# hydroponic noodle troughs: fluid-glow broth, noodle coils growing
+	for tz in [-2.8, 0.0, 2.8]:
+		var off := Vector3(float(r["cx"]), 0, tz)
+		_plate(Vector3(7.6, 0.9, 1.6), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.45)), off, Color("#20262e"), 0.0)
+		var broth := MeshInstance3D.new()
+		var bqm := BoxMesh.new()
+		bqm.size = Vector3(7.3, 0.06, 1.3)
+		broth.mesh = bqm
+		broth.material_override = DatamoshStudio._fluid_material(Color("#ff8a2a"))
+		add_child(broth)
+		broth.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.93))
+		broth.translate_object_local(off)
+		for nx in 4:
+			var coil := MeshInstance3D.new()
+			var cm9 := TorusMesh.new()
+			cm9.inner_radius = 0.1
+			cm9.outer_radius = 0.24
+			coil.mesh = cm9
+			coil.material_override = Surfaces.plaster(Color("#f2e3b0"))
+			add_child(coil)
+			coil.global_transform = Transform3D(r["fb"] as Basis,
+				_C + (r["up"] as Vector3) * (_rF + 1.0))
+			coil.translate_object_local(off + Vector3(-2.7 + 1.8 * float(nx), 0, 0))
+		_deco_box(Vector3(7.6, 0.08, 0.5), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 3.9)), off, Color("#ffe9c9"), 2.4)
+
+func _dress_storage(r: Dictionary) -> void:
+	for st in [[Vector3(-2.6, 0, -2.8), 2], [Vector3(-2.6, 0, 0.6), 3],
+			[Vector3(2.4, 0, -2.2), 1], [Vector3(2.4, 0, 2.6), 2],
+			[Vector3(-2.6, 0, 3.4), 1]]:
+		var base: Vector3 = st[0]
+		for lv in int(st[1]):
+			_plate(Vector3(1.4, 1.4, 1.4), Transform3D(r["fb"] as Basis,
+				_C + (r["up"] as Vector3) * (_rF + 0.7 + 1.42 * float(lv))),
+				Vector3(float(r["cx"]) + base.x, 0, base.z), Color("#242a32"), 0.0)
+			_deco_box(Vector3(1.44, 0.1, 1.44), Transform3D(r["fb"] as Basis,
+				_C + (r["up"] as Vector3) * (_rF + 1.32 + 1.42 * float(lv))),
+				Vector3(float(r["cx"]) + base.x, 0, base.z), AMBER, 1.2)
+
+func _dress_workshop(r: Dictionary) -> void:
+	# workbench, tool wall, and a drone torso somebody never finished
+	_plate(Vector3(6.4, 1.0, 1.4), Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 0.5)),
+		Vector3(float(r["cx"]), 0, -3.4), Color("#20262e"), 0.0)
+	for tx in 5:
+		_deco_box(Vector3(0.12, 0.5 + 0.2 * float(tx % 3), 0.12),
+			Transform3D(r["fb"] as Basis, _C + (r["up"] as Vector3) * (_rF + 2.4)),
+			Vector3(float(r["cx"]) - 2.0 + 1.0 * float(tx), 0, -4.2),
+			Color("#4a5266"), 0.0)
+	var tors := MeshInstance3D.new()
+	var tm9 := BoxMesh.new()
+	tm9.size = Vector3(0.42, 0.3, 0.42)
+	tors.mesh = tm9
+	tors.material_override = Surfaces.metal(STEEL)
+	add_child(tors)
+	tors.global_transform = Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.15))
+	tors.translate_object_local(Vector3(float(r["cx"]), 0, -3.4))
+	_chatter(Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.0)).origin, 151, -12.0)
+
+func _dress_medbay(r: Dictionary) -> void:
+	for bz in [-2.2, 2.2]:
+		_plate(Vector3(2.6, 0.7, 1.4), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.35)),
+			Vector3(float(r["cx"]) - 1.6, 0, bz), Color("#cfd8d4"), 0.0)
+		_deco_box(Vector3(2.4, 0.12, 1.2), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.76)),
+			Vector3(float(r["cx"]) - 1.6, 0, bz), Color("#f2ead8"), 0.5)
+	# the cross, in glowing white -- meaningful, universal
+	_deco_box(Vector3(0.3, 1.2, 0.1), Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 3.0)),
+		Vector3(float(r["cx"]) + 4.2, 0, 0), Color("#f2ead8"), 2.2)
+	_deco_box(Vector3(1.2, 0.3, 0.1), Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 3.0)),
+		Vector3(float(r["cx"]) + 4.2, 0, 0), Color("#f2ead8"), 2.2)
+	for fx in 3:
+		var flask := MeshInstance3D.new()
+		var fm9 := SphereMesh.new()
+		fm9.radius = 0.14
+		fm9.height = 0.28
+		flask.mesh = fm9
+		flask.material_override = Destructible.make_material(
+			[Color("#66ff99"), Color("#7df9ff"), Color("#ff66aa")][fx], 1.6)
+		add_child(flask)
+		flask.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 1.3))
+		flask.translate_object_local(Vector3(float(r["cx"]) + 3.4, 0, -2.0 + 2.0 * float(fx)))
+
+func _dress_gym(r: Dictionary) -> void:
+	# grav rings to hop through and dumbbell stacks -- dude fitness
+	for gz in [-2.6, 0.0, 2.6]:
+		var gr9 := MeshInstance3D.new()
+		var gm9 := TorusMesh.new()
+		gm9.inner_radius = 0.7
+		gm9.outer_radius = 1.0
+		gr9.mesh = gm9
+		gr9.material_override = Destructible.make_material(Color("#7df9ff"), 1.6)
+		add_child(gr9)
+		gr9.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 1.6))
+		gr9.translate_object_local(Vector3(float(r["cx"]) - 2.0, 0, gz))
+		gr9.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+		_spins.append({"node": gr9, "rate": 0.5 + 0.3 * absf(gz)})
+	for dx in 3:
+		_plate(Vector3(0.9, 0.35, 0.35), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.18)),
+			Vector3(float(r["cx"]) + 3.6, 0, -2.0 + 2.0 * float(dx)),
+			Color("#31384a"), 0.0)
+
+func _dress_archive(r: Dictionary) -> void:
+	for sz in [-3.2, -1.1, 1.1, 3.2]:
+		_plate(Vector3(7.0, 3.2, 0.5), Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 1.6)),
+			Vector3(float(r["cx"]), 0, sz), Color("#242a32"), 0.0)
+		for sh in 3:
+			_deco_box(Vector3(6.6, 0.07, 0.56), Transform3D(r["fb"] as Basis,
+				_C + (r["up"] as Vector3) * (_rF + 0.8 + 0.9 * float(sh))),
+				Vector3(float(r["cx"]), 0, sz), Color("#8a7a4a"), 0.6)
+	_chatter(Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.5)).origin, 171, -14.0)
+
+func _dress_kitchen(r: Dictionary) -> void:
+	_plate(Vector3(6.6, 1.0, 1.3), Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 0.5)),
+		Vector3(float(r["cx"]), 0, 3.6), Color("#20262e"), 0.0)
+	var pot := MeshInstance3D.new()
+	var pm9 := CylinderMesh.new()
+	pm9.top_radius = 0.8
+	pm9.bottom_radius = 0.7
+	pm9.height = 0.9
+	pot.mesh = pm9
+	pot.material_override = Surfaces.metal(Color("#4a5266"))
+	add_child(pot)
+	pot.global_transform = Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.45))
+	pot.translate_object_local(Vector3(float(r["cx"]) - 1.5, 0, 3.6))
+	var soup := MeshInstance3D.new()
+	var sm9 := CylinderMesh.new()
+	sm9.top_radius = 0.72
+	sm9.bottom_radius = 0.72
+	sm9.height = 0.06
+	soup.mesh = sm9
+	soup.material_override = DatamoshStudio._fluid_material(Color("#ff8a2a"))
+	add_child(soup)
+	soup.global_transform = Transform3D(r["fb"] as Basis,
+		_C + (r["up"] as Vector3) * (_rF + 1.88))
+	soup.translate_object_local(Vector3(float(r["cx"]) - 1.5, 0, 3.6))
+	for bw in 4:
+		var bwl := MeshInstance3D.new()
+		var bm9 := CylinderMesh.new()
+		bm9.top_radius = 0.3
+		bm9.bottom_radius = 0.18
+		bm9.height = 0.22
+		bwl.mesh = bm9
+		bwl.material_override = Surfaces.plaster(Color("#e8e2d4"))
+		add_child(bwl)
+		bwl.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 1.15))
+		bwl.translate_object_local(Vector3(float(r["cx"]) + 1.2 + 0.8 * float(bw % 2),
+			0, 3.6 - 0.4 * float(bw)))
+
+func _dress_trophy(r: Dictionary) -> void:
+	# three trophies the dudes actually earned: a noodle, a tetrahedron,
+	# an icosahedron. Every shape here MEANS something.
+	var shapes: Array = []
+	var tn := TorusMesh.new()
+	tn.inner_radius = 0.14
+	tn.outer_radius = 0.32
+	shapes.append(tn)
+	shapes.append(_tetra_mesh(0.34))
+	var ic9 := SphereMesh.new()
+	ic9.radius = 0.32
+	ic9.height = 0.64
+	ic9.radial_segments = 5
+	ic9.rings = 3
+	shapes.append(ic9)
+	for pz in 3:
+		var off := Vector3(float(r["cx"]), 0, -2.8 + 2.8 * float(pz))
+		var ped := MeshInstance3D.new()
+		var pdm := CylinderMesh.new()
+		pdm.top_radius = 0.4
+		pdm.bottom_radius = 0.55
+		pdm.height = 1.1
+		ped.mesh = pdm
+		ped.material_override = Surfaces.metal(Color("#20262e"))
+		add_child(ped)
+		ped.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 0.55))
+		ped.translate_object_local(off)
+		var tro := MeshInstance3D.new()
+		tro.mesh = shapes[pz]
+		tro.material_override = Destructible.make_material(Color("#ffd700"), 1.8)
+		add_child(tro)
+		tro.global_transform = Transform3D(r["fb"] as Basis,
+			_C + (r["up"] as Vector3) * (_rF + 1.55))
+		tro.translate_object_local(off)
+		_spins.append({"node": tro, "rate": 0.6})
 
 ## One Death-Star side room off deck segment i, on side s. Shell +
 ## door aligned to the deck doorway, then themed contents.
@@ -1178,53 +1632,10 @@ func _room_cargo(fb: Basis, up: Vector3, cx: float) -> void:
 	_sign("CARGO BAY // MANIFEST LOST", fb, _C + up * (_rF + 3.7),
 		Vector3(cx, 0, 4.2), 180.0)
 
-## ---- SERVICE WING: tight vents -> assembly hall -> generator hall ----
+## ---- SERVICE WING: assembly hall + generator hall, now fronted by
+## the ring's northwest hallway (the crawl tube is gone -- ventilation
+## became a separate secret system) ----
 func _service_wing() -> void:
-	for i in 6:
-		var a := -(_a0 + _step * float(i))
-		var fb := _fr(a)
-		var up := _pdir(a)
-		_plate(Vector3(3.0, 0.4, 5.0), Transform3D(fb, _C + up * (_rF - 0.2)),
-			Vector3.ZERO, DARK, 0.0)
-		_plate(Vector3(3.4, 0.4, 5.0), Transform3D(fb, _C + up * (_rF + 2.5)),
-			Vector3.ZERO, DARK, 0.0)
-		var wxf := Transform3D(fb, _C + up * (_rF + 1.15))
-		_plate(Vector3(0.4, 2.7, 5.0), wxf, Vector3(1.5, 0, 0), STEEL, 0.0)
-		_plate(Vector3(0.4, 2.7, 5.0), wxf, Vector3(-1.5, 0, 0), STEEL, 0.0)
-		# floor grates + a dim strip -- crawlspace dressing
-		_deco_box(Vector3(2.8, 0.05, 0.2), Transform3D(fb, _C + up * (_rF + 0.03)),
-			Vector3(0, 0, 1.2), Color("#12161c"), 0.0)
-		_deco_box(Vector3(2.8, 0.05, 0.2), Transform3D(fb, _C + up * (_rF + 0.03)),
-			Vector3(0, 0, -1.2), Color("#12161c"), 0.0)
-		_deco_box(Vector3(0.05, 0.1, 5.0), wxf, Vector3(1.35, -0.5, 0),
-			Color("#66ff99"), 1.1)
-		if i % 3 == 2:
-			# a FAN: ring + spinning blades filling the tube
-			var fring9 := MeshInstance3D.new()
-			var frm9 := TorusMesh.new()
-			frm9.inner_radius = 1.0
-			frm9.outer_radius = 1.18
-			fring9.mesh = frm9
-			fring9.material_override = Surfaces.metal(STEEL)
-			add_child(fring9)
-			fring9.global_transform = Transform3D(fb, _C + up * (_rF + 1.25))
-			fring9.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
-			var hub := Node3D.new()
-			add_child(hub)
-			hub.global_transform = Transform3D(fb, _C + up * (_rF + 1.25))
-			for bl in 4:
-				var blade := MeshInstance3D.new()
-				var blm := BoxMesh.new()
-				blm.size = Vector3(0.22, 0.9, 0.05)
-				blade.mesh = blm
-				blade.position = Vector3(0, 0, 0)
-				blade.rotation_degrees = Vector3(0, 0, 90.0 * float(bl))
-				blade.translate_object_local(Vector3(0, 0.5, 0))
-				blade.material_override = Surfaces.metal(Color("#4a5266"))
-				hub.add_child(blade)
-			_spins.append({"node": hub, "rate": 6.5})
-	_sign("ATRIUM", _fr(-_a0), _C + _pdir(-_a0) * (_rF + 1.9),
-		Vector3(1.3, 0, 0), -90.0)
 	# ASSEMBLY HALL
 	var ah2 := -(_a0 + _step * 6.0 + (2.5 + 7.5) / _rF)
 	var hb2 := _fr(ah2)
@@ -1232,9 +1643,11 @@ func _service_wing() -> void:
 	_arc_floor(ah2, 22.6, 15.4, _rF - 0.25, 0.0)
 	_arc_floor(ah2, 22.6, 15.4, _rF + 9.25, 0.0)
 	var awx2 := Transform3D(hb2, _C + hup2 * (_rF + 4.5))
-	_plate(Vector3(10.4, 9.5, 0.5), awx2, Vector3(6.1, 0, 7.3), STEEL, 0.0)
-	_plate(Vector3(10.4, 9.5, 0.5), awx2, Vector3(-6.1, 0, 7.3), STEEL, 0.0)
-	_plate(Vector3(1.8, 7.3, 0.5), awx2, Vector3(0, 1.1, 7.3), STEEL, 0.0)
+	# +Z wall: a REAL 2.4x3.0 doorway to the northwest hallway (the old
+	# crawl-hatch entrance is history)
+	_plate(Vector3(10.1, 9.5, 0.5), awx2, Vector3(6.25, 0, 7.3), STEEL, 0.0)
+	_plate(Vector3(10.1, 9.5, 0.5), awx2, Vector3(-6.25, 0, 7.3), STEEL, 0.0)
+	_plate(Vector3(2.4, 6.25, 0.5), awx2, Vector3(0, 1.625, 7.3), STEEL, 0.0)
 	_plate(Vector3(10.0, 9.5, 0.5), awx2, Vector3(6.3, 0, -7.3), STEEL, 0.0)
 	_plate(Vector3(10.0, 9.5, 0.5), awx2, Vector3(-6.3, 0, -7.3), STEEL, 0.0)
 	_plate(Vector3(2.6, 6.25, 0.5), awx2, Vector3(0, 1.625, -7.3), STEEL, 0.0)
@@ -1294,7 +1707,10 @@ func _service_wing() -> void:
 	_plate(Vector3(7.0, 8.5, 0.5), gwx2, Vector3(4.8, 0, 8.3), STEEL, 0.0)
 	_plate(Vector3(7.0, 8.5, 0.5), gwx2, Vector3(-4.8, 0, 8.3), STEEL, 0.0)
 	_plate(Vector3(2.6, 5.25, 0.5), gwx2, Vector3(0, 1.875, 8.3), STEEL, 0.0)
-	_plate(Vector3(16.6, 8.5, 0.5), gwx2, Vector3(0, 0, -8.3), STEEL, 0.0)
+	# -Z wall: doorway continuing the ring hallway west
+	_plate(Vector3(7.1, 8.5, 0.5), gwx2, Vector3(4.75, 0, -8.3), STEEL, 0.0)
+	_plate(Vector3(7.1, 8.5, 0.5), gwx2, Vector3(-4.75, 0, -8.3), STEEL, 0.0)
+	_plate(Vector3(2.4, 5.25, 0.5), gwx2, Vector3(0, 1.625, -8.3), STEEL, 0.0)
 	_plate(Vector3(0.5, 8.5, 16.6), gwx2, Vector3(8.3, 0, 0), STEEL, 0.0)
 	_plate(Vector3(0.5, 8.5, 16.6), gwx2, Vector3(-8.3, 0, 0), STEEL, 0.0)
 	for pp in [[-3.5, -2.5], [3.5, -2.5], [0.0, 3.5]]:

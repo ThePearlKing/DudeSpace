@@ -696,6 +696,12 @@ func _mainframe_test() -> void:
 		["VIP deck", (u0 * cos(0.412) - e2 * sin(0.412)).normalized(), rF - 7.0, 1.8],
 		["assembly", (u0 * cos(0.722) - e1 * sin(0.722)).normalized(), rF, 3.0],
 		["generator", (u0 * cos(0.978) - e1 * sin(0.978)).normalized(), rF, 3.0],
+		["ringA east", (u0 * cos(2.0) + e1 * sin(2.0)).normalized(), rF, 2.5],
+		["dude ai", (u0 * cos(2.685) + e1 * sin(2.685)).normalized(), rF, 3.5],
+		["cockpit", (u0 * -1.0).normalized(), rF, 4.0],
+		["server 2", (u0 * cos(3.775) + e1 * sin(3.775)).normalized(), rF, 3.0],
+		["ringB east", (u0 * cos(1.0) + e2 * sin(1.0)).normalized(), rF, 2.5],
+		["ringB west", (u0 * cos(4.4) + e2 * sin(4.4)).normalized(), rF, 2.5],
 	]
 	for fc in floor_checks:
 		var pd9: Vector3 = fc[1]
