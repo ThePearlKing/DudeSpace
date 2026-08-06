@@ -323,13 +323,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_view()
 		elif kc9 == Settings.key("drop"):
 			Inventory.drop_slot(Inventory.selected)
-		elif kc9 == Settings.key("pose"):
-			if _body:
-				_body.set_pose((_body.pose + 1) % 6)
-				var hudp = get_tree().get_first_node_in_group("hud")
-				if hudp:
-					hudp.flash("pose: " + Human.POSE_NAMES[_body.pose])
-				Sfx.play("click", -16.0)
 	elif event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_RIGHT:
