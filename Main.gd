@@ -1011,6 +1011,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 	crack.mesh = ckm
 	var ckmat := ShaderMaterial.new()
 	ckmat.shader = Monolith._crack_shader()
+	ckmat.render_priority = -6   # behind world transparents, above veil
 	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
 	# density is PROGRESS: each link cracks the sky harder than the last
 	ckmat.set_shader_parameter("intensity",
@@ -1156,6 +1157,7 @@ void fragment(){
 	var bmat := ShaderMaterial.new()
 	bmat.shader = sh
 	bmat.set_shader_parameter("bradius", Universe.BOUNDARY)
+	bmat.render_priority = -4
 	_boundary_mat = bmat
 	_boundary_mesh = MeshInstance3D.new()
 	_boundary_mesh.mesh = bmesh
@@ -1192,8 +1194,14 @@ void fragment(){
 """
 	var bmt9 := ShaderMaterial.new()
 	bmt9.shader = bsh9
+	bmt9.render_priority = -8   # always UNDER every other transparent
 	ball.material_override = bmt9
 	ball.extra_cull_margin = 16384.0
+	# the veil exists only for OUTSIDE eyes -- inside it must never
+	# render, or three giant concentric transparents sort-fight and the
+	# whole universe flickers dark
+	ball.visible = false
+	_night_veil = ball
 	add_child(ball)
 	ball.global_position = Vector3.ZERO
 
@@ -2065,6 +2073,8 @@ func _process(delta: float) -> void:
 		var outside := pos.length() > Universe.BOUNDARY
 		if outside != _outside_white:
 			_outside_white = outside
+			if _night_veil != null:
+				_night_veil.visible = outside
 			if outside:
 				_env_ref.background_mode = Environment.BG_COLOR
 				_env_ref.background_color = Color(1, 1, 1)
@@ -6295,6 +6305,7 @@ var _h_monolith: Monolith = null
 var _earth_monolith: Monolith = null
 var _boundary_mesh: MeshInstance3D = null
 var _boundary_mat: ShaderMaterial = null
+var _night_veil: MeshInstance3D = null
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
@@ -6362,8 +6373,14 @@ void fragment(){
 """
 	var bmt9 := ShaderMaterial.new()
 	bmt9.shader = bsh9
+	bmt9.render_priority = -8   # always UNDER every other transparent
 	ball.material_override = bmt9
 	ball.extra_cull_margin = 16384.0
+	# the veil exists only for OUTSIDE eyes -- inside it must never
+	# render, or three giant concentric transparents sort-fight and the
+	# whole universe flickers dark
+	ball.visible = false
+	_night_veil = ball
 	add_child(ball)
 	ball.global_position = Vector3.ZERO
 	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
@@ -6406,8 +6423,14 @@ void fragment(){
 """
 	var bmt9 := ShaderMaterial.new()
 	bmt9.shader = bsh9
+	bmt9.render_priority = -8   # always UNDER every other transparent
 	ball.material_override = bmt9
 	ball.extra_cull_margin = 16384.0
+	# the veil exists only for OUTSIDE eyes -- inside it must never
+	# render, or three giant concentric transparents sort-fight and the
+	# whole universe flickers dark
+	ball.visible = false
+	_night_veil = ball
 	add_child(ball)
 	ball.global_position = Vector3.ZERO
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
