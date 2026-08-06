@@ -431,13 +431,6 @@ func _open_mono() -> void:
 		Game.monolith_stage = 2
 		msync.call()
 		Sfx.play("learn")))
-	col.add_child(_btn("BREAK THE UNIVERSE (set stage 8)", func() -> void:
-		Game.cheated = true
-		Game.monolith_stage = 8
-		msync.call()
-		var cs2 := get_tree().current_scene
-		if cs2 and cs2.has_method("sky_shatter"):
-			cs2.sky_shatter()))
 	col.add_child(_btn("Reset ALL monolith progress", func() -> void:
 		Game.cheated = true
 		Game.monolith_stage = 0
@@ -450,7 +443,7 @@ func _open_mono() -> void:
 			cs.mono_sky_clear()
 		Sfx.play("click")))
 	var sk := Label.new()
-	sk.text = "preview a sky (VISUAL ONLY -- the god still guards the edge\nunless you BREAK THE UNIVERSE above):"
+	sk.text = "SET monolith progress (1-7 = links done + that sky;\n8 = BREAK THE UNIVERSE for real):"
 	sk.add_theme_font_size_override("font_size", 13)
 	col.add_child(sk)
 	var srow := HBoxContainer.new()
@@ -464,10 +457,11 @@ func _open_mono() -> void:
 		var idx := si
 		sb2.pressed.connect(func() -> void:
 			Game.cheated = true
+			# these SET progress now: button N = N links done. 1 raises
+			# the Earth stele and nothing else; 8 is the real end.
+			Game.monolith_stage = idx + 1
+			msync.call()
 			var cs := get_tree().current_scene
-			# 8 previews the SHATTER itself; 1-7 preview crack skies.
-			# previews are VISUAL ONLY -- the boundary still stands
-			# unless you BREAK THE UNIVERSE above.
 			if idx == 7:
 				if cs and cs.has_method("sky_shatter"):
 					cs.sky_shatter()
