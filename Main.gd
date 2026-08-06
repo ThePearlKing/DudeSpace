@@ -898,24 +898,114 @@ void fragment(){
 		_uw_layer.queue_free()
 		_uw_layer = null
 
-## cheat helpers: demo a monolith sky at the nearest planet / clear it
+## THE SKY SHOW: the universe itself cracking. A crack dome and two
+## shells of giant triangles CENTERED ON YOU -- they follow the camera
+## every frame like a skybox, so the broken sky is everywhere you go,
+## for the whole six-minute afterglow. Planets still occlude them:
+## the universe cracks BEHIND the world.
+var _skyfx: Array = []   # nodes that track the player like a skybox
+
 func mono_sky_clear() -> void:
 	for n in get_tree().get_nodes_in_group("mono_sky"):
 		if is_instance_valid(n):
 			n.queue_free()
+	_skyfx.clear()
 
 func mono_sky_demo(stage: int) -> void:
+	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7), false)
+
+func sky_show(col: Color, stage: int, linger: bool) -> void:
 	mono_sky_clear()
-	var b = Universe.nearest(_player.global_position if _player else Vector3.ZERO)
-	var col: Color = Game.MONO_COLORS[clampi(stage, 0, 7)]
-	var demo := Monolith.new()
-	demo.add_to_group("mono_sky")
-	add_child(demo)
-	demo.body = b
-	demo.dir = (( _player.global_position if _player else Vector3.UP)
-		- (b.center as Vector3)).normalized()
-	demo.stage = clampi(stage, 0, 7)
-	demo.sky_only(col)
+	# CRACKS: a dome at cosmic distance, always around you
+	var crack := MeshInstance3D.new()
+	var ckm := SphereMesh.new()
+	ckm.radius = 38000.0
+	ckm.height = 76000.0
+	ckm.radial_segments = 48
+	ckm.rings = 24
+	crack.mesh = ckm
+	var ckmat := ShaderMaterial.new()
+	ckmat.shader = Monolith._crack_shader()
+	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
+	ckmat.set_shader_parameter("intensity",
+		0.25 + 0.75 * float(stage + 1) / 8.0)
+	crack.material_override = ckmat
+	crack.extra_cull_margin = 16384.0
+	crack.add_to_group("mono_sky")
+	add_child(crack)
+	_skyfx.append(crack)
+	var cktw := create_tween()
+	cktw.tween_method(func(v: float) -> void:
+		if is_instance_valid(crack):
+			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 2.5)
+	# TRIANGLES: two counter-wheeling shells of colossal tetrahedra at
+	# sky distance, breathing light
+	var skyp := Node3D.new()
+	skyp.add_to_group("mono_sky")
+	add_child(skyp)
+	_skyfx.append(skyp)
+	var tris: Array = []
+	for shell in 2:
+		var n9 := 36 if shell == 0 else 20
+		var rad9 := 21000.0 if shell == 0 else 14500.0
+		var size9 := 900.0 if shell == 0 else 520.0
+		var host := skyp if shell == 0 else Node3D.new()
+		if shell == 1:
+			skyp.add_child(host)
+			var ctw := create_tween().set_loops()
+			ctw.tween_property(host, "rotation:y", -TAU, 300.0).as_relative()
+		for i in n9:
+			var t9 := MeshInstance3D.new()
+			t9.mesh = MainframeComplex._tetra_mesh(
+				size9 + size9 * 0.7 * fmod(float(i) * 0.618, 1.0))
+			var tmat := StandardMaterial3D.new()
+			tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			tmat.albedo_color = col if shell == 0 else col.lightened(0.3)
+			tmat.emission_enabled = true
+			tmat.emission = col
+			t9.material_override = tmat
+			t9.extra_cull_margin = 16384.0
+			host.add_child(t9)
+			var ph := TAU * float(i) / float(n9)
+			var lat := -0.85 + 1.7 * fmod(float(i) * 0.382, 1.0)
+			t9.position = Vector3(cos(ph) * cos(lat), sin(lat),
+				sin(ph) * cos(lat)) * rad9
+			tris.append(t9)
+			var st9 := create_tween().set_loops()
+			st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0),
+				11.0 + 3.0 * fmod(float(i) * 0.7, 1.0)).as_relative()
+			var brt := create_tween().set_loops()
+			brt.tween_property(tmat, "emission_energy_multiplier", 2.2,
+				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)).from(0.6) \
+				.set_trans(Tween.TRANS_SINE)
+			brt.tween_property(tmat, "emission_energy_multiplier", 0.6,
+				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)) \
+				.set_trans(Tween.TRANS_SINE)
+	var wheel := create_tween().set_loops()
+	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
+	# lifecycle: demo = 30s and gone; the real thing lingers six minutes
+	var hold := 26.0 if linger else 4.0
+	var fade9 := 360.0 if linger else 24.0
+	var life := create_tween()
+	life.tween_interval(hold)
+	life.tween_callback(func() -> void:
+		var f2 := create_tween()
+		f2.tween_method(func(v: float) -> void:
+			if is_instance_valid(crack):
+				ckmat.set_shader_parameter("fade", v), 1.0, 0.0, fade9)
+		for t9 in tris:
+			if is_instance_valid(t9):
+				var ft := create_tween()
+				ft.tween_property(t9, "scale",
+					Vector3(0.01, 0.01, 0.01), fade9) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN))
+	life.tween_interval(fade9 + 2.0)
+	life.tween_callback(func() -> void:
+		if is_instance_valid(crack):
+			crack.queue_free()
+		if is_instance_valid(skyp):
+			skyp.queue_free()
+		_skyfx.clear())
 
 ## The EDGE OF THE UNIVERSE, visible when you get close: a red warning
 ## lattice that fades in over the last 2km before the god throws you
@@ -1817,6 +1907,11 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
+	# the cracked sky follows you like a skybox
+	for fx in _skyfx:
+		if is_instance_valid(fx):
+			(fx as Node3D).global_position = pos
+
 	# UNDERWATER: inside an ocean world's water shell the whole screen
 	# wobbles and drowns in blue fog, aquarium-style
 	var wet := false
