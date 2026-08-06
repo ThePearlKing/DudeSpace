@@ -1010,20 +1010,15 @@ func _sky_detonate() -> void:
 	# and out of the wreckage, the dying scaffold FADES IN -- the bars
 	# were always there; now you get to see them
 	if _boundary_mesh != null:
+		# ABRUPT: the lattice is just THERE the instant the sky goes
 		_boundary_mesh.visible = true
 		for fm in _boundary_fade_mats:
-			(fm as StandardMaterial3D).albedo_color.a = 0.0
-			(fm as StandardMaterial3D).emission_energy_multiplier = 0.0
-		var rtw := create_tween()
-		rtw.tween_interval(2.0)
-		rtw.tween_method(func(v: float) -> void:
-			for fm in _boundary_fade_mats:
-				(fm as StandardMaterial3D).albedo_color.a = 0.12 * v
-				(fm as StandardMaterial3D).emission_energy_multiplier = 1.1 * v,
-			0.0, 1.0, 9.0)
+			(fm as StandardMaterial3D).albedo_color.a = 0.12
+			(fm as StandardMaterial3D).emission_energy_multiplier = 1.1
 		if Game.monolith_stage < 8:
 			# PREVIEW: the lattice shows off, then goes back to hiding
-			rtw.tween_interval(8.0)
+			var rtw := create_tween()
+			rtw.tween_interval(12.0)
 			rtw.tween_method(func(v: float) -> void:
 				for fm in _boundary_fade_mats:
 					(fm as StandardMaterial3D).albedo_color.a = 0.12 * v
@@ -1032,6 +1027,79 @@ func _sky_detonate() -> void:
 			rtw.tween_callback(func() -> void:
 				if _boundary_mesh != null and Game.monolith_stage < 8:
 					_boundary_mesh.visible = false)
+	# THE FULL SHELL, for one breath: the border appears PACKED --
+	# hundreds of triangles tiling the whole sphere, connected, flush --
+	# then every one of them strays off on its own line and most of
+	# them simply stop existing. What stays is the broken scaffold.
+	var brng := RandomNumberGenerator.new()
+	brng.seed = 424242
+	var bshell := Node3D.new()
+	bshell.add_to_group("mono_sky")
+	add_child(bshell)
+	bshell.global_position = Vector3.ZERO
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bmat.albedo_color = Color(0.25, 0.6, 1.0, 0.55)
+	bmat.emission_enabled = true
+	bmat.emission = Color(0.25, 0.6, 1.0)
+	bmat.emission_energy_multiplier = 1.6
+	bmat.render_priority = -3
+	var b_lrad := Universe.BOUNDARY - 900.0
+	var b_side := Universe.BOUNDARY * 0.058
+	var edge_mesh := BoxMesh.new()
+	edge_mesh.size = Vector3(b_side * 1.02, b_side * 0.018, b_side * 0.018)
+	var NB := 520
+	for i in NB:
+		var ky := 1.0 - 2.0 * (float(i) + 0.5) / float(NB)
+		var kr := sqrt(maxf(0.0, 1.0 - ky * ky))
+		var kphi := PI * (1.0 + sqrt(5.0)) * float(i)
+		var dir9 := Vector3(cos(kphi) * kr, ky, sin(kphi) * kr)
+		var tx := dir9.cross(Vector3(0, 1, 0))
+		if tx.length() < 0.01:
+			tx = dir9.cross(Vector3(1, 0, 0))
+		tx = tx.normalized()
+		var tz := tx.cross(dir9).normalized()
+		var plate := Node3D.new()
+		bshell.add_child(plate)
+		plate.position = dir9 * b_lrad
+		plate.transform.basis = Basis(tx, dir9, tz).orthonormalized()
+		plate.rotate_object_local(Vector3(0, 1, 0), brng.randf() * TAU)
+		for e9 in 3:
+			var va := Vector3(cos(TAU * (float(e9) + 0.25) / 3.0), 0,
+				sin(TAU * (float(e9) + 0.25) / 3.0)) * b_side * 0.577
+			var vb := Vector3(cos(TAU * (float(e9) + 1.25) / 3.0), 0,
+				sin(TAU * (float(e9) + 1.25) / 3.0)) * b_side * 0.577
+			var ed := MeshInstance3D.new()
+			ed.mesh = edge_mesh
+			ed.material_override = bmat
+			ed.extra_cull_margin = 16384.0
+			plate.add_child(ed)
+			ed.position = (va + vb) * 0.5
+			ed.rotation.y = -atan2((vb - va).z, (vb - va).x)
+		var away := (dir9 * (0.8 if brng.randf() < 0.5 else -0.45)
+			+ tx * brng.randf_range(-0.6, 0.6)
+			+ tz * brng.randf_range(-0.6, 0.6)).normalized()
+		var sc9 := create_tween()
+		_sky_tweens.append(sc9)
+		sc9.tween_interval(brng.randf_range(0.3, 1.5))
+		sc9.tween_property(plate, "position",
+			away * Universe.BOUNDARY * brng.randf_range(0.2, 0.55),
+			brng.randf_range(5.0, 9.0)) \
+			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		var tb9 := create_tween()
+		_sky_tweens.append(tb9)
+		tb9.tween_property(plate, "rotation",
+			Vector3(brng.randf_range(-2.0, 2.0), brng.randf_range(-2.0, 2.0),
+				brng.randf_range(-1.0, 1.0)), 8.0).as_relative()
+	var bf9 := create_tween()
+	_sky_tweens.append(bf9)
+	bf9.tween_interval(1.4)
+	bf9.tween_property(bmat, "albedo_color:a", 0.0, 7.5)
+	bf9.parallel().tween_property(bmat, "emission_energy_multiplier", 0.0, 7.5)
+	bf9.tween_callback(func() -> void:
+		if is_instance_valid(bshell):
+			bshell.queue_free())
 	var rng9 := RandomNumberGenerator.new()
 	rng9.seed = 8888
 	var shroot := Node3D.new()
@@ -2428,6 +2496,7 @@ func _process(delta: float) -> void:
 						break
 				if rr9 != null and not rr9.edge_won:
 					_wcut = 2 if rr9.nuclear else 1
+					Game.timewarp = 1.0   # cutscenes run in real time
 					_wcut_t = 0.0
 					_wcut_r = rr9
 					_wcut_p0 = rr9.global_position
@@ -2778,6 +2847,7 @@ func _drive_edge_cutscene(delta: float) -> void:
 		_wcut = 0
 		_wcut_r = null
 		return
+	Game.timewarp = 1.0   # no fast-forwarding the hand
 	_wcut_t += delta
 	var t9 := _wcut_t
 	var out9 := _wcut_p0.normalized()
@@ -3659,22 +3729,15 @@ void fragment(){
 	vec3 n = normalize(vn);
 	float rock = fbm(n * 9.0);
 	float crag = fbm(n * 26.0);
-	vec3 col = base * (0.35 + 0.5 * rock + 0.2 * crag);
-	// crawling shadow bands: broad darkness sliding slowly around it
-	float band = 0.5 + 0.5 * sin(n.y * 6.0 + n.x * 3.0 + TIME * 0.05);
-	col *= 0.75 + 0.25 * band;
-	// thinking veins: thin pale lines that flicker in and out
-	float vein = smoothstep(0.485, 0.5, abs(fract(fbm(n * 5.0) * 7.0
-		+ TIME * 0.03) - 0.5));
-	float vflick = step(0.75, fract(sin(floor(TIME * 0.8)
-		+ floor(fbm(n * 5.0) * 7.0) * 13.7) * 43758.5453));
-	col = mix(col, vec3(0.95, 0.95, 0.92), (1.0 - vein) * vflick * 0.5);
-	// the breath: rarely, the whole face pales
-	float breathe = smoothstep(0.92, 1.0, sin(TIME * 0.043));
-	col = mix(col, vec3(0.9, 0.9, 0.88), breathe * 0.35);
+	vec3 col = base * (0.3 + 0.45 * rock + 0.18 * crag);
+	// frozen shadow bands: painted on the bone, going nowhere
+	float band = 0.5 + 0.5 * sin(n.y * 6.0 + n.x * 3.0 + fbm(n * 3.0) * 2.0);
+	col *= 0.68 + 0.32 * band;
+	// dead pale veins, faint and still
+	float vein = smoothstep(0.48, 0.5, abs(fract(fbm(n * 5.0) * 7.0) - 0.5));
+	col = mix(col, vec3(0.82, 0.8, 0.76), (1.0 - vein) * 0.18);
 	ALBEDO = col;
-	ROUGHNESS = 0.9;
-	EMISSION = vec3(0.9, 0.92, 0.9) * (1.0 - vein) * vflick * 0.25;
+	ROUGHNESS = 0.95;
 }
 """
 			var rgm9 := ShaderMaterial.new()
@@ -3920,7 +3983,60 @@ func _shader_code(kind: String) -> String:
 
 # -------------------------------------------------------------- content
 
+## a Requiem needle: Harold's spike grown wrong -- taller, paler,
+## more of them
+func _r_spike(b, cd: Vector3, hrng: RandomNumberGenerator) -> void:
+	var sb8 := _basis_from_up(cd)
+	var segs := 4 + hrng.randi() % 3
+	var sh8 := 0.0
+	var tall := 1.5 if hrng.randf() > 0.12 else 2.4   # some are MONSTERS
+	var bw := hrng.randf_range(1.6, 3.0)
+	for sg in segs:
+		var nk := MeshInstance3D.new()
+		var nkm := CylinderMesh.new()
+		var frac := 1.0 - float(sg) / float(segs)
+		nkm.bottom_radius = bw * frac
+		nkm.top_radius = bw * maxf(0.05, frac - 1.0 / float(segs)) * 0.75
+		nkm.height = hrng.randf_range(2.6, 5.2) * tall
+		nkm.radial_segments = 6
+		nk.mesh = nkm
+		nk.material_override = Surfaces.stone(
+			Color("#8a8378").darkened(float(sg) * 0.05))
+		var nsh := CylinderShape3D.new()
+		nsh.radius = maxf(0.12, nkm.bottom_radius * 0.8)
+		nsh.height = nkm.height
+		_rockify(nk, nsh)
+		add_child(nk)
+		nk.global_transform = Transform3D(sb8,
+			b.center + cd * (float(b.radius) + sh8 + nkm.height * 0.5 - 0.4))
+		nk.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
+		sh8 += nkm.height * 0.94
+
 func _populate(b) -> void:
+	if str(b.name) == "Requiem":
+		# THE NEEDLE GRAVEYARD: Harold's silhouette taken too far --
+		# clusters of tall pale spikes over the whole face. The crown
+		# (28 degrees around +Y) stays CLEAR: something will stand
+		# there one day and it will not share the ground.
+		var qrng := RandomNumberGenerator.new()
+		qrng.seed = 8008
+		var qcap := cos(deg_to_rad(28.0))
+		var placed := 0
+		while placed < 210:
+			var cd9 := Vector3(qrng.randf_range(-1, 1),
+				qrng.randf_range(-1, 1),
+				qrng.randf_range(-1, 1)).normalized()
+			if cd9.y > qcap:
+				continue
+			var cluster := 3 + qrng.randi() % 4
+			for ci9 in cluster:
+				var cdir9 := (cd9 + Vector3(qrng.randf_range(-0.06, 0.06),
+					qrng.randf_range(-0.06, 0.06),
+					qrng.randf_range(-0.06, 0.06))).normalized()
+				if cdir9.y > qcap:
+					continue
+				_r_spike(b, cdir9, qrng)
+				placed += 1
 	# Coin value per crate rises far from Home, so late-game gear forces
 	# you out to the dangerous planets. (value, target crate count)
 	match b.kind:
