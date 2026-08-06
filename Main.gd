@@ -185,9 +185,14 @@ func _boot() -> void:
 	if eb9 != null and not Game.tutorial_session:
 		_earth_monolith = Monolith.new()
 		add_child(_earth_monolith)
+		_earth_monolith.stage = 1
 		_earth_monolith.risen = Game.monolith_stage >= 1
-		_earth_monolith.build_stele(eb9,
-			Vector3(0.3, 0.8, -0.52).normalized())
+		_build_monument(eb9, Vector3(0.3, 0.8, -0.52).normalized(),
+			_earth_monolith)
+		if not _earth_monolith.risen:
+			_earth_monolith._root.global_position = \
+				(eb9.center as Vector3) + _earth_monolith.dir \
+				* (float(eb9.radius) - Monolith.RISE_DEPTH)
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -306,6 +311,8 @@ func _boot() -> void:
 		_mainframe_test()
 	if OS.get_environment("CTD_TEST") == "28":
 		_readme_shots()
+	if OS.get_environment("CTD_TEST") == "29":
+		_hole_shot()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -932,6 +939,29 @@ void fragment(){
 	# open -- until then the edge is invisible: just the shove, and the
 	# hand
 	_boundary_mesh.visible = Game.monolith_stage >= 8
+
+## CTD_TEST=29: stand INSIDE the Pixel mouth, look outward + inward.
+func _hole_shot() -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	await get_tree().create_timer(1.0).timeout
+	var b = Universe.body_named("Pixel")
+	var u0: Vector3 = COLONY_DIRS["Pixel"]
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.current = true
+	# from INSIDE the shaft, 6m below the surface, looking OUT
+	cam.global_position = b.center + u0 * (b.radius - 6.0)
+	cam.look_at(b.center + u0 * (b.radius + 30.0), u0.cross(Vector3(0, 0, 1)).normalized())
+	await get_tree().create_timer(0.4).timeout
+	get_viewport().get_texture().get_image().save_png("res://docs/shots/hole_inside_out.png")
+	# from the hollow, 25m below, looking UP at the mouth from inside
+	cam.global_position = b.center + u0 * (b.radius - 25.0)
+	cam.look_at(b.center + u0 * b.radius, u0.cross(Vector3(0, 0, 1)).normalized())
+	await get_tree().create_timer(0.4).timeout
+	get_viewport().get_texture().get_image().save_png("res://docs/shots/hole_hollow_up.png")
+	print("HOLESHOT done")
+	get_tree().quit()
 
 ## CTD_TEST=28: the README tour. Flies a camera to every showpiece and
 ## saves docs/shots/*.png.
@@ -5912,22 +5942,35 @@ func _on_monolith_advanced() -> void:
 			tr9.refresh()
 
 func _h_monument(b, hrng: RandomNumberGenerator) -> void:
-	var dir := _h_dir(hrng)
-	var bas := _basis_from_up(dir)
-	var root := Node3D.new()
-	add_child(root)
-	root.global_transform = Transform3D(bas, b.center + dir * b.radius)
 	# the YELLOW monolith: link 0 of the chain. Feeding it SPECIMEN 4
 	# starts everything. Already fed on an older save? It sits sunk.
 	_h_monolith = Monolith.new()
 	add_child(_h_monolith)
-	_h_monolith.body = b
-	_h_monolith.dir = dir
 	_h_monolith.stage = 0
-	_h_monolith._root = root
+	_build_monument(b, _h_dir(hrng), _h_monolith)
 	if Game.monolith_stage > 0:
-		root.visible = false
-		root.global_position = b.center + dir * (b.radius - Monolith.RISE_DEPTH)
+		_h_monolith._root.visible = false
+		_h_monolith._root.global_position = (b.center as Vector3) \
+			+ _h_monolith.dir * (float(b.radius) - Monolith.RISE_DEPTH)
+
+## THE MONUMENT, shared by every link of the chain: identical stone
+## everywhere -- tiers, diamonds, the tetrahedral socket, the glyph
+## ring, the crown pictogram. Only the crown's LOCATION HINT differs
+## per stele (and Earth's is a placeholder until the lime source is
+## decided).
+func _build_monument(b, dir: Vector3, mono: Monolith) -> void:
+	# chips + weathering roll from the monument's own seeded dice so
+	# every stele weathers identically-in-kind but uniquely-in-detail
+	var hrng := RandomNumberGenerator.new()
+	hrng.seed = 618 + mono.stage * 77
+	var bas := _basis_from_up(dir)
+	var root := Node3D.new()
+	add_child(root)
+	root.global_transform = Transform3D(bas, (b.center as Vector3)
+		+ dir * float(b.radius))
+	mono.body = b
+	mono.dir = dir
+	mono._root = root
 	var stone := Surfaces.stone(Color("#8a7f70"))
 	var dark := Surfaces.stone(Color("#6b6154"))
 	# tiers: [size, position, yaw_degrees] -- diamonds break the cubic
@@ -6074,7 +6117,7 @@ void fragment() {
 	# solid hitbox over the whole carved front -- you don't fit in the
 	# mouth anyway, so the collider ignores the carving
 	var pbody := Monolith.MonoSocket.new()
-	pbody.host = _h_monolith
+	pbody.host = mono
 	var pcs := CollisionShape3D.new()
 	var pbs := BoxShape3D.new()
 	pbs.size = Vector3(hx * 2.0, hy * 2.0, zf - zback)
