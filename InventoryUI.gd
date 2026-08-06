@@ -613,6 +613,35 @@ class _TrashSlot extends Panel:
 					break
 				n = n.get_parent()
 			if ui and str(ui.held["id"]) != "":
+				# deleting a backpack whose OWN bag still has items needs
+				# a confirm -- the universe backpack is exempt, its
+				# storage exists outside space and survives the pack
+				var hid := str(ui.held["id"])
+				var pstore: Array = []
+				if hid == "backpack":
+					pstore = Inventory.backpack_store
+				elif hid == "backpack2":
+					pstore = Inventory.prism_store
+				var loaded := false
+				for s9 in pstore:
+					if str((s9 as Dictionary).get("id", "")) != "":
+						loaded = true
+						break
+				if loaded:
+					var dlg := ConfirmationDialog.new()
+					dlg.title = "DELETE " + str(Inventory.items[hid]["name"]).to_upper() + "?"
+					dlg.dialog_text = "This %s still has items in its bag.\nDelete the pack anyway?" \
+						% str(Inventory.items[hid]["name"])
+					dlg.ok_button_text = "DELETE"
+					ui.add_child(dlg)
+					dlg.confirmed.connect(func() -> void:
+						ui.held = Inventory.empty_slot()
+						Sfx.play("explode", -20.0)
+						Inventory.changed.emit()
+						dlg.queue_free())
+					dlg.canceled.connect(func() -> void: dlg.queue_free())
+					dlg.popup_centered()
+					return
 				ui.held = Inventory.empty_slot()
 				Sfx.play("explode", -20.0)
 				Inventory.changed.emit()
