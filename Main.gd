@@ -1793,17 +1793,18 @@ func _process(delta: float) -> void:
 					* get_physics_process_delta_time()
 	if Game.zone == "" and pos.length() > Universe.BOUNDARY \
 			and Game.monolith_stage < 8:
-		# no announcement anymore. a colossal "me" fades into the dark
-		# and a colossal hand throws you back toward the center of
-		# everything. the god does not narrate.
-		# (feed all eight monoliths and the ME stops policing: the
-		# eighth activation shatters the sky and the boundary with it
-		# -- that sequence is planned, not yet staged.)
+		# crossing the edge ANGERS the god -- but the colossal hand only
+		# comes when he is already SUPER angry. Below that, the deep
+		# just keeps shoving you home and the wrath keeps climbing until
+		# one day the fling is earned.
+		var node := _active_node()
+		if node != null and "velocity" in node:
+			node.velocity += -pos.normalized() * 25.0 \
+				* get_physics_process_delta_time()
 		if not _threw_back:
 			_threw_back = true
 			Game.anger(15.0)
-			var node := _active_node()
-			if node != null:
+			if Game.wrath >= 70.0 and node != null:
 				var gh := GodHand.new()
 				add_child(gh)
 				gh.begin(node, Vector3.ZERO)
