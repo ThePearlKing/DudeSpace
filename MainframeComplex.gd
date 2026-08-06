@@ -4653,8 +4653,6 @@ func _lower_ring() -> void:
 	pool.global_transform = sxf.translated_local(Vector3(float(sr["cx"]), 0.25, 0))
 	_plate(Vector3(2.0, 0.3, 9.4), sxf, Vector3(float(sr["cx"]), 0.55, 0),
 		Color("#12161c"), 0.0)
-	_escape_gate(sxf.translated_local(Vector3(0, 1.3, 0)),
-		Vector3(float(sr["cx"]), 0.7, 3.4))
 	# ring probes for MFTEST
 	_net_probes.append(Transform3D(_fr(1.4), _C + _pdir(1.4) * R_LOW).origin)
 	_net_probes.append(Transform3D(_fr(4.6), _C + _pdir(4.6) * R_LOW).origin)
