@@ -247,6 +247,9 @@ func _boot() -> void:
 	await _load_set(0.95, "restoring your world")
 	Game.reset()
 	Save.apply_progress()   # restore this slot's run (no-op on a fresh slot)
+	# the monolith chain state arrives AFTER the world built: snap the
+	# steles and repaint the tracker triangles to match the save
+	_monolith_snap()
 	# deterministic world-gen: same save, same Earth, every single time
 	seed(Game.world_seed)
 	if OS.get_environment("CTD_TEST") != "":
@@ -2083,8 +2086,51 @@ void fragment(){
 """
 		var cmt9 := ShaderMaterial.new()
 		cmt9.shader = csh9
+		cmt9.render_priority = 2   # clouds draw AFTER the water: no
+		                           # transparency-sort flicker with it
 		cl9.material_override = cmt9
 		p.add_child(cl9)
+	if b.kind == "ocean":
+		# FISHIES: thirty of them, orbiting the deep on their own tilted
+		# rings, nose-first, forever
+		var frng := RandomNumberGenerator.new()
+		frng.seed = 4242
+		for fi9 in 30:
+			var pivot := Node3D.new()
+			p.add_child(pivot)
+			pivot.rotation = Vector3(frng.randf() * TAU, frng.randf() * TAU,
+				frng.randf() * TAU)
+			var fish9 := Node3D.new()
+			pivot.add_child(fish9)
+			var forb: float = b.radius * frng.randf_range(0.66, 0.96)
+			fish9.position = Vector3(forb, 0, 0)
+			var fcol9: Color = [Color("#ffcf40"), Color("#ff6a6a"),
+				Color("#7df9ff"), Color("#66ff99"), Color("#ff66aa"),
+				Color("#b388ff")][fi9 % 6]
+			var fsc := frng.randf_range(0.8, 2.6)
+			var fbody9 := MeshInstance3D.new()
+			var fcm9 := CapsuleMesh.new()
+			fcm9.radius = 0.14 * fsc
+			fcm9.height = 0.8 * fsc
+			fbody9.mesh = fcm9
+			fbody9.rotation_degrees = Vector3(0, 0, 90)
+			fbody9.scale = Vector3(1.0, 0.55, 1.0)
+			fbody9.material_override = Destructible.make_material(fcol9, 1.1)
+			fish9.add_child(fbody9)
+			var ftail9 := MeshInstance3D.new()
+			var ftm9 := BoxMesh.new()
+			ftm9.size = Vector3(0.05, 0.3, 0.3) * fsc
+			ftail9.mesh = ftm9
+			ftail9.position = Vector3(0.5 * fsc, 0, 0)
+			ftail9.rotation_degrees = Vector3(0, 90, 0)
+			ftail9.material_override = Destructible.make_material(
+				fcol9.darkened(0.2), 0.9)
+			fish9.add_child(ftail9)
+			# swim: the pivot turns forever; nose leads (-X of orbit)
+			fish9.rotation_degrees = Vector3(0, 180, 0)
+			var ftw := pivot.create_tween().set_loops()
+			ftw.tween_property(pivot, "rotation:y", TAU,
+				frng.randf_range(70.0, 220.0) / fsc).as_relative()
 	if b.kind != "gas":
 		p.add_child(col)   # gas giants have NO surface. you fall in.
 	else:
@@ -2563,16 +2609,15 @@ void fragment(){
 	if (FRONT_FACING) {
 		ALBEDO = mix(bg, watercol, 0.42);
 	} else {
-		// from UNDERNEATH the surface is a rolling MIRROR: mostly the
-		// wobbled scene thrown back silver, swell highlights racing it
-		vec3 mirror9 = mix(bg, vec3(0.78, 0.88, 0.97), 0.55)
-			* (0.85 + 0.5 * sw2);
-		ALBEDO = mix(mirror9, watercol, 0.18);
-		EMISSION = vec3(0.10, 0.16, 0.22) * (0.5 + sw * 0.8);
+		// from UNDERNEATH: barely there -- the wobbled world above with
+		// just a whisper of surface sheen so you can SEE the ceiling
+		// without it turning into a strobing mirror
+		ALBEDO = mix(bg, watercol, 0.10)
+			+ vec3(0.05, 0.07, 0.09) * sw2;
 	}
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
-	EMISSION += base * 0.05;
+	EMISSION = base * 0.05;
 }
 """
 			osh.code = "shader_type spatial;\nrender_mode cull_disabled, unshaded;\n" \
@@ -5721,6 +5766,27 @@ var _boundary_mesh: MeshInstance3D = null
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
+## instant (no animation) sync of everything monolith-stage-driven --
+## used right after a save restores the stage
+func _monolith_snap() -> void:
+	if Game.monolith_stage >= 1:
+		if _h_monolith != null and _h_monolith._root != null:
+			_h_monolith._root.visible = false
+			_h_monolith._root.global_position = _h_monolith.body.center \
+				+ _h_monolith.dir * (float(_h_monolith.body.radius)
+				- Monolith.RISE_DEPTH)
+		if _earth_monolith != null and not _earth_monolith.risen:
+			_earth_monolith.risen = true
+			if _earth_monolith._root != null:
+				_earth_monolith._root.global_position = \
+					(_earth_monolith.body.center as Vector3) \
+					+ _earth_monolith.dir * float(_earth_monolith.body.radius)
+	if _boundary_mesh != null:
+		_boundary_mesh.visible = Game.monolith_stage >= 8
+	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
+		if tr9.has_method("refresh"):
+			tr9.refresh()
+
 func _on_monolith_advanced() -> void:
 	if _boundary_mesh != null:
 		_boundary_mesh.visible = Game.monolith_stage >= 8
