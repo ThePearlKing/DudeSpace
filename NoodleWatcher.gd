@@ -115,6 +115,16 @@ func _process(delta: float) -> void:
 	var wob := sin(_t * 0.05) * 0.06
 	var d := (_dir + Vector3(0, wob, 0)).normalized()
 	global_position = p.global_position + d * DIST
+	# the god CANNOT leave. Step outside and he stays behind, pressed
+	# against the inside of his own sky, staring out through the bars.
+	if global_position.length() > Universe.BOUNDARY - 400.0:
+		global_position = global_position.normalized() \
+			* (Universe.BOUNDARY - 400.0)
+	# the god CANNOT leave. Step outside and he presses against the
+	# inside of the sky, staring out at you through his own bars.
+	if global_position.length() > Universe.BOUNDARY - 400.0:
+		global_position = global_position.normalized() \
+			* (Universe.BOUNDARY - 400.0)
 	# the -Z face (pupil + iris) points DEAD AT you, every frame, always
 	var up_ref := Vector3.UP if absf(d.y) < 0.95 else Vector3.RIGHT
 	look_at(p.global_position, up_ref)

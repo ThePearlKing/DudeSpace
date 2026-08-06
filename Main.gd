@@ -1071,6 +1071,40 @@ void fragment(){
 	# open -- until then the edge is invisible: just the shove, and the
 	# hand
 	_boundary_mesh.visible = Game.monolith_stage >= 8
+	# THE UNIVERSE FROM OUTSIDE: a ball of night. Front faces only, so
+	# it is invisible from within -- but stand in the white void and
+	# look back, and there it is: black, full of stars, everything you
+	# know inside it.
+	var ball := MeshInstance3D.new()
+	var blm9 := SphereMesh.new()
+	blm9.radius = Universe.BOUNDARY - 120.0
+	blm9.height = blm9.radius * 2.0
+	blm9.radial_segments = 64
+	blm9.rings = 32
+	ball.mesh = blm9
+	var bsh9 := Shader.new()
+	bsh9.code = """
+shader_type spatial;
+render_mode unshaded;
+varying vec3 vn;
+void vertex(){ vn = normalize(VERTEX); }
+float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 220.0);
+	float star = step(0.9975, h31(cell));
+	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
+		+ h31(cell + 2.0) * 6.28);
+	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
+	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
+}
+"""
+	var bmt9 := ShaderMaterial.new()
+	bmt9.shader = bsh9
+	ball.material_override = bmt9
+	ball.extra_cull_margin = 16384.0
+	add_child(ball)
+	ball.global_position = Vector3.ZERO
 
 ## CTD_TEST=29: stand INSIDE the Pixel mouth, look outward + inward.
 func _hole_shot() -> void:
@@ -6106,6 +6140,40 @@ func _monolith_snap() -> void:
 					+ _earth_monolith.dir * float(_earth_monolith.body.radius)
 	if _boundary_mesh != null:
 		_boundary_mesh.visible = Game.monolith_stage >= 8
+	# THE UNIVERSE FROM OUTSIDE: a ball of night. Front faces only, so
+	# it is invisible from within -- but stand in the white void and
+	# look back, and there it is: black, full of stars, everything you
+	# know inside it.
+	var ball := MeshInstance3D.new()
+	var blm9 := SphereMesh.new()
+	blm9.radius = Universe.BOUNDARY - 120.0
+	blm9.height = blm9.radius * 2.0
+	blm9.radial_segments = 64
+	blm9.rings = 32
+	ball.mesh = blm9
+	var bsh9 := Shader.new()
+	bsh9.code = """
+shader_type spatial;
+render_mode unshaded;
+varying vec3 vn;
+void vertex(){ vn = normalize(VERTEX); }
+float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 220.0);
+	float star = step(0.9975, h31(cell));
+	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
+		+ h31(cell + 2.0) * 6.28);
+	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
+	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
+}
+"""
+	var bmt9 := ShaderMaterial.new()
+	bmt9.shader = bsh9
+	ball.material_override = bmt9
+	ball.extra_cull_margin = 16384.0
+	add_child(ball)
+	ball.global_position = Vector3.ZERO
 	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
 		if tr9.has_method("refresh"):
 			tr9.refresh()
@@ -6113,6 +6181,40 @@ func _monolith_snap() -> void:
 func _on_monolith_advanced() -> void:
 	if _boundary_mesh != null:
 		_boundary_mesh.visible = Game.monolith_stage >= 8
+	# THE UNIVERSE FROM OUTSIDE: a ball of night. Front faces only, so
+	# it is invisible from within -- but stand in the white void and
+	# look back, and there it is: black, full of stars, everything you
+	# know inside it.
+	var ball := MeshInstance3D.new()
+	var blm9 := SphereMesh.new()
+	blm9.radius = Universe.BOUNDARY - 120.0
+	blm9.height = blm9.radius * 2.0
+	blm9.radial_segments = 64
+	blm9.rings = 32
+	ball.mesh = blm9
+	var bsh9 := Shader.new()
+	bsh9.code = """
+shader_type spatial;
+render_mode unshaded;
+varying vec3 vn;
+void vertex(){ vn = normalize(VERTEX); }
+float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+void fragment(){
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 220.0);
+	float star = step(0.9975, h31(cell));
+	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
+		+ h31(cell + 2.0) * 6.28);
+	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
+	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
+}
+"""
+	var bmt9 := ShaderMaterial.new()
+	bmt9.shader = bsh9
+	ball.material_override = bmt9
+	ball.extra_cull_margin = 16384.0
+	add_child(ball)
+	ball.global_position = Vector3.ZERO
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
 			and not _earth_monolith.risen:
 		_earth_monolith.rise()
