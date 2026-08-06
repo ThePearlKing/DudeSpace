@@ -858,6 +858,7 @@ var _ocean_mats: Array = []
 ## fullscreen ocean effect: screen-space wave distortion + blue fog,
 ## the aquarium treatment applied to your whole eyeball
 func _set_underwater(on: bool) -> void:
+	Game.underwater = on
 	for om in _ocean_mats:
 		(om as ShaderMaterial).set_shader_parameter("submerged",
 			1.0 if on else 0.0)

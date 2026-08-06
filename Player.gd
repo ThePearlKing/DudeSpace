@@ -1154,6 +1154,19 @@ func _physics_process(delta: float) -> void:
 			v_up = JUMP_VEL              # fixed launch -> low gravity jumps higher
 		v_up -= _g * delta
 		velocity = wish * WALK_SPEED + up * v_up
+	elif Game.underwater:
+		# SWIMMING: the water carries you. Heavy drag, a slow sink,
+		# Space strokes up, C strokes down, WASD swims -- no jetpack
+		# needed, no jetpack fuel burned.
+		velocity = velocity.lerp(Vector3.ZERO, minf(1.0, delta * 1.6))
+		velocity += Universe.gravity_at(global_position) * delta * 0.12
+		if Input.is_key_pressed(KEY_SPACE):
+			velocity += up * 15.0 * delta
+		if Input.is_key_pressed(Settings.key("jet_down")):
+			velocity -= up * 11.0 * delta
+		velocity += wish * 11.0 * delta
+		if velocity.length() > 8.0:
+			velocity = velocity.normalized() * 8.0
 	else:
 		# AIRBORNE free body: momentum + gravity. Barely steerable...
 		if Game.zone == "":
