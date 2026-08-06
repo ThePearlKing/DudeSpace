@@ -3091,11 +3091,40 @@ void fragment(){
 			_ocean_mats.append(om9)
 			return om9
 		"rogue":
-			# the pale wanderer: bleached bone-grey stone, no sun to warm it
-			var rg9 := _rocky_material(color, 0.0, 4.0)
-			if rg9 is StandardMaterial3D:
-				rg9.roughness = 0.9
-			return rg9
+			# Harold's rock gone WRONG: bone-grey crags like the old man,
+			# but shadow bands crawl the surface, pale veins flicker like
+			# something under the crust is thinking, and every so often
+			# the whole face goes a shade too white
+			var rsh := Shader.new()
+			rsh.code = "shader_type spatial;\n" \
+				+ "uniform vec3 base : source_color;\n" \
+				+ preload("res://Title.gd")._TP_NOISE + """
+void fragment(){
+	vec3 n = normalize(vn);
+	float rock = fbm(n * 9.0);
+	float crag = fbm(n * 26.0);
+	vec3 col = base * (0.35 + 0.5 * rock + 0.2 * crag);
+	// crawling shadow bands: broad darkness sliding slowly around it
+	float band = 0.5 + 0.5 * sin(n.y * 6.0 + n.x * 3.0 + TIME * 0.05);
+	col *= 0.75 + 0.25 * band;
+	// thinking veins: thin pale lines that flicker in and out
+	float vein = smoothstep(0.485, 0.5, abs(fract(fbm(n * 5.0) * 7.0
+		+ TIME * 0.03) - 0.5));
+	float vflick = step(0.75, fract(sin(floor(TIME * 0.8)
+		+ floor(fbm(n * 5.0) * 7.0) * 13.7) * 43758.5453));
+	col = mix(col, vec3(0.95, 0.95, 0.92), (1.0 - vein) * vflick * 0.5);
+	// the breath: rarely, the whole face pales
+	float breathe = smoothstep(0.92, 1.0, sin(TIME * 0.043));
+	col = mix(col, vec3(0.9, 0.9, 0.88), breathe * 0.35);
+	ALBEDO = col;
+	ROUGHNESS = 0.9;
+	EMISSION = vec3(0.9, 0.92, 0.9) * (1.0 - vein) * vflick * 0.25;
+}
+"""
+			var rgm9 := ShaderMaterial.new()
+			rgm9.shader = rsh
+			rgm9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))
+			return rgm9
 		"ice":
 			# glacial: saturated blue with a frosty sheen
 			var im2 := _rocky_material(Color("#5ab4f2"))

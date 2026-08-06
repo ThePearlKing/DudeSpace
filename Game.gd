@@ -175,7 +175,7 @@ const MONO_COLORS: Array = [Color("#ffd23f"), Color("#7fff3a"),
 	Color("#ff8a2a"), Color("#2a6fff"), Color("#ff3a2a"), Color("#ff7ce9"),
 	Color("#7df9ff"), Color("#f2f2f2")]
 const MONO_PLANETS: Array = ["Harold", "Earth", "Euclid", "Undros",
-	"Mars", "Wobble", "Crystalia", "Palewander"]
+	"Mars", "Wobble", "Crystalia", "Hush"]
 var mind_core: bool = false   # unlocks the pyramid
 var playtime: float = 0.0     # for time-rift snapshots
 var cheated: bool = false     # any cheat = save branded illegitimate forever
