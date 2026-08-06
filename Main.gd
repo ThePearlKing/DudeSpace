@@ -343,6 +343,7 @@ func _boot() -> void:
 	if Game.door_open:
 		open_temple_door()   # temple stays open across sessions
 	restore_world()          # your machines, chests, wires: still there
+	_lod_sweep()
 	await _load_set(1.0, "done")
 	if _load_layer != null:
 		_load_layer.queue_free()
@@ -2363,6 +2364,10 @@ func _process(delta: float) -> void:
 		_pop_t = randf_range(20.0, 40.0)
 		_repopulate()
 	var pos := _active_pos()
+	_plod_t -= delta
+	if _plod_t <= 0.0:
+		_plod_t = 0.7
+		_planet_lod_tick()
 	_save_t -= delta
 	if _save_t <= 0.0:
 		_save_t = 5.0
@@ -3119,6 +3124,65 @@ func _setup_light() -> void:
 	sun.light_color = Color("#ffe6f2")
 	add_child(sun)
 
+## -------------------------------------------------- PLANET LOD
+## Far planets do not deserve per-pixel noise shaders: past ~30 radii
+## the detailed material swaps for a FLAT color. Only what is close is
+## expensive (and the noodle god is never a planet).
+var _plod: Array = []
+var _plod_t := 0.0
+
+func _register_planet_lod(b, mi: MeshInstance3D) -> void:
+	var flat := StandardMaterial3D.new()
+	flat.albedo_color = b.color
+	flat.roughness = 1.0
+	if b.kind == "sun":
+		flat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		flat.emission_enabled = true
+		flat.emission = b.color
+		flat.emission_energy_multiplier = 1.4
+	elif b.kind == "blind":
+		flat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_plod.append({"b": b, "mi": mi, "det": mi.material_override,
+		"flat": flat, "is_flat": false})
+
+func _planet_lod_tick() -> void:
+	var pos := _active_pos()
+	for e9 in _plod:
+		var mi9: MeshInstance3D = e9["mi"]
+		if not is_instance_valid(mi9):
+			continue
+		var b9 = e9["b"]
+		var far9: bool = pos.distance_to(b9.center) \
+			> maxf(float(b9.radius) * 30.0, 9000.0 * Universe.world_scale)
+		if far9 != bool(e9["is_flat"]):
+			e9["is_flat"] = far9
+			mi9.material_override = e9["flat"] if far9 else e9["det"]
+
+## one sweep after the world is built: every SMALL mesh gets a Godot
+## visibility range so distant clutter (spikes, props, facility guts,
+## signs) stops issuing draw calls from across the universe
+func _lod_sweep(n: Node = null) -> void:
+	if n == null:
+		n = self
+	# the player's own kit draws at any range it likes
+	if n is Rocket or n is Player:
+		return
+	if n is GeometryInstance3D and not (n is CSGShape3D):
+		var gi := n as GeometryInstance3D
+		if gi.visibility_range_end <= 0.0:
+			var sz := 100000.0
+			if gi is MeshInstance3D and (gi as MeshInstance3D).mesh != null:
+				sz = (gi as MeshInstance3D).get_aabb().size.length() \
+					* maxf(gi.scale.length() / 1.732, 1.0)
+			elif gi is Label3D:
+				sz = 8.0
+			if sz < 60.0:
+				gi.visibility_range_end = 5500.0 + sz * 40.0
+			elif sz < 700.0:
+				gi.visibility_range_end = 42000.0
+	for c9 in n.get_children():
+		_lod_sweep(c9)
+
 func _build_body(b) -> void:
 	if b.kind == "torus":
 		_build_torus(b)
@@ -3133,6 +3197,7 @@ func _build_body(b) -> void:
 	mi.mesh = sm
 	mi.material_override = _planet_material(b.kind, b.color)
 	p.add_child(mi)
+	_register_planet_lod(b, mi)
 	var col := CollisionShape3D.new()
 	var hole_specs: Array = []   # [dir, cut radius in metres]
 	if MINE_DIRS.has(b.name):
