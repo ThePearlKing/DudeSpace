@@ -49,7 +49,7 @@ func _ready() -> void:
 	_cam_pivot.top_level = true
 	add_child(_cam_pivot)
 	_cam = Camera3D.new()
-	_cam.far = 240000.0
+	_cam.far = 420000.0
 	_cam.cull_mask = 0xFFFFF & ~(1 << 9)
 	_cam.position = Vector3(0, 2.5, 14.0)   # behind + above, looks toward ship (-Z)
 	_cam_pivot.add_child(_cam)

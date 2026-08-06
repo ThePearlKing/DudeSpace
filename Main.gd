@@ -943,8 +943,7 @@ func sky_shatter() -> void:
 	ftw.tween_callback(flash.queue_free)
 	# the sound of a universe losing its lid: the full nuke waveform,
 	# sub punch and rolling rumble, at full voice
-	Sfx.play("nuke", 2.0)
-	Sfx.play("explode", -4.0)
+	Sfx.play("nuke", -8.0)
 	# and out of the wreckage, the dying scaffold FADES IN -- the bars
 	# were always there; now you get to see them
 	if _boundary_mesh != null:
@@ -996,6 +995,12 @@ func sky_shatter() -> void:
 	var cln := create_tween()
 	cln.tween_interval(18.0)
 	cln.tween_callback(func() -> void:
+		# the shard spins are in _sky_tweens: kill them BEFORE their
+		# targets free, or they step corpses forever
+		for tw9 in _sky_tweens:
+			if tw9 != null and (tw9 as Tween).is_valid():
+				(tw9 as Tween).kill()
+		_sky_tweens.clear()
 		if is_instance_valid(shroot):
 			shroot.queue_free())
 
@@ -1169,41 +1174,60 @@ void fragment(){
 	# open -- until then the edge is invisible: just the shove, and the
 	# hand
 	_boundary_mesh.visible = Game.monolith_stage >= 8
-	# THE UNIVERSE FROM OUTSIDE: a ball of night. Front faces only, so
-	# it is invisible from within -- but stand in the white void and
-	# look back, and there it is: black, full of stars, everything you
-	# know inside it.
-	var ball := MeshInstance3D.new()
-	var blm9 := SphereMesh.new()
-	blm9.radius = Universe.BOUNDARY - 120.0
-	blm9.height = blm9.radius * 2.0
-	blm9.radial_segments = 64
-	blm9.rings = 32
-	ball.mesh = blm9
-	var bsh9 := Shader.new()
-	bsh9.code = """
+	# THE VOID ARCHITECTURE -- no overlays, only real geometry, so
+	# depth sorting can never draw anything over a planet:
+	# 1. a WHITE SHELL far outside everything (inward faces): the void's
+	#    backdrop in every direction.
+	# 2. a BLACK STAR BALL sitting exactly at the boundary (inward
+	#    faces): from inside it IS the starry sky; from outside its far
+	#    inner wall is a disc of night with stars, exactly where the
+	#    universe is, with every planet drawn in FRONT of it by plain
+	#    depth. Nothing curves around anything.
+	var wshell := MeshInstance3D.new()
+	var wsm := SphereMesh.new()
+	wsm.radius = Universe.BOUNDARY * 1.5
+	wsm.height = wsm.radius * 2.0
+	wsm.radial_segments = 48
+	wsm.rings = 24
+	wshell.mesh = wsm
+	var wmat := StandardMaterial3D.new()
+	wmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	wmat.albedo_color = Color(1, 1, 1)
+	wmat.cull_mode = BaseMaterial3D.CULL_FRONT
+	wshell.material_override = wmat
+	wshell.extra_cull_margin = 999999.0
+	add_child(wshell)
+	wshell.global_position = Vector3.ZERO
+	var starball := MeshInstance3D.new()
+	var sbm := SphereMesh.new()
+	sbm.radius = Universe.BOUNDARY - 200.0
+	sbm.height = sbm.radius * 2.0
+	sbm.radial_segments = 64
+	sbm.rings = 32
+	starball.mesh = sbm
+	var ssh := Shader.new()
+	ssh.code = """
 shader_type spatial;
-render_mode unshaded;
+render_mode unshaded, cull_front;
+varying vec3 vn;
+void vertex(){ vn = normalize(VERTEX); }
+float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 void fragment(){
-	// plain DARKNESS -- no star effect. The universe reads as a dark
-	// ball in the white void, planets and the boundary scaffold show
-	// straight through it.
-	ALBEDO = vec3(0.004, 0.005, 0.010);
-	ALPHA = 0.8;
+	vec3 n = normalize(vn);
+	vec3 cell = floor(n * 240.0);
+	float star = step(0.9974, h31(cell));
+	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
+		+ h31(cell + 2.0) * 6.28);
+	ALBEDO = vec3(0.002, 0.003, 0.006) + vec3(1.0) * star * tw;
+	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.7;
 }
 """
-	var bmt9 := ShaderMaterial.new()
-	bmt9.shader = bsh9
-	bmt9.render_priority = -8   # always UNDER every other transparent
-	ball.material_override = bmt9
-	ball.extra_cull_margin = 16384.0
-	# the veil exists only for OUTSIDE eyes -- inside it must never
-	# render, or three giant concentric transparents sort-fight and the
-	# whole universe flickers dark
-	ball.visible = false
-	_night_veil = ball
-	add_child(ball)
-	ball.global_position = Vector3.ZERO
+	var smt := ShaderMaterial.new()
+	smt.shader = ssh
+	starball.material_override = smt
+	starball.extra_cull_margin = 999999.0
+	add_child(starball)
+	starball.global_position = Vector3.ZERO
 
 ## CTD_TEST=29: stand INSIDE the Pixel mouth, look outward + inward.
 func _hole_shot() -> void:
@@ -2068,20 +2092,13 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
-	# beyond the edge there is only WHITE. inside, the stars stay.
-	if _env_ref != null and Game.zone == "":
+	# the white/starry split is pure GEOMETRY now (star ball inside the
+	# boundary, white shell outside) -- position only decides the choir
+	if Game.zone == "":
 		var outside := pos.length() > Universe.BOUNDARY
 		if outside != _outside_white:
 			_outside_white = outside
-			if _night_veil != null:
-				_night_veil.visible = outside
 			if outside:
-				_env_ref.background_mode = Environment.BG_COLOR
-				_env_ref.background_color = Color(1, 1, 1)
-				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-				_env_ref.ambient_light_color = Color(1, 1, 1)
-				_env_ref.ambient_light_energy = 1.0
-				# the choir was waiting for you
 				if _void_amb == null:
 					_void_amb = AudioStreamPlayer.new()
 					_void_amb.stream = _void_ambience()
@@ -2090,14 +2107,17 @@ func _process(delta: float) -> void:
 				_void_amb.play()
 				var vtw := create_tween()
 				vtw.tween_property(_void_amb, "volume_db", -7.0, 3.0)
-			else:
-				_env_ref.background_mode = Environment.BG_SKY
-				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_BG
-				_env_ref.ambient_light_energy = 1.0
-				if _void_amb != null and _void_amb.playing:
-					var vtw2 := create_tween()
-					vtw2.tween_property(_void_amb, "volume_db", -60.0, 2.0)
-					vtw2.tween_callback(_void_amb.stop)
+				# your music belongs to the universe. it stays behind.
+				if _bgm != null and _bgm.playing:
+					var btw := create_tween()
+					btw.tween_property(_bgm, "volume_db", -60.0, 2.5)
+			elif _void_amb != null and _void_amb.playing:
+				var vtw2 := create_tween()
+				vtw2.tween_property(_void_amb, "volume_db", -60.0, 2.0)
+				vtw2.tween_callback(_void_amb.stop)
+				if _bgm != null and _bgm.playing:
+					var btw2 := create_tween()
+					btw2.tween_property(_bgm, "volume_db", -8.0, 2.5)
 
 	# the cracked sky follows you like a skybox
 	for fx in _skyfx:
@@ -6305,7 +6325,6 @@ var _h_monolith: Monolith = null
 var _earth_monolith: Monolith = null
 var _boundary_mesh: MeshInstance3D = null
 var _boundary_mat: ShaderMaterial = null
-var _night_veil: MeshInstance3D = null
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
@@ -6344,45 +6363,8 @@ func _monolith_snap() -> void:
 	# it is invisible from within -- but stand in the white void and
 	# look back, and there it is: black, full of stars, everything you
 	# know inside it.
-	var ball := MeshInstance3D.new()
-	var blm9 := SphereMesh.new()
-	blm9.radius = Universe.BOUNDARY - 120.0
-	blm9.height = blm9.radius * 2.0
-	blm9.radial_segments = 64
-	blm9.rings = 32
-	ball.mesh = blm9
-	var bsh9 := Shader.new()
-	bsh9.code = """
-shader_type spatial;
-render_mode unshaded;
-varying vec3 vn;
-void vertex(){ vn = normalize(VERTEX); }
-float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-void fragment(){
-	vec3 n = normalize(vn);
-	vec3 cell = floor(n * 220.0);
-	float star = step(0.9975, h31(cell));
-	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
-		+ h31(cell + 2.0) * 6.28);
-	// a dark VEIL, not a wall: the void outside is white, the universe
-	// reads as night -- but every planet inside still shows through
-	ALBEDO = vec3(0.004, 0.005, 0.010);
-	ALPHA = clamp(0.55 + star * tw, 0.0, 1.0);
-	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
-}
-"""
-	var bmt9 := ShaderMaterial.new()
-	bmt9.shader = bsh9
-	bmt9.render_priority = -8   # always UNDER every other transparent
-	ball.material_override = bmt9
-	ball.extra_cull_margin = 16384.0
-	# the veil exists only for OUTSIDE eyes -- inside it must never
-	# render, or three giant concentric transparents sort-fight and the
-	# whole universe flickers dark
-	ball.visible = false
-	_night_veil = ball
-	add_child(ball)
-	ball.global_position = Vector3.ZERO
+# (night veil removed -- the star ball + white shell do this with
+	# real geometry now)
 	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
 		if tr9.has_method("refresh"):
 			tr9.refresh()
@@ -6394,45 +6376,8 @@ func _on_monolith_advanced() -> void:
 	# it is invisible from within -- but stand in the white void and
 	# look back, and there it is: black, full of stars, everything you
 	# know inside it.
-	var ball := MeshInstance3D.new()
-	var blm9 := SphereMesh.new()
-	blm9.radius = Universe.BOUNDARY - 120.0
-	blm9.height = blm9.radius * 2.0
-	blm9.radial_segments = 64
-	blm9.rings = 32
-	ball.mesh = blm9
-	var bsh9 := Shader.new()
-	bsh9.code = """
-shader_type spatial;
-render_mode unshaded;
-varying vec3 vn;
-void vertex(){ vn = normalize(VERTEX); }
-float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-void fragment(){
-	vec3 n = normalize(vn);
-	vec3 cell = floor(n * 220.0);
-	float star = step(0.9975, h31(cell));
-	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
-		+ h31(cell + 2.0) * 6.28);
-	// a dark VEIL, not a wall: the void outside is white, the universe
-	// reads as night -- but every planet inside still shows through
-	ALBEDO = vec3(0.004, 0.005, 0.010);
-	ALPHA = clamp(0.55 + star * tw, 0.0, 1.0);
-	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
-}
-"""
-	var bmt9 := ShaderMaterial.new()
-	bmt9.shader = bsh9
-	bmt9.render_priority = -8   # always UNDER every other transparent
-	ball.material_override = bmt9
-	ball.extra_cull_margin = 16384.0
-	# the veil exists only for OUTSIDE eyes -- inside it must never
-	# render, or three giant concentric transparents sort-fight and the
-	# whole universe flickers dark
-	ball.visible = false
-	_night_veil = ball
-	add_child(ball)
-	ball.global_position = Vector3.ZERO
+# (night veil removed -- the star ball + white shell do this with
+	# real geometry now)
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
 			and not _earth_monolith.risen:
 		_earth_monolith.rise()

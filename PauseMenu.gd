@@ -607,7 +607,9 @@ func _quit_title() -> void:
 	var n := get_tree().get_first_node_in_group(g)
 	if n:
 		Save.set_player_pos(n.global_position, Game.mode == Game.Mode.IN_ROCKET,
-			n.hyperdrive if n is Rocket else false)
+			n.hyperdrive if n is Rocket else false,
+			n.mk2 if n is Rocket else false,
+			n.vel if n is Rocket else Vector3.ZERO)
 	var cs := get_tree().current_scene
 	if cs and cs.has_method("collect_world") and cs.get("_world_load_ok"):
 		Save.set_world(cs.collect_world())

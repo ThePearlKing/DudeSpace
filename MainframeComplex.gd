@@ -1890,8 +1890,10 @@ var _ai_mat: ShaderMaterial = null
 const AI_LINES := [
 	"i am the dude a i.",
 	"the dudes built me to run the big computer. then they went up.",
+	"up. and OUT.",
 	"i kept the lights on. four hundred years.",
 	"specimen four is not a shape. it is a memory with corners.",
+	"there is a white place past the edge. they are in it. or they are it.",
 	"the noodle knows the rest. ask the noodle.",
 ]
 
