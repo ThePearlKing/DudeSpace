@@ -74,7 +74,8 @@ func _process(delta: float) -> void:
 		_tab.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 		_tab.add_theme_constant_override("outline_size", 8)
 		add_child(_tab)
-	_tab.visible = Input.is_key_pressed(KEY_TAB) and Net.active and not _input.visible
+	_tab.visible = Input.is_key_pressed(KEY_TAB) and not _input.visible \
+		and not Game.dead
 	if _tab.visible:
 		var me = get_tree().get_first_node_in_group("player")
 		var rows := ["— PLAYERS (%d) —" % (Net.player_names.size() if Net.player_names.size() > 0 else 1)]

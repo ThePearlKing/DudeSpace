@@ -296,7 +296,7 @@ const TIPS := [
 	"tip: the electric seller pays 1.25x what the manual sell station does.",
 	"tip: armor caps at 60%. cheap pieces can hit the cap together.",
 	"tip: wire a computer output to a Light Box: instant status lamp.",
-	"tip: hold TAB in multiplayer to see everyone's distance from you.",
+	"tip: hold TAB for the player list -- every username, and how far away they are.",
 	"tip: gas giants have no ground. do not go looking for the ground.",
 	"tip: K opens the calendar. UFO trader Saturdays are predictable.",
 	"tip: prism shards only grow under shader light.",

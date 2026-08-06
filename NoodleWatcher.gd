@@ -230,9 +230,6 @@ func _process(delta: float) -> void:
 			Inventory.select_slot(randi() % 5)
 		3:
 			# THE SMACK: a tendril reaches all the way down and swats you
-			# -- SUPER-angry privileges only (a small eye just zaps)
-			if Game.wrath < 70.0:
-				return
 			var smack := _SmackFx.new()
 			smack.target = p
 			get_tree().current_scene.add_child(smack)
