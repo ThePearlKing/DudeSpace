@@ -239,10 +239,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				Sfx.play("denied")
 				return
 			var n: int = event.keycode - KEY_0
-			if n == 0 and Game.playtime - _warp_tap_t < 0.4:
-				if Game.playtime >= _overdrive_cd:
-					_overdrive_until = Game.playtime + 10.0
-					_overdrive_cd = Game.playtime + 90.0
+			# REAL milliseconds: playtime runs 10x fast after the first
+			# tap, which crushed the double-tap window to 0.04s -- the
+			# whole overdrive clock lives on wall time now
+			var nowms := float(Time.get_ticks_msec())
+			if n == 0 and nowms - _warp_tap_t < 400.0:
+				if nowms >= _overdrive_cd:
+					_overdrive_until = nowms + 10000.0
+					_overdrive_cd = nowms + 90000.0
 					Game.timewarp = 20.0
 					Sfx.play("warp", -10.0)
 				else:
@@ -250,11 +254,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_overdrive_until = 0.0   # picking any warp cancels the burst
 				Game.timewarp = 10.0 if n == 0 else float(n)
-			_warp_tap_t = Game.playtime if n == 0 else -10.0
+			_warp_tap_t = float(Time.get_ticks_msec()) if n == 0 else -1e9
 
-var _warp_tap_t := -10.0      # last time 0 was tapped (double-tap window)
-var _overdrive_until := 0.0   # 20x burst active until this playtime
-var _overdrive_cd := 0.0      # next time a burst is allowed
+var _warp_tap_t := -1e9       # last 0-tap, REAL ms (double-tap window)
+var _overdrive_until := 0.0   # 20x burst active until this REAL ms
+var _overdrive_cd := 0.0      # next burst allowed at this REAL ms
 
 func _physics_process(delta: float) -> void:
 	if not piloted or Game.dead:
@@ -352,7 +356,8 @@ func _physics_process(delta: float) -> void:
 		Game.timewarp = 1.0   # burning instantly kills time warp
 		_overdrive_until = 0.0
 	# overdrive burst expires back down to a plain 10x
-	if _overdrive_until > 0.0 and Game.playtime >= _overdrive_until:
+	if _overdrive_until > 0.0 \
+			and float(Time.get_ticks_msec()) >= _overdrive_until:
 		_overdrive_until = 0.0
 		if Game.timewarp > 10.0:
 			Game.timewarp = 10.0

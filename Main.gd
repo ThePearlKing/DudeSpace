@@ -368,6 +368,9 @@ func _boot() -> void:
 			rk.global_position = sp
 			rk.hyperdrive = Save.was_hyper()
 			rk.board(_player)
+			# the TRAJECTORY survives the rejoin: same velocity, same
+			# orbit, same arc you logged out on
+			rk.vel = Save.rocket_vel()
 
 ## Headless: park a Human in front of the player's face and press F.
 func _talk_test() -> void:
@@ -1086,17 +1089,12 @@ void fragment(){
 	bsh9.code = """
 shader_type spatial;
 render_mode unshaded;
-varying vec3 vn;
-void vertex(){ vn = normalize(VERTEX); }
-float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 void fragment(){
-	vec3 n = normalize(vn);
-	vec3 cell = floor(n * 220.0);
-	float star = step(0.9975, h31(cell));
-	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
-		+ h31(cell + 2.0) * 6.28);
-	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
-	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
+	// plain DARKNESS -- no star effect. The universe reads as a dark
+	// ball in the white void, planets and the boundary scaffold show
+	// straight through it.
+	ALBEDO = vec3(0.004, 0.005, 0.010);
+	ALPHA = 0.8;
 }
 """
 	var bmt9 := ShaderMaterial.new()
@@ -1894,7 +1892,12 @@ func _process(delta: float) -> void:
 			Save.set_pet(false)
 		if _world_load_ok:
 			Save.set_world(collect_world())
-		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2)
+		var rvel := Vector3.ZERO
+		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
+				and is_instance_valid(_rocket):
+			rvel = _rocket.vel
+		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2,
+			rvel)
 		Save.save_progress()
 
 	# --- time-rift snapshots: one per minute, keep the last 6 ---
@@ -2180,7 +2183,12 @@ func _notification(what: int) -> void:
 					mk2 = r.mk2
 		if _world_load_ok:
 			Save.set_world(collect_world())
-		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET, hyper, mk2)
+		var rvel2 := Vector3.ZERO
+		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
+				and is_instance_valid(_rocket):
+			rvel2 = _rocket.vel
+		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET,
+			hyper, mk2, rvel2)
 		Save.save_progress()
 
 func _active_node() -> Node:
@@ -6164,7 +6172,10 @@ void fragment(){
 	float star = step(0.9975, h31(cell));
 	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
 		+ h31(cell + 2.0) * 6.28);
-	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
+	// a dark VEIL, not a wall: the void outside is white, the universe
+	// reads as night -- but every planet inside still shows through
+	ALBEDO = vec3(0.004, 0.005, 0.010);
+	ALPHA = clamp(0.55 + star * tw, 0.0, 1.0);
 	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
 }
 """
@@ -6205,7 +6216,10 @@ void fragment(){
 	float star = step(0.9975, h31(cell));
 	float tw = 0.6 + 0.4 * sin(TIME * (1.0 + h31(cell + 1.0) * 3.0)
 		+ h31(cell + 2.0) * 6.28);
-	ALBEDO = vec3(0.004, 0.005, 0.010) + vec3(1.0) * star * tw;
+	// a dark VEIL, not a wall: the void outside is white, the universe
+	// reads as night -- but every planet inside still shows through
+	ALBEDO = vec3(0.004, 0.005, 0.010);
+	ALPHA = clamp(0.55 + star * tw, 0.0, 1.0);
 	EMISSION = vec3(0.9, 0.95, 1.0) * star * tw * 0.8;
 }
 """
