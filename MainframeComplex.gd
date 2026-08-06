@@ -1981,8 +1981,8 @@ func _grand_aquarium(ac: float) -> void:
 			Color("#66ff99"), Color("#b388ff")][fi]
 		var fbody := MeshInstance3D.new()
 		var fcm := CapsuleMesh.new()
-		fcm.radius = 0.22
-		fcm.height = 1.2
+		fcm.radius = 0.42
+		fcm.height = 2.3
 		fbody.mesh = fcm
 		fbody.rotation_degrees = Vector3(90, 0, 0)
 		fbody.scale = Vector3(0.55, 1.0, 1.0)
@@ -1990,21 +1990,83 @@ func _grand_aquarium(ac: float) -> void:
 		fish.add_child(fbody)
 		var dorsal := MeshInstance3D.new()
 		var dfm := BoxMesh.new()
-		dfm.size = Vector3(0.04, 0.3, 0.36)
+		dfm.size = Vector3(0.07, 0.6, 0.7)
 		dorsal.mesh = dfm
-		dorsal.position = Vector3(0, 0.3, -0.05)
+		dorsal.position = Vector3(0, 0.58, -0.1)
 		dorsal.material_override = Destructible.make_material(fcol.darkened(0.25), 0.9)
 		fish.add_child(dorsal)
 		var tail := MeshInstance3D.new()
 		var tfm := BoxMesh.new()
-		tfm.size = Vector3(0.06, 0.44, 0.44)
+		tfm.size = Vector3(0.1, 0.85, 0.85)
 		tail.mesh = tfm
-		tail.position = Vector3(0, 0, -0.75)
+		tail.position = Vector3(0, 0, -1.45)
 		tail.material_override = Destructible.make_material(fcol.darkened(0.15), 1.0)
 		fish.add_child(tail)
 		_fish.append({"node": fish, "tail": tail, "fb": fb, "up": up,
 			"x": 15.6, "phase": float(fi) * 1.9, "zr": 6.0,
 			"yb": 1.6 + 1.1 * float(fi % 3)})
+	# THE WHALE of the tank: 5m of slow blue bulk, one lazy lap
+	var whale := Node3D.new()
+	add_child(whale)
+	var wbody := MeshInstance3D.new()
+	var wcm := CapsuleMesh.new()
+	wcm.radius = 0.85
+	wcm.height = 5.0
+	wbody.mesh = wcm
+	wbody.rotation_degrees = Vector3(90, 0, 0)
+	wbody.scale = Vector3(0.7, 1.0, 1.0)
+	wbody.material_override = Destructible.make_material(Color("#3a6fae"), 0.9)
+	whale.add_child(wbody)
+	var wtail := MeshInstance3D.new()
+	var wtm := BoxMesh.new()
+	wtm.size = Vector3(1.6, 0.14, 1.0)
+	wtail.mesh = wtm
+	wtail.position = Vector3(0, 0, -2.9)
+	wtail.material_override = Destructible.make_material(Color("#2a5288"), 0.9)
+	whale.add_child(wtail)
+	var wbel := MeshInstance3D.new()
+	var wbm2 := CapsuleMesh.new()
+	wbm2.radius = 0.55
+	wbm2.height = 3.6
+	wbel.mesh = wbm2
+	wbel.rotation_degrees = Vector3(90, 0, 0)
+	wbel.position = Vector3(0, -0.4, 0.2)
+	wbel.material_override = Destructible.make_material(Color("#cfd8e2"), 0.7)
+	whale.add_child(wbel)
+	_fish.append({"node": whale, "tail": wtail, "fb": fb, "up": up,
+		"x": 15.6, "phase": 4.7, "zr": 5.2, "yb": 3.6})
+	# ANGLERFISH: lives in the dark bottom corner, lure burning
+	var ang := Node3D.new()
+	add_child(ang)
+	var abody := MeshInstance3D.new()
+	var acm := CapsuleMesh.new()
+	acm.radius = 0.32
+	acm.height = 1.1
+	abody.mesh = acm
+	abody.rotation_degrees = Vector3(90, 0, 0)
+	abody.scale = Vector3(0.7, 1.1, 1.0)
+	abody.material_override = Destructible.make_material(Color("#1c2026"), 0.4)
+	ang.add_child(abody)
+	var lrod := MeshInstance3D.new()
+	var lrm := CylinderMesh.new()
+	lrm.top_radius = 0.02
+	lrm.bottom_radius = 0.02
+	lrm.height = 0.55
+	lrod.mesh = lrm
+	lrod.position = Vector3(0, 0.42, 0.35)
+	lrod.rotation_degrees = Vector3(35, 0, 0)
+	lrod.material_override = Surfaces.metal(Color("#0e1116"))
+	ang.add_child(lrod)
+	var lure := MeshInstance3D.new()
+	var lum := SphereMesh.new()
+	lum.radius = 0.09
+	lum.height = 0.18
+	lure.mesh = lum
+	lure.material_override = Destructible.make_material(Color("#b7ffe0"), 2.6)
+	lure.position = Vector3(0, 0.62, 0.55)
+	ang.add_child(lure)
+	_fish.append({"node": ang, "tail": lrod, "fb": fb, "up": up,
+		"x": 17.2, "phase": 2.2, "zr": 3.0, "yb": 0.9})
 	# WEIRD creatures: three jellyfish, an eel, an icosahedron urchin
 	for ji in 3:
 		var jelly := Node3D.new()
@@ -2050,6 +2112,52 @@ func _grand_aquarium(ac: float) -> void:
 		esegs.append(es9)
 	_creatures.append({"node": eel, "kind": 1, "fb": fb, "up": up,
 		"phase": 0.7, "x": 15.2, "segs": esegs})
+	# MANTA: two wings that actually beat, gliding a wide circle
+	var manta := Node3D.new()
+	add_child(manta)
+	var mbody := MeshInstance3D.new()
+	var mbm := BoxMesh.new()
+	mbm.size = Vector3(0.7, 0.16, 1.3)
+	mbody.mesh = mbm
+	mbody.material_override = Destructible.make_material(Color("#31384a"), 0.8)
+	manta.add_child(mbody)
+	var wings: Array = []
+	for wsd in [-1.0, 1.0]:
+		var wing := MeshInstance3D.new()
+		var wgm := BoxMesh.new()
+		wgm.size = Vector3(1.5, 0.06, 1.0)
+		wing.mesh = wgm
+		wing.position = Vector3(wsd * 1.05, 0, -0.05)
+		wing.material_override = Destructible.make_material(Color("#48536e"), 0.8)
+		manta.add_child(wing)
+		wings.append(wing)
+	var mtail := MeshInstance3D.new()
+	var mtm2 := BoxMesh.new()
+	mtm2.size = Vector3(0.05, 0.05, 1.4)
+	mtail.mesh = mtm2
+	mtail.position = Vector3(0, 0, -1.3)
+	mtail.material_override = Destructible.make_material(Color("#31384a"), 0.7)
+	manta.add_child(mtail)
+	_creatures.append({"node": manta, "kind": 2, "fb": fb, "up": up,
+		"phase": 1.1, "x": 15.6, "wings": wings})
+	# a SCHOOL of twelve tiny fish that moves as one silver cloud
+	var school := Node3D.new()
+	add_child(school)
+	for sfi in 12:
+		var tf := MeshInstance3D.new()
+		var tfc := CapsuleMesh.new()
+		tfc.radius = 0.05
+		tfc.height = 0.24
+		tf.mesh = tfc
+		tf.rotation_degrees = Vector3(90, 0, 0)
+		tf.position = Vector3(fmod(float(sfi) * 0.71, 1.4) - 0.7,
+			fmod(float(sfi) * 0.43, 1.0) - 0.5,
+			fmod(float(sfi) * 1.13, 1.6) - 0.8)
+		tf.material_override = Destructible.make_material(
+			Color("#cfe0ec") if sfi % 3 else Color("#9fc2dc"), 1.4)
+		school.add_child(tf)
+	_creatures.append({"node": school, "kind": 3, "fb": fb, "up": up,
+		"phase": 0.4, "x": 15.0})
 	var urch := MeshInstance3D.new()
 	var um := SphereMesh.new()
 	um.radius = 0.5
@@ -4501,6 +4609,49 @@ func _process(delta: float) -> void:
 			+ 0.25 * sin(ph * 1.4))).translated_local(Vector3(fx, 0, fz)).origin)
 		(f["tail"] as Node3D).rotation = Vector3(0,
 			sin(_t * 9.0 + float(f["phase"]) * 3.0) * 0.5, 0)
+	# aquarium creatures: jellies bob, the eel snakes, the manta beats
+	# its wings, the school wheels
+	for cr9 in _creatures:
+		var cn: Node3D = cr9["node"]
+		var cfb: Basis = cr9["fb"]
+		var cup: Vector3 = cr9["up"]
+		var cph := _t * 0.4 + float(cr9["phase"])
+		match int(cr9["kind"]):
+			0:
+				cn.global_transform = Transform3D(cfb,
+					Transform3D(cfb, _C + cup * (_rF + 2.6
+					+ 1.1 * sin(cph * 1.7))).translated_local(Vector3(
+					float(cr9["x"]) + 0.8 * sin(cph), 0,
+					2.2 * cos(cph * 0.6))).origin)
+			1:
+				var segs: Array = cr9["segs"]
+				var ex := float(cr9["x"]) + 0.6 * sin(cph * 0.9)
+				cn.global_transform = Transform3D(
+					cfb * Basis(Vector3(0, 1, 0), cph * 0.7),
+					Transform3D(cfb, _C + cup * (_rF + 1.3
+					+ 0.5 * sin(cph))).translated_local(
+					Vector3(ex, 0, 3.5 * sin(cph * 0.5))).origin)
+				for si9 in segs.size():
+					(segs[si9] as Node3D).position = Vector3(
+						0.35 * sin(_t * 3.0 - float(si9) * 0.9), 0,
+						-0.28 * float(si9))
+			2:
+				cn.global_transform = Transform3D(
+					cfb * Basis(Vector3(0, 1, 0), -cph * 0.55 + PI * 0.5),
+					Transform3D(cfb, _C + cup * (_rF + 3.4
+					+ 0.6 * sin(cph * 1.3))).translated_local(Vector3(
+					float(cr9["x"]) + 1.6 * cos(cph * 0.55), 0,
+					4.4 * sin(cph * 0.55))).origin)
+				for wi9 in (cr9["wings"] as Array).size():
+					((cr9["wings"] as Array)[wi9] as Node3D).rotation.z = \
+						(1.0 if wi9 == 0 else -1.0) * 0.55 * sin(_t * 2.6)
+			3:
+				cn.global_transform = Transform3D(
+					cfb * Basis(Vector3(0, 1, 0), cph * 1.1 + PI * 0.5),
+					Transform3D(cfb, _C + cup * (_rF + 2.3
+					+ 0.9 * sin(cph * 2.1))).translated_local(Vector3(
+					float(cr9["x"]) + 1.2 * sin(cph * 1.1), 0,
+					3.6 * cos(cph * 1.1))).origin)
 	# fusion: pulses, rising discs, flickering arc bolts
 	for pu in _pulses:
 		(pu["mat"] as StandardMaterial3D).emission_energy_multiplier = \
