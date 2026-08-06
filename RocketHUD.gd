@@ -33,13 +33,14 @@ class _NavView extends Control:
 	var rocket: Rocket
 
 	## outside the universe no planet owns you, whatever is nearest
-func _place_name(body) -> String:
-	var rr := rocket.global_position.length()
-	if Game.zone == "" and rr > Universe.BOUNDARY:
-		return "THE DARK" if rr > Universe.BOUNDARY * 1.5 else "THE WHITE ZONE"
-	return str(body.name)
+	func _place_name(body) -> String:
+		var rr := rocket.global_position.length()
+		if Game.zone == "" and rr > Universe.BOUNDARY:
+			return "THE DARK" if rr > Universe.BOUNDARY * 1.5 \
+				else "THE WHITE ZONE"
+		return str(body.name)
 
-func _draw() -> void:
+	func _draw() -> void:
 		if rocket == null or not is_instance_valid(rocket):
 			return
 		var font := ThemeDB.fallback_font

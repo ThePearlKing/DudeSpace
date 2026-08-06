@@ -93,7 +93,7 @@ func _ready() -> void:
 	add_child(_head)
 	_camera = Camera3D.new()
 	_camera.current = true
-	_camera.far = 420000.0
+	_camera.far = 1000000.0
 	# your OWN body lives on layer 11: every other camera sees it, yours
 	# doesn't -- so windows and TVs show a person, not a floating hand
 	_camera.cull_mask = 0xFFFFF & ~(1 << 10)
