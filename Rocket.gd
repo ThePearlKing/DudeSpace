@@ -435,6 +435,11 @@ func _physics_process(delta: float) -> void:
 	else:
 		landed = false
 
+	# the camera pivot was positioned BEFORE the ship moved this tick,
+	# so at high speed (or deep timewarp) the view trailed the hull by
+	# hundreds of meters. Re-anchor it to where the ship actually IS.
+	_cam_pivot.global_position = global_position
+
 	_cooldown -= delta
 	if not ui and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _cooldown <= 0.0:
 		_smash()
