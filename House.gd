@@ -1016,7 +1016,7 @@ func _build_interior() -> void:
 
 const RIDDLE_ITEMS := ["ultima", "prism", "circle", "noodle", "uranium"]
 const RIDDLES := [
-	"I AM THE LAST THING THE MOUNTAIN SAYS\nBEFORE IT SAYS NOTHING.\nSHIPS DRINK MY LIGHT.\nBRING ME.",
+	"THE DEEPEST ROCK GIVES ME UP LAST.\nI AM CRYSTAL. I AM THE COLOR OF ICE.\nSTARSHIP DRIVES DRINK MY LIGHT.\nBRING ME.",
 	"I TAKE ONE TRUTH\nAND TELL IT SEVEN WAYS.\nNONE OF THEM LIE.\nBRING ME.",
 	"I BEGIN NOWHERE. I END NOWHERE.\nI AM WORTH MORE THAN BOTH.\nBRING ME.",
 	"THE EYE ABOVE WOULD FORGIVE YOU\nANYTHING FOR ONE OF ME.\nCOOK ME FIRST.\nBRING ME.",
@@ -1250,12 +1250,12 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 		Color("#5c554c"), 0.03)
 	# the BOTTOM CHAMBER: its own walls from ceiling to floor around
 	# the landing, open only through the doorway into the room
-	for cw in [[Vector3(1, 3.6, 4.8), Vector3(shc.x - 2.8, rc.y, shc.z + 1.1)],
-			[Vector3(1, 3.6, 4.8), Vector3(shc.x + 2.8, rc.y, shc.z + 1.1)],
+	# NO cap over the shaft column -- the spiral falls straight through
+	# into this chamber (the first cap sealed the staircase shut)
+	for cw in [[Vector3(1, 3.6, 6.4), Vector3(shc.x - 2.8, rc.y, shc.z + 0.4)],
+			[Vector3(1, 3.6, 6.4), Vector3(shc.x + 2.8, rc.y, shc.z + 0.4)],
 			[Vector3(5.6, 3.6, 1), Vector3(shc.x, rc.y, shc.z + 2.8)]]:
 		_solid(cw[1] as Vector3, cw[0] as Vector3, Color("#5c554c"), 0.03)
-	_solid(Vector3(shc.x, rc.y + 1.8, shc.z + 1.1), Vector3(6.6, 1, 5.0),
-		Color("#5c554c"), 0.03)
 	# candles never burned down. nobody asks why
 	for cd in [Vector3(-3.6, -1.4, 3.6), Vector3(3.6, -1.4, 3.6)]:
 		_deco(rc + cd, Vector3(0.12, 0.5, 0.12), Color("#d8c8ae"), 0.1)

@@ -1571,8 +1571,8 @@ func _harold_test() -> void:
 	var shx := c.x - hx - 6.6
 	var d3: float = cast.call(Vector3(shx, fy + 1.0, c.z - 2.0),
 		Vector3(shx, fy - 40.0, c.z - 2.0))
-	print("HAROLD shaft floored: hit %.2f (must hit) %s" % [
-		d3, "PASS" if d3 >= 0.0 else "FAIL"])
+	print("HAROLD shaft floored: hit %.2f (13.5-15.5: floor, not a cap) %s" % [
+		d3, "PASS" if d3 > 13.5 and d3 < 15.5 else "FAIL"])
 	# 4. riddle room floor exists
 	var rcy := fy - 11.0 - 1.6
 	var d4: float = cast.call(Vector3(shx, rcy, c.z - 7.6),
