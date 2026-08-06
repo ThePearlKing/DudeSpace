@@ -342,6 +342,8 @@ func _boot() -> void:
 		_edge_shots()
 	if OS.get_environment("CTD_TEST") == "32":
 		_throat_shot()
+	if OS.get_environment("CTD_TEST") == "36":
+		_skyshow_test()
 	if OS.get_environment("CTD_TEST") == "33":
 		_harold_test()
 	if OS.get_environment("CTD_TEST") == "34":
@@ -1537,6 +1539,21 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=36: fire the monolith sky show headless and prove it built
+func _skyshow_test() -> void:
+	await get_tree().create_timer(3.0).timeout
+	var mat9 = sky_show(Game.MONO_COLORS[1], 1, true)
+	await get_tree().create_timer(2.0).timeout
+	var n9 := get_tree().get_nodes_in_group("mono_sky").size()
+	var plates9 := 0
+	for fx in _skyfx:
+		if is_instance_valid(fx):
+			plates9 = (fx as Node3D).get_child_count()
+	print("SKYSHOW nodes=%d plates=%d mat=%s %s" % [n9, plates9,
+		str(mat9 != null), "PASS" if n9 >= 2 and plates9 > 50
+		and mat9 != null else "FAIL"])
+	get_tree().quit()
+
 ## CTD_TEST=34: camera in the riddle room, looking at the far wall --
 ## the riddle must be READABLE in the frame
 func _riddle_shot() -> void:

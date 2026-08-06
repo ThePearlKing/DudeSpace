@@ -285,13 +285,8 @@ func activate() -> void:
 	add_child(sp)
 	sp.global_position = top + dir * 6.0
 	sp.play()
-	# 4. THE UNIVERSE ITSELF answers: cracks spider across the actual
-	# sky and giant triangles wheel at cosmic distance -- Main owns the
-	# show so it follows you anywhere for its whole six-minute afterglow
-	var m0 = get_tree().current_scene
-	if m0 != null and m0.has_method("sky_show"):
-		m0.sky_show(col, stage, true)
-	# 5. the monolith lowers into the ground while all of it happens
+	# 4. the monolith lowers into the ground first -- the sky answers
+	# AFTER the stone is gone, so nobody watching the descent misses it
 	if _root != null:
 		var twl := create_tween()
 		twl.tween_property(_root, "global_position",
@@ -305,6 +300,14 @@ func activate() -> void:
 		await twl.finished
 		_root.visible = false
 		tet.visible = false
+	# 5. THE UNIVERSE ITSELF answers: the stone drops, a breath -- then
+	# cracks spider across the actual sky and the boundary's own glass
+	# tears loose at cosmic distance. Main owns the show so it follows
+	# you anywhere for its whole six-minute afterglow.
+	await get_tree().create_timer(0.8).timeout
+	var m0 = get_tree().current_scene
+	if m0 != null and m0.has_method("sky_show"):
+		m0.sky_show(col, stage, true)
 	# 6. hologram: a PROJECTOR PUCK left in the ground beams up a flat
 	# 2D pictogram of the next planet -- ring, latitude bands, a bar --
 	# in the piece's color, with a visible cone of light from the
