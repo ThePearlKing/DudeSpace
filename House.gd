@@ -1368,7 +1368,7 @@ func _harold_try_slot() -> void:
 	if Game.lime_wall_open:
 		var hud0 = get_tree().get_first_node_in_group("hud")
 		if hud0:
-			hud0.flash("the wall already gave its answer")
+			hud0.flash("this riddle was solved long ago -- the wall stands open, the prize already claimed")
 		return
 	var ridx := int(absi(Game.world_seed)) % 5
 	var want: String = RIDDLE_ITEMS[ridx]
