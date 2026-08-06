@@ -435,6 +435,10 @@ func _open_mono() -> void:
 		Game.cheated = true
 		Game.lime_wall_open = false
 		Game.lime_taken = false
+		for hh9 in get_tree().get_nodes_in_group("house"):
+			if hh9 is House and hh9.harolds:
+				hh9.harold_reset()
+		Save.save_progress()
 		Sfx.play("click")))
 	col.add_child(_btn("Reset ALL monolith progress", func() -> void:
 		Game.cheated = true

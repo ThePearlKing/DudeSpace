@@ -1037,6 +1037,14 @@ class RiddleSlot extends StaticBody3D:
 
 class LimeTetra extends StaticBody3D:
 	func use() -> void:
+		# clipped through the wall somehow? the stone does not care how
+		# clever you are -- no answer, no prize
+		if not Game.lime_wall_open:
+			Sfx.play("denied", -14.0)
+			var hud0 = get_tree().get_first_node_in_group("hud")
+			if hud0:
+				hud0.flash("it will not move while the wall stands")
+			return
 		Inventory.add_res("ltetra", 1)
 		Game.lime_taken = true
 		Sfx.play("learn", -6.0)
@@ -1048,6 +1056,8 @@ class LimeTetra extends StaticBody3D:
 var _hshelf: StaticBody3D = null
 var _hshelf_open := false
 var _hwall: StaticBody3D = null
+var _hwall_home := Vector3.ZERO
+var _halcove := Vector3.ZERO
 
 func _hbook_row(parent: Node3D, at: Vector3, w: float,
 		rng: RandomNumberGenerator, gap0 := 99.0, gap1 := 99.0) -> void:
@@ -1363,6 +1373,7 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	_hwall.add_child(wcs)
 	_iroot.add_child(_hwall)
 	_hwall.global_position = rc + Vector3(4.0, 0, 0)
+	_hwall_home = _hwall.position
 	# the alcove beyond it
 	var ac9 := rc + Vector3(6.4, 0, 0)
 	for aw in [[Vector3(3.8, 1, 4.4), Vector3(0, -1.8, 0)],
@@ -1371,34 +1382,52 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 			[Vector3(3.8, 3.6, 1), Vector3(0, 0, 2.2)],
 			[Vector3(1, 3.6, 4.4), Vector3(1.9, 0, 0)]]:
 		_solid(ac9 + (aw[1] as Vector3), aw[0] as Vector3, Color("#5c554c"), 0.02)
+	_halcove = ac9
 	if Game.lime_wall_open:
 		_hwall.position += Vector3(0, -3.3, 0)
 	if not Game.lime_taken:
-		var lt := LimeTetra.new()
-		var lmi := MeshInstance3D.new()
-		lmi.mesh = MainframeComplex._tetra_mesh(0.5)
-		lmi.material_override = Destructible.make_material(Color("#b6ff3f"), 1.8)
-		lt.add_child(lmi)
-		lmi.position = Vector3(0, 1.5, 0)
-		var lcs := CollisionShape3D.new()
-		var lcb := BoxShape3D.new()
-		lcb.size = Vector3(1.2, 1.6, 1.2)
-		lcs.shape = lcb
-		lcs.position = Vector3(0, 1.2, 0)
-		lt.add_child(lcs)
-		var lped := MeshInstance3D.new()
-		var lpm := CylinderMesh.new()
-		lpm.top_radius = 0.4
-		lpm.bottom_radius = 0.5
-		lpm.height = 1.0
-		lped.mesh = lpm
-		lped.material_override = _wallmat(Color("#57504a"), 0.02)
-		lt.add_child(lped)
-		lped.position = Vector3(0, 0.5, 0)
-		_iroot.add_child(lt)
-		lt.global_position = ac9 + Vector3(0, -1.8, 0)
-		var ltw := lt.create_tween().set_loops()
-		ltw.tween_property(lmi, "rotation:y", TAU, 9.0).as_relative()
+		_spawn_lime()
+
+## the prize, standing in its alcove (build-time and cheat-reset both)
+func _spawn_lime() -> void:
+	var ac9 := _halcove
+	var lt := LimeTetra.new()
+	var lmi := MeshInstance3D.new()
+	lmi.mesh = MainframeComplex._tetra_mesh(0.5)
+	lmi.material_override = Destructible.make_material(Color("#b6ff3f"), 1.8)
+	lt.add_child(lmi)
+	lmi.position = Vector3(0, 1.5, 0)
+	var lcs := CollisionShape3D.new()
+	var lcb := BoxShape3D.new()
+	lcb.size = Vector3(1.2, 1.6, 1.2)
+	lcs.shape = lcb
+	lcs.position = Vector3(0, 1.2, 0)
+	lt.add_child(lcs)
+	var lped := MeshInstance3D.new()
+	var lpm := CylinderMesh.new()
+	lpm.top_radius = 0.4
+	lpm.bottom_radius = 0.5
+	lpm.height = 1.0
+	lped.mesh = lpm
+	lped.material_override = _wallmat(Color("#57504a"), 0.02)
+	lt.add_child(lped)
+	lped.position = Vector3(0, 0.5, 0)
+	_iroot.add_child(lt)
+	lt.global_position = ac9 + Vector3(0, -1.8, 0)
+	var ltw := lt.create_tween().set_loops()
+	ltw.tween_property(lmi, "rotation:y", TAU, 9.0).as_relative()
+
+## cheat support: un-solve the riddle LIVE -- wall back up, prize back
+func harold_reset() -> void:
+	if _hwall != null and is_instance_valid(_hwall):
+		_hwall.position = _hwall_home
+	var has_lt := false
+	if _iroot != null:
+		for ch9 in _iroot.get_children():
+			if ch9 is LimeTetra:
+				has_lt = true
+	if not has_lt and _halcove != Vector3.ZERO:
+		_spawn_lime()
 
 func _harold_open_shelf() -> void:
 	if _hshelf_open or _hshelf == null:
@@ -1415,10 +1444,7 @@ func _harold_open_shelf() -> void:
 
 func _harold_try_slot() -> void:
 	if Game.lime_wall_open:
-		var hud0 = get_tree().get_first_node_in_group("hud")
-		if hud0:
-			hud0.flash("this riddle was solved long ago -- the wall stands open, the prize already claimed")
-		return
+		return   # the open wall says everything
 	var ridx := int(absi(Game.world_seed)) % 5
 	var want: String = RIDDLE_ITEMS[ridx]
 	var hud = get_tree().get_first_node_in_group("hud")
@@ -1439,8 +1465,7 @@ func _harold_try_slot() -> void:
 		tw.tween_property(_hwall, "position",
 			_hwall.position + Vector3(0, -3.3, 0), 3.0) \
 			.set_trans(Tween.TRANS_SINE)
-	if hud:
-		hud.flash("the answer was accepted. the wall remembers how to move")
+
 
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop
 ## looking like the inside of a shipping box.
