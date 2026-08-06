@@ -315,6 +315,8 @@ func _boot() -> void:
 		_hole_shot()
 	if OS.get_environment("CTD_TEST") == "30":
 		_edge_shots()
+	if OS.get_environment("CTD_TEST") == "32":
+		_throat_shot()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -995,14 +997,12 @@ func _sky_detonate() -> void:
 	ech.tween_interval(1.0)
 	ech.tween_callback(func() -> void:
 		var gp := AudioStreamPlayer.new()
-		gp.stream = _void_ambience()
-		gp.volume_db = -40.0
+		gp.stream = _god_chord()
+		gp.volume_db = -7.0
 		add_child(gp)
 		gp.play()
 		var gtw := create_tween()
-		gtw.tween_property(gp, "volume_db", -5.0, 4.0)
-		gtw.tween_interval(8.0)
-		gtw.tween_property(gp, "volume_db", -44.0, 6.0)
+		gtw.tween_interval(13.0)
 		gtw.tween_callback(gp.queue_free))
 	# and out of the wreckage, the dying scaffold FADES IN -- the bars
 	# were always there; now you get to see them
@@ -1298,6 +1298,23 @@ func _build_boundary() -> void:
 	wsm.radial_segments = 48
 	wsm.rings = 24
 	wshell.mesh = wsm
+	var bshell := MeshInstance3D.new()
+	var bsm := SphereMesh.new()
+	bsm.radius = Universe.BOUNDARY * 4.0   # SUPER big: 285km of dark
+	bsm.height = bsm.radius * 2.0
+	bsm.radial_segments = 48
+	bsm.rings = 24
+	bshell.mesh = bsm
+	var bkmat := StandardMaterial3D.new()
+	bkmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bkmat.albedo_color = Color(0, 0, 0)
+	bkmat.cull_mode = BaseMaterial3D.CULL_FRONT
+	bshell.material_override = bkmat
+	bshell.extra_cull_margin = 999999.0
+	bshell.visible = false
+	_void_shells.append(bshell)
+	add_child(bshell)
+	bshell.global_position = Vector3.ZERO
 	var wmat := StandardMaterial3D.new()
 	wmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	wmat.albedo_color = Color(1, 1, 1)
@@ -1346,6 +1363,24 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=32: stand on the Big Computer atrium floor, look UP the
+## shaft -- the way out must read OPEN (crust cut + sky at the top)
+func _throat_shot() -> void:
+	await get_tree().create_timer(4.0).timeout
+	var b = Universe.body_named("Big Computer")
+	var u0: Vector3 = MAINFRAME_DIR
+	var cam := Camera3D.new()
+	add_child(cam)
+	var e1x := u0.cross(Vector3(0, 0, 1)).normalized()
+	cam.global_position = b.center + u0 * (b.radius - 16.0 + 8.0) + e1x * 2.0
+	cam.look_at(b.center + u0 * (b.radius + 30.0), e1x)
+	cam.current = true
+	await get_tree().create_timer(1.0).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("THROATSHOT saved")
+	get_tree().quit()
+
 func _edge_shots() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
@@ -2239,7 +2274,21 @@ func _process(delta: float) -> void:
 	# the white/starry split is pure GEOMETRY now (star ball inside the
 	# boundary, white shell outside) -- position only decides the choir
 	if Game.zone == "":
-		var outside := pos.length() > Universe.BOUNDARY
+		var outside := pos.length() > Universe.BOUNDARY + (
+			-50.0 if _outside_white else 50.0)
+		# THE END OF EVERYTHING: past the white zone is the dark, and
+		# the dark has a wall. Nothing crosses 2.1x the boundary.
+		var lim9 := Universe.BOUNDARY * 3.9
+		if pos.length() > lim9:
+			var an9 := _active_node()
+			if an9 != null:
+				var rd9: Vector3 = pos.normalized()
+				(an9 as Node3D).global_position = rd9 * lim9
+				if "vel" in an9:
+					an9.vel = an9.vel - rd9 * maxf(an9.vel.dot(rd9), 0.0)
+				elif "velocity" in an9:
+					an9.velocity = an9.velocity \
+						- rd9 * maxf(an9.velocity.dot(rd9), 0.0)
 		if outside != _outside_white:
 			_outside_white = outside
 			for sh9 in _void_shells:
@@ -2532,6 +2581,40 @@ func _void_ambience() -> AudioStreamWAV:
 	wav.data = data
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	wav.loop_end = n
+	return wav
+
+## the sound the universe makes when its god understands the sky is
+## gone: one immense chord -- a dark open stack with bells ringing over
+## it, swelling for two seconds and dying for ten. Nothing loops.
+func _god_chord() -> AudioStreamWAV:
+	var rate := 22050
+	var secs := 12.0
+	var n := int(rate * secs)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var ts := float(i) / float(rate)
+		var env := pow(minf(ts / 2.2, 1.0), 1.6) \
+			* exp(-maxf(ts - 2.2, 0.0) * 0.38)
+		var v := 0.0
+		for pt in [[73.42, 0.20], [110.0, 0.16], [146.83, 0.13],
+				[174.61, 0.10], [220.0, 0.08]]:
+			var f0: float = pt[0]
+			var a0: float = pt[1]
+			var vib := 1.0 + 0.004 * sin(TAU * 4.5 * ts + f0)
+			v += sin(TAU * f0 * vib * ts) * a0
+			v += sin(TAU * f0 * 2.0 * vib * ts) * a0 * 0.35
+		v += 0.10 * sin(TAU * 587.3 * ts) * exp(-ts * 0.9)
+		v += 0.07 * sin(TAU * 987.8 * ts) * exp(-ts * 1.3)
+		v += 0.05 * sin(TAU * 1567.9 * ts) * exp(-ts * 1.7)
+		v *= env
+		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
+		data[i * 2] = s9 & 0xFF
+		data[i * 2 + 1] = (s9 >> 8) & 0xFF
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.data = data
 	return wav
 
 func _setup_environment() -> void:

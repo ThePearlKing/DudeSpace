@@ -158,6 +158,18 @@ func _fault_box(sys: String, pos: Vector3, label: String) -> void:
 	_fault_boxes[sys] = {"mat": cmat, "pos": pos}
 	_fault_light(sys)
 
+func _mesh_from_faces(faces: PackedVector3Array) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in faces.size():
+		var v := faces[i]
+		var n := v.normalized()
+		st.set_normal(n)
+		st.set_uv(Vector2(atan2(n.z, n.x) / TAU + 0.5,
+			acos(clampf(n.y, -1.0, 1.0)) / PI))
+		st.add_vertex(v)
+	return st.commit()
+
 func _femissive(c: Color, emit: float) -> StandardMaterial3D:
 	var key := c.to_html(true) + ("_%.2f" % emit)
 	if _fmat_cache.has(key):
@@ -362,7 +374,22 @@ func build(b, dir: Vector3) -> void:
 	crm.height = (R - 1.2) * 2.0
 	crm.radial_segments = 48
 	crm.rings = 24
-	crust.mesh = crm
+	# the MOUTH IS CUT THROUGH THE CRUST TOO: the planet shell always
+	# had its hole, but this inner shell sat behind it unbroken -- from
+	# the atrium the way out READ as blocked even though you could fly
+	# through. Cut a cone around the shaft and cover the ragged edge
+	# with a steel apron.
+	var crfaces := crm.get_faces()
+	var crkept := PackedVector3Array()
+	var crcos := cos(15.0 / (R - 1.2))
+	for ci in range(0, crfaces.size(), 3):
+		var ccen := (crfaces[ci] + crfaces[ci + 1] + crfaces[ci + 2]) / 3.0
+		if ccen.normalized().dot(_u0) > crcos:
+			continue
+		crkept.append(crfaces[ci])
+		crkept.append(crfaces[ci + 1])
+		crkept.append(crfaces[ci + 2])
+	crust.mesh = _mesh_from_faces(crkept)
 	var crsh := Shader.new()
 	crsh.code = """
 shader_type spatial;
@@ -406,6 +433,13 @@ void fragment(){
 	crust.material_override = crmat
 	add_child(crust)
 	crust.global_position = _C
+	# the crust-side APRON: a steel square around the shaft covering the
+	# crust cut edge, so the hole reads machined, not bitten
+	var apxf := Transform3D(abas, _C + _u0 * (R - 2.2))
+	_plate(Vector3(32.0, 0.6, 12.8), apxf, Vector3(0, 0, 9.6), DARK, 0.0)
+	_plate(Vector3(32.0, 0.6, 12.8), apxf, Vector3(0, 0, -9.6), DARK, 0.0)
+	_plate(Vector3(12.8, 0.6, 6.4), apxf, Vector3(9.6, 0, 0), DARK, 0.0)
+	_plate(Vector3(12.8, 0.6, 6.4), apxf, Vector3(-9.6, 0, 0), DARK, 0.0)
 	# ---- surface kit: rim, collar, apron, masts ----
 	var rim := MeshInstance3D.new()
 	var tmm := TorusMesh.new()
