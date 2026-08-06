@@ -11,6 +11,7 @@ var _t := 0.0
 var _phase := 0.0
 var _tents: Array = []
 var _pupils: Array = []      # [eyeball_pos, pupil_node]
+var _wings: Array = []
 var _strike_cd := 0.0
 var _lunge := 0.0
 var _dead := false
@@ -22,112 +23,138 @@ func _ready() -> void:
 	_phase = randf() * TAU
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 3.2
-	cap.height = 7.5
+	cap.radius = 2.6
+	cap.height = 13.0
 	cs.shape = cap
 	add_child(cs)
 	_build()
 
 func _build() -> void:
-	var flesh := Destructible.make_material(Color("#151021"), 0.12)
-	var flesh2 := Destructible.make_material(Color("#241a38"), 0.2)
-	var noodle := Destructible.make_material(Color("#e8d5a0"), 0.3)
-	# the mantle, smoother and crowned, with a second inner hood tone
-	var body := MeshInstance3D.new()
-	var bm := SphereMesh.new()
-	bm.radius = 3.45
-	bm.height = 6.0
-	bm.radial_segments = 32
-	bm.rings = 16
-	body.mesh = bm
-	body.material_override = flesh
-	add_child(body)
-	var hood := MeshInstance3D.new()
-	var hm2 := SphereMesh.new()
-	hm2.radius = 3.0
-	hm2.height = 4.4
-	hood.mesh = hm2
-	hood.position = Vector3(0, 0.9, 0.4)
-	hood.material_override = flesh2
-	add_child(hood)
-	var skirt := MeshInstance3D.new()
-	var skm := CylinderMesh.new()
-	skm.top_radius = 3.15
-	skm.bottom_radius = 4.5
-	skm.height = 2.7
-	skm.radial_segments = 24
-	skirt.mesh = skm
-	skirt.position = Vector3(0, -2.25, 0)
-	skirt.material_override = flesh
-	add_child(skirt)
-	# ridge spines, five now, sweeping back like a crest
-	for i in 5:
-		var sp := MeshInstance3D.new()
-		var spm := CylinderMesh.new()
-		spm.top_radius = 0.0
-		spm.bottom_radius = 0.24
-		spm.height = 1.9 - 0.15 * absf(float(i) - 2.0)
-		sp.mesh = spm
-		sp.position = Vector3(0, 2.6, -1.1 + 0.65 * float(i))
-		sp.rotation_degrees.x = -25.0 + 16.0 * float(i)
-		sp.material_override = flesh2
-		add_child(sp)
-	# faint violet vein glow seaming the mantle
-	for vi in 4:
-		var vein := MeshInstance3D.new()
-		var vm := TorusMesh.new()
-		vm.inner_radius = 2.5 + 0.22 * float(vi)
-		vm.outer_radius = 2.56 + 0.22 * float(vi)
-		vein.mesh = vm
-		vein.material_override = Destructible.make_material(Color("#6a4a9e"), 0.9)
-		vein.position = Vector3(0, -0.6 - 0.5 * float(vi), 0)
-		vein.scale = Vector3(1, 0.25, 1)
-		add_child(vein)
-	# TWO pale eyes. both looking at you. always.
+	var flesh := Destructible.make_material(Color("#1a2418"), 0.15)
+	var flesh2 := Destructible.make_material(Color("#2a3a26"), 0.25)
+	var wingm := Destructible.make_material(Color("#141c12"), 0.1)
+	# CTHULHU PROPER: a hulking humanoid TORSO, not a hood
+	var torso := MeshInstance3D.new()
+	var tm := CapsuleMesh.new()
+	tm.radius = 2.2
+	tm.height = 7.0
+	torso.mesh = tm
+	torso.material_override = flesh
+	add_child(torso)
+	var chest := MeshInstance3D.new()
+	var chm := SphereMesh.new()
+	chm.radius = 2.5
+	chm.height = 4.2
+	chest.mesh = chm
+	chest.position = Vector3(0, 1.2, -0.3)
+	chest.material_override = flesh2
+	add_child(chest)
+	# the HEAD: bulbous, wider than tall, eyes forward
+	var head := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 1.9
+	hm.height = 3.2
+	head.mesh = hm
+	head.position = Vector3(0, 4.6, 0)
+	head.material_override = flesh
+	add_child(head)
+	# TWO eyes. tracking. always.
 	for es in [-1.0, 1.0]:
 		var eye := MeshInstance3D.new()
 		var em := SphereMesh.new()
-		em.radius = 0.85
-		em.height = 1.7
+		em.radius = 0.55
+		em.height = 1.1
 		eye.mesh = em
-		eye.material_override = Destructible.make_material(Color("#ded2a8"), 1.6)
-		eye.position = Vector3(es * 1.25, 0.5, -2.75)
+		eye.material_override = Destructible.make_material(Color("#ffd9a0"), 1.8)
+		eye.position = Vector3(es * 0.85, 5.0, -1.45)
 		add_child(eye)
 		var pupil := MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.32
-		pm.height = 0.64
+		pm.radius = 0.22
+		pm.height = 0.44
 		pupil.mesh = pm
 		pupil.material_override = Destructible.make_material(Color("#0a0808"), 0.0)
 		add_child(pupil)
-		pupil.position = eye.position + Vector3(0, 0, -0.62)
+		pupil.position = eye.position + Vector3(0, 0, -0.4)
 		_pupils.append([eye.position, pupil])
-	# the SPAGHETTI: twelve tentacles, nine segments, thick to thin
-	for ti in 12:
-		var ang := TAU * float(ti) / 12.0
+	# the FACE TENTACLES: the beard. eight writhing feelers off the jaw
+	for ti in 8:
+		var bx := -1.2 + 2.4 * float(ti) / 7.0
 		var root := Node3D.new()
-		root.position = Vector3(cos(ang) * 2.3, -3.2, sin(ang) * 2.3)
+		root.position = Vector3(bx, 3.9, -1.3)
 		add_child(root)
 		var segs: Array = [root]
 		var parent: Node3D = root
-		for si in 9:
+		for si in 6:
 			var seg := Node3D.new()
 			parent.add_child(seg)
-			seg.position = Vector3(0, -1.1, 0)
+			seg.position = Vector3(0, -0.55, -0.1)
 			var mi := MeshInstance3D.new()
 			var cm := CapsuleMesh.new()
-			cm.radius = 0.3 - 0.026 * float(si)
-			cm.height = 1.35
+			cm.radius = 0.17 - 0.02 * float(si)
+			cm.height = 0.7
 			mi.mesh = cm
-			mi.material_override = noodle
+			mi.material_override = flesh2
 			seg.add_child(mi)
 			segs.append(seg)
 			parent = seg
 		_tents.append(segs)
-
-var _departing := false
-func depart() -> void:
-	_departing = true
+	# ARMS: thick, clawed, hanging ready
+	for asd in [-1.0, 1.0]:
+		var arm := MeshInstance3D.new()
+		var am := CapsuleMesh.new()
+		am.radius = 0.75
+		am.height = 5.2
+		arm.mesh = am
+		arm.position = Vector3(asd * 2.9, 1.2, 0)
+		arm.rotation_degrees = Vector3(0, 0, asd * -14.0)
+		arm.material_override = flesh
+		add_child(arm)
+		for cl in 3:
+			var claw := MeshInstance3D.new()
+			var clm := CylinderMesh.new()
+			clm.top_radius = 0.0
+			clm.bottom_radius = 0.14
+			clm.height = 0.9
+			claw.mesh = clm
+			claw.position = Vector3(asd * 3.5 + (float(cl) - 1.0) * 0.3,
+				-1.6, -0.2)
+			claw.rotation_degrees = Vector3(180, 0, 0)
+			claw.material_override = flesh2
+			add_child(claw)
+	# LEGS: it stands on the void
+	for lsd in [-1.0, 1.0]:
+		var leg := MeshInstance3D.new()
+		var lm := CapsuleMesh.new()
+		lm.radius = 0.9
+		lm.height = 5.6
+		leg.mesh = lm
+		leg.position = Vector3(lsd * 1.2, -4.6, 0)
+		leg.material_override = flesh
+		add_child(leg)
+	# THE WINGS: vast ragged membranes, half-folded, slowly beating
+	for wsd in [-1.0, 1.0]:
+		var wroot := Node3D.new()
+		wroot.position = Vector3(wsd * 1.6, 2.8, 1.6)
+		add_child(wroot)
+		_wings.append(wroot)
+		var spar := MeshInstance3D.new()
+		var sm := CapsuleMesh.new()
+		sm.radius = 0.3
+		sm.height = 7.5
+		spar.mesh = sm
+		spar.position = Vector3(wsd * 3.2, 1.4, 0.6)
+		spar.rotation_degrees = Vector3(0, 0, wsd * -62.0)
+		spar.material_override = flesh
+		wroot.add_child(spar)
+		var mem := MeshInstance3D.new()
+		var mm := PrismMesh.new()
+		mm.size = Vector3(6.4, 5.4, 0.14)
+		mem.mesh = mm
+		mem.position = Vector3(wsd * 3.6, 0.4, 1.0)
+		mem.rotation_degrees = Vector3(8, wsd * 14.0, wsd * -20.0)
+		mem.material_override = wingm
+		wroot.add_child(mem)
 
 func take_damage(d: float, _from: Vector3) -> void:
 	if _dead:
@@ -194,8 +221,13 @@ func _process(delta: float) -> void:
 		var eyepos: Vector3 = pe[0]
 		var pup: Node3D = pe[1]
 		var ldir := (to_local(p.global_position) - eyepos).normalized()
-		pup.position = eyepos + ldir * 0.62
-	# writhe
+		pup.position = eyepos + ldir * 0.4
+	# wings: a slow heavy beat, deeper when it lunges
+	for wi in _wings.size():
+		var wr: Node3D = _wings[wi]
+		wr.rotation.z = (1.0 if wi == 0 else -1.0) \
+			* (0.12 + 0.10 * sin(_t * 0.9) + _lunge * 0.3)
+	# the beard writhes
 	for ti in _tents.size():
 		var segs: Array = _tents[ti]
 		for si in segs.size():
