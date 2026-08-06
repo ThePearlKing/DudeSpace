@@ -1194,6 +1194,23 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	bk.position = Vector3(0.615, 1.815, 0.02)
 	# THE PASSAGE: corridor west, then the shaft
 	var cx := c + Vector3(-hx - 2.2, 0, -2.0)   # corridor center
+	# NO SOFTLOCKS: a switch inside the passage opens the shelf-door
+	# from behind, whatever state the world loaded in
+	var lev := SecretBook.new()
+	lev.host = self
+	var lmi9 := MeshInstance3D.new()
+	var lbm9 := BoxMesh.new()
+	lbm9.size = Vector3(0.12, 0.3, 0.2)
+	lmi9.mesh = lbm9
+	lmi9.material_override = _wallmat(Color("#7a1f1f"), 0.4)
+	lev.add_child(lmi9)
+	var lcs9 := CollisionShape3D.new()
+	var lcb9 := BoxShape3D.new()
+	lcb9.size = Vector3(0.3, 0.5, 0.4)
+	lcs9.shape = lcb9
+	lev.add_child(lcs9)
+	_iroot.add_child(lev)
+	lev.global_position = cx + Vector3(1.9, fy - c.y + 1.5, 1.0)
 	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn, 0.08,
 		Surfaces.STONE)
 	_solid(cx + Vector3(0, fy - c.y + 3.4, 0), Vector3(4.4, 1, 2.3), worn, 0.08,
@@ -1280,7 +1297,7 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	# floor slab seams, cracks
 	for pil in [Vector3(-4.0, 0, -4.0), Vector3(4.0, 0, -4.0),
 			Vector3(-4.0, 0, 4.0), Vector3(4.0, 0, 4.0),
-			Vector3(-4.0, 0, 0), Vector3(4.0, 0, 0)]:
+			Vector3(-4.0, 0, 0)]:
 		_solid(rc + pil, Vector3(0.55, 3.6, 0.55), Color("#4e4840"), 0.02,
 			Surfaces.STONE)
 	for cnz in [-1.0, 1.0]:
