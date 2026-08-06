@@ -556,7 +556,9 @@ func _on_destroyed(push_dir: Vector3) -> void:
 		for nd in entry["nodes"]:
 			if is_instance_valid(nd):
 				nd.queue_free()
-	if refund_id != "" and not Game.creative:
+	# ALWAYS give the machine back -- losing the generator but keeping
+	# its coal is nobody's idea of fair (creative included)
+	if refund_id != "":
 		Inventory.give_at(refund_id, 1, global_position)
 	if str(in_slot["id"]) != "":
 		Inventory.give_at(str(in_slot["id"]), int(in_slot["n"]), global_position)

@@ -1179,6 +1179,25 @@ func _physics_process(delta: float) -> void:
 
 	up_direction = up
 	move_and_slide()
+	# STAIR STEP: bumping a small ledge (<=0.55) while walking on the
+	# ground lifts you onto it -- every stair works, no ramps needed
+	if is_on_wall() and is_on_floor() and wish.length() > 0.1:
+		var sspace := get_world_3d().direct_space_state
+		var fwd := wish.normalized()
+		var head := global_position + up * 1.6 + fwd * 0.75
+		var qh := PhysicsRayQueryParameters3D.create(head, head - up * 1.55)
+		qh.exclude = [get_rid()]
+		var hh := sspace.intersect_ray(qh)
+		if hh:
+			var rise: float = 1.55 - (head - (hh.position as Vector3)).dot(up)
+			if rise > 0.06 and rise <= 0.55 \
+					and (hh.normal as Vector3).dot(up) > 0.6:
+				var clr := PhysicsRayQueryParameters3D.create(
+					(hh.position as Vector3) + up * 0.1,
+					(hh.position as Vector3) + up * 1.9)
+				clr.exclude = [get_rid()]
+				if not sspace.intersect_ray(clr):
+					global_position += up * (rise + 0.05) + fwd * 0.12
 
 	_cooldown -= delta
 	if not _ui_open() and not Game.dead and not _door_mode and not _wreck_mode \
@@ -1810,6 +1829,12 @@ func _use_selected() -> void:
 				pn = pn.get_parent()
 	if id == "":
 		return
+	if id == "dudemap":
+		for mf in get_tree().get_nodes_in_group("mainframe"):
+			if mf.has_method("map_use"):
+				mf.map_use()
+				return
+		return
 	if id == "locator":
 		var lui = get_tree().get_first_node_in_group("locator_ui")
 		if lui and lui.has_method("open"):
@@ -1857,6 +1882,12 @@ func _use_selected() -> void:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
+			if Universe.inside_body(global_position):
+				Sfx.play("denied")
+				var hudi = get_tree().get_first_node_in_group("hud")
+				if hudi:
+					hudi.flash("can't place machines inside a planet")
+				return
 			if id in ["coaldrill", "autominer"] and Game.zone != "":
 				Sfx.play("denied")   # nothing to drill in a pocket dimension
 				return
@@ -1926,8 +1957,8 @@ func _use_selected() -> void:
 			Inventory.remove_res("waypoint", 1)
 			Sfx.play("place")
 		"rocket", "rocket2":
-			if Game.zone == "flat":
-				# houses and temple interiors: no launch pads in pockets
+			if Game.zone == "flat" or Universe.inside_body(global_position):
+				# pockets, colony interiors, facilities, mines: no pads
 				Sfx.play("denied")
 				var hudr = get_tree().get_first_node_in_group("hud")
 				if hudr:

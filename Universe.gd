@@ -159,8 +159,24 @@ func gravity_at(pos: Vector3) -> Vector3:
 		if rsq < 1.0 or b.gm() / rsq < 0.0004:
 			continue
 		var r: float = sqrt(rsq)
-		a += d / r * (b.gm() / (r * r))
+		var pull: float = b.gm() / rsq
+		# INSIDE a body, gravity tapers like a solid sphere: g_surf * r/R.
+		# The point-mass formula would crush anyone in a facility interior
+		# and hit hundreds of m/s^2 near the planetary core.
+		if r < b.radius:
+			pull = b.g_surf * (r / b.radius)
+		a += d / r * pull
 	return a
+
+## true when pos is INSIDE a planet's shell -- colony interiors, the Big
+## Computer facility, mine shafts. No rockets or machines down there.
+func inside_body(pos: Vector3) -> bool:
+	for b in bodies:
+		if b.kind == "torus":
+			continue
+		if pos.distance_to(b.center) < b.radius - 0.5:
+			return true
+	return false
 
 ## Body whose surface is closest to pos.
 func nearest(pos: Vector3) -> Body:

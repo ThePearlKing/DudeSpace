@@ -128,6 +128,24 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 	var c := _color_of(id)
 	var box := BoxMesh.new()
 	match id:
+		"ytetra":
+			# SPECIMEN 4: one real tetrahedron, glowing amber. Same model
+			# everywhere -- world drop, inventory icon, hand.
+			_p(r, MainframeComplex._tetra_mesh(0.34), Vector3.ZERO,
+				Color("#ffd23f"), 1.6)
+		"dudemap":
+			# the facility map: an amber slate with a glowing route line
+			var slate := BoxMesh.new()
+			slate.size = Vector3(0.44, 0.05, 0.34)
+			_p(r, slate, Vector3.ZERO, Color("#1c2026"), 0.2)
+			var tr9 := BoxMesh.new()
+			tr9.size = Vector3(0.3, 0.02, 0.03)
+			_p(r, tr9, Vector3(0, 0.04, -0.04), Color("#66ff99"), 1.6,
+				Vector3(0, 15, 0))
+			var tr2 := BoxMesh.new()
+			tr2.size = Vector3(0.16, 0.02, 0.03)
+			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
+				Vector3(0, -30, 0))
 		"meat", "cooked_meat":
 			var slab := BoxMesh.new()
 			slab.size = Vector3(0.55, 0.22, 0.4)

@@ -224,6 +224,15 @@ func _build_stations() -> void:
 			"TIN 618":
 				# the black hole broadcasts. nobody asked it to.
 				st = {"name": "EVENT HORIZON", "type": "music"}
+			"Big Computer":
+				# the facility's own station: the A.I. runs a transmitter
+				# off one of the four giant antennas. all circuits, all day.
+				st = {"name": "BIG COMPUTER FM", "type": "music",
+					"kind": "circuit"}
+				st["freq"] = snappedf(rng.randf_range(88.5, 107.5), 0.1)
+				st["body"] = b
+				stations.append(st)
+				continue
 			_:
 				if kind == "sun":
 					st = {"name": b.name.to_upper() + " ✶", "type": "music"}
