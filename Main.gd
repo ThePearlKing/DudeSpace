@@ -5534,6 +5534,7 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"coaldrill": return EMachines.CoalDrill.new()
 		"bioreactor": return EMachines.Bioreactor.new()
 		"rtg": return EMachines.RTG.new()
+		"netanalyser": return EMachines.NetworkAnalyser.new()
 		"creativegen": return EMachines.CreativeGen.new()
 		"prisreactor": return EMachines.PrismReactor.new()
 		"teleporter": return EMachines.Teleporter.new()

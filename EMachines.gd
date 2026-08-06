@@ -521,6 +521,107 @@ class CreativeGen extends Machine:
 	func info_text() -> String:
 		return "energy: %.0f / %.0f EU\n+999 EU/s, continuous, from nowhere" % [buf, buf_cap]
 
+## NETWORK ANALYSER: wire it into your grid and it walks EVERY
+## connection -- the whole base -- and reports the truth: gained and
+## lost EU per second, storage, machine census, wire count.
+class NetworkAnalyser extends Machine:
+	var _scan_t := 0.0
+	var _net: Array = []          # every Machine reachable through wires
+	var _last: Dictionary = {}    # machine -> buf last second
+	var _gain := 0.0
+	var _loss := 0.0
+	var _rate_t := 0.0
+	var _dish: MeshInstance3D
+	func _init() -> void:
+		title = "NETWORK ANALYSER"
+		box_color = Color("#1a3a4a")
+		refund_id = "netanalyser"
+		shows_in = false
+		shows_out = false
+		buf_cap = 50.0
+	func _ready() -> void:
+		super._ready()
+		dress_industrial(Color("#122a36"))
+		_dish = MeshInstance3D.new()
+		var dm := CylinderMesh.new()
+		dm.top_radius = 0.55
+		dm.bottom_radius = 0.1
+		dm.height = 0.3
+		_dish.mesh = dm
+		_dish.position = Vector3(0, box_size.y + 0.45, 0)
+		_dish.rotation_degrees = Vector3(55, 0, 0)
+		_dish.material_override = Destructible.make_material(Color("#7df9ff"), 1.6)
+		add_child(_dish)
+	## walk the wire graph in BOTH directions from here
+	func _scan() -> void:
+		_net.clear()
+		var seen := {}
+		var frontier: Array = [self]
+		seen[self] = true
+		# reverse edges need the full census once
+		var all9: Array = get_tree().get_nodes_in_group("machine")
+		while not frontier.is_empty():
+			var m = frontier.pop_back()
+			if not is_instance_valid(m):
+				continue
+			_net.append(m)
+			var links: Array = []
+			for w in m.wires_out:
+				links.append(w)
+			for o in all9:
+				if is_instance_valid(o) and o.wires_out.has(m):
+					links.append(o)
+			for l in links:
+				if is_instance_valid(l) and not seen.has(l):
+					seen[l] = true
+					frontier.append(l)
+	func _process(delta: float) -> void:
+		super._process(delta)
+		if _dish:
+			_dish.rotate_y(delta * 1.7)
+		_scan_t -= delta
+		if _scan_t <= 0.0:
+			_scan_t = 2.0
+			_scan()
+		_rate_t += delta
+		if _rate_t >= 1.0:
+			var g := 0.0
+			var l := 0.0
+			for m in _net:
+				if not is_instance_valid(m):
+					continue
+				if _last.has(m):
+					var dv: float = (m.buf - float(_last[m])) / _rate_t
+					if dv > 0.0:
+						g += dv
+					else:
+						l -= dv
+				_last[m] = m.buf
+			_gain = g
+			_loss = l
+			_rate_t = 0.0
+	func info_text() -> String:
+		var stored := 0.0
+		var cap := 0.0
+		var gens := 0
+		var caps := 0
+		var wires := 0
+		var live := 0
+		for m in _net:
+			if not is_instance_valid(m):
+				continue
+			live += 1
+			stored += m.buf
+			cap += m.buf_cap
+			wires += m.wires_out.size()
+			if m.gen_rate > 0.0 or m is Generator or m is CoalDrill \
+					or m is Bioreactor or m is NuclearReactor or m is PrismReactor:
+				gens += 1
+			elif m is Capacitor or m is UltraCapacitor:
+				caps += 1
+		return "network: %d machines · %d wires\ngenerators: %d · capacitors: %d\nstored: %.0f / %.0f EU\ngained: +%.1f EU/s · lost: -%.1f EU/s\nnet: %+.1f EU/s" % [
+			live, wires, gens, caps, stored, cap, _gain, _loss, _gain - _loss]
+
 ## ULTRA capacitor: 10x the storage, feeds wires faster. Late game.
 class UltraCapacitor extends Machine:
 	var _fill: MeshInstance3D

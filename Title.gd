@@ -137,6 +137,12 @@ func _build_main_menu() -> void:
 			_roll_tip())
 	col.add_child(_tip)
 	_roll_tip()
+	# tips rotate on their own every seven seconds (click still skips)
+	var tiptimer := Timer.new()
+	tiptimer.wait_time = 7.0
+	tiptimer.autostart = true
+	tiptimer.timeout.connect(_roll_tip)
+	add_child(tiptimer)
 
 ## LAN server browser: hosts on the network announce themselves and show
 ## up here by name, Minecraft style. Manual IP entry as a fallback.
@@ -310,7 +316,16 @@ const TIPS := [
 	"tip: the black hole has no death screen. it just keeps you.",
 	"tip: glowing seams on crates mean OPENABLE.",
 	"tip: Big Computer is worth a visit.",
-	"tip: capacitors report net EU/s. negative means your base is bleeding.",
+	"tip: a Network Analyser wired anywhere reports your WHOLE grid: gained, lost, net EU/s.",
+	"tip: hyperdrive: hold H in a rocket. point first, regret never.",
+	"tip: jetpack: Space up, C down. zero-g turns it into a spaceship.",
+	"tip: F1 hides the whole HUD. F1 brings it back. screenshots thank you.",
+	"tip: sell stations pay double what the shop does.",
+	"tip: spawn beacons place dormant. F claims one as YOUR respawn.",
+	"tip: the shop shows ??? until you learn a recipe. temples teach.",
+	"tip: fuel and jet fuel are different liquids. rockets are picky.",
+	"tip: K opens the calendar. some visitors keep schedules.",
+	"tip: number keys 1-9 warp time in a rocket. burning cancels it.",
 	"tip: the Zapper fires twenty zaps a second. the math works out.",
 	"tip: gas giants have no floor. your rocket also believes this.",
 	"tip: Undros has no land. the sand floor is 40 meters down.",
@@ -344,9 +359,15 @@ const TIPS := [
 
 var _tip: Label
 
+var _tip_bag: Array = []
 func _roll_tip() -> void:
-	if _tip:
-		_tip.text = TIPS[randi() % TIPS.size()]
+	if _tip == null:
+		return
+	# a shuffle bag: every tip appears once before any repeats
+	if _tip_bag.is_empty():
+		_tip_bag = range(TIPS.size())
+		_tip_bag.shuffle()
+	_tip.text = TIPS[_tip_bag.pop_back()]
 
 ## Tutorial session: fresh throwaway world on the tutorial planet.
 ## Nothing it does is ever written to disk.

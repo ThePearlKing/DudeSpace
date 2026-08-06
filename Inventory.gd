@@ -131,6 +131,7 @@ var items: Dictionary = {
 	"eseller":    {"name": "Electric Seller",  "color": Color("#7a6a10")},
 	"atm":        {"name": "ATM",              "color": Color("#1b2b4a")},
 	"ecomputer":  {"name": "Electric Computer","color": Color("#2a4a6a")},
+	"netanalyser": {"name": "Network Analyser", "color": Color("#1a3a4a")},
 	"scomputer":  {"name": "Sorter Computer",  "color": Color("#5a3a6a")},
 	"carkeys":    {"name": "Space Car Keys",   "color": Color("#4dff9a")},
 	"shroom":     {"name": "Mushroom",         "color": Color("#d13a3a")},
@@ -171,7 +172,7 @@ var items: Dictionary = {
 }
 var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier", "autominer",
 	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
-	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender"]
+	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser"]
 
 var hotbar: Array = []
 var backpack_store: Array = []   # basic pack: 20
@@ -277,6 +278,7 @@ func _ready() -> void:
 		{"id": "nreactor",  "tab": "Electric", "name": "Nuclear Reactor", "cost": {"ingot": 30, "irid": 20, "ultima": 6, "uranium": 10}, "desc": "Fission: up to +16 EU/s. Feed uranium, raise the control rods, mind the core temperature. Cooling only carries ~60% power -- run hotter and it CLIMBS. At 1000°C it takes your base with it."},
 		{"id": "efurnace",  "tab": "Electric", "name": "Electric Furnace","cost": {"ingot": 25, "irid": 12}, "desc": "INSTANT smelt, 4 EU per item. Wire power in, funnel ore in."},
 		{"id": "ecomputer", "tab": "Electric", "name": "Electric Computer","cost": {"ingot": 20, "irid": 10}, "desc": "Programmable power gate: inp1, out1..out8. Lua-ish."},
+		{"id": "netanalyser", "tab": "Electric", "name": "Network Analyser", "cost": {"ingot": 8, "irid": 3}, "desc": "Wire it in: full-grid report. EU/s gained, lost, census."},
 		{"id": "scomputer", "tab": "Electric", "name": "Sorter Computer", "cost": {"ingot": 20, "irid": 10}, "desc": "Programmable item router: sort(funnel, port)."},
 		{"id": "eseller",   "tab": "Electric", "name": "Electric Seller","cost": {"ingot": 25, "irid": 15}, "desc": "Sells fast at 1.25x price, 2 EU per sale."},
 

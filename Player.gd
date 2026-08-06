@@ -1351,7 +1351,7 @@ const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
-	"nreactor", "waypoint", "rocket", "rocket2"]
+	"nreactor", "waypoint", "rocket", "rocket2", "netanalyser"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -1888,7 +1888,7 @@ func _use_selected() -> void:
 			place = global_position - global_transform.basis.z * 3.0
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
-		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
+		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", "netanalyser", \
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
 			if Universe.inside_body(global_position):
 				Sfx.play("denied")
@@ -1910,6 +1910,7 @@ func _use_selected() -> void:
 				"coaldrill": n = EMachines.CoalDrill.new()
 				"bioreactor": n = EMachines.Bioreactor.new()
 				"rtg": n = EMachines.RTG.new()
+				"netanalyser": n = EMachines.NetworkAnalyser.new()
 				"creativegen": n = EMachines.CreativeGen.new()
 				"prisreactor": n = EMachines.PrismReactor.new()
 				"nreactor": n = EMachines.NuclearReactor.new()
