@@ -133,6 +133,8 @@ static func _resource_mesh(rid: String) -> Mesh:
 			var m := TorusMesh.new()
 			m.inner_radius = 0.16; m.outer_radius = 0.34
 			return m
+		"ytetra":      # SPECIMEN 4 -- a real four-vertex tetrahedron
+			return MainframeComplex._tetra_mesh(0.3)
 		_:
 			var m := BoxMesh.new()
 			m.size = Vector3(0.5, 0.5, 0.5)

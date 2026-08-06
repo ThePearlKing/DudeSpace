@@ -1255,6 +1255,7 @@ func _rings() -> void:
 	_dress_farm(nf)
 	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.")
 	set_meta("ai_room_a", 2.685)
+	_dress_ai()
 	# --- ring A west: cockpit -> server hall 2 -> generator wing ---
 	_hall(0, 3.383, 3.63, [])
 	var s2 := _big_room(0, 3.775, 9.0, 8.0, 6.5, "SERVER HALL 2")
@@ -1456,6 +1457,92 @@ func _cockpit_dress() -> void:
 	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2)).origin, 201, -9.0)
 	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2))
 		.translated_local(Vector3(-7.0, 0, 6.0)).origin, 202, -12.0)
+
+## THE DUDE A.I. -- the machine that ran this place for four hundred
+## years. A wall-sized terminal face that blinks and talks, cable
+## conduits converging on it, and two operator consoles nobody sits at.
+func _dress_ai() -> void:
+	var aA := 2.685
+	var fw := aA + 12.9 / _rF
+	var fb9 := _fr(fw)
+	var fup := _pdir(fw)
+	# the FACE: a 10x5 screen on the far end wall
+	var face := MeshInstance3D.new()
+	var fqm := QuadMesh.new()
+	fqm.size = Vector2(10.0, 5.0)
+	face.mesh = fqm
+	face.material_override = _ai_face_mat()
+	add_child(face)
+	face.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.6))
+	face.rotate_object_local(Vector3(0, 1, 0), PI)
+	# it TALKS -- an old voice on a loop, positional, patient
+	var vsp := AudioStreamPlayer3D.new()
+	var vw = HumanVoice.render(
+		"i am the dude a i. the dudes went up. i kept the lights on. " +
+		"four hundred years. the noodle knows the rest.",
+		RadioLib.ALIEN_HOSTS[1])
+	if vw is AudioStreamWAV:
+		(vw as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+		(vw as AudioStreamWAV).loop_end = (vw as AudioStreamWAV).data.size() / 2
+	vsp.stream = vw
+	vsp.volume_db = -6.0
+	vsp.max_distance = 34.0
+	add_child(vsp)
+	vsp.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.0))
+	vsp.play()
+	# cable conduits converging on the face along the floor
+	for cv in 5:
+		var cz: float = -5.6 + 2.8 * float(cv)
+		var cvxf := Transform3D(_fr(aA), _C + _pdir(aA) * (_rF + 0.06))
+		_deco_box(Vector3(0.22, 0.1, 22.0), cvxf, Vector3(cz * 0.5, 0, 0),
+			[Color("#66ff99"), AMBER, Color("#7df9ff"), AMBER,
+			Color("#ff6a6a")][cv], 1.2)
+	# two operator consoles facing the face
+	for cs9 in [-1.0, 1.0]:
+		var ca := aA + 6.0 / _rF
+		var cbb := _fr(ca)
+		var cuu := _pdir(ca)
+		_plate(Vector3(2.6, 1.05, 1.1), Transform3D(cbb, _C + cuu * (_rF + 0.52)),
+			Vector3(cs9 * 3.2, 0, 0), Color("#12161c"), 0.0)
+		var cpan := MeshInstance3D.new()
+		cpan.mesh = IcosaColony._cham_mesh(2.4, 0.05, 0.95, 0.22)
+		cpan.material_override = Destructible.make_material(
+			Color("#2a8f4a"), 1.5)
+		add_child(cpan)
+		cpan.global_transform = Transform3D(cbb * Basis(Vector3(1, 0, 0), -0.5),
+			_C + cuu * (_rF + 1.16))
+		cpan.translate_object_local(Vector3(cs9 * 3.2, 0, 0))
+	_chatter(Transform3D(_fr(aA), _C + _pdir(aA) * (_rF + 1.4)).origin, 191, -8.0)
+
+## the A.I face: terminal-green eyes that blink and a mouth bar that
+## moves like speech
+func _ai_face_mat() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded;
+void fragment(){
+	vec2 uv = UV;
+	float t = TIME;
+	vec3 col = vec3(0.015, 0.045, 0.025);
+	float blink = step(0.06, fract(t * 0.21));
+	float ey1 = smoothstep(0.10, 0.075, distance(uv * vec2(2.0, 1.0),
+		vec2(0.70, 0.40)));
+	float ey2 = smoothstep(0.10, 0.075, distance(uv * vec2(2.0, 1.0),
+		vec2(1.30, 0.40)));
+	float mw = step(abs(uv.x - 0.5), 0.17);
+	float mh = 0.015 + 0.05 * abs(sin(t * 6.4) + 0.6 * sin(t * 11.7));
+	float mo = mw * step(abs(uv.y - 0.70), mh);
+	vec3 g = vec3(0.30, 1.0, 0.45);
+	col += g * (ey1 + ey2) * blink + g * mo * 0.85;
+	float scan = 0.5 + 0.5 * sin(uv.y * 90.0 - t * 7.0);
+	ALBEDO = col * (0.8 + 0.2 * scan);
+	EMISSION = col * 1.8;
+}
+"""
+	var m9 := ShaderMaterial.new()
+	m9.shader = sh
+	return m9
 
 func _dress_tape(r: Dictionary) -> void:
 	# reel-to-reel tape banks: cabinets with two spinning reels each
@@ -1689,30 +1776,32 @@ func _side_room(i: int, s: float, kind: String) -> void:
 	var fb := _fr(a)
 	var up := _pdir(a)
 	var cx := s * 9.6
-	_plate(Vector3(8.6, 0.5, 9.6), Transform3D(fb, _C + up * (_rF - 0.25)),
-		Vector3(cx, 0, 0), DARK, 0.0)
-	_plate(Vector3(8.6, 0.5, 9.6), Transform3D(fb, _C + up * (_rF + 5.25)),
-		Vector3(cx, 0, 0), DARK, 0.0)
 	var wxf := Transform3D(fb, _C + up * (_rF + 2.5))
-	_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.65, 0, 0), STEEL, 0.0)
-	_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, 4.55), STEEL, 0.0)
-	_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, -4.55), STEEL, 0.0)
+	if kind != "LAB":
+		# standard one-room shell (flat floor is fine at this depth)
+		_plate(Vector3(8.6, 0.5, 9.6), Transform3D(fb, _C + up * (_rF - 0.25)),
+			Vector3(cx, 0, 0), DARK, 0.0)
+		_plate(Vector3(8.6, 0.5, 9.6), Transform3D(fb, _C + up * (_rF + 5.25)),
+			Vector3(cx, 0, 0), DARK, 0.0)
+		_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.65, 0, 0), STEEL, 0.0)
+		_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, 4.55), STEEL, 0.0)
+		_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, -4.55), STEEL, 0.0)
+		var rl := MeshInstance3D.new()
+		var rlm := CylinderMesh.new()
+		rlm.top_radius = 0.8
+		rlm.bottom_radius = 0.8
+		rlm.height = 0.08
+		rl.mesh = rlm
+		rl.material_override = Destructible.make_material(Color("#f2ead8"), 1.9)
+		add_child(rl)
+		rl.global_transform = Transform3D(fb, _C + up * (_rF + 4.95))
+		rl.translate_object_local(Vector3(cx, 0, 0))
 	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 5.55, 0, 3.0), STEEL, 0.0)
 	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 5.55, 0, -3.0), STEEL, 0.0)
 	_plate(Vector3(0.5, 1.4, 2.4), wxf, Vector3(s * 5.55, 2.05, 0), STEEL, 0.0)
-	var rl := MeshInstance3D.new()
-	var rlm := CylinderMesh.new()
-	rlm.top_radius = 0.8
-	rlm.bottom_radius = 0.8
-	rlm.height = 0.08
-	rl.mesh = rlm
-	rl.material_override = Destructible.make_material(Color("#f2ead8"), 1.9)
-	add_child(rl)
-	rl.global_transform = Transform3D(fb, _C + up * (_rF + 4.95))
-	rl.translate_object_local(Vector3(cx, 0, 0))
 	match kind:
 		"LAB":
-			_room_lab(fb, up, cx)
+			_room_lab(a, signf(cx))
 		"AQUARIUM":
 			_room_aquarium(fb, up, cx, s)
 		"MAP ROOM":
@@ -1720,12 +1809,65 @@ func _side_room(i: int, s: float, kind: String) -> void:
 		"CARGO BAY":
 			_room_cargo(fb, up, cx)
 
-func _room_lab(fb: Basis, up: Vector3, cx: float) -> void:
-	# two benches, glowing glassware, and SPECIMEN 4: a tetrahedron in a
-	# containment ring. The dudes were studying something Harold-shaped.
+## THE LAB COMPLEX: three chained rooms burrowing away from the deck
+## -- LAB (benches, SPECIMEN 4), RESEARCH (desks, data walls), and
+## CONTAINMENT (glass cell with a socket you can store the specimen
+## in). Floors/walls follow the sphere laterally so nothing tilts.
+var _spec_xf: Transform3D
+var _specimen: Node3D = null
+var _sock_tetra: MeshInstance3D = null
+var _sock_full := false
+
+class TetraSpecimen extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._tetra_take(self)
+
+class TetraButton extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._tetra_respawn()
+
+class TetraSocket extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._tetra_socket_use()
+
+## frame at arc angle a, SIGNED lateral offset x meters, height h
+func _lat(a: float, x: float, h: float) -> Transform3D:
+	var b := x / _rF
+	return Transform3D(_sbas(a, b), _C + _sdir(a, b) * (_rF + h))
+
+func _room_lab(a: float, s: float) -> void:
+	# shared shell: floor/ceiling strips + z walls following the sphere
+	for k in 7:
+		var lx: float = s * (5.5 + 4.35 * float(k))
+		_plate(Vector3(4.6, 0.5, 9.6), _lat(a, lx, -0.25), Vector3.ZERO, DARK, 0.0)
+		_plate(Vector3(4.6, 0.5, 9.6), _lat(a, lx, 5.25), Vector3.ZERO, DARK, 0.0)
+		_plate(Vector3(4.6, 5.5, 0.5), _lat(a, lx, 2.5), Vector3(0, 0, 4.55), STEEL, 0.0)
+		_plate(Vector3(4.6, 5.5, 0.5), _lat(a, lx, 2.5), Vector3(0, 0, -4.55), STEEL, 0.0)
+		if k % 2 == 0:
+			_deco_box(Vector3(0.5, 0.08, 3.0), _lat(a, lx, 4.85), Vector3.ZERO,
+				Color("#f2ead8"), 2.0)
+	# partitions with doorways + the far end wall
+	for px in [14.15, 23.65]:
+		_plate(Vector3(0.5, 5.5, 3.6), _lat(a, s * px, 2.5), Vector3(0, 0, 3.0), STEEL, 0.0)
+		_plate(Vector3(0.5, 5.5, 3.6), _lat(a, s * px, 2.5), Vector3(0, 0, -3.0), STEEL, 0.0)
+		_plate(Vector3(0.5, 2.5, 2.4), _lat(a, s * px, 4.25), Vector3.ZERO, STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 9.6), _lat(a, s * 32.55, 2.5), Vector3.ZERO, STEEL, 0.0)
+	_sign("RESEARCH", _sbas(a, s * 14.15 / _rF),
+		_C + _sdir(a, s * 14.15 / _rF) * (_rF + 3.55), Vector3(s * -0.7, 0, 0),
+		90.0 if s < 0.0 else -90.0)
+	_sign("CONTAINMENT", _sbas(a, s * 23.65 / _rF),
+		_C + _sdir(a, s * 23.65 / _rF) * (_rF + 3.55), Vector3(s * -0.7, 0, 0),
+		90.0 if s < 0.0 else -90.0)
+	# ---- LAB: benches, glassware, SPECIMEN 4 on its pedestal ----
 	for bz in [-2.4, 2.4]:
-		_plate(Vector3(6.4, 1.0, 1.2), Transform3D(fb, _C + up * (_rF + 0.5)),
-			Vector3(cx, 0, bz), Color("#20262e"), 0.0)
+		_plate(Vector3(6.4, 1.0, 1.2), _lat(a, s * 9.6, 0.5), Vector3(0, 0, bz),
+			Color("#20262e"), 0.0)
 		for bx in 3:
 			var flask := MeshInstance3D.new()
 			var fm9 := SphereMesh.new()
@@ -1735,8 +1877,8 @@ func _room_lab(fb: Basis, up: Vector3, cx: float) -> void:
 			flask.material_override = Destructible.make_material(
 				[Color("#66ff99"), Color("#ff66aa"), Color("#7df9ff")][bx], 1.7)
 			add_child(flask)
-			flask.global_transform = Transform3D(fb, _C + up * (_rF + 1.18))
-			flask.translate_object_local(Vector3(cx - 2.0 + 2.0 * float(bx), 0, bz))
+			flask.global_transform = _lat(a, s * (7.6 + 2.0 * float(bx)), 1.18)
+			flask.translate_object_local(Vector3(0, 0, bz))
 	var ped := MeshInstance3D.new()
 	var pdm := CylinderMesh.new()
 	pdm.top_radius = 0.55
@@ -1745,8 +1887,7 @@ func _room_lab(fb: Basis, up: Vector3, cx: float) -> void:
 	ped.mesh = pdm
 	ped.material_override = Surfaces.metal(STEEL)
 	add_child(ped)
-	ped.global_transform = Transform3D(fb, _C + up * (_rF + 0.45))
-	ped.translate_object_local(Vector3(cx, 0, 0))
+	ped.global_transform = _lat(a, s * 8.85, 0.45)
 	var ring := MeshInstance3D.new()
 	var rgm := TorusMesh.new()
 	rgm.inner_radius = 0.55
@@ -1754,19 +1895,192 @@ func _room_lab(fb: Basis, up: Vector3, cx: float) -> void:
 	ring.mesh = rgm
 	ring.material_override = Destructible.make_material(AMBER, 1.9)
 	add_child(ring)
-	ring.global_transform = Transform3D(fb, _C + up * (_rF + 1.35))
-	ring.translate_object_local(Vector3(cx, 0, 0))
-	var tet := MeshInstance3D.new()
-	tet.mesh = _tetra_mesh(0.42)
-	tet.material_override = Destructible.make_material(AMBER.lightened(0.25), 2.2)
-	add_child(tet)
-	tet.global_transform = Transform3D(fb, _C + up * (_rF + 1.75))
-	tet.translate_object_local(Vector3(cx, 0, 0))
-	_spins.append({"node": tet, "rate": 0.7})
-	_sign("SPECIMEN 4: TETRAHEDRON", fb, _C + up * (_rF + 3.6),
-		Vector3(cx, 0, -4.2), 0.0)
-	_sign("DO NOT TOUCH. IT REMEMBERS.", fb, _C + up * (_rF + 3.1),
-		Vector3(cx, 0, -4.2), 0.0)
+	ring.global_transform = _lat(a, s * 8.85, 1.35)
+	_spec_xf = _lat(a, s * 8.85, 1.75)
+	_spawn_specimen()
+	# the RESPAWN button on the pedestal flank
+	var tbn := TetraButton.new()
+	tbn.host = self
+	var bmi := MeshInstance3D.new()
+	var bbm := BoxMesh.new()
+	bbm.size = Vector3(0.26, 0.26, 0.26)
+	bmi.mesh = bbm
+	bmi.material_override = Destructible.make_material(Color("#ff4444"), 1.9)
+	tbn.add_child(bmi)
+	var bcs := CollisionShape3D.new()
+	var bbs := BoxShape3D.new()
+	bbs.size = Vector3(0.3, 0.3, 0.3)
+	bcs.shape = bbs
+	tbn.add_child(bcs)
+	add_child(tbn)
+	tbn.global_transform = _lat(a, s * 8.85, 0.62)
+	tbn.translate_object_local(Vector3(0, 0, 0.85))
+	var blb := Label3D.new()
+	blb.text = "RESPAWN"
+	blb.font_size = 18
+	blb.pixel_size = 0.005
+	blb.modulate = Color("#ff8888")
+	blb.outline_size = 6
+	blb.outline_modulate = Color(0, 0, 0, 0.9)
+	blb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(blb)
+	blb.global_transform = _lat(a, s * 8.85, 0.95)
+	blb.translate_object_local(Vector3(0, 0, 0.95))
+	_sign("SPECIMEN 4: TETRAHEDRON", _sbas(a, s * 8.85 / _rF),
+		_C + _sdir(a, s * 8.85 / _rF) * (_rF + 3.6), Vector3(0, 0, -4.2), 0.0)
+	_sign("DO NOT TOUCH. IT REMEMBERS.", _sbas(a, s * 8.85 / _rF),
+		_C + _sdir(a, s * 8.85 / _rF) * (_rF + 3.1), Vector3(0, 0, -4.2), 0.0)
+	# ---- RESEARCH: desks, instruments, data walls, the notes ----
+	for dz in [-2.6, 2.6]:
+		_plate(Vector3(2.8, 1.0, 1.2), _lat(a, s * 18.9, 0.5), Vector3(0, 0, dz),
+			Color("#20262e"), 0.0)
+	var mtube := MeshInstance3D.new()
+	var mtm := CylinderMesh.new()
+	mtm.top_radius = 0.07
+	mtm.bottom_radius = 0.1
+	mtm.height = 0.55
+	mtube.mesh = mtm
+	mtube.material_override = Surfaces.metal(Color("#4a5266"))
+	add_child(mtube)
+	mtube.global_transform = _lat(a, s * 18.9, 1.3)
+	mtube.translate_object_local(Vector3(0.4, 0, -2.6))
+	var meye := MeshInstance3D.new()
+	var mem := SphereMesh.new()
+	mem.radius = 0.12
+	mem.height = 0.24
+	meye.mesh = mem
+	meye.material_override = Destructible.make_material(Color("#7df9ff"), 1.8)
+	add_child(meye)
+	meye.global_transform = _lat(a, s * 18.9, 1.62)
+	meye.translate_object_local(Vector3(0.4, 0, -2.6))
+	for dw in [-1.0, 1.0]:
+		var dscr := MeshInstance3D.new()
+		var dqm := QuadMesh.new()
+		dqm.size = Vector2(2.6, 1.5)
+		dscr.mesh = dqm
+		dscr.material_override = _data_mat()
+		add_child(dscr)
+		dscr.global_transform = _lat(a, s * 18.9, 3.1)
+		dscr.translate_object_local(Vector3(0, 0, dw * 4.25))
+		if dw > 0.0:
+			dscr.rotate_object_local(Vector3(0, 1, 0), PI)
+	_sign("DAY 74201: STILL HUMMING", _sbas(a, s * 18.9 / _rF),
+		_C + _sdir(a, s * 18.9 / _rF) * (_rF + 2.6), Vector3(0, 0, -4.2), 0.0)
+	_chatter(_lat(a, s * 18.9, 1.5).origin, 181, -12.0)
+	# ---- CONTAINMENT: hazard ring, glass cell, the SOCKET ----
+	var hz9 := MeshInstance3D.new()
+	var hzm9 := TorusMesh.new()
+	hzm9.inner_radius = 2.0
+	hzm9.outer_radius = 2.2
+	hz9.mesh = hzm9
+	hz9.material_override = Destructible.make_material(AMBER, 1.5)
+	add_child(hz9)
+	hz9.global_transform = _lat(a, s * 28.1, 0.06)
+	var cped := MeshInstance3D.new()
+	var cpm := CylinderMesh.new()
+	cpm.top_radius = 0.7
+	cpm.bottom_radius = 0.9
+	cpm.height = 1.1
+	cped.mesh = cpm
+	cped.material_override = Surfaces.metal(Color("#12161c"))
+	add_child(cped)
+	cped.global_transform = _lat(a, s * 28.1, 0.55)
+	var cell := MeshInstance3D.new()
+	var clm := CylinderMesh.new()
+	clm.top_radius = 1.3
+	clm.bottom_radius = 1.3
+	clm.height = 3.0
+	cell.mesh = clm
+	var clmat := StandardMaterial3D.new()
+	clmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	clmat.albedo_color = Color(1.0, 0.85, 0.5, 0.12)
+	clmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	cell.material_override = clmat
+	add_child(cell)
+	cell.global_transform = _lat(a, s * 28.1, 2.0)
+	var sck := TetraSocket.new()
+	sck.host = self
+	var smi := MeshInstance3D.new()
+	var stm9 := TorusMesh.new()
+	stm9.inner_radius = 0.4
+	stm9.outer_radius = 0.55
+	smi.mesh = stm9
+	smi.material_override = Destructible.make_material(Color("#7df9ff"), 1.8)
+	sck.add_child(smi)
+	var scs := CollisionShape3D.new()
+	var sbs := BoxShape3D.new()
+	sbs.size = Vector3(1.2, 0.7, 1.2)
+	scs.shape = sbs
+	sck.add_child(scs)
+	add_child(sck)
+	sck.global_transform = _lat(a, s * 28.1, 1.25)
+	_sock_tetra = MeshInstance3D.new()
+	_sock_tetra.mesh = _tetra_mesh(0.42)
+	_sock_tetra.material_override = Destructible.make_material(
+		AMBER.lightened(0.25), 2.2)
+	_sock_tetra.visible = false
+	add_child(_sock_tetra)
+	_sock_tetra.global_transform = _lat(a, s * 28.1, 2.0)
+	_chatter(_lat(a, s * 28.1, 1.5).origin, 182, -14.0)
+
+func _spawn_specimen() -> void:
+	if _specimen != null and is_instance_valid(_specimen):
+		return
+	var sp := TetraSpecimen.new()
+	sp.host = self
+	var mi := MeshInstance3D.new()
+	mi.mesh = _tetra_mesh(0.42)
+	mi.material_override = Destructible.make_material(AMBER.lightened(0.25), 2.2)
+	sp.add_child(mi)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.85, 0.85, 0.85)
+	cs.shape = bs
+	sp.add_child(cs)
+	add_child(sp)
+	sp.global_transform = _spec_xf
+	_specimen = sp
+
+func _tetra_take(sp: Node3D) -> void:
+	Inventory.add_res("ytetra", 1)
+	Sfx.play("coin", -6.0)
+	_hud_flash("YELLOW TETRAHEDRON acquired")
+	if _specimen == sp:
+		_specimen = null
+	sp.queue_free()
+
+func _tetra_respawn() -> void:
+	if _specimen != null and is_instance_valid(_specimen):
+		_hud_flash("SPECIMEN 4 already present")
+		Sfx.play("denied", -16.0)
+		return
+	_spawn_specimen()
+	Sfx.play("place", -6.0)
+	_hud_flash("SPECIMEN 4 respawned")
+
+func _tetra_socket_use() -> void:
+	if _sock_full:
+		_sock_full = false
+		_sock_tetra.visible = false
+		Inventory.add_res("ytetra", 1)
+		Sfx.play("coin", -8.0)
+		_hud_flash("YELLOW TETRAHEDRON retrieved")
+	elif Inventory.res_count("ytetra") > 0:
+		Inventory.remove_res("ytetra", 1)
+		_sock_full = true
+		_sock_tetra.visible = true
+		Sfx.play("place", -6.0)
+		_hud_flash("specimen contained")
+	else:
+		Sfx.play("denied", -14.0)
+		_hud_flash("no specimen in inventory")
+
+func _hud_flash(t: String) -> void:
+	var m9 = get_tree().current_scene
+	if m9 != null:
+		var h9 = m9.get("_hud")
+		if h9 != null:
+			h9.flash(t)
 
 func _room_aquarium(fb: Basis, up: Vector3, cx: float, s: float) -> void:
 	# a full-wall tank: fluid-glow backdrop, glass front, live fish.
@@ -2569,6 +2883,11 @@ func _process(delta: float) -> void:
 			delta * float(sp["rate"]))
 	_clk_cool = maxf(0.0, _clk_cool - delta)
 	_radio_cool = maxf(0.0, _radio_cool - delta)
+	if _specimen != null and is_instance_valid(_specimen):
+		_specimen.rotate_object_local(Vector3(0, 1, 0), delta * 0.7)
+	if _sock_tetra != null and is_instance_valid(_sock_tetra) \
+			and _sock_tetra.visible:
+		_sock_tetra.rotate_object_local(Vector3(0, 1, 0), delta * 0.9)
 	# fish swim nose-first, tails beating
 	for f in _fish:
 		var fn: Node3D = f["node"]

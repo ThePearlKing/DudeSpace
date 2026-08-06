@@ -86,6 +86,7 @@ var items: Dictionary = {
 	"prisreactor": {"name": "Prism Reactor",   "color": Color("#2a1a3a")},
 	"nreactor":   {"name": "Nuclear Reactor",  "color": Color("#8a8d90")},
 	"charm":      {"name": "Anti-Death Charm", "color": Color("#b56cff")},
+	"ytetra":     {"name": "Yellow Tetrahedron", "color": Color("#ffd23f")},
 	"permapple":  {"name": "Permadeath Apple", "color": Color("#8b0000")},
 	"chest":      {"name": "Chest",            "color": Color("#a9713b")},
 	"furnace":    {"name": "Furnace",          "color": Color("#ff7a1a")},
