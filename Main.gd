@@ -1018,16 +1018,39 @@ render_mode unshaded, cull_front;
 uniform float bradius = 95000.0;
 varying vec3 wpos;
 void vertex(){ wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void fragment(){
-	float d = bradius - length(wpos - vec3(0.0));
-	float near = 1.0 - smoothstep(120.0, 2000.0, abs(d));
-	vec2 g = fract(wpos.xy * 0.002) - 0.5;
-	vec2 g2 = fract(wpos.zy * 0.002) - 0.5;
-	float lat = max(step(abs(g.x), 0.03) + step(abs(g.y), 0.03),
-		step(abs(g2.x), 0.03));
-	ALPHA = near * (0.02 + 0.16 * min(lat, 1.0));
-	ALBEDO = vec3(1.0, 0.3, 0.2);
-	EMISSION = vec3(1.0, 0.3, 0.2) * near * 0.5;
+	vec3 dirn = normalize(wpos);
+	// GIANT triangular wireframe: ~24 cells around the equator, so each
+	// triangle is thousands of meters of dim blue scaffolding
+	vec2 P = vec2(atan(dirn.z, dirn.x) * 12.0, asin(clamp(dirn.y, -1.0, 1.0)) * 12.0);
+	// each cell FALLS APART: sliding drift + slow shear, per-cell clocks
+	vec2 cell0 = floor(vec2(P.x - P.y / 1.7320508, P.y * 1.1547005));
+	float hc = h21(cell0);
+	P += vec2(sin(TIME * (0.13 + hc * 0.2) + hc * 6.28),
+		cos(TIME * (0.11 + hc * 0.17) + hc * 12.0)) * (0.14 + 0.20 * hc);
+	// tri lattice barycentric edge distance
+	vec2 q = vec2(P.x - P.y / 1.7320508, P.y * 1.1547005);
+	vec2 f = fract(q);
+	float upTri = step(f.x + f.y, 1.0);
+	vec3 bc = (upTri > 0.5) ? vec3(f.x, f.y, 1.0 - f.x - f.y)
+		: vec3(1.0 - f.x, 1.0 - f.y, f.x + f.y - 1.0);
+	float e = min(bc.x, min(bc.y, bc.z));
+	float wire = 1.0 - smoothstep(0.015, 0.05, e);
+	// crazy blue: hue breathes cyan-violet per cell, pulses race edges
+	vec2 cid = floor(q) + vec2(upTri * 0.5);
+	float hp = h21(cid + 3.7);
+	vec3 blue = mix(vec3(0.20, 0.55, 1.0), vec3(0.45, 0.30, 1.0),
+		0.5 + 0.5 * sin(TIME * 0.6 + hp * 6.28));
+	blue = mix(blue, vec3(0.4, 0.95, 1.0),
+		0.5 + 0.5 * sin(TIME * 2.3 + hp * 20.0 + e * 40.0));
+	// some triangles have already fallen dark -- the shell is DYING
+	float alive = step(0.18, h21(cid + 9.1) + 0.6 * sin(TIME * 0.07 + hp * 6.28));
+	float d = bradius - length(wpos);
+	float near = 1.0 - smoothstep(400.0, 6000.0, abs(d));
+	ALPHA = wire * alive * (0.08 + 0.22 * near) + 0.008;
+	ALBEDO = blue;
+	EMISSION = blue * wire * alive * (0.35 + 0.8 * near);
 }
 """
 	var bmesh := SphereMesh.new()
