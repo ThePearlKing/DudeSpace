@@ -365,6 +365,26 @@ func _boot() -> void:
 	var sp = Save.saved_pos()
 	if sp != null and _player:
 		_player.global_position = sp
+		# RESCUE: saved inside a pocket interior that no longer contains
+		# that spot (a secret wing that moved, a demolished room) --
+		# instead of waking sealed in the void, wake at the nearest
+		# house door, or failing that at spawn
+		if Game.zone == "flat":
+			var best9 := 1.0e18
+			var host9: Node = null
+			for hn9 in get_tree().get_nodes_in_group("house"):
+				if hn9 is House:
+					var d9: float = sp.distance_to((hn9 as House).room_center())
+					if d9 < best9:
+						best9 = d9
+						host9 = hn9
+			if host9 == null or best9 > 60.0:
+				if host9 != null and best9 < 220.0:
+					_player.global_position = (host9 as House).interior_spawn()
+				else:
+					Game.zone = ""
+					_player.global_position = Game.spawn_pos \
+						+ Game.spawn_up * 1.5
 		if Save.was_in_rocket():
 			var rk := Rocket.new()
 			rk.mk2 = Save.was_mk2()   # a 2.0 comes back AS a 2.0
@@ -1544,6 +1564,11 @@ func _harold_test() -> void:
 			lt9 = ch
 	if lt9 != null:
 		lt9.use()
+	for ch3 in hh._iroot.get_children():
+		if ch3 is Label3D and "BRING ME" in str(ch3.text):
+			print("HAROLD riddle label: off=", ch3.global_position
+				- (hh.room_center() + Vector3(0, 0, 0)), " rot=",
+				ch3.rotation_degrees)
 	var bkc := 0
 	for ch2 in hh._hshelf.get_children():
 		if ch2 is MeshInstance3D:

@@ -291,6 +291,7 @@ func apply_progress() -> void:
 	Game.white_beaten = bool(_progress.get("white_beaten", false))
 	Game.lime_taken = bool(_progress.get("lime_taken", false))
 	Game.lime_wall_open = bool(_progress.get("lime_wall_open", false))
+	Game.harold_shelf_open = bool(_progress.get("harold_shelf_open", false))
 	Game.facility_power = float(_progress.get("facility_power", 1800.0))
 	Game.mind_core = bool(_progress.get("mind_core", false))
 	Game.cheated = bool(_progress.get("cheated", false))
@@ -381,6 +382,7 @@ func save_progress() -> void:
 		"white_beaten": Game.white_beaten,
 		"lime_taken": Game.lime_taken,
 		"lime_wall_open": Game.lime_wall_open,
+		"harold_shelf_open": Game.harold_shelf_open,
 		"facility_power": Game.facility_power,
 		"mind_core": Game.mind_core,
 		"cheated": Game.cheated,

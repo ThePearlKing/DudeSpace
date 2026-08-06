@@ -1158,6 +1158,9 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	_hshelf = _hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, -2.0), rng, 1)
 	_hshelf.rotation_degrees.y = -90.0
 	# the book that is not a book: bound in red, sitting too proud
+	if Game.harold_shelf_open:
+		_hshelf_open = true
+		_hshelf.position += Vector3(0, 0, 2.7)
 	var bk := SecretBook.new()
 	bk.host = self
 	var bmi := MeshInstance3D.new()
@@ -1257,7 +1260,7 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	_iroot.add_child(rl)
 	# CARVED INTO the far wall, facing the door: flush against the -Z
 	# face, right way round, first thing you see walking in
-	rl.global_position = rc + Vector3(0, 0.4, -3.96)
+	rl.global_position = rc + Vector3(0, 0.4, -3.85)
 	# the slot: a stone plinth with a hungry square
 	var slot9 := RiddleSlot.new()
 	slot9.host = self
@@ -1339,6 +1342,7 @@ func _harold_open_shelf() -> void:
 	if _hshelf_open or _hshelf == null:
 		return
 	_hshelf_open = true
+	Game.harold_shelf_open = true
 	Sfx.play("click", -8.0)
 	Sfx.play("rumble", -10.0)
 	var tw := create_tween()
