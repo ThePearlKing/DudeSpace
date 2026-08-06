@@ -1095,7 +1095,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 	_sky_tweens.append(cktw)
 	cktw.tween_method(func(v: float) -> void:
 		if is_instance_valid(crack):
-			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 2.5)
+			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 0.1)
 	# SHATTERED GLASS: pieces of the universe's own boundary shaken
 	# loose -- wire triangles exactly like the edge-of-the-universe
 	# plates, but in the piece's color, tilted off the shell, DRIFTING
@@ -1108,13 +1108,13 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 	var tris: Array = []
 	var rngs := RandomNumberGenerator.new()
 	rngs.seed = 991 + stage * 31
-	var nplates := 26 + 12 * stage
+	var nplates := 84 + 14 * stage
 	var srad := Universe.BOUNDARY - 3000.0
 	var side := Universe.BOUNDARY * 0.048
 	var rim_mat := StandardMaterial3D.new()
 	rim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	rim_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rim_mat.albedo_color = Color(col.r, col.g, col.b, 0.34)
+	rim_mat.albedo_color = Color(col.r, col.g, col.b, 0.5)
 	rim_mat.emission_enabled = true
 	rim_mat.emission = col
 	rim_mat.emission_energy_multiplier = 1.5
@@ -1156,18 +1156,29 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 		var tum := create_tween().set_loops()
 		_sky_tweens.append(tum)
 		tum.tween_property(plate, "rotation",
-			Vector3(TAU * rngs.randf_range(0.1, 0.35),
-				TAU * rngs.randf_range(0.15, 0.5),
-				TAU * rngs.randf_range(0.05, 0.25)),
-			70.0 + 90.0 * rngs.randf()).as_relative()
-		var drf := create_tween().set_loops()
-		_sky_tweens.append(drf)
-		var dv := (tx * rngs.randf_range(-0.4, 0.4)
-			+ tz * rngs.randf_range(-0.4, 0.4)) * side
-		drf.tween_property(plate, "position", dv, 45.0 + 60.0 * rngs.randf()) \
-			.as_relative().set_trans(Tween.TRANS_SINE)
-		drf.tween_property(plate, "position", -dv, 45.0 + 60.0 * rngs.randf()) \
-			.as_relative().set_trans(Tween.TRANS_SINE)
+			Vector3(TAU * rngs.randf_range(0.2, 0.6),
+				TAU * rngs.randf_range(0.3, 0.8),
+				TAU * rngs.randf_range(0.1, 0.4)),
+			18.0 + 20.0 * rngs.randf()).as_relative()
+		# the RUSH: each shard tears off radially -- half dive inward,
+		# half flee outward -- fast, and gone
+		var rsign := 1.0 if rngs.randf() < 0.5 else -1.0
+		var rush := create_tween()
+		_sky_tweens.append(rush)
+		rush.tween_property(plate, "position",
+			dir9 * rsign * Universe.BOUNDARY * rngs.randf_range(0.3, 0.7),
+			8.0 + 3.0 * rngs.randf()) \
+			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	# the whole field fades away as it rushes; the cracks stay behind
+	var pfade := create_tween()
+	_sky_tweens.append(pfade)
+	pfade.tween_interval(1.5)
+	pfade.tween_property(rim_mat, "albedo_color:a", 0.0, 7.5)
+	pfade.parallel().tween_property(rim_mat,
+		"emission_energy_multiplier", 0.0, 7.5)
+	pfade.tween_callback(func() -> void:
+		if is_instance_valid(skyp):
+			skyp.queue_free())
 	var wheel := create_tween().set_loops()
 	_sky_tweens.append(wheel)
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
