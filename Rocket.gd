@@ -246,7 +246,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if n == 0 and nowms - _warp_tap_t < 400.0:
 				if nowms >= _overdrive_cd:
 					_overdrive_until = nowms + 10000.0
-					_overdrive_cd = nowms + 90000.0
+					# a fitted hyperdrive cools the warp coils too:
+					# twenty-second cooldown instead of ninety
+					_overdrive_cd = nowms \
+						+ (20000.0 if hyperdrive else 90000.0)
 					Game.timewarp = 20.0
 					Sfx.play("warp", -10.0)
 				else:
