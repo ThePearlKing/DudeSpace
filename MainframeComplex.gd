@@ -80,6 +80,34 @@ func _bup(up: Vector3) -> Basis:
 	return Basis(x, up, x.cross(up).normalized()).orthonormalized()
 
 
+## one server rack: cabinet, four glowing slits, TWO blinking status
+## lights -- every server in the building blinks
+func _rack(fbR: Basis, upR: Vector3, rbase: float, off: Vector3,
+		fs: float, ph: float) -> void:
+	_plate(Vector3(1.3, 3.4, 1.0), Transform3D(fbR, _C + upR * (rbase + 1.7)),
+		off, Color("#12161c"), 0.0)
+	for sl in 4:
+		_deco_box(Vector3(0.06, 0.07, 0.8),
+			Transform3D(fbR, _C + upR * (rbase + 0.7 + 0.65 * float(sl))),
+			off + Vector3(-fs * 0.66, 0, 0), Color("#66ff99"), 1.8)
+	for db9 in 2:
+		var rdot := MeshInstance3D.new()
+		var rdm := BoxMesh.new()
+		rdm.size = Vector3(0.09, 0.09, 0.09)
+		rdot.mesh = rdm
+		var rdmat := StandardMaterial3D.new()
+		rdmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var rdc: Color = AMBER if db9 == 0 else Color("#66ff99")
+		rdmat.albedo_color = rdc
+		rdmat.emission_enabled = true
+		rdmat.emission = rdc
+		rdot.material_override = rdmat
+		add_child(rdot)
+		rdot.global_transform = Transform3D(fbR, _C + upR * (rbase + 3.05))
+		rdot.translate_object_local(off + Vector3(-fs * 0.66, 0,
+			0.3 - 0.6 * float(db9)))
+		_blinks.append({"mat": rdmat, "phase": ph + float(db9) * 0.45})
+
 ## spherical helpers: direction / frame at arc angle a, lateral angle b
 func _sdir(a: float, beta: float) -> Vector3:
 	return (_pdir(a) * cos(beta) + _e2 * sin(beta)).normalized()
@@ -429,31 +457,11 @@ func build(b, dir: Vector3) -> void:
 	_chatter(Transform3D(hb, _C + hup * (_r2 + 2.0)).origin, 11, -6.0)
 	_chatter(Transform3D(hb, _C + hup * (_r2 + 2.0))
 		.translated_local(Vector3(-6.0, 0, 3.0)).origin, 12, -6.0)
-	# racks: two rows, glowing slits, one blinker each
-	for rz in 5:
-		for rs in [-1.0, 1.0]:
-			var rxf := Transform3D(hb, _C + hup * (_r2 + 1.6))
-			var roff := Vector3(rs * 4.2, 0, -5.0 + 2.5 * float(rz))
-			_plate(Vector3(1.3, 3.2, 1.0), rxf, roff, Color("#12161c"), 0.0)
-			for sl in 3:
-				_deco_box(Vector3(0.06, 0.07, 0.8),
-					Transform3D(hb, _C + hup * (_r2 + 1.0 + 0.7 * float(sl))),
-					roff + Vector3(-rs * 0.66, 0, 0), Color("#66ff99"), 1.8)
-			var rdot := MeshInstance3D.new()
-			var rdm := BoxMesh.new()
-			rdm.size = Vector3(0.09, 0.09, 0.09)
-			rdot.mesh = rdm
-			var rdmat := StandardMaterial3D.new()
-			rdmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			rdmat.albedo_color = AMBER
-			rdmat.emission_enabled = true
-			rdmat.emission = AMBER
-			rdot.material_override = rdmat
-			add_child(rdot)
-			rdot.global_transform = Transform3D(hb, _C + hup * (_r2 + 3.0))
-			rdot.translate_object_local(roff + Vector3(-rs * 0.66, 0, 0.3))
-			_blinks.append({"mat": rdmat,
-				"phase": float(rz) * 0.9 + (0.5 if rs > 0.0 else 0.0)})
+	# racks: four DENSE rows, glowing slits, every single server blinking
+	for rx in [-7.0, -3.5, 3.5, 7.0]:
+		for rz in 6:
+			_rack(hb, hup, _r2, Vector3(rx, 0, -5.5 + 2.2 * float(rz)),
+				signf(rx), float(rz) * 0.9 + rx * 0.31)
 	# cooling pipes along the ceiling
 	for ps in [-1.0, 1.0]:
 		var pipe := MeshInstance3D.new()
@@ -1251,6 +1259,16 @@ func _rings() -> void:
 	_hall(0, 3.383, 3.63, [])
 	var s2 := _big_room(0, 3.775, 9.0, 8.0, 6.5, "SERVER HALL 2")
 	set_meta("server2_a", 3.775)
+	# the second server farm, opposite side of the planet from the first
+	for rr in 7:
+		var a_r: float = 3.775 + (-6.6 + 2.2 * float(rr)) / _rF
+		for rx in [-5.5, -1.8, 1.8, 5.5]:
+			_rack(_fr(a_r), _pdir(a_r), _rF, Vector3(float(rx), 0, 0),
+				signf(float(rx)), float(rr) * 0.7 + float(rx) * 0.27)
+	_chatter(Transform3D(_fr(3.775), _C + _pdir(3.775) * (_rF + 2.0)).origin,
+		211, -6.0)
+	_chatter(Transform3D(_fr(3.72), _C + _pdir(3.72) * (_rF + 2.0))
+		.translated_local(Vector3(5.0, 0, 0)).origin, 212, -7.0)
 	_hall(0, 3.92, 5.172, [[4.35, -1.0], [4.75, 1.0]])
 	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE")
 	_dress_storage(st9)
@@ -1821,8 +1839,43 @@ func _room_aquarium(fb: Basis, up: Vector3, cx: float, s: float) -> void:
 		_fish.append({"node": fish, "tail": tail, "fb": fb, "up": up,
 			"x": s * 12.5, "phase": float(fi) * 1.7, "zr": 3.6,
 			"yb": 1.0 + 0.5 * float(fi % 3)})
+	# THE WATER: a transparent volume filling the tank that wobbles what
+	# you see through it and drowns it in blue fog
+	var wat := MeshInstance3D.new()
+	var wbm := BoxMesh.new()
+	wbm.size = Vector3(1.75, 3.7, 8.5)
+	wat.mesh = wbm
+	wat.material_override = _water_mat()
+	add_child(wat)
+	wat.global_transform = Transform3D(fb, _C + up * (_rF + 2.15))
+	wat.translate_object_local(Vector3(s * 12.45, 0, 0))
 	_sign("AQUARIUM // FEEDING: AUTOMATED", fb, _C + up * (_rF + 3.7),
 		Vector3(cx, 0, 4.2), 180.0)
+
+## tank water: screen-space wave distortion + blue fog tint
+var _water_cache: ShaderMaterial = null
+func _water_mat() -> ShaderMaterial:
+	if _water_cache != null:
+		return _water_cache
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled;
+uniform sampler2D scr : hint_screen_texture, filter_linear_mipmap;
+void fragment(){
+	float t = TIME;
+	vec2 w = vec2(sin(t * 1.4 + SCREEN_UV.y * 34.0 + SCREEN_UV.x * 11.0),
+		cos(t * 1.1 + SCREEN_UV.x * 28.0)) * 0.007;
+	vec3 bg = texture(scr, clamp(SCREEN_UV + w, vec2(0.001), vec2(0.999))).rgb;
+	vec3 fogc = vec3(0.08, 0.30, 0.55);
+	vec3 col = mix(bg, fogc, 0.34);
+	float shimmer = 0.05 * sin(t * 2.2 + SCREEN_UV.y * 60.0);
+	ALBEDO = col + shimmer * fogc;
+}
+"""
+	_water_cache = ShaderMaterial.new()
+	_water_cache.shader = sh
+	return _water_cache
 
 func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 	# a STATIC hologram of the actual Dude system, built from the live
@@ -1846,25 +1899,66 @@ func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 	add_child(ring)
 	ring.global_transform = Transform3D(fb, _C + up * (_rF + 0.84))
 	ring.translate_object_local(Vector3(cx, 0, 0))
+	# TRUE-layout hologram: real relative positions, planet sizes to
+	# scale against each other, each mini planet wearing its REAL
+	# surface material, and a transparent projection ray feeding each
+	# one from the pedestal
 	var holo := Transform3D(fb, _C + up * (_rF + 2.5))
 	var maxd := 1.0
+	var maxr := 1.0
 	var dude_bodies: Array = []
 	for db in Universe.bodies:
 		if (db.center as Vector3).length() < 13500.0 * Universe.world_scale:
 			dude_bodies.append(db)
 			maxd = maxf(maxd, (db.center as Vector3).length())
+			maxr = maxf(maxr, float(db.radius))
 	var k := 3.0 / maxd
+	var k2 := 0.42 / maxr
+	var apex := Transform3D(fb, _C + up * (_rF + 0.9))\
+		.translated_local(Vector3(cx, 0, 0)).origin
+	var raymat := StandardMaterial3D.new()
+	raymat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	raymat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	raymat.albedo_color = Color(0.5, 0.85, 1.0, 0.09)
+	raymat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	for db in dude_bodies:
+		var pmat9: Material = null
+		if db.node != null:
+			for pc9 in (db.node as Node).get_children():
+				if pc9 is MeshInstance3D:
+					pmat9 = (pc9 as MeshInstance3D).material_override
+					break
 		var g := MeshInstance3D.new()
 		var gm9 := SphereMesh.new()
-		gm9.radius = clampf(float(db.radius) * k * 12.0, 0.07, 0.4)
+		gm9.radius = maxf(float(db.radius) * k2, 0.05)
 		gm9.height = gm9.radius * 2.0
 		g.mesh = gm9
-		g.material_override = Destructible.make_material(
-			(db.color as Color).lightened(0.15), 1.4)
+		g.material_override = pmat9 if pmat9 != null else \
+			Destructible.make_material((db.color as Color).lightened(0.15), 1.4)
 		add_child(g)
 		g.global_transform = holo
 		g.translate_object_local(Vector3(cx, 0.6, 0) + (db.center as Vector3) * k)
+		_spins.append({"node": g, "rate": 0.4})
+		# the projection ray: a thin transparent beam from the pedestal
+		var rayv := g.global_position - apex
+		var raylen := rayv.length()
+		if raylen > 0.2:
+			var ray := MeshInstance3D.new()
+			var rym := CylinderMesh.new()
+			rym.top_radius = 0.035
+			rym.bottom_radius = 0.012
+			rym.height = raylen
+			ray.mesh = rym
+			ray.material_override = raymat
+			add_child(ray)
+			var ry := rayv.normalized()
+			var rx9 := ry.cross(up)
+			if rx9.length() < 0.01:
+				rx9 = ry.cross(fb.x)
+			rx9 = rx9.normalized()
+			ray.global_transform = Transform3D(
+				Basis(rx9, ry, rx9.cross(ry)).orthonormalized(),
+				apex + ry * raylen * 0.5)
 		if db.name == "Big Computer":
 			var mk := MeshInstance3D.new()
 			var mkm := TorusMesh.new()
@@ -1884,7 +1978,7 @@ func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 			yah.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			add_child(yah)
 			yah.global_position = g.global_position + up * 0.55
-	_sign("SYSTEM MAP // NOT TO SCALE", fb, _C + up * (_rF + 3.7),
+	_sign("SYSTEM MAP // TO SCALE", fb, _C + up * (_rF + 3.7),
 		Vector3(cx, 0, -4.2), 0.0)
 
 func _room_cargo(fb: Basis, up: Vector3, cx: float) -> void:
