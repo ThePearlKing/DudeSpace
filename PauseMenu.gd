@@ -602,9 +602,17 @@ func _quit_title() -> void:
 		Save.set_pet(true, petq.genome, petq.staying)
 	else:
 		Save.set_pet(false)
-	# save the EXACT spot, not the last 5s autosave
-	var g := "rocket" if Game.mode == Game.Mode.IN_ROCKET else "player"
-	var n := get_tree().get_first_node_in_group(g)
+	# save the EXACT spot, not the last 5s autosave -- and the FLOWN
+	# ship, not whichever parked hull joined the group first
+	var n: Node = null
+	if Game.mode == Game.Mode.IN_ROCKET:
+		for r9 in get_tree().get_nodes_in_group("rocket"):
+			if r9 is Rocket and r9.piloted:
+				n = r9
+				break
+	if n == null:
+		var g := "rocket" if Game.mode == Game.Mode.IN_ROCKET else "player"
+		n = get_tree().get_first_node_in_group(g)
 	if n:
 		Save.set_player_pos(n.global_position, Game.mode == Game.Mode.IN_ROCKET,
 			n.hyperdrive if n is Rocket else false,

@@ -2286,11 +2286,10 @@ func _process(delta: float) -> void:
 		if _world_load_ok:
 			Save.set_world(collect_world())
 		var rvel := Vector3.ZERO
-		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
-				and is_instance_valid(_rocket):
-			rvel = _rocket.vel
-		var rok9: Rocket = _rocket if _rocket != null \
-			and is_instance_valid(_rocket) else null
+		var rv9 := _piloted_rocket()
+		if Game.mode == Game.Mode.IN_ROCKET and rv9 != null:
+			rvel = rv9.vel
+		var rok9 := _piloted_rocket()
 		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2,
 			rvel, rok9.hyper_charge if rok9 != null else 4.0,
 			rok9.nuclear if rok9 != null else false,
@@ -2649,16 +2648,21 @@ func _notification(what: int) -> void:
 		if _world_load_ok:
 			Save.set_world(collect_world())
 		var rvel2 := Vector3.ZERO
-		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
-				and is_instance_valid(_rocket):
-			rvel2 = _rocket.vel
-		var rokA: Rocket = _rocket if _rocket != null \
-			and is_instance_valid(_rocket) else null
+		var rvA := _piloted_rocket()
+		if Game.mode == Game.Mode.IN_ROCKET and rvA != null:
+			rvel2 = rvA.vel
+		var rokA := _piloted_rocket()
 		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET,
 			hyper, mk2, rvel2, rokA.hyper_charge if rokA != null else 4.0,
 			rokA.nuclear if rokA != null else false,
 			rokA.edge_won if rokA != null else false)
 		Save.save_progress()
+
+func _piloted_rocket() -> Rocket:
+	for r in get_tree().get_nodes_in_group("rocket"):
+		if r is Rocket and r.piloted:
+			return r
+	return null
 
 func _active_node() -> Node:
 	if Game.mode == Game.Mode.IN_ROCKET:
