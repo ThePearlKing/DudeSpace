@@ -413,6 +413,15 @@ func reset() -> void:
 	zone_g = 9.0
 	door_open = false
 	mind_core = false
+	# per-slot chain + facility state: a NEW world starts at zero (the
+	# previous slot's stage was leaking through the autoload and sinking
+	# Harold's stele in fresh worlds)
+	monolith_stage = 0
+	void_loot = {}
+	ai_blessed = false
+	charts_unlocked = false
+	facility_power = FACILITY_MAX
+	underwater = false
 	cheated = false
 	godmode = false
 	inf_fuel = false
