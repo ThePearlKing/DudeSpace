@@ -288,6 +288,7 @@ func apply_progress() -> void:
 	Game.void_loot = _progress.get("void_loot", {})
 	Game.ai_blessed = bool(_progress.get("ai_blessed", false))
 	Game.charts_unlocked = bool(_progress.get("charts_unlocked", false))
+	Game.white_beaten = bool(_progress.get("white_beaten", false))
 	Game.facility_power = float(_progress.get("facility_power", 1800.0))
 	Game.mind_core = bool(_progress.get("mind_core", false))
 	Game.cheated = bool(_progress.get("cheated", false))
@@ -375,6 +376,7 @@ func save_progress() -> void:
 		"void_loot": Game.void_loot,
 		"ai_blessed": Game.ai_blessed,
 		"charts_unlocked": Game.charts_unlocked,
+		"white_beaten": Game.white_beaten,
 		"facility_power": Game.facility_power,
 		"mind_core": Game.mind_core,
 		"cheated": Game.cheated,
@@ -395,6 +397,8 @@ func save_progress() -> void:
 		"in_rocket": _last_in_rocket,
 		"in_rocket_hyper": _last_hyper,
 		"in_rocket_mk2": _last_mk2,
+		"in_rocket_nuc": _last_nuc,
+		"in_rocket_edge": _last_edgew,
 		"rocket_vel": [_last_vel.x, _last_vel.y, _last_vel.z],
 		"hyper_charge": _last_hyperq,
 		"pet": _last_pet,
@@ -416,6 +420,8 @@ func rocket_vel() -> Vector3:
 	return Vector3.ZERO
 var _last_hyper: bool = false
 var _last_mk2: bool = false
+var _last_nuc: bool = false
+var _last_edgew: bool = false
 var _last_pet: bool = false
 var _pet_genome: int = -1
 var _pet_stay: bool = false
@@ -436,19 +442,27 @@ func had_pet() -> bool:
 
 func set_player_pos(p: Vector3, in_rocket: bool = false, hyper: bool = false,
 		mk2: bool = false, vel: Vector3 = Vector3.ZERO,
-		hyperq: float = 4.0) -> void:
+		hyperq: float = 4.0, nuc: bool = false, edgew: bool = false) -> void:
 	_last_pos = [p.x, p.y, p.z]
 	_last_in_rocket = in_rocket
 	_last_hyper = hyper
 	_last_mk2 = mk2
 	_last_vel = vel
 	_last_hyperq = hyperq
+	_last_nuc = nuc
+	_last_edgew = edgew
 
 func was_hyper() -> bool:
 	return bool(_progress.get("in_rocket_hyper", false))
 
 func was_mk2() -> bool:
 	return bool(_progress.get("in_rocket_mk2", false))
+
+func was_nuclear() -> bool:
+	return bool(_progress.get("in_rocket_nuc", false))
+
+func edge_won() -> bool:
+	return bool(_progress.get("in_rocket_edge", false))
 
 ## Give a world a new name without touching anything else in it.
 func rename_slot(n: int, new_name: String) -> void:

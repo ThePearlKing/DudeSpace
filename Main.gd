@@ -151,7 +151,6 @@ func _boot() -> void:
 	if not Game.tutorial_session:
 		Zones.build_shadow_temple(self, Universe.make_flat_body(Zones.SHADOW_POS))
 		_spawn_rifts()
-		_spawn_starship()
 		_c4 = Connect4.new()
 		_c4.add_to_group("connect4")
 		add_child(_c4)
@@ -376,6 +375,8 @@ func _boot() -> void:
 			# orbit, same arc you logged out on
 			rk.vel = Save.rocket_vel()
 			rk.hyper_charge = Save.hyper_charge()
+			rk.nuclear = Save.was_nuclear()
+			rk.edge_won = Save.edge_won()
 
 ## Headless: park a Human in front of the player's face and press F.
 func _talk_test() -> void:
@@ -2199,9 +2200,12 @@ func _process(delta: float) -> void:
 		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
 				and is_instance_valid(_rocket):
 			rvel = _rocket.vel
+		var rok9: Rocket = _rocket if _rocket != null \
+			and is_instance_valid(_rocket) else null
 		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2,
-			rvel, _rocket.hyper_charge if _rocket != null
-			and is_instance_valid(_rocket) else 4.0)
+			rvel, rok9.hyper_charge if rok9 != null else 4.0,
+			rok9.nuclear if rok9 != null else false,
+			rok9.edge_won if rok9 != null else false)
 		Save.save_progress()
 
 	# --- time-rift snapshots: one per minute, keep the last 6 ---
@@ -2274,21 +2278,48 @@ func _process(delta: float) -> void:
 	# the white/starry split is pure GEOMETRY now (star ball inside the
 	# boundary, white shell outside) -- position only decides the choir
 	if Game.zone == "":
-		var outside := pos.length() > Universe.BOUNDARY + (
-			-50.0 if _outside_white else 50.0)
-		# THE END OF EVERYTHING: past the white zone is the dark, and
-		# the dark has a wall. Nothing crosses 2.1x the boundary.
+		var zr9 := pos.length()
+		var wr9 := Universe.BOUNDARY * 1.5
+		# three zones, hysteresis on both lines: universe / white / dark
+		var zprev9 := _outzone
+		if _outzone == 0 and zr9 > Universe.BOUNDARY + 50.0:
+			_outzone = 1
+		elif _outzone == 1 and zr9 < Universe.BOUNDARY - 50.0:
+			_outzone = 0
+		elif _outzone == 1 and zr9 > wr9 + 100.0:
+			_outzone = 2
+		elif _outzone == 2 and zr9 < wr9 - 100.0:
+			_outzone = 1
+		if _outzone != zprev9:
+			_set_out_ambience()
+		# THE WALL AT THE END OF THE DARK: 3.9x the boundary. Hitting it
+		# is an EVENT: thud, flash, shake, bounce.
 		var lim9 := Universe.BOUNDARY * 3.9
-		if pos.length() > lim9:
+		_wall_fx_t = maxf(0.0, _wall_fx_t - delta)
+		if zr9 > lim9:
 			var an9 := _active_node()
 			if an9 != null:
 				var rd9: Vector3 = pos.normalized()
 				(an9 as Node3D).global_position = rd9 * lim9
-				if "vel" in an9:
-					an9.vel = an9.vel - rd9 * maxf(an9.vel.dot(rd9), 0.0)
+				if an9 is Rocket:
+					an9.vel = (an9.vel as Vector3).bounce(rd9) * 0.25
+					an9._cine_shake = maxf(an9._cine_shake, 0.9)
 				elif "velocity" in an9:
-					an9.velocity = an9.velocity \
-						- rd9 * maxf(an9.velocity.dot(rd9), 0.0)
+					an9.velocity = (an9.velocity as Vector3) \
+						.bounce(rd9) * 0.25
+				if _wall_fx_t <= 0.0:
+					_wall_fx_t = 1.2
+					Sfx.play("rumble", -2.0)
+					Sfx.play("hurt", -14.0)
+					if _env_ref != null:
+						var wtw9 := create_tween()
+						wtw9.tween_property(_env_ref,
+							"glow_intensity", 3.4, 0.08)
+						wtw9.tween_property(_env_ref,
+							"glow_intensity", 1.9, 0.7)
+					if _hud:
+						_hud.flash("the dark ends here.")
+		var outside := _outzone >= 1
 		if outside != _outside_white:
 			_outside_white = outside
 			for sh9 in _void_shells:
@@ -2296,19 +2327,31 @@ func _process(delta: float) -> void:
 			if _env_ref != null:
 				_env_ref.glow_intensity = 1.9 if outside else 0.8
 				_env_ref.glow_bloom = 0.5 if outside else 0.25
-			if outside:
-				if _void_amb == null:
-					_void_amb = AudioStreamPlayer.new()
-					_void_amb.stream = _void_ambience()
-					_void_amb.volume_db = -60.0
-					add_child(_void_amb)
-				_void_amb.play()
-				var vtw := create_tween()
-				vtw.tween_property(_void_amb, "volume_db", -7.0, 3.0)
-			elif _void_amb != null and _void_amb.playing:
-				var vtw2 := create_tween()
-				vtw2.tween_property(_void_amb, "volume_db", -60.0, 2.0)
-				vtw2.tween_callback(_void_amb.stop)
+		# THE EDGE OF THE WHITE: nothing weaker than a nuclear engine
+		# leaves -- until the day one WINS. After that first full
+		# escape the white zone stops pushing anybody, forever.
+		if _wcut == 0 and not Game.white_beaten \
+				and zr9 > Universe.BOUNDARY * 1.44:
+			if Game.mode == Game.Mode.IN_ROCKET:
+				var rr9: Rocket = null
+				for rrr in get_tree().get_nodes_in_group("rocket"):
+					if rrr is Rocket and rrr.piloted:
+						rr9 = rrr
+						break
+				if rr9 != null and not rr9.edge_won:
+					_wcut = 2 if rr9.nuclear else 1
+					_wcut_t = 0.0
+					_wcut_r = rr9
+					_wcut_p0 = rr9.global_position
+					rr9.force_locked = true
+					Sfx.play("rumble", -6.0)
+					if _hud:
+						_hud.flash("SOMETHING PUSHES BACK")
+			elif _player != null and Game.mode == Game.Mode.ON_FOOT:
+				# on foot the force just leans you home, no ceremony
+				_player.velocity -= pos.normalized() * 80.0 * delta
+		if _wcut > 0:
+			_drive_edge_cutscene(delta)
 
 	# the cracked sky follows you like a skybox
 	for fx in _skyfx:
@@ -2518,9 +2561,12 @@ func _notification(what: int) -> void:
 		if Game.mode == Game.Mode.IN_ROCKET and _rocket != null \
 				and is_instance_valid(_rocket):
 			rvel2 = _rocket.vel
+		var rokA: Rocket = _rocket if _rocket != null \
+			and is_instance_valid(_rocket) else null
 		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET,
-			hyper, mk2, rvel2, _rocket.hyper_charge if _rocket != null
-			and is_instance_valid(_rocket) else 4.0)
+			hyper, mk2, rvel2, rokA.hyper_charge if rokA != null else 4.0,
+			rokA.nuclear if rokA != null else false,
+			rokA.edge_won if rokA != null else false)
 		Save.save_progress()
 
 func _active_node() -> Node:
@@ -2541,6 +2587,13 @@ func _active_pos() -> Vector3:
 var _env_ref: Environment = null
 var _outside_white := false
 var _void_amb: AudioStreamPlayer = null
+var _dark_amb: AudioStreamPlayer = null
+var _outzone := 0    # 0 universe · 1 white zone · 2 the dark
+var _wcut := 0       # white-edge cutscene: 0 idle · 1 losing · 2 winning
+var _wcut_t := 0.0
+var _wcut_r: Rocket = null
+var _wcut_p0 := Vector3.ZERO
+var _wall_fx_t := 0.0
 
 ## the sound of the space OUTSIDE space: a vast slow choir that was
 ## here before the universe and will be here after. Detuned voice
@@ -2586,6 +2639,136 @@ func _void_ambience() -> AudioStreamWAV:
 ## the sound the universe makes when its god understands the sky is
 ## gone: one immense chord -- a dark open stack with bells ringing over
 ## it, swelling for two seconds and dying for ten. Nothing loops.
+## crossfade the outer ambiences to match _outzone: the holy choir
+## belongs to the white; below it, the other thing
+func _set_out_ambience() -> void:
+	if _outzone == 1:
+		if _void_amb == null:
+			_void_amb = AudioStreamPlayer.new()
+			_void_amb.stream = _void_ambience()
+			_void_amb.volume_db = -60.0
+			add_child(_void_amb)
+		if not _void_amb.playing:
+			_void_amb.play()
+		var vt := create_tween()
+		vt.tween_property(_void_amb, "volume_db", -7.0, 3.0)
+	elif _void_amb != null and _void_amb.playing:
+		var vt2 := create_tween()
+		vt2.tween_property(_void_amb, "volume_db", -60.0, 2.5)
+		vt2.tween_callback(_void_amb.stop)
+	if _outzone == 2:
+		if _dark_amb == null:
+			_dark_amb = AudioStreamPlayer.new()
+			_dark_amb.stream = _dark_ambience()
+			_dark_amb.volume_db = -60.0
+			add_child(_dark_amb)
+		if not _dark_amb.playing:
+			_dark_amb.play()
+		var dt := create_tween()
+		dt.tween_property(_dark_amb, "volume_db", -8.0, 4.0)
+	elif _dark_amb != null and _dark_amb.playing:
+		var dt2 := create_tween()
+		dt2.tween_property(_dark_amb, "volume_db", -60.0, 2.5)
+		dt2.tween_callback(_dark_amb.stop)
+
+## the white-edge cutscene, both endings. The ship strains, the force
+## answers. Weak engines get walked home; the nuclear one wins.
+func _drive_edge_cutscene(delta: float) -> void:
+	var r := _wcut_r
+	if r == null or not is_instance_valid(r) or not r.piloted:
+		if r != null and is_instance_valid(r):
+			r.force_locked = false
+			r._cine_shake = 0.0
+			r._cine_fov = 0.0
+		_wcut = 0
+		_wcut_r = null
+		return
+	_wcut_t += delta
+	var t9 := _wcut_t
+	var out9 := _wcut_p0.normalized()
+	if _wcut == 1:
+		# LOSING: 5s pinned at the edge, engines screaming into a hand
+		# that does not care -- then flung the whole way home, easing
+		# out so the arrival is gentle
+		if t9 < 5.0:
+			r._cine_shake = 0.12 + t9 * 0.14
+			r._cine_fov = t9 * 2.4
+			r.vel = r.vel.lerp(Vector3.ZERO, delta * 2.2)
+			r.global_position = r.global_position.lerp(_wcut_p0, delta * 2.0)
+			if fmod(t9, 1.1) < delta:
+				Sfx.play("rumble", -10.0 + t9)
+		elif t9 < 14.0:
+			var k9 := (t9 - 5.0) / 9.0
+			var e9 := k9 * k9 * (3.0 - 2.0 * k9)
+			var tgt := Game.spawn_pos + Game.spawn_up * 60.0
+			r.global_position = _wcut_p0.lerp(tgt, e9)
+			r.vel = (tgt - _wcut_p0) * (6.0 * k9 * (1.0 - k9)) / 9.0
+			r._cine_shake = maxf(0.05, 0.8 * (1.0 - k9))
+			r._cine_fov = maxf(0.0, 12.0 * (1.0 - k9))
+		else:
+			r.vel = Vector3.ZERO
+			r.force_locked = false
+			r._cine_shake = 0.0
+			r._cine_fov = 0.0
+			if _hud:
+				_hud.flash("the white zone refused you. all the way home.")
+			_wcut = 0
+			_wcut_r = null
+	else:
+		# WINNING: eight seconds of escalating violence -- shake
+		# climbing, rumbles arriving faster and louder -- and then the
+		# NUCLEAR ENGINE simply wins
+		if t9 < 8.0:
+			r._cine_shake = 0.15 + t9 * 0.22
+			r._cine_fov = t9 * 3.2
+			r.vel = r.vel.lerp(Vector3.ZERO, delta * 1.6)
+			r.global_position = r.global_position.lerp(_wcut_p0, delta * 1.6)
+			if fmod(t9, maxf(0.25, 1.0 - t9 * 0.09)) < delta:
+				Sfx.play("rumble", -12.0 + t9 * 1.3)
+		else:
+			r.edge_won = true
+			Game.white_beaten = true
+			r.force_locked = false
+			r._cine_shake = 0.0
+			r._cine_fov = 0.0
+			r.vel = out9 * 1500.0
+			Sfx.play("warp", -2.0)
+			Sfx.play("nuke", -20.0)
+			if _hud:
+				_hud.flash("THE NUCLEAR ENGINE WINS. THE DARK IS YOURS.")
+			_wcut = 0
+			_wcut_r = null
+
+func _dark_ambience() -> AudioStreamWAV:
+	var rate := 22050
+	var secs := 16.0
+	var n := int(rate * secs)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var ts := float(i) / float(rate)
+		var v := 0.0
+		# deep drone pair, barely detuned (both integer cycles per loop)
+		v += 0.16 * sin(TAU * (588.0 / secs) * ts) \
+			* (0.6 + 0.4 * sin(TAU * ts / 16.0))
+		v += 0.14 * sin(TAU * (592.0 / secs) * ts)
+		# the wrong interval: a minor second grinding at the pace of dread
+		v += 0.05 * sin(TAU * (880.0 / secs) * ts)
+		v += 0.05 * sin(TAU * (932.0 / secs) * ts)
+		# a heartbeat that is not yours, every eight seconds
+		var hb := fmod(ts, 8.0)
+		v += 0.22 * exp(-hb * 9.0) * sin(TAU * 38.0 * hb)
+		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
+		data[i * 2] = s9 & 0xFF
+		data[i * 2 + 1] = (s9 >> 8) & 0xFF
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.data = data
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = n
+	return wav
+
 func _god_chord() -> AudioStreamWAV:
 	var rate := 22050
 	var secs := 12.0
@@ -6487,14 +6670,6 @@ func _enter_rift() -> void:
 		_hud.flash("the rift takes you. this already happened.")
 	Inventory.changed.emit()
 	Game.changed.emit()
-
-# -------------------------------------------------------------- starship
-
-func _spawn_starship() -> void:
-	var ship := Starship.new()
-	add_child(ship)
-	ship.global_position = Vector3(1500, 700, 2200)
-	ship.rotation_degrees = Vector3(20, 40, 65)   # derelict tilt
 
 # --------------------------------------------------------------- helpers
 

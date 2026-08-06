@@ -7,7 +7,6 @@ var _zb_lbl: Label
 var _rows: Array = []
 
 const STOCK := [
-	["carkeys", "Space Car Keys", 50, "Starts the wrecked alien starship. He grins."],
 	["hyperdrive", "Hyperdrive (alien surplus)", 30, "Ship part. Slightly dented."],
 	["charm", "Anti-Death Charm", 40, "\"very good luck. probably.\""],
 	["ultima5", "Ultima Crystals ×5", 20, "Fell off a comet, allegedly."],

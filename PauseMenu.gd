@@ -610,7 +610,9 @@ func _quit_title() -> void:
 			n.hyperdrive if n is Rocket else false,
 			n.mk2 if n is Rocket else false,
 			n.vel if n is Rocket else Vector3.ZERO,
-			n.hyper_charge if n is Rocket else 4.0)
+			n.hyper_charge if n is Rocket else 4.0,
+			n.nuclear if n is Rocket else false,
+			n.edge_won if n is Rocket else false)
 	var cs := get_tree().current_scene
 	if cs and cs.has_method("collect_world") and cs.get("_world_load_ok"):
 		Save.set_world(cs.collect_world())

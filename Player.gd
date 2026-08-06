@@ -1669,10 +1669,10 @@ func _make_held_model(id: String) -> void:
 		"engine_mk2":
 			_hm_cyl(0.14, 0.2, Vector3(0, 0.06, 0), Color("#ff8c42"), 0.5, 0.08)
 			_hm_cyl(0.16, 0.12, Vector3(0, -0.1, 0), Color("#2a2a30"), 0.9, 0.2)
-		"carkeys":
-			_hm_cyl(0.06, 0.02, Vector3(0, 0.08, 0), Color("#4dff9a"), 0.8)
-			_hm_box(Vector3(0.035, 0.18, 0.015), Vector3(0, -0.05, 0), Color("#c8c8d0"), 0.5)
-			_hm_box(Vector3(0.06, 0.02, 0.015), Vector3(0.02, -0.13, 0), Color("#c8c8d0"), 0.5)
+		"nucengine":
+			_hm_cyl(0.14, 0.22, Vector3(0, 0.05, 0), Color("#2a2a30"), 0.9, 0.2)
+			_hm_cyl(0.1, 0.1, Vector3(0, -0.12, 0), Color("#444a52"), 0.6, 0.05)
+			_hm_cyl(0.17, 0.05, Vector3(0, 0.02, 0), Color("#5aff3a"), 2.0)
 		"rcs":
 			_hm_box(Vector3(0.18, 0.18, 0.18), Vector3.ZERO, Color("#8fe8ff"), 0.5)
 			for rd in [Vector3(0.12, 0, 0), Vector3(-0.12, 0, 0), Vector3(0, 0.12, 0), Vector3(0, -0.12, 0)]:
@@ -2022,12 +2022,26 @@ func _use_selected() -> void:
 			else:
 				Sfx.play("denied")
 		"hyperdrive":
-			# ship equipment: install it ON a nearby rocket/starship
+			# ship equipment: install it ON a nearby rocket
 			var rh := _nearest_in("rocket", 8.0)
 			if rh and rh is Rocket and not rh.hyperdrive:
 				rh.hyperdrive = true
 				Inventory.clear_slot(slot)
 				Sfx.play("learn")
+			else:
+				Sfx.play("denied")
+		"nucengine":
+			# mk2-only ship part
+			var rn := _nearest_in("rocket", 8.0)
+			if rn and rn is Rocket and rn.mk2 and not rn.nuclear:
+				rn.nuclear = true
+				Inventory.clear_slot(slot)
+				Sfx.play("learn")
+			elif rn and rn is Rocket and not rn.mk2:
+				Sfx.play("denied")
+				var hud9 = get_tree().get_first_node_in_group("hud")
+				if hud9:
+					hud9.flash("the Nuclear Engine only fits a Rocket 2.0")
 			else:
 				Sfx.play("denied")
 		"coil":
@@ -2455,26 +2469,18 @@ func locate(mode: int) -> void:
 	var targets: Array = []
 	match Game.locator_mode:
 		0:
-			label = "ALIEN SHIP"
-			var best := 1e18
-			for n in get_tree().get_nodes_in_group("starship"):
-				var d2: float = global_position.distance_squared_to(n.global_position)
-				if d2 < best:
-					best = d2
-					targets = [n.global_position]
-		1:
 			label = "SPACE INVADERS"
 			for n in get_tree().get_nodes_in_group("invader"):
 				targets.append(n.global_position)
-		2:
+		1:
 			label = "SHADOW TEMPLE"
 			targets = [Zones.SHADOW_POS]
-		3:
+		2:
 			label = "UFO"
 			var u = get_tree().get_first_node_in_group("ufo")
 			if u:
 				targets = [u.global_position]
-		5:
+		4:
 			label = "MINE ENTRANCE"
 			var cs2 := get_tree().current_scene
 			if cs2 and cs2.has_method("mine_positions"):
@@ -2484,19 +2490,19 @@ func locate(mode: int) -> void:
 					if d5 < best4:
 						best4 = d5
 						targets = [mpos]
-		6:
+		5:
 			label = "CONNECT 4 ARENA"
 			var c4 = get_tree().get_first_node_in_group("connect4")
 			if c4:
 				targets = [c4.global_position]
-		4:
+		3:
 			label = "TIME RIFT"
 			var cs := get_tree().current_scene
 			var rifts = cs.get("_rifts") if cs else null
 			if rifts is Array:
 				for r in rifts:
 					targets.append(r)
-		7:
+		6:
 			label = "NOODLE GOD"
 			var nwl = get_tree().get_first_node_in_group("noodle_watcher")
 			if nwl != null and nwl is Node3D:
@@ -2512,7 +2518,7 @@ func locate(mode: int) -> void:
 	Game.locator_label = label
 	# the god reads FALSE: the locator insists it's 4x farther than it is.
 	# instruments agree it is enormous. instruments refuse to agree where.
-	Game.locator_lie = 4.0 if Game.locator_mode == 7 else 1.0
+	Game.locator_lie = 4.0 if Game.locator_mode == 6 else 1.0
 	Game.locator_until = Game.playtime + 45.0
 	Sfx.play("click", -10.0)
 	if hud:
@@ -2572,9 +2578,6 @@ func _interact() -> void:
 			if n is SpawnBeacon:
 				n.activate_spawn()
 				Sfx.play("click")
-				return
-			if n is Starship and not n.repaired:
-				n.try_repair()
 				return
 			if n is Rocket and not n.piloted:
 				if Game.playtime >= Game.board_lock and n.has_method("board"):

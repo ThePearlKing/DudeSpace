@@ -18,6 +18,12 @@ var piloted: bool = false
 var landed: bool = false
 var arcade: bool = false      # alien starship mode: unrealistic + angers gods
 var hyperdrive: bool = false  # installed on THIS ship (right-click the item nearby)
+var nuclear: bool = false     # NUCLEAR ENGINE: mk2-only. Hotter, thriftier,
+                              # and strong enough to win against the white zone
+var force_locked: bool = false  # a cutscene owns the ship: player input dies
+var edge_won: bool = false      # this ship has beaten the white zone's edge
+var _cine_shake := 0.0          # cutscene camera violence
+var _cine_fov := 0.0
 # the hyperdrive drinks ULTIMA, not rocket fuel: a shipboard charge
 # measured in crystals. Empty tank = the drive is a paperweight until
 # you feed it (holding H auto-loads crystals from your inventory).
@@ -272,11 +278,12 @@ var _overdrive_cd := 0.0      # next burst allowed at this REAL ms
 func _physics_process(delta: float) -> void:
 	if not piloted or Game.dead:
 		return
-	_cam.fov = Settings.fov
-	var ui := Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+	_cam.fov = Settings.fov + _cine_fov
+	var ui := Input.mouse_mode != Input.MOUSE_MODE_CAPTURED or force_locked
 
-	# F to hop out. Polled unconditionally -- exiting must ALWAYS work.
-	if Input.is_key_pressed(Settings.key("interact")):
+	# F to hop out. Polled unconditionally -- exiting must ALWAYS work
+	# (except while a cutscene owns the ship).
+	if Input.is_key_pressed(Settings.key("interact")) and not force_locked:
 		if not _f_held:
 			_f_held = true
 			_try_exit()
@@ -323,13 +330,20 @@ func _physics_process(delta: float) -> void:
 	_cam_pivot.global_transform.basis = (ref
 		* Basis(Vector3.UP, _cam_yaw) * Basis(Vector3.RIGHT, _cam_pitch)).orthonormalized()
 	_cam.position = Vector3(0, _cam_dist * 0.18, _cam_dist)
+	if _cine_shake > 0.001:
+		_cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1),
+			randf_range(-0.3, 0.3)) * _cine_shake
 
 	var fwd := -global_transform.basis.z
 	_engine_on = false
 
-	# --- main engine: Space (Mk2 upgrade = +60% thrust) ---
-	var thrust := MAIN_THRUST * (1.6 if Inventory.engine_mk2 else 1.0)
+	# --- main engine: Space (Mk2 upgrade = +60% thrust; the NUCLEAR
+	# ENGINE stacks another +45% and burns half again cooler) ---
+	var thrust := MAIN_THRUST * (1.6 if Inventory.engine_mk2 else 1.0) \
+		* (1.45 if nuclear else 1.0)
 	var burn_eff := 0.5 if mk2 else 1.0   # 2.0 sips where the 1.0 gulps
+	if nuclear:
+		burn_eff *= 0.6
 	if not ui and Input.is_key_pressed(KEY_SPACE) and Inventory.fuel > 0.0:
 		vel += fwd * thrust * delta
 		Inventory.fuel = maxf(0.0, Inventory.fuel - MAIN_BURN * burn_eff * delta)

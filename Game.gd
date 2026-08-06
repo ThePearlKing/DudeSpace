@@ -168,6 +168,7 @@ var underwater: bool = false     # inside an ocean world's water right now
 var ai_blessed: bool = false     # synced with the DUDE A.I.: sells pay +10%
 var charts_unlocked: bool = false  # map room star charts: hidden worlds shown
 var suit_boost_until: float = 0.0  # BIG COMPUTER overclock: fast legs until then
+var white_beaten: bool = false  # somebody escaped the white zone once: it gave up
 # BIG COMPUTER runs on fuel now. Drains while you play; feed the
 # reactor coal/uranium or the whole facility goes DARK.
 var facility_power: float = 1800.0
@@ -422,6 +423,7 @@ func reset() -> void:
 	ai_blessed = false
 	charts_unlocked = false
 	suit_boost_until = 0.0
+	white_beaten = false
 	facility_power = FACILITY_MAX
 	underwater = false
 	cheated = false
