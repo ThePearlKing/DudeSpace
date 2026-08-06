@@ -79,6 +79,22 @@ func _bup(up: Vector3) -> Basis:
 	x = x.normalized()
 	return Basis(x, up, x.cross(up).normalized()).orthonormalized()
 
+
+## spherical helpers: direction / frame at arc angle a, lateral angle b
+func _sdir(a: float, beta: float) -> Vector3:
+	return (_pdir(a) * cos(beta) + _e2 * sin(beta)).normalized()
+
+func _sbas(a: float, beta: float) -> Basis:
+	var upv := _sdir(a, beta)
+	var ex := (-_pdir(a) * sin(beta) + _e2 * cos(beta)).normalized()
+	return Basis(ex, upv, ex.cross(upv)).orthonormalized()
+
+## one spherical floor tile (curves with gravity in BOTH axes)
+func _stile(a: float, beta: float, size: Vector3, rad: float,
+		col: Color) -> void:
+	_plate(size, Transform3D(_sbas(a, beta), _C + _sdir(a, beta) * rad),
+		Vector3.ZERO, col, 0.0)
+
 ## floor/ceiling as chained ARC STRIPS: every big room curves with
 ## gravity exactly like the deck. len_z is the FULL span to cover --
 ## strips are laid edge to edge so the floor always reaches the walls
@@ -470,63 +486,145 @@ func build(b, dir: Vector3) -> void:
 	sl9.global_transform = Transform3D(hb, _C + hup * (_r2 + 5.15))
 	sl9.translate_object_local(Vector3(0, 0, 3.2))
 
-	# ---- REACTOR CORE: a GIANT chamber (22x22x12, arc floors) with a
-	# fusion assembly in the middle and a raised control booth inside
-	var ac := aend + (2.5 + 11.55) / _rF
+	# ---- REACTOR CORE: a GIGANTIC cavern. Floor 9m below deck level,
+	# ceiling 15m above it, ~30x31 footprint, every surface curving with
+	# gravity in both axes. Deck + ring + comms enter at rF onto a
+	# BALCONY ring with railings; a ramp descends the west side to the
+	# cavern floor where the fusion assembly towers 13m tall.
+	var ac := aend + (2.5 + 15.5) / _rF
+	var rC := _rF - 9.0
 	var cb := _fr(ac)
 	var cup := _pdir(ac)
-	_arc_floor(ac, 22.6, 23.4, _rF - 0.25, 0.0)
-	_arc_floor(ac, 22.6, 23.4, _rF + 12.25, 0.0)
-	var cwxf := Transform3D(cb, _C + cup * (_rF + 6.0))
-	# -Z wall: deck-sized opening + a DEEP header sealing the band above
-	# the deck ceiling (the old escape hole)
-	_plate(Vector3(6.3, 12.5, 0.5), cwxf, Vector3(8.15, 0, -11.3), STEEL, 0.0)
-	_plate(Vector3(6.3, 12.5, 0.5), cwxf, Vector3(-8.15, 0, -11.3), STEEL, 0.0)
-	_plate(Vector3(10.6, 6.5, 0.5), cwxf, Vector3(0, 3.0, -11.3), STEEL, 0.0)
-	# +X wall: doorway to COMMUNICATIONS
-	_plate(Vector3(0.5, 12.5, 10.1), cwxf, Vector3(11.3, 0, 6.25), STEEL, 0.0)
-	_plate(Vector3(0.5, 12.5, 10.1), cwxf, Vector3(11.3, 0, -6.25), STEEL, 0.0)
-	_plate(Vector3(0.5, 9.5, 2.4), cwxf, Vector3(11.3, 1.5, 0), STEEL, 0.0)
-	_plate(Vector3(0.5, 12.5, 22.6), cwxf, Vector3(-11.3, 0, 0), STEEL, 0.0)
-	# +Z wall grows a ring doorway: the hallway EAST continues past the
-	# core all the way around the planet
-	_plate(Vector3(10.1, 12.5, 0.5), cwxf, Vector3(6.25, 0, 11.3), STEEL, 0.0)
-	_plate(Vector3(10.1, 12.5, 0.5), cwxf, Vector3(-6.25, 0, 11.3), STEEL, 0.0)
-	_plate(Vector3(2.4, 9.5, 0.5), cwxf, Vector3(0, 1.5, 11.3), STEEL, 0.0)
-	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 5.7),
-		Vector3(10.7, 0, 0), -90.0)
-	# fusion assembly: plinth, plasma heart in a translucent sleeve,
-	# feed columns, three tilted spin rings, six pylons, rising discs
+	var LATW := 15.25 / _rF          # lateral half-angle of the walls
+	# floor + ceiling as 7x7 spherical tiles
+	for k in 7:
+		var aw9 := ac + (4.4 / _rF) * (float(k) - 3.0)
+		for m in 7:
+			var bw := (4.4 / _rF) * (float(m) - 3.0)
+			_stile(aw9, bw, Vector3(5.0, 0.5, 4.6), rC - 0.25, DARK)
+			_stile(aw9, bw, Vector3(5.0, 0.5, 4.6), _rF + 15.25, DARK)
+	# curved side walls (radial fences at constant lateral angle), with
+	# the comms doorway cut into the +X centre strip
+	var wmid := (rC + _rF + 15.0) * 0.5
+	for k in 7:
+		var aw9 := ac + (4.4 / _rF) * (float(k) - 3.0)
+		for sd in [1.0, -1.0]:
+			var bw: float = LATW * sd
+			var wb := _sbas(aw9, bw)
+			var wdir := _sdir(aw9, bw)
+			if sd > 0.0 and k == 3:
+				# comms doorway: flanks + sill + header (2.4 x 2.75)
+				_plate(Vector3(0.5, 25.0, 1.2), Transform3D(wb, _C + wdir * wmid),
+					Vector3(0, 0, 1.8), STEEL, 0.0)
+				_plate(Vector3(0.5, 25.0, 1.2), Transform3D(wb, _C + wdir * wmid),
+					Vector3(0, 0, -1.8), STEEL, 0.0)
+				_plate(Vector3(0.5, 9.5, 2.6),
+					Transform3D(wb, _C + wdir * (rC + 4.25)), Vector3.ZERO, STEEL, 0.0)
+				_plate(Vector3(0.5, 12.75, 2.6),
+					Transform3D(wb, _C + wdir * (_rF + 9.125)), Vector3.ZERO, STEEL, 0.0)
+			else:
+				_plate(Vector3(0.5, 25.0, 4.7), Transform3D(wb, _C + wdir * wmid),
+					Vector3.ZERO, STEEL, 0.0)
+	# end walls in lateral strips (tilted to local up), door cuts in the
+	# centre strip: deck opening (-Z, 10.6 wide above rF) and the ring
+	# doorway (+Z, 2.4 x 3.0 above rF)
+	for es in [1.0, -1.0]:
+		var ae: float = ac + es * 15.5 / _rF
+		for m in 7:
+			var bw := (4.4 / _rF) * (float(m) - 3.0)
+			var eb := _sbas(ae, bw)
+			var edir := _sdir(ae, bw)
+			if m >= 2 and m <= 4 and es < 0.0:
+				# deck side: sill below rF, opening 10.6 wide x 6.5, header
+				_plate(Vector3(4.7, 9.5, 0.5),
+					Transform3D(eb, _C + edir * (rC + 4.25)), Vector3.ZERO, STEEL, 0.0)
+				_plate(Vector3(4.7, 9.0, 0.5),
+					Transform3D(eb, _C + edir * (_rF + 11.0)), Vector3.ZERO, STEEL, 0.0)
+				if m != 3:
+					_plate(Vector3(4.7, 6.6, 0.5),
+						Transform3D(eb, _C + edir * (_rF + 3.2)),
+						Vector3((2.15 if m == 2 else -2.15), 0, 0), STEEL, 0.0)
+			elif m == 3 and es > 0.0:
+				# ring doorway east
+				_plate(Vector3(1.2, 25.0, 0.5), Transform3D(eb, _C + edir * wmid),
+					Vector3(1.8, 0, 0), STEEL, 0.0)
+				_plate(Vector3(1.2, 25.0, 0.5), Transform3D(eb, _C + edir * wmid),
+					Vector3(-1.8, 0, 0), STEEL, 0.0)
+				_plate(Vector3(2.6, 9.5, 0.5),
+					Transform3D(eb, _C + edir * (rC + 4.25)), Vector3.ZERO, STEEL, 0.0)
+				_plate(Vector3(2.6, 12.5, 0.5),
+					Transform3D(eb, _C + edir * (_rF + 9.25)), Vector3.ZERO, STEEL, 0.0)
+			else:
+				_plate(Vector3(4.7, 25.0, 0.5), Transform3D(eb, _C + edir * wmid),
+					Vector3.ZERO, STEEL, 0.0)
+	# BALCONY ring at rF: side ledges + end ledges, spherical tiles
+	for k in 7:
+		var aw9 := ac + (4.4 / _rF) * (float(k) - 3.0)
+		for sd in [1.0, -1.0]:
+			_stile(aw9, sd * 13.0 / _rF, Vector3(5.0, 0.5, 4.6), _rF - 0.25, DARK)
+	for m in 7:
+		var bw := (4.4 / _rF) * (float(m) - 3.0)
+		_stile(ac + 13.0 / _rF, bw, Vector3(5.0, 0.5, 4.6), _rF - 0.25, DARK)
+		_stile(ac - 13.0 / _rF, bw, Vector3(5.0, 0.5, 4.6), _rF - 0.25, DARK)
+	# railings on the balcony inner edge (gap at the west ramp mouth)
+	for k in 7:
+		var aw9 := ac + (4.4 / _rF) * (float(k) - 3.0)
+		for sd in [1.0, -1.0]:
+			if sd < 0.0 and k <= 1:
+				continue   # ramp mouth
+			_plate(Vector3(0.15, 1.15, 4.7),
+				Transform3D(_sbas(aw9, sd * 10.75 / _rF),
+				_C + _sdir(aw9, sd * 10.75 / _rF) * (_rF + 0.55)),
+				Vector3.ZERO, STEEL, 0.0)
+	for m in 7:
+		var bw := (4.4 / _rF) * (float(m) - 3.0)
+		if absf(bw) * _rF < 11.0:
+			for es in [1.0, -1.0]:
+				_plate(Vector3(4.7, 1.15, 0.15),
+					Transform3D(_sbas(ac + es * 10.75 / _rF, bw),
+					_C + _sdir(ac + es * 10.75 / _rF, bw) * (_rF + 0.55)),
+					Vector3.ZERO, STEEL, 0.0)
+	# the RAMP: five chained pitched plates down the -X side
+	for rp in 5:
+		var t9 := (float(rp) + 0.5) / 5.0
+		var ar := ac + (-9.0 + 18.0 * t9) / _rF
+		var rr := lerpf(_rF, rC, t9)
+		var rb := _sbas(ar, -13.0 / _rF)
+		var rxf := Transform3D(rb, _C + _sdir(ar, -13.0 / _rF) * rr)
+		rxf.basis = rxf.basis * Basis(Vector3(1, 0, 0), 0.464)
+		_plate(Vector3(4.2, 0.5, 4.3), rxf, Vector3.ZERO, STEEL, 0.0)
+		_deco_box(Vector3(0.15, 0.5, 4.3), rxf, Vector3(2.1, 0.4, 0), STEEL, 0.0)
+	# ---- the fusion assembly, floor-mounted, 13m tall ----
 	var plinth := MeshInstance3D.new()
 	var plm := CylinderMesh.new()
-	plm.top_radius = 2.8
-	plm.bottom_radius = 3.2
-	plm.height = 0.6
+	plm.top_radius = 5.0
+	plm.bottom_radius = 5.6
+	plm.height = 0.8
 	plinth.mesh = plm
 	plinth.material_override = Surfaces.metal(Color("#12161c"))
 	add_child(plinth)
-	plinth.global_transform = Transform3D(cb, _C + cup * (_rF + 0.3))
+	plinth.global_transform = Transform3D(cb, _C + cup * (rC + 0.4))
 	var cgb := StaticBody3D.new()
 	var cgc := CollisionShape3D.new()
 	var cgs := CylinderShape3D.new()
-	cgs.radius = 2.6
-	cgs.height = 6.5
+	cgs.radius = 4.5
+	cgs.height = 12.0
 	cgc.shape = cgs
 	cgb.add_child(cgc)
 	add_child(cgb)
-	cgb.global_transform = Transform3D(cb, _C + cup * (_rF + 3.25))
+	cgb.global_transform = Transform3D(cb, _C + cup * (rC + 6.0))
 	var heart := MeshInstance3D.new()
 	var hsm := SphereMesh.new()
-	hsm.radius = 1.5
-	hsm.height = 3.0
+	hsm.radius = 2.6
+	hsm.height = 5.2
 	heart.mesh = hsm
 	heart.material_override = DatamoshStudio._fluid_material(AMBER)
 	add_child(heart)
-	heart.global_transform = Transform3D(cb, _C + cup * (_rF + 3.4))
+	heart.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
 	var hglow := MeshInstance3D.new()
 	var hgm := SphereMesh.new()
-	hgm.radius = 0.85
-	hgm.height = 1.7
+	hgm.radius = 1.5
+	hgm.height = 3.0
 	hglow.mesh = hgm
 	_core_mat = StandardMaterial3D.new()
 	_core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -535,22 +633,22 @@ func build(b, dir: Vector3) -> void:
 	_core_mat.emission = Color("#ffd27a")
 	hglow.material_override = _core_mat
 	add_child(hglow)
-	hglow.global_transform = Transform3D(cb, _C + cup * (_rF + 3.4))
-	for fc in [1.1, 5.7]:
+	hglow.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
+	for fc in [1.9, 10.5]:
 		var col9 := MeshInstance3D.new()
 		var clm9 := CylinderMesh.new()
-		clm9.top_radius = 0.32
-		clm9.bottom_radius = 0.32
-		clm9.height = 1.6
+		clm9.top_radius = 0.6
+		clm9.bottom_radius = 0.6
+		clm9.height = 2.6
 		col9.mesh = clm9
 		col9.material_override = Destructible.make_material(AMBER, 1.6)
 		add_child(col9)
-		col9.global_transform = Transform3D(cb, _C + cup * (_rF + fc))
+		col9.global_transform = Transform3D(cb, _C + cup * (rC + fc))
 	var sleeve := MeshInstance3D.new()
 	var svm := CylinderMesh.new()
-	svm.top_radius = 2.5
-	svm.bottom_radius = 2.5
-	svm.height = 6.0
+	svm.top_radius = 4.2
+	svm.bottom_radius = 4.2
+	svm.height = 11.6
 	sleeve.mesh = svm
 	var svmat := StandardMaterial3D.new()
 	svmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -558,17 +656,17 @@ func build(b, dir: Vector3) -> void:
 	svmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	sleeve.material_override = svmat
 	add_child(sleeve)
-	sleeve.global_transform = Transform3D(cb, _C + cup * (_rF + 3.4))
+	sleeve.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
 	for ri in 3:
 		var ring := MeshInstance3D.new()
 		var rgm := TorusMesh.new()
-		rgm.inner_radius = 3.0 + 0.5 * float(ri)
-		rgm.outer_radius = 3.25 + 0.5 * float(ri)
+		rgm.inner_radius = 5.4 + 0.9 * float(ri)
+		rgm.outer_radius = 5.85 + 0.9 * float(ri)
 		ring.mesh = rgm
 		ring.material_override = Destructible.make_material(
 			AMBER.lightened(0.2), 1.8)
 		add_child(ring)
-		ring.global_transform = Transform3D(cb, _C + cup * (_rF + 3.4))
+		ring.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
 		ring.rotate_object_local(Vector3(1, 0, 0),
 			[0.35, -0.22, 0.12][ri])
 		_core_rings.append({"node": ring, "spin": 0.4 + 0.35 * float(ri)})
@@ -576,85 +674,83 @@ func build(b, dir: Vector3) -> void:
 		var pang := TAU * float(py) / 6.0
 		var pyl := MeshInstance3D.new()
 		var pym := BoxMesh.new()
-		pym.size = Vector3(0.35, 5.0, 0.35)
+		pym.size = Vector3(0.5, 8.5, 0.5)
 		pyl.mesh = pym
 		pyl.material_override = Surfaces.metal(STEEL)
 		add_child(pyl)
-		pyl.global_transform = Transform3D(cb, _C + cup * (_rF + 2.2))
-		pyl.translate_object_local(Vector3(cos(pang) * 5.2, 0, sin(pang) * 5.2))
+		pyl.global_transform = Transform3D(cb, _C + cup * (rC + 3.8))
+		pyl.translate_object_local(Vector3(cos(pang) * 8.8, 0, sin(pang) * 8.8))
 		pyl.rotate_object_local(Vector3(-sin(pang), 0, cos(pang)) * -1.0, 0.55)
 		var tip := MeshInstance3D.new()
 		var tpm2 := SphereMesh.new()
-		tpm2.radius = 0.22
-		tpm2.height = 0.44
+		tpm2.radius = 0.32
+		tpm2.height = 0.64
 		tip.mesh = tpm2
 		tip.material_override = Destructible.make_material(AMBER, 2.2)
 		add_child(tip)
-		tip.global_transform = Transform3D(cb, _C + cup * (_rF + 4.6))
-		tip.translate_object_local(Vector3(cos(pang) * 3.9, 0, sin(pang) * 3.9))
+		tip.global_transform = Transform3D(cb, _C + cup * (rC + 8.0))
+		tip.translate_object_local(Vector3(cos(pang) * 6.6, 0, sin(pang) * 6.6))
 	for di2 in 4:
 		var disc := MeshInstance3D.new()
 		var dcm := CylinderMesh.new()
-		dcm.top_radius = 2.0
-		dcm.bottom_radius = 2.0
-		dcm.height = 0.06
+		dcm.top_radius = 3.3
+		dcm.bottom_radius = 3.3
+		dcm.height = 0.07
 		disc.mesh = dcm
 		disc.material_override = Destructible.make_material(
 			AMBER.lightened(0.35), 2.0)
 		add_child(disc)
 		_core_discs.append({"node": disc, "cb": cb, "cup": cup,
-			"phase": float(di2) * 1.4})
+			"phase": float(di2) * 2.3, "base": rC + 1.2, "span": 9.5})
 	var collector := MeshInstance3D.new()
 	var ccm := CylinderMesh.new()
-	ccm.top_radius = 0.3
-	ccm.bottom_radius = 2.0
-	ccm.height = 1.4
+	ccm.top_radius = 0.5
+	ccm.bottom_radius = 3.4
+	ccm.height = 2.2
 	collector.mesh = ccm
 	collector.material_override = Surfaces.metal(Color("#12161c"))
 	add_child(collector)
-	collector.global_transform = Transform3D(cb, _C + cup * (_rF + 7.2))
+	collector.global_transform = Transform3D(cb, _C + cup * (rC + 13.0))
 	var fring := MeshInstance3D.new()
 	var frm := TorusMesh.new()
-	frm.inner_radius = 4.7
-	frm.outer_radius = 4.95
+	frm.inner_radius = 8.0
+	frm.outer_radius = 8.4
 	fring.mesh = frm
 	fring.material_override = Destructible.make_material(AMBER, 1.3)
 	add_child(fring)
-	fring.global_transform = Transform3D(cb, _C + cup * (_rF + 0.08))
+	fring.global_transform = Transform3D(cb, _C + cup * (rC + 0.1))
 	# lightning: jagged arc bolts that flicker around the heart
 	for ab in 5:
 		var arc9 := Node3D.new()
 		add_child(arc9)
-		arc9.global_transform = Transform3D(cb, _C + cup * (_rF + 3.4))
+		arc9.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
 		arc9.rotate_object_local(Vector3(0, 1, 0), TAU * float(ab) / 5.0)
 		for seg9 in 3:
 			var bolt := MeshInstance3D.new()
 			var bom := BoxMesh.new()
-			bom.size = Vector3(0.06, 0.06, 1.1)
+			bom.size = Vector3(0.08, 0.08, 1.9)
 			bolt.mesh = bom
-			bolt.position = Vector3(1.6 + 0.5 * float(seg9),
-				0.5 - 0.5 * float(seg9), 0)
+			bolt.position = Vector3(2.9 + 0.9 * float(seg9),
+				0.9 - 0.9 * float(seg9), 0)
 			bolt.rotation_degrees = Vector3(0, 24.0 * float(seg9) - 20.0,
 				38.0 - 34.0 * float(seg9))
 			bolt.material_override = Destructible.make_material(
 				Color("#fff2cf"), 2.6)
 			arc9.add_child(bolt)
 		_arcs.append({"node": arc9, "phase": float(ab) * 1.3})
-	# control booth INSIDE the chamber: raised glass box overlooking the
-	# core, reached by a ramp
-	var bpx := 7.2
-	var bpz := 7.6
-	_plate(Vector3(7.0, 0.6, 5.4), Transform3D(cb, _C + cup * (_rF + 2.1)),
-		Vector3(bpx, 0, bpz), STEEL, 0.0)
-	_plate(Vector3(2.6, 0.5, 5.8),
-		Transform3D(cb * Basis(Vector3(1, 0, 0), -0.46),
-		_C + cup * (_rF + 1.1)), Vector3(bpx - 1.4, 0, bpz - 5.15), STEEL, 0.0)
-	for gw9 in [[Vector3(7.0, 2.4, 0.12), Vector3(bpx, 3.6, bpz - 2.7)],
-			[Vector3(0.12, 2.4, 5.4), Vector3(bpx - 3.45, 3.6, bpz)]]:
+	# ---- CONTROL BOOTH on the -Z balcony, east of the deck door: a
+	# glass-fronted room whose WINDOW looks out over the whole cavern
+	var bthb := _sbas(ac - 12.6 / _rF, 8.1 / _rF)
+	var bthd := _sdir(ac - 12.6 / _rF, 8.1 / _rF)
+	var glf := _sbas(ac - 10.7 / _rF, 8.1 / _rF)
+	var gld := _sdir(ac - 10.7 / _rF, 8.1 / _rF)
+	for gspec9 in [[Vector3(7.4, 3.4, 0.12), glf, gld, Vector3.ZERO],
+			[Vector3(0.12, 3.4, 4.6), _sbas(ac - 12.9 / _rF, 11.7 / _rF),
+			_sdir(ac - 12.9 / _rF, 11.7 / _rF), Vector3.ZERO]]:
 		var gl9 := StaticBody3D.new()
 		var gmi9 := MeshInstance3D.new()
 		var gbm9 := BoxMesh.new()
-		gbm9.size = gw9[0]
+		gbm9.size = gspec9[0]
 		gmi9.mesh = gbm9
 		var gmat9 := StandardMaterial3D.new()
 		gmat9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -663,27 +759,38 @@ func build(b, dir: Vector3) -> void:
 		gl9.add_child(gmi9)
 		var gcs9 := CollisionShape3D.new()
 		var gbs9 := BoxShape3D.new()
-		gbs9.size = gw9[0]
+		gbs9.size = gspec9[0]
 		gcs9.shape = gbs9
 		gl9.add_child(gcs9)
 		add_child(gl9)
-		gl9.global_transform = Transform3D(cb, _C + cup * _rF)
-		gl9.translate_object_local(gw9[1])
-	_plate(Vector3(3.2, 1.1, 0.9), Transform3D(cb, _C + cup * (_rF + 2.95)),
-		Vector3(bpx, 0, bpz - 2.2), Color("#12161c"), 0.0)
+		gl9.global_transform = Transform3D(gspec9[1] as Basis,
+			_C + (gspec9[2] as Vector3) * (_rF + 1.7))
+		gl9.translate_object_local(gspec9[3] as Vector3)
+	# booth inner side wall with a 1.2m door gap onto the balcony walk
+	_plate(Vector3(0.5, 3.4, 2.6), Transform3D(_sbas(ac - 13.6 / _rF, 4.6 / _rF),
+		_C + _sdir(ac - 13.6 / _rF, 4.6 / _rF) * (_rF + 1.7)),
+		Vector3.ZERO, STEEL, 0.0)
+	# desk + tilted amber panel + status dots inside
+	_plate(Vector3(3.2, 1.1, 0.9), Transform3D(bthb, _C + bthd * (_rF + 0.55)),
+		Vector3(0, 0, 1.4), Color("#12161c"), 0.0)
 	var bpan := MeshInstance3D.new()
 	bpan.mesh = IcosaColony._cham_mesh(0.9, 0.05, 3.3, 0.22)
 	bpan.material_override = Destructible.make_material(AMBER.darkened(0.1), 1.6)
 	add_child(bpan)
 	bpan.global_transform = Transform3D(
-		cb * Basis(Vector3(0, 0, 1), 0.5), _C + cup * (_rF + 3.62))
-	bpan.translate_object_local(Vector3(bpx * 0.88, 0, bpz - 2.2))
-	_sign("REACTOR CORE", cb, _C + cup * (_rF + 8.6),
-		Vector3(0, 0, 10.9), 180.0)
-	_sign("CONTROL BOOTH", cb, _C + cup * (_rF + 5.4),
-		Vector3(bpx, 0, bpz + 2.6), 180.0)
-	_sign("CONTROL DECK / ATRIUM", cb, _C + cup * (_rF + 5.2),
-		Vector3(0, 0, -10.9), 0.0)
+		bthb * Basis(Vector3(0, 0, 1), 0.5), _C + bthd * (_rF + 1.25))
+	bpan.translate_object_local(Vector3(0, 0, 1.4))
+	_sign("CONTROL BOOTH", bthb, _C + bthd * (_rF + 4.1),
+		Vector3(0, 0, -1.0), 0.0)
+	_sign("REACTOR CORE", cb, _C + cup * (_rF + 6.4),
+		Vector3(0, 0, -14.4), 0.0)
+	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 3.9),
+		Vector3(14.6, 0, 0), -90.0)
+	_sign("CONTROL DECK / ATRIUM", cb, _C + cup * (_rF + 7.6),
+		Vector3(0, 0, -14.6), 180.0)
+	_chatter(Transform3D(cb, _C + cup * (rC + 2.0)).origin, 61, -8.0)
+	_chatter(Transform3D(cb, _C + cup * (_rF + 1.0))
+		.translated_local(Vector3(10.0, 0, 10.0)).origin, 62, -10.0)
 
 	# ---- the wings ----
 	_service_wing()
@@ -1133,7 +1240,7 @@ func _cockpit_shell() -> void:
 ## atrium, meeting at the cockpit, swallowing the old bunk end cap.
 func _rings() -> void:
 	# --- ring A east: reactor far wall -> DUDE A.I -> cockpit ---
-	_hall(0, 1.489, 2.47, [[1.75, 1.0], [2.02, -1.0]])
+	_hall(0, 1.621, 2.47, [[1.75, 1.0], [2.02, -1.0]])
 	var tr := _ring_room(0, 1.75, 1.0, "TAPE ARCHIVE")
 	_dress_tape(tr)
 	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM")
@@ -1773,7 +1880,7 @@ const RADIO_HUES := [Color("#b388ff"), Color("#66ff99"),
 func _comms_room(cb: Basis, _ac: float) -> void:
 	# the room hangs off the core's +X wall, on its own lateral arc
 	# frame so the floor still agrees with gravity
-	var gam := 16.6 / _rF
+	var gam := 22.05 / _rF
 	var cb2 := cb.rotated((cb * Vector3(0, 0, 1)).normalized(), -gam)
 	var up2 := (cb2 * Vector3(0, 1, 0)).normalized()
 	_plate(Vector3(12.6, 0.5, 12.6), Transform3D(cb2, _C + up2 * (_rF - 0.25)),
@@ -1820,48 +1927,72 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	dial.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.1))
 	dial.translate_object_local(Vector3(2.6, 0, 0))
 	_spins.append({"node": dial, "rate": 0.8})
-	for btn in [[Vector3(2.6, 0, 1.7), Color("#ff4444"), "POWER"],
-			[Vector3(2.6, 0, -1.7), Color("#66ff99"), "STATION"]]:
+	# FULL CHANNEL CONTROLLER: a red POWER button plus one physical
+	# button per channel, each wearing its channel's colour. No titles
+	# -- the colour and the sound ARE the channel.
+	var btns: Array = [[Vector3(2.6, 0, 2.1), Color("#ff4444"), -1]]
+	for ci in 4:
+		btns.append([Vector3(2.6, 0, 1.0 - 0.9 * float(ci)), RADIO_HUES[ci], ci])
+	for btn in btns:
+		var mode: int = int(btn[2])
 		var bped := MeshInstance3D.new()
 		var bpm2 := BoxMesh.new()
-		bpm2.size = Vector3(0.5, 0.24, 0.5)
+		bpm2.size = Vector3(0.5, 0.24, 0.5) if mode < 0 else Vector3(0.42, 0.22, 0.42)
 		bped.mesh = bpm2
 		bped.material_override = Destructible.make_material(btn[1], 1.8)
 		add_child(bped)
 		bped.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.12))
 		bped.translate_object_local(btn[0])
-		var lb2 := Label3D.new()
-		lb2.text = str(btn[2])
-		lb2.font_size = 22
-		lb2.pixel_size = 0.005
-		lb2.modulate = btn[1]
-		lb2.outline_size = 8
-		lb2.outline_modulate = Color(0, 0, 0, 0.9)
-		add_child(lb2)
-		lb2.global_transform = Transform3D(
-			cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
-			Transform3D(cb2, _C + up2 * (_rF + 1.55))
-			.translated_local(btn[0]).origin)
+		if mode < 0:
+			var lb2 := Label3D.new()
+			lb2.text = "POWER"
+			lb2.font_size = 22
+			lb2.pixel_size = 0.005
+			lb2.modulate = btn[1]
+			lb2.outline_size = 8
+			lb2.outline_modulate = Color(0, 0, 0, 0.9)
+			add_child(lb2)
+			lb2.global_transform = Transform3D(
+				cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
+				Transform3D(cb2, _C + up2 * (_rF + 1.55))
+				.translated_local(btn[0]).origin)
 		var trig := Area3D.new()
 		var tcs := CollisionShape3D.new()
 		var tss := SphereShape3D.new()
-		tss.radius = 0.9
+		tss.radius = 0.42
 		tcs.shape = tss
 		trig.add_child(tcs)
 		add_child(trig)
 		trig.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.3))
 		trig.translate_object_local(btn[0])
-		var is_power: bool = str(btn[2]) == "POWER"
 		trig.body_entered.connect(func(bod):
 			if _radio_cool > 0.0 or not bod.is_in_group("player"):
 				return
-			_radio_cool = 1.0
-			if is_power:
+			_radio_cool = 0.6
+			if mode < 0:
 				_radio_on = not _radio_on
 			else:
-				_radio_idx = (_radio_idx + 1) % RADIO_NAMES.size()
+				_radio_idx = mode
+				_radio_on = true
 			Sfx.play("click", -8.0)
 			_radio_apply())
+	# the SPECTROGRAM: yellow, fast -- much faster than the radio's --
+	# on the -Z wall
+	var spfr := MeshInstance3D.new()
+	spfr.mesh = IcosaColony._cham_mesh(2.2, 0.08, 5.0, 0.4)
+	spfr.material_override = Destructible.make_material(AMBER, 1.3)
+	add_child(spfr)
+	spfr.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.2))
+	spfr.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	spfr.translate_object_local(Vector3(0, -5.72, 0))
+	var spq := MeshInstance3D.new()
+	var spm := QuadMesh.new()
+	spm.size = Vector2(4.5, 1.8)
+	spq.mesh = spm
+	spq.material_override = _spectro_mat()
+	add_child(spq)
+	spq.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.2))
+	spq.translate_object_local(Vector3(0, 0, -5.62))
 	_sign("INTERUNIVERSE COMMUNICATIONS", cb2, _C + up2 * (_rF + 5.9),
 		Vector3(0, 0, -5.7), 0.0)
 	_radio_sp = AudioStreamPlayer3D.new()
@@ -1882,6 +2013,34 @@ func _radio_apply() -> void:
 		if _radio_on and _radio_streams[_radio_idx] != null:
 			_radio_sp.stream = _radio_streams[_radio_idx]
 			_radio_sp.play()
+
+## the comms spectrogram: yellow, scrolling FAST -- waterfall columns
+## with per-band jitter, quicker than anything on the radio
+func _spectro_mat() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded;
+void fragment(){
+	vec2 uv = UV;
+	float t = TIME;
+	float xs = fract(uv.x + t * 0.85);
+	float col9 = floor(xs * 44.0);
+	float tq = floor(t * 18.0);
+	float h = fract(sin(col9 * 12.9898 + tq * 0.37) * 43758.5453);
+	float h2 = fract(sin(col9 * 78.233 + tq * 0.11) * 24634.6345);
+	float amp = 0.12 + 0.88 * h * (0.55 + 0.45 * h2);
+	float bar = step(1.0 - uv.y, amp);
+	vec3 gold = vec3(1.0, 0.72, 0.05);
+	vec3 col = gold * bar * (0.35 + 0.65 * (1.0 - uv.y))
+		+ gold * 0.07;
+	ALBEDO = col;
+	EMISSION = col * 1.9;
+}
+"""
+	var m9 := ShaderMaterial.new()
+	m9.shader = sh
+	return m9
 
 func _radio_screen_mat() -> ShaderMaterial:
 	var sh := Shader.new()
@@ -2171,10 +2330,10 @@ func _process(delta: float) -> void:
 		(pu["mat"] as StandardMaterial3D).emission_energy_multiplier = \
 			1.3 + 0.8 * sin(_t * 2.0 + float(pu["phase"]))
 	for dc in _core_discs:
-		var dh := fmod(_t * 1.1 + float(dc["phase"]), 4.4)
+		var dh := fmod(_t * 1.6 + float(dc["phase"]), float(dc["span"]))
 		(dc["node"] as Node3D).global_transform = Transform3D(
 			dc["cb"] as Basis,
-			_C + (dc["cup"] as Vector3) * (_rF + 0.8 + dh))
+			_C + (dc["cup"] as Vector3) * (float(dc["base"]) + dh))
 	for ar in _arcs:
 		var an: Node3D = ar["node"]
 		var fl := fmod(_t * 1.7 + float(ar["phase"]), 1.0)

@@ -702,6 +702,11 @@ func _mainframe_test() -> void:
 		["server 2", (u0 * cos(3.775) + e1 * sin(3.775)).normalized(), rF, 3.0],
 		["ringB east", (u0 * cos(1.0) + e2 * sin(1.0)).normalized(), rF, 2.5],
 		["ringB west", (u0 * cos(4.4) + e2 * sin(4.4)).normalized(), rF, 2.5],
+		["reactor flr", (u0 * cos(1.3708) + e1 * sin(1.3708)).normalized(), rF - 9.0, 4.0],
+		["reactor balc", ((u0 * cos(1.3708) + e1 * sin(1.3708)) * cos(0.21)
+			+ e2 * sin(0.21)).normalized(), rF, 2.0],
+		["comms", ((u0 * cos(1.3708) + e1 * sin(1.3708)) * cos(0.3556)
+			+ e2 * sin(0.3556)).normalized(), rF, 2.5],
 	]
 	for fc in floor_checks:
 		var pd9: Vector3 = fc[1]
