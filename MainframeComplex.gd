@@ -54,6 +54,11 @@ const DARK := Color("#1c2026")
 const SEGS := 14
 const HATCH_SEG := 7
 
+var _e_pts: Dictionary = {}    # hidden data-tunnel entrances
+var _vp: Dictionary = {}       # room vent-hole endpoints
+var _duct_end: Vector3
+var _net_probes: Array = []    # world positions MFTEST can floor-check
+
 var _C: Vector3
 var _u0: Vector3
 var _e1: Vector3
@@ -274,20 +279,21 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(5.1, 7.0, 0.5), awxf, Vector3(-3.75, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.4, 4.0, 0.5), awxf, Vector3(0, 1.75, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.15, 7.0, 0.5), awxf, Vector3(2.275, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(1.1, 5.55, 0.5), awxf, Vector3(3.9, 0.725, -6.05), STEEL, 0.0)
+	_plate(Vector3(1.1, 4.3, 0.5), awxf, Vector3(3.9, 1.35, -6.05), STEEL, 0.0)
 	_plate(Vector3(1.85, 7.0, 0.5), awxf, Vector3(5.375, 0, -6.05), STEEL, 0.0)
-	for vg in [[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -2.0, -6.0)],
+	for vg in [[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -1.0, -6.0)],
 			[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -3.3, -6.0)],
-			[Vector3(0.1, 1.3, 0.1), Vector3(3.25, -2.6, -6.0)],
-			[Vector3(0.1, 1.3, 0.1), Vector3(4.55, -2.6, -6.0)]]:
+			[Vector3(0.1, 2.4, 0.1), Vector3(3.25, -2.15, -6.0)],
+			[Vector3(0.1, 2.4, 0.1), Vector3(4.55, -2.15, -6.0)]]:
 		_deco_box(vg[0], awxf, vg[1], AMBER, 1.3)
-	# the duct itself: a short sealed run behind the grille (the planet
-	# is hollow -- an open vent would be an escape hole)
+	# the duct: tall enough to WALK now -- it no longer dead-ends, it is
+	# the atrium's mouth of the secret vent network
 	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -3.65, -8.1), STEEL, 0.0)
-	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -1.85, -8.1), STEEL, 0.0)
-	_plate(Vector3(0.4, 2.2, 3.6), awxf, Vector3(3.15, -2.75, -8.1), STEEL, 0.0)
-	_plate(Vector3(0.4, 2.2, 3.6), awxf, Vector3(4.65, -2.75, -8.1), STEEL, 0.0)
-	_plate(Vector3(1.9, 2.4, 0.4), awxf, Vector3(3.9, -2.75, -10.1), STEEL, 0.0)
+	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -0.95, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.1, 3.6), awxf, Vector3(3.15, -2.3, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.1, 3.6), awxf, Vector3(4.65, -2.3, -8.1), STEEL, 0.0)
+	_duct_end = Transform3D(abas, _C + _u0 * (_rF + 3.25)) \
+		.translated_local(Vector3(3.9, -3.45, -9.6)).origin
 	_deco_box(Vector3(0.04, 0.08, 3.4), awxf, Vector3(3.4, -2.2, -8.1),
 		Color("#66ff99"), 1.1)
 	var vring := MeshInstance3D.new()
@@ -453,9 +459,15 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(9.4, 5.7, 0.5), swxf, Vector3(5.6, 0, 7.3), STEEL, 0.0)
 	_plate(Vector3(9.4, 5.7, 0.5), swxf, Vector3(-5.6, 0, 7.3), STEEL, 0.0)
 	_plate(Vector3(1.8, 3.25, 0.5), swxf, Vector3(0, 1.225, 7.3), STEEL, 0.0)
-	_plate(Vector3(20.6, 5.7, 0.5), swxf, Vector3(0, 0, -7.3), STEEL, 0.0)
+	# -Z wall: solid to the eye, but a 2.6-wide breach hides behind the
+	# west rack row -- the way DOWN into the computer tunnels
+	_plate(Vector3(2.0, 5.7, 0.5), swxf, Vector3(-9.3, 0, -7.3), STEEL, 0.0)
+	_plate(Vector3(16.0, 5.7, 0.5), swxf, Vector3(2.3, 0, -7.3), STEEL, 0.0)
+	_plate(Vector3(2.6, 3.1, 0.5), swxf, Vector3(-7.0, 1.3, -7.3), STEEL, 0.0)
+	_e_pts["srv"] = Transform3D(hb, _C + hup * (_r2 - 0.25)) \
+		.translated_local(Vector3(-7.0, 0, -8.6)).origin
 	_chatter(Transform3D(hb, _C + hup * (_r2 + 2.0)).origin, 11, -6.0)
-	_chatter(Transform3D(hb, _C + hup * (_r2 + 2.0))
+	_chatter(Transform3D(hb, _C + hup * (_r2 + 2.0)) \
 		.translated_local(Vector3(-6.0, 0, 3.0)).origin, 12, -6.0)
 	# racks: four DENSE rows, glowing slits, every single server blinking
 	for rx in [-7.0, -3.5, 3.5, 7.0]:
@@ -797,7 +809,7 @@ func build(b, dir: Vector3) -> void:
 	_sign("CONTROL DECK / ATRIUM", cb, _C + cup * (_rF + 7.6),
 		Vector3(0, 0, -14.6), 180.0)
 	_chatter(Transform3D(cb, _C + cup * (rC + 2.0)).origin, 61, -8.0)
-	_chatter(Transform3D(cb, _C + cup * (_rF + 1.0))
+	_chatter(Transform3D(cb, _C + cup * (_rF + 1.0)) \
 		.translated_local(Vector3(10.0, 0, 10.0)).origin, 62, -10.0)
 
 	# ---- the wings ----
@@ -805,6 +817,9 @@ func build(b, dir: Vector3) -> void:
 	_comms_room(cb, ac)
 	# ---- the planet-wide hallway rings + their rooms ----
 	_rings()
+	# ---- LAST, once every room exists: the secret networks, laid
+	# through the space that provably nobody else is using ----
+	_networks()
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
 		var aang := TAU * float(an9) / 4.0 + 0.5
@@ -1003,7 +1018,11 @@ func _bunk_wing() -> void:
 	_plate(Vector3(4.15, 0.5, 3.3), vcxf, Vector3(3.725, 0, 0), DARK, 0.0)
 	_plate(Vector3(4.15, 0.5, 3.3), vcxf, Vector3(-3.725, 0, 0), DARK, 0.0)
 	var vwxf := Transform3D(fb4, _C + up4 * (rV + 2.1))
-	_plate(Vector3(0.5, 5.2, 11.6), vwxf, Vector3(5.8, 0, 0), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.2, 1.5), vwxf, Vector3(5.8, 0, -5.05), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.2, 7.7), vwxf, Vector3(5.8, 0, 1.95), STEEL, 0.0)
+	_plate(Vector3(0.5, 2.35, 2.4), vwxf, Vector3(5.8, 1.425, -3.1), STEEL, 0.0)
+	_e_pts["gold"] = Transform3D(fb4, _C + up4 * (rV - 0.25)) \
+		.translated_local(Vector3(7.0, 0, -3.1)).origin
 	_plate(Vector3(0.5, 5.2, 11.6), vwxf, Vector3(-5.8, 0, 0), STEEL, 0.0)
 	_plate(Vector3(11.6, 5.2, 0.5), vwxf, Vector3(0, 0, 5.8), STEEL, 0.0)
 	_plate(Vector3(11.6, 5.2, 0.5), vwxf, Vector3(0, 0, -5.8), STEEL, 0.0)
@@ -1131,7 +1150,8 @@ func _hall(fam: int, a_from: float, a_to: float, doors: Array) -> void:
 ## a standard side room hanging off a ring hallway at angle ac, side s.
 ## Interior ~9m lateral x 9.6 arc x 4.5 tall, 2.4x3.0 doorway. Returns
 ## {fb, up, cx} for the dressing pass.
-func _ring_room(fam: int, ac: float, s: float, name: String) -> Dictionary:
+func _ring_room(fam: int, ac: float, s: float, name: String,
+		vholes: int = 0) -> Dictionary:
 	var fb := _abas9(fam, ac)
 	var up := _aup9(fam, ac)
 	_plate(Vector3(9.7, 0.5, 9.6), Transform3D(fb, _C + up * (_rF - 0.25)),
@@ -1143,7 +1163,28 @@ func _ring_room(fam: int, ac: float, s: float, name: String) -> Dictionary:
 	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 3.55, 0, 3.0), STEEL, 0.0)
 	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(s * 3.55, 0, -3.0), STEEL, 0.0)
 	_plate(Vector3(0.5, 2.0, 2.4), wxf, Vector3(s * 3.55, 1.75, 0), STEEL, 0.0)
-	_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
+	# far wall -- solid, or carrying 1-2 enterable wall vents (1.2x2.2,
+	# amber grille frame) that feed the secret vent network
+	var vent_pts: Array = []
+	if vholes == 0:
+		_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
+	else:
+		var zs9: Array = [0.0] if vholes == 1 else [-2.8, 2.8]
+		if vholes == 1:
+			_plate(Vector3(0.5, 5.5, 4.2), wxf, Vector3(s * 13.05, 0, 2.7), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 4.2), wxf, Vector3(s * 13.05, 0, -2.7), STEEL, 0.0)
+		else:
+			_plate(Vector3(0.5, 5.5, 3.2), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 1.4), wxf, Vector3(s * 13.05, 0, 4.1), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 1.4), wxf, Vector3(s * 13.05, 0, -4.1), STEEL, 0.0)
+		for z9 in zs9:
+			var zf: float = float(z9)
+			_plate(Vector3(0.5, 2.8, 1.2), wxf, Vector3(s * 13.05, 1.35, zf), STEEL, 0.0)
+			_deco_box(Vector3(0.1, 2.3, 0.1), wxf, Vector3(s * 12.75, -1.15, zf - 0.66), AMBER, 1.3)
+			_deco_box(Vector3(0.1, 2.3, 0.1), wxf, Vector3(s * 12.75, -1.15, zf + 0.66), AMBER, 1.3)
+			_deco_box(Vector3(0.1, 0.1, 1.4), wxf, Vector3(s * 12.75, -0.05, zf), AMBER, 1.3)
+			vent_pts.append(Transform3D(fb, _C + up * (_rF - 0.25)) \
+				.translated_local(Vector3(s * 14.3, 0, zf)).origin)
 	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, 4.55), STEEL, 0.0)
 	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, -4.55), STEEL, 0.0)
 	var rl := MeshInstance3D.new()
@@ -1158,12 +1199,12 @@ func _ring_room(fam: int, ac: float, s: float, name: String) -> Dictionary:
 	rl.translate_object_local(Vector3(s * 8.3, 0, 0))
 	_sign(name, fb, _C + up * (_rF + 3.6), Vector3(s * 2.7, 0, 0),
 		90.0 if s < 0.0 else -90.0)
-	return {"fb": fb, "up": up, "cx": s * 8.3}
+	return {"fb": fb, "up": up, "cx": s * 8.3, "vents": vent_pts}
 
 ## a big room sitting ON a ring: the hallway enters through a doorway in
 ## each end wall. half_arc/half_lat in meters, h interior height.
 func _big_room(fam: int, ac: float, half_arc: float, half_lat: float,
-		h: float, name: String) -> Dictionary:
+		h: float, name: String, holes: Array = []) -> Dictionary:
 	var fb := _abas9(fam, ac)
 	var up := _aup9(fam, ac)
 	_arc_floor_f(fam, ac, half_lat * 2.0 + 0.6, half_arc * 2.0 + 0.8,
@@ -1177,8 +1218,22 @@ func _big_room(fam: int, ac: float, half_arc: float, half_lat: float,
 	for k in n:
 		var a := ac + st2 * (float(k) - float(n - 1) * 0.5)
 		var wxk := Transform3D(_abas9(fam, a), _C + _aup9(fam, a) * (_rF + h * 0.5))
-		_plate(Vector3(0.5, h + 1.0, 4.6), wxk, Vector3(half_lat + 0.25, 0, 0), STEEL, 0.0)
-		_plate(Vector3(0.5, h + 1.0, 4.6), wxk, Vector3(-half_lat - 0.25, 0, 0), STEEL, 0.0)
+		for sd9 in [1.0, -1.0]:
+			var hole9 := false
+			for hh in holes:
+				if int(hh[0]) == k and float(hh[1]) == sd9:
+					hole9 = true
+			if hole9:
+				# hidden 2.4x2.6 breach -- a wall panel somebody removed
+				_plate(Vector3(0.5, h + 1.0, 1.1), wxk,
+					Vector3(sd9 * (half_lat + 0.25), 0, 1.75), STEEL, 0.0)
+				_plate(Vector3(0.5, h + 1.0, 1.1), wxk,
+					Vector3(sd9 * (half_lat + 0.25), 0, -1.75), STEEL, 0.0)
+				_plate(Vector3(0.5, h - 2.1, 2.4), wxk,
+					Vector3(sd9 * (half_lat + 0.25), 1.55, 0), STEEL, 0.0)
+			else:
+				_plate(Vector3(0.5, h + 1.0, 4.6), wxk,
+					Vector3(sd9 * (half_lat + 0.25), 0, 0), STEEL, 0.0)
 		if k % 2 == 0:
 			_deco_box(Vector3(1.0, 0.08, 3.0),
 				Transform3D(_abas9(fam, a), _C + _aup9(fam, a) * (_rF + h - 0.15)),
@@ -1249,13 +1304,17 @@ func _cockpit_shell() -> void:
 func _rings() -> void:
 	# --- ring A east: reactor far wall -> DUDE A.I -> cockpit ---
 	_hall(0, 1.621, 2.47, [[1.75, 1.0], [2.02, -1.0]])
-	var tr := _ring_room(0, 1.75, 1.0, "TAPE ARCHIVE")
+	var tr := _ring_room(0, 1.75, 1.0, "TAPE ARCHIVE", 2)
 	_dress_tape(tr)
-	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM")
+	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM", 2)
 	_dress_farm(nf)
-	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.")
+	_vp["tape"] = tr["vents"]
+	_vp["farm"] = nf["vents"]
+	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.", [[5, -1.0]])
 	set_meta("ai_room_a", 2.685)
 	_dress_ai()
+	_e_pts["ai"] = Transform3D(_fr(2.8033), _C + _pdir(2.8033) * (_rF - 0.25))\
+		.translated_local(Vector3(-8.5, 0, 0)).origin
 	# --- ring A west: cockpit -> server hall 2 -> generator wing ---
 	_hall(0, 3.383, 3.63, [])
 	var s2 := _big_room(0, 3.775, 9.0, 8.0, 6.5, "SERVER HALL 2")
@@ -1268,30 +1327,37 @@ func _rings() -> void:
 				signf(float(rx)), float(rr) * 0.7 + float(rx) * 0.27)
 	_chatter(Transform3D(_fr(3.775), _C + _pdir(3.775) * (_rF + 2.0)).origin,
 		211, -6.0)
-	_chatter(Transform3D(_fr(3.72), _C + _pdir(3.72) * (_rF + 2.0))
+	_chatter(Transform3D(_fr(3.72), _C + _pdir(3.72) * (_rF + 2.0)) \
 		.translated_local(Vector3(5.0, 0, 0)).origin, 212, -7.0)
 	_hall(0, 3.92, 5.172, [[4.35, -1.0], [4.75, 1.0]])
-	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE")
+	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE", 2)
 	_dress_storage(st9)
-	var wk := _ring_room(0, 4.75, 1.0, "WORKSHOP")
+	var wk := _ring_room(0, 4.75, 1.0, "WORKSHOP", 2)
 	_dress_workshop(wk)
+	_vp["storage"] = st9["vents"]
+	_vp["workshop"] = wk["vents"]
 	# --- ring A northwest: assembly -> atrium (the old crawl tube is
 	# now a real hallway; ventilation becomes a secret system) ---
 	_hall(0, 5.682, 6.185, [])
 	# --- ring B east: atrium +X -> medbay/gym/archive -> cockpit ---
 	_hall(1, 0.098, 2.897, [[0.75, -1.0], [1.5, 1.0], [2.3, -1.0]])
-	var mb := _ring_room(1, 0.75, -1.0, "MEDBAY")
+	var mb := _ring_room(1, 0.75, -1.0, "MEDBAY", 2)
 	_dress_medbay(mb)
-	var gy := _ring_room(1, 1.5, 1.0, "GYMNASIUM")
+	var gy := _ring_room(1, 1.5, 1.0, "GYMNASIUM", 2)
 	_dress_gym(gy)
-	var ar := _ring_room(1, 2.3, -1.0, "ARCHIVE")
+	var ar := _ring_room(1, 2.3, -1.0, "ARCHIVE", 2)
 	_dress_archive(ar)
+	_vp["medbay"] = mb["vents"]
+	_vp["gym"] = gy["vents"]
+	_vp["archive"] = ar["vents"]
 	# --- ring B west: cockpit -> kitchen/trophy hall -> bunk wing ---
 	_hall(1, 3.383, 5.578, [[4.0, 1.0], [4.8, -1.0]])
-	var kt := _ring_room(1, 4.0, 1.0, "KITCHEN")
+	var kt := _ring_room(1, 4.0, 1.0, "KITCHEN", 2)
 	_dress_kitchen(kt)
-	var tp := _ring_room(1, 4.8, -1.0, "TROPHY HALL")
+	var tp := _ring_room(1, 4.8, -1.0, "TROPHY HALL", 1)
 	_dress_trophy(tp)
+	_vp["kitchen"] = kt["vents"]
+	_vp["trophy"] = tp["vents"]
 	_cockpit_shell()
 	_cockpit_dress()
 
@@ -1455,7 +1521,7 @@ func _cockpit_dress() -> void:
 	add_child(oring)
 	oring.global_transform = Transform3D(ab0, _C + au * (_rF + 7.4))
 	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2)).origin, 201, -9.0)
-	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2))
+	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2)) \
 		.translated_local(Vector3(-7.0, 0, 6.0)).origin, 202, -12.0)
 
 ## THE DUDE A.I. -- the machine that ran this place for four hundred
@@ -1783,7 +1849,15 @@ func _side_room(i: int, s: float, kind: String) -> void:
 			Vector3(cx, 0, 0), DARK, 0.0)
 		_plate(Vector3(8.6, 0.5, 9.6), Transform3D(fb, _C + up * (_rF + 5.25)),
 			Vector3(cx, 0, 0), DARK, 0.0)
-		_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.65, 0, 0), STEEL, 0.0)
+		if kind == "CARGO BAY":
+			_plate(Vector3(0.5, 5.5, 2.8), wxf, Vector3(s * 13.65, 0, 0), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 3.4), wxf, Vector3(s * 13.65, 0, 3.1), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 1.0), wxf, Vector3(s * 13.65, 0, -4.3), STEEL, 0.0)
+			_plate(Vector3(0.5, 2.65, 2.4), wxf, Vector3(s * 13.65, 1.425, -2.6), STEEL, 0.0)
+			_e_pts["cargo"] = Transform3D(fb, _C + up * (_rF - 0.25)) \
+				.translated_local(Vector3(s * 14.9, 0, -2.6)).origin
+		else:
+			_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(s * 13.65, 0, 0), STEEL, 0.0)
 		_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, 4.55), STEEL, 0.0)
 		_plate(Vector3(8.6, 5.5, 0.5), wxf, Vector3(cx, 0, -4.55), STEEL, 0.0)
 		var rl := MeshInstance3D.new()
@@ -2526,7 +2600,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 			add_child(lb2)
 			lb2.global_transform = Transform3D(
 				cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
-				Transform3D(cb2, _C + up2 * (_rF + 1.55))
+				Transform3D(cb2, _C + up2 * (_rF + 1.55)) \
 				.translated_local(btn[0]).origin)
 		var trig := Area3D.new()
 		var tcs := CollisionShape3D.new()
@@ -2811,6 +2885,385 @@ func _console(fb: Basis, up: Vector3, s: float) -> void:
 		dot.position = Vector3(0.25, 0.05, -0.7 + 0.7 * float(bd))
 		pan.add_child(dot)
 		_blinks.append({"mat": dmat, "phase": randf() * TAU})
+
+## ==================== THE SECRET NETWORKS ====================
+## Built LAST, through space nothing else occupies. Vents: steel crawl
+## tunnels linking room wall-grilles, dipping under the floors. Data
+## tunnels: big data-rain corridors between junction hubs deep in the
+## hollow planet, entered through four hidden breaches, with ESCAPE
+## checkpoints and the noodle bowl at the very bottom.
+
+## a GREAT-CIRCLE tunnel between two world points. Chained pitched
+## segments sealed by overlap; dip sinks the middle below both ends.
+## kind 0 = steel vent, 1 = data tunnel. Returns the mid transform.
+func _gc_tunnel(pa: Vector3, pb: Vector3, w: float, h: float,
+		kind: int, dip: float = 0.0) -> Transform3D:
+	var r1 := (pa - _C).length()
+	var r2c := (pb - _C).length()
+	var d1 := (pa - _C).normalized()
+	var d2 := (pb - _C).normalized()
+	var ang := d1.angle_to(d2)
+	var nx := d1.cross(d2).normalized()
+	var arclen: float = maxf(ang * (r1 + r2c) * 0.5, 1.0)
+	var steps := maxi(2, int(ceil(arclen / 3.9)))
+	var slen := arclen / float(steps)
+	var mid := Transform3D()
+	for i in steps:
+		var t := (float(i) + 0.5) / float(steps)
+		var rt := lerpf(r1, r2c, t) - dip * sin(PI * t)
+		var ta: float = maxf(t - 0.5 / float(steps), 0.0)
+		var tb: float = minf(t + 0.5 / float(steps), 1.0)
+		var dr := (lerpf(r1, r2c, tb) - dip * sin(PI * tb)) \
+			- (lerpf(r1, r2c, ta) - dip * sin(PI * ta))
+		var pitch := atan2(dr, slen * (tb - ta) * float(steps))
+		var dirt := d1.rotated(nx, ang * t)
+		var bb := Basis(nx, dirt, nx.cross(dirt)).orthonormalized()
+		var xf := Transform3D(bb * Basis(Vector3(1, 0, 0), -pitch),
+			_C + dirt * rt)
+		if i == steps / 2:
+			mid = xf
+		var wallm := _data_mat() if kind == 1 else null
+		_plate(Vector3(w + 0.8, 0.4, slen + 1.0), xf, Vector3(0, -0.2, 0),
+			DARK, 0.0)
+		_plate(Vector3(w + 0.8, 0.4, slen + 1.0), xf, Vector3(0, h + 0.2, 0),
+			DARK, 0.0)
+		for ws9 in [1.0, -1.0]:
+			if kind == 1:
+				_plate_m(Vector3(0.4, h + 0.9, slen + 1.0), xf,
+					Vector3(ws9 * (w * 0.5 + 0.2), h * 0.5, 0), wallm)
+			else:
+				_plate(Vector3(0.4, h + 0.9, slen + 1.0), xf,
+					Vector3(ws9 * (w * 0.5 + 0.2), h * 0.5, 0), STEEL, 0.0)
+		if kind == 0 and i % 3 == 1:
+			_deco_box(Vector3(0.05, 0.1, slen + 1.0), xf,
+				Vector3(w * 0.5 + 0.05, 0.6, 0), Color("#66ff99"), 1.1)
+		if kind == 1 and i % 4 == 2:
+			_deco_box(Vector3(w + 0.6, 0.06, 0.5), xf,
+				Vector3(0, h - 0.1, 0), Color("#66ff99"), 1.6)
+	return mid
+
+## a spinning fan filling a vent tunnel at the given frame
+func _vent_fan(xf: Transform3D, rad9: float) -> void:
+	var fring9 := MeshInstance3D.new()
+	var frm9 := TorusMesh.new()
+	frm9.inner_radius = rad9 - 0.08
+	frm9.outer_radius = rad9 + 0.06
+	fring9.mesh = frm9
+	fring9.material_override = Surfaces.metal(STEEL)
+	add_child(fring9)
+	fring9.global_transform = xf.translated_local(Vector3(0, 1.1, 0))
+	fring9.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	var hub := Node3D.new()
+	add_child(hub)
+	hub.global_transform = xf.translated_local(Vector3(0, 1.1, 0))
+	hub.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	for vbl in 4:
+		var vblade := MeshInstance3D.new()
+		var vbm := BoxMesh.new()
+		vbm.size = Vector3(rad9 * 0.82, 0.05, 0.16)
+		vblade.mesh = vbm
+		vblade.rotation_degrees = Vector3(0, 90.0 * float(vbl), 0)
+		vblade.translate_object_local(Vector3(rad9 * 0.5, 0, 0))
+		vblade.material_override = Surfaces.metal(Color("#4a5266"))
+		hub.add_child(vblade)
+	_spins.append({"node": hub, "rate": 5.5})
+
+## a junction hub: box room deep in the void. doors = 4 bools (+X -X
+## +Z -Z of _bup(dir)). Returns the four face endpoints (tucked inside).
+func _hub(dir: Vector3, r: float, doors: Array) -> Array:
+	var bb := _bup(dir)
+	var xf0 := Transform3D(bb, _C + dir * r)
+	_plate(Vector3(8.6, 0.5, 8.6), xf0, Vector3(0, -0.25, 0), DARK, 0.0)
+	_plate_m(Vector3(8.6, 0.5, 8.6), xf0, Vector3(0, 3.85, 0), _data_mat())
+	var norms: Array = [Vector3(1, 0, 0), Vector3(-1, 0, 0),
+		Vector3(0, 0, 1), Vector3(0, 0, -1)]
+	var pts: Array = []
+	for f in 4:
+		var nl: Vector3 = norms[f]
+		var side := Vector3(0, 0, 1) if absf(nl.x) > 0.5 else Vector3(1, 0, 0)
+		var woff: Vector3 = nl * 4.1 + Vector3(0, 1.8, 0)
+		if doors[f]:
+			_plate_m(Vector3(0.5, 4.6, 2.7) if absf(nl.x) > 0.5
+				else Vector3(2.7, 4.6, 0.5), xf0, woff + side * 2.75, _data_mat())
+			_plate_m(Vector3(0.5, 4.6, 2.7) if absf(nl.x) > 0.5
+				else Vector3(2.7, 4.6, 0.5), xf0, woff - side * 2.75, _data_mat())
+			_plate_m(Vector3(0.5, 1.2, 2.8) if absf(nl.x) > 0.5
+				else Vector3(2.8, 1.2, 0.5), xf0, woff + Vector3(0, 1.7, 0),
+				_data_mat())
+		else:
+			_plate_m(Vector3(0.5, 4.6, 8.6) if absf(nl.x) > 0.5
+				else Vector3(8.6, 4.6, 0.5), xf0, woff, _data_mat())
+		pts.append(xf0.translated_local(nl * 2.6).origin)
+	var jl := MeshInstance3D.new()
+	var jlm := CylinderMesh.new()
+	jlm.top_radius = 0.7
+	jlm.bottom_radius = 0.7
+	jlm.height = 0.08
+	jl.mesh = jlm
+	jl.material_override = Destructible.make_material(Color("#66ff99"), 1.9)
+	add_child(jl)
+	jl.global_transform = xf0.translated_local(Vector3(0, 3.5, 0))
+	_chatter(xf0.translated_local(Vector3(0, 1.2, 0)).origin,
+		220 + int(r), -9.0)
+	_net_probes.append(xf0.origin)
+	return pts
+
+## a CHECKPOINT: dead-end room off a hub with an ESCAPE gate
+func _checkpoint(from_pt: Vector3, away: Vector3, idx: int) -> void:
+	var dirc := ((from_pt - _C) + away * 10.0).normalized()
+	var rc := (from_pt - _C).length() - 1.0
+	var bb := _bup(dirc)
+	var xf0 := Transform3D(bb, _C + dirc * rc)
+	# door faces back toward the hub
+	var back := (from_pt - xf0.origin).normalized()
+	var norms: Array = [Vector3(1, 0, 0), Vector3(-1, 0, 0),
+		Vector3(0, 0, 1), Vector3(0, 0, -1)]
+	var bestf := 0
+	var bestd := -2.0
+	for f in 4:
+		var wd := (bb * (norms[f] as Vector3)).dot(back)
+		if wd > bestd:
+			bestd = wd
+			bestf = f
+	_plate(Vector3(5.6, 0.5, 5.6), xf0, Vector3(0, -0.25, 0), DARK, 0.0)
+	_plate(Vector3(5.6, 0.5, 5.6), xf0, Vector3(0, 3.15, 0), DARK, 0.0)
+	for f in 4:
+		var nl: Vector3 = norms[f]
+		var side := Vector3(0, 0, 1) if absf(nl.x) > 0.5 else Vector3(1, 0, 0)
+		var woff: Vector3 = nl * 2.6 + Vector3(0, 1.45, 0)
+		if f == bestf:
+			_plate(Vector3(0.5, 3.9, 1.6) if absf(nl.x) > 0.5
+				else Vector3(1.6, 3.9, 0.5), xf0, woff + side * 2.0, STEEL, 0.0)
+			_plate(Vector3(0.5, 3.9, 1.6) if absf(nl.x) > 0.5
+				else Vector3(1.6, 3.9, 0.5), xf0, woff - side * 2.0, STEEL, 0.0)
+			_plate(Vector3(0.5, 1.1, 2.6) if absf(nl.x) > 0.5
+				else Vector3(2.6, 1.1, 0.5), xf0, woff + Vector3(0, 1.4, 0),
+				STEEL, 0.0)
+		else:
+			_plate(Vector3(0.5, 3.9, 5.6) if absf(nl.x) > 0.5
+				else Vector3(5.6, 3.9, 0.5), xf0, woff, STEEL, 0.0)
+	var ep := Gate.new().configure({
+		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
+		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
+	add_child(ep)
+	ep.global_transform = xf0.translated_local(Vector3(0, 1.3, 0))
+	var cl := MeshInstance3D.new()
+	var clm2 := CylinderMesh.new()
+	clm2.top_radius = 0.5
+	clm2.bottom_radius = 0.5
+	clm2.height = 0.08
+	cl.mesh = clm2
+	cl.material_override = Destructible.make_material(Color("#ff8a2a"), 1.8)
+	add_child(cl)
+	cl.global_transform = xf0.translated_local(Vector3(0, 2.8, 0))
+	# the connecting stub
+	_gc_tunnel(from_pt, xf0.translated_local(
+		(norms[bestf] as Vector3) * 2.2).origin, 2.6, 2.9, 1)
+	_net_probes.append(xf0.origin)
+
+## the NOODLE BOWL ROOM, at the very bottom of the network
+func _noodle_room(dir: Vector3, r: float, door_from: Vector3) -> Vector3:
+	var bb := _bup(dir)
+	var xf0 := Transform3D(bb, _C + dir * r)
+	var back := (door_from - xf0.origin).normalized()
+	var norms: Array = [Vector3(1, 0, 0), Vector3(-1, 0, 0),
+		Vector3(0, 0, 1), Vector3(0, 0, -1)]
+	var bestf := 0
+	var bestd := -2.0
+	for f in 4:
+		if (bb * (norms[f] as Vector3)).dot(back) > bestd:
+			bestd = (bb * (norms[f] as Vector3)).dot(back)
+			bestf = f
+	_plate(Vector3(9.7, 0.5, 9.7), xf0, Vector3(0, -0.25, 0), DARK, 0.0)
+	_plate(Vector3(9.7, 0.5, 9.7), xf0, Vector3(0, 4.35, 0), DARK, 0.0)
+	for f in 4:
+		var nl: Vector3 = norms[f]
+		var side := Vector3(0, 0, 1) if absf(nl.x) > 0.5 else Vector3(1, 0, 0)
+		var woff: Vector3 = nl * 4.6 + Vector3(0, 2.05, 0)
+		if f == bestf:
+			_plate(Vector3(0.5, 4.6, 3.3) if absf(nl.x) > 0.5
+				else Vector3(3.3, 4.6, 0.5), xf0, woff + side * 3.2, STEEL, 0.0)
+			_plate(Vector3(0.5, 4.6, 3.3) if absf(nl.x) > 0.5
+				else Vector3(3.3, 4.6, 0.5), xf0, woff - side * 3.2, STEEL, 0.0)
+			_plate(Vector3(0.5, 1.6, 2.6) if absf(nl.x) > 0.5
+				else Vector3(2.6, 1.6, 0.5), xf0, woff + Vector3(0, 1.55, 0),
+				STEEL, 0.0)
+		else:
+			_plate(Vector3(0.5, 4.6, 9.7) if absf(nl.x) > 0.5
+				else Vector3(9.7, 4.6, 0.5), xf0, woff, STEEL, 0.0)
+	var bowl := MeshInstance3D.new()
+	var bwm2 := CylinderMesh.new()
+	bwm2.top_radius = 1.6
+	bwm2.bottom_radius = 0.9
+	bwm2.height = 1.0
+	bowl.mesh = bwm2
+	bowl.material_override = Surfaces.plaster(Color("#e8e2d4"))
+	add_child(bowl)
+	bowl.global_transform = xf0.translated_local(Vector3(0, 0.5, 0))
+	var sauce := MeshInstance3D.new()
+	var scm := CylinderMesh.new()
+	scm.top_radius = 1.45
+	scm.bottom_radius = 1.45
+	scm.height = 0.08
+	sauce.mesh = scm
+	sauce.material_override = DatamoshStudio._fluid_material(Color("#ff8a2a"))
+	add_child(sauce)
+	sauce.global_transform = xf0.translated_local(Vector3(0, 1.02, 0))
+	for nd in 3:
+		var nood := MeshInstance3D.new()
+		var ndm := TorusMesh.new()
+		ndm.inner_radius = 0.25 + 0.22 * float(nd)
+		ndm.outer_radius = 0.45 + 0.22 * float(nd)
+		nood.mesh = ndm
+		nood.material_override = Surfaces.plaster(Color("#f2e3b0"))
+		add_child(nood)
+		nood.global_transform = xf0.translated_local(
+			Vector3(0, 1.14 + 0.05 * float(nd), 0))
+		nood.rotate_object_local(Vector3(1, 0, 0), 0.06 * float(nd))
+	for ch2 in [-0.3, 0.3]:
+		var stick := MeshInstance3D.new()
+		var stm3 := BoxMesh.new()
+		stm3.size = Vector3(0.06, 0.06, 1.6)
+		stick.mesh = stm3
+		stick.material_override = Surfaces.plaster(Color("#8a5a2a"))
+		add_child(stick)
+		stick.global_transform = xf0.translated_local(Vector3(ch2, 1.35, 0.4))
+		stick.rotate_object_local(Vector3(0, 1, 0), ch2)
+	var ep := Gate.new().configure({
+		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
+		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
+	add_child(ep)
+	ep.global_transform = xf0.translated_local(Vector3(0, 1.3, 3.4))
+	_sign("NOODLE BOWL ROOM", bb, xf0.origin + (bb * Vector3(0, 1, 0)) * 3.4,
+		Vector3(0, 0, 0), 180.0)
+	var nl9 := MeshInstance3D.new()
+	var nlm := CylinderMesh.new()
+	nlm.top_radius = 1.0
+	nlm.bottom_radius = 1.0
+	nlm.height = 0.08
+	nl9.mesh = nlm
+	nl9.material_override = Destructible.make_material(Color("#fff3d0"), 2.0)
+	add_child(nl9)
+	nl9.global_transform = xf0.translated_local(Vector3(0, 4.0, 0))
+	_net_probes.append(xf0.origin)
+	return xf0.translated_local((norms[bestf] as Vector3) * 4.2).origin
+
+func _networks() -> void:
+	# ---- THE VENTS: nine great-circle crawl tunnels pairing rooms all
+	# around the planet, dipping to radius ~58 under every floor ----
+	var vpairs: Array = [
+		["medbay", 0, "gym", 0, true],
+		["gym", 1, "archive", 0, false],
+		["archive", 1, "tape", 0, false],
+		["tape", 1, "farm", 0, true],
+		["farm", 1, "workshop", 0, false],
+		["workshop", 1, "storage", 0, false],
+		["storage", 1, "kitchen", 0, true],
+		["kitchen", 1, "trophy", 0, false],
+	]
+	for vp9 in vpairs:
+		var pa: Vector3 = (_vp[vp9[0]] as Array)[int(vp9[1])]
+		var pb: Vector3 = (_vp[vp9[2]] as Array)[int(vp9[3])]
+		var dip9: float = (pa - _C).length() - 57.8
+		var mid := _gc_tunnel(pa, pb, 2.0, 2.3, 0, dip9)
+		if bool(vp9[4]):
+			_vent_fan(mid, 1.0)
+		if vp9[0] == "medbay" or vp9[0] == "farm":
+			_net_probes.append(mid.origin + mid.basis.y * 0.1)
+	# the atrium duct joins the web at the medbay's second grille
+	_gc_tunnel(_duct_end, (_vp["medbay"] as Array)[1], 2.0, 2.3, 0,
+		(_duct_end - _C).length() - 57.8)
+	# ---- THE COMPUTER TUNNELS: hubs deep in the hollow, wired with
+	# big data-rain corridors going every direction ----
+	var hubs: Array = [
+		[_sdir(0.75, 0.45), 47.0],
+		[_sdir(1.9, -0.7), 43.5],
+		[_sdir(2.9, 0.9), 46.0],
+		[(_pdx(4.6) + _e1 * 0.5).normalized(), 41.0],
+		[(_pdx(1.6) + _e1 * -0.6).normalized(), 44.5],
+		[(-_u0 + _e1 * 0.4 + _e2 * -0.5).normalized(), 40.5],
+	]
+	var edges: Array = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
+		[1, 4], [0, 2]]
+	var entries: Array = [["srv", 0], ["cargo", 0], ["gold", 3], ["ai", 2]]
+	# assign hub faces: for each hub, the outgoing directions in order
+	var used: Array = []
+	var doorf: Array = []
+	for i9 in hubs.size():
+		used.append([false, false, false, false])
+		doorf.append([false, false, false, false])
+	var face_pick := func(hi: int, toward: Vector3) -> int:
+		var hd: Vector3 = (hubs[hi] as Array)[0]
+		var hb9 := _bup(hd)
+		var v := (toward - _C).normalized()
+		v = (v - hd * hd.dot(v)).normalized()
+		var norms: Array = [Vector3(1, 0, 0), Vector3(-1, 0, 0),
+			Vector3(0, 0, 1), Vector3(0, 0, -1)]
+		var bi := -1
+		var bd := -2.0
+		for f in 4:
+			if (used[hi] as Array)[f]:
+				continue
+			var d9 := (hb9 * (norms[f] as Vector3)).dot(v)
+			if d9 > bd:
+				bd = d9
+				bi = f
+		(used[hi] as Array)[bi] = true
+		(doorf[hi] as Array)[bi] = true
+		return bi
+	# noodle room hangs off the last hub
+	var ndir := (-_u0 - _e1 * 0.6 + _e2 * 0.6).normalized()
+	var plan: Array = []   # [hub_i, face, target_point, is_room_end]
+	for e9 in edges:
+		var ha: int = e9[0]
+		var hbb: int = e9[1]
+		var pa9: Vector3 = _C + ((hubs[ha] as Array)[0] as Vector3) \
+			* float((hubs[ha] as Array)[1])
+		var pb9: Vector3 = _C + ((hubs[hbb] as Array)[0] as Vector3) \
+			* float((hubs[hbb] as Array)[1])
+		plan.append([ha, face_pick.call(ha, pb9), hbb, face_pick.call(hbb, pa9)])
+	var eplan: Array = []
+	for en9 in entries:
+		var hi: int = en9[1]
+		var pt: Vector3 = _e_pts[en9[0]]
+		eplan.append([en9[0], hi, face_pick.call(hi, pt)])
+	var nface: int = face_pick.call(5, _C + ndir * 40.0)
+	# reserve checkpoint faces NOW so their hub walls get door gaps
+	var chk: Array = []
+	for hi9 in [1, 3, 4]:
+		for f9 in 4:
+			if not (used[hi9] as Array)[f9]:
+				(used[hi9] as Array)[f9] = true
+				(doorf[hi9] as Array)[f9] = true
+				chk.append([hi9, f9])
+				break
+	# build hubs (doors where assigned), remember face points
+	var fpts: Array = []
+	for i9 in hubs.size():
+		fpts.append(_hub((hubs[i9] as Array)[0],
+			float((hubs[i9] as Array)[1]), doorf[i9]))
+	# hub-to-hub corridors
+	for pe in plan:
+		_gc_tunnel((fpts[pe[0]] as Array)[pe[1]],
+			(fpts[pe[2]] as Array)[pe[3]], 3.4, 3.2, 1, 1.5)
+	# entrance corridors from the four hidden breaches
+	for ee in eplan:
+		_gc_tunnel(_e_pts[ee[0]], (fpts[ee[1]] as Array)[ee[2]], 3.0, 2.9, 1)
+	# the last corridor: down to the noodle bowl room
+	var ndoor := _noodle_room(ndir, 40.0, _C
+		+ ((hubs[5] as Array)[0] as Vector3) * 40.5)
+	_gc_tunnel((fpts[5] as Array)[nface], ndoor, 3.4, 3.2, 1, 1.0)
+	# checkpoints: small dead ends off spare hub faces, ESCAPE inside
+	var ci := 0
+	for cf in chk:
+		var hi: int = cf[0]
+		var f: int = cf[1]
+		var hd: Vector3 = (hubs[hi] as Array)[0]
+		var wnorm := _bup(hd) * ([Vector3(1, 0, 0), Vector3(-1, 0, 0),
+			Vector3(0, 0, 1), Vector3(0, 0, -1)][f] as Vector3)
+		_checkpoint((fpts[hi] as Array)[f], wnorm, ci)
+		ci += 1
+	set_meta("net_probes", _net_probes)
 
 func _sign(txt: String, bas: Basis, pos: Vector3, off: Vector3,
 		yaw_deg: float) -> void:

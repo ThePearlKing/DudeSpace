@@ -728,9 +728,27 @@ func _mainframe_test() -> void:
 	# an unsealed vent is an escape hole). Expect the end cap ~4.3m in;
 	# <2 means the ray hit the wall face (bad aim), miss/far means leak.
 	var vfrom := C + u0 * (rF + 0.5) + e2 * 3.9 - e1 * 5.6
-	var dv: float = cast.call(vfrom, vfrom - e1 * 12.0)
-	print("MFTEST vent duct seal: hit at %.1fm (~4.3) %s" % [dv,
-		"PASS" if dv >= 2.0 and dv < 7.0 else "FAIL"])
+	var dv: float = cast.call(vfrom, vfrom - e1 * 30.0)
+	print("MFTEST vent duct: hit at %.1fm (tunnel wall, no void) %s" % [dv,
+		"PASS" if dv >= 2.0 else "FAIL"])
+	# 8. the secret networks: every stored probe point (vent tunnel
+	# mids, hubs, checkpoints, noodle room) has floor AND ceiling
+	var mfc9: Node = null
+	for ch9 in get_children():
+		if ch9 is MainframeComplex:
+			mfc9 = ch9
+	if mfc9 != null and mfc9.has_meta("net_probes"):
+		var idx9 := 0
+		for pp in (mfc9.get_meta("net_probes") as Array):
+			var pv: Vector3 = pp
+			var upv := (pv - C).normalized()
+			var st9 := pv + upv * 1.2
+			var dflr: float = cast.call(st9, st9 - upv * 5.0)
+			var dcei: float = cast.call(st9, st9 + upv * 5.0)
+			print("MFTEST net probe %d: floor %.1f ceil %.1f %s" % [idx9,
+				dflr, dcei,
+				"PASS" if dflr >= 0.0 and dcei >= 0.0 else "FAIL"])
+			idx9 += 1
 	print("MFTEST done")
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
