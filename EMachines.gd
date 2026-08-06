@@ -575,10 +575,16 @@ class NetworkAnalyser extends Machine:
 				if is_instance_valid(l) and not seen.has(l):
 					seen[l] = true
 					frontier.append(l)
+	const SIP := 0.2   # EU/s -- the analyser only LOOKS, barely sips
 	func _process(delta: float) -> void:
 		super._process(delta)
+		var powered := buf > 0.0
+		if powered:
+			buf = maxf(0.0, buf - SIP * delta)
 		if _dish:
-			_dish.rotate_y(delta * 1.7)
+			_dish.rotate_y(delta * (1.7 if powered else 0.1))
+		if not powered:
+			return   # dark panel until a wire feeds it
 		_scan_t -= delta
 		if _scan_t <= 0.0:
 			_scan_t = 2.0
@@ -601,6 +607,8 @@ class NetworkAnalyser extends Machine:
 			_loss = l
 			_rate_t = 0.0
 	func info_text() -> String:
+		if buf <= 0.0:
+			return "NO POWER\nfeed it a wire -- it sips %.1f EU/s" % SIP
 		var stored := 0.0
 		var cap := 0.0
 		var gens := 0
