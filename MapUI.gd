@@ -7,6 +7,7 @@ var _view: Control
 var zoom: float = 1.0
 var pan: Vector2 = Vector2.ZERO     # world-space XZ offset from YOU
 var _dragging: bool = false
+var _click_at := Vector2.ZERO
 var _last_scale: float = 0.001
 
 var select_cb: Callable = Callable()   # set = click-a-planet picker mode

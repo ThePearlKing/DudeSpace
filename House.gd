@@ -1182,10 +1182,21 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	bk.position = Vector3(0.615, 1.815, 0.02)
 	# THE PASSAGE: corridor west, then the shaft
 	var cx := c + Vector3(-hx - 2.2, 0, -2.0)   # corridor center
-	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn)
-	_solid(cx + Vector3(0, fy - c.y + 3.4, 0), Vector3(4.4, 1, 2.3), worn)
-	_solid(cx + Vector3(0, fy - c.y + 1.45, -1.65), Vector3(4.4, 4.9, 1), worn)
-	_solid(cx + Vector3(0, fy - c.y + 1.45, 1.65), Vector3(4.4, 4.9, 1), worn)
+	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn, 0.08,
+		Surfaces.STONE)
+	_solid(cx + Vector3(0, fy - c.y + 3.4, 0), Vector3(4.4, 1, 2.3), worn, 0.08,
+		Surfaces.STONE)
+	_solid(cx + Vector3(0, fy - c.y + 1.45, -1.65), Vector3(4.4, 4.9, 1), worn,
+		0.08, Surfaces.STONE)
+	_solid(cx + Vector3(0, fy - c.y + 1.45, 1.65), Vector3(4.4, 4.9, 1), worn,
+		0.08, Surfaces.STONE)
+	# corridor ribs: stone arches marching toward the shaft
+	for rb9 in [-1.4, 0.0, 1.4]:
+		_deco(cx + Vector3(rb9, fy - c.y + 2.75, 0), Vector3(0.35, 0.3, 2.3),
+			Color("#4e4840"), 0.0)
+		for rbz in [-1.05, 1.05]:
+			_deco(cx + Vector3(rb9, fy - c.y + 1.45, rbz),
+				Vector3(0.35, 2.9, 0.25), Color("#4e4840"), 0.0)
 	# the SPIRAL: a stone shaft, a center pole, steps winding down 10m
 	var shc := c + Vector3(-hx - 6.6, 0, -2.0)   # shaft center (top)
 	var sdepth := 11.0
@@ -1198,7 +1209,7 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 			[Vector3(5.6, swh, 1), Vector3(0, 4.0 - swh * 0.5, -2.8)],
 			[Vector3(5.6, swh, 1), Vector3(0, 4.0 - swh * 0.5, 2.8)]]:
 		_solid(shc + Vector3(0, fy - c.y, 0) + (sw[1] as Vector3), sw[0] as Vector3,
-			stone, 0.02)
+			stone, 0.02, Surfaces.STONE)
 	# +X face: solid below the corridor mouth (down to the same ceiling
 	# line), header above it, side strips beside it
 	_solid(shc + Vector3(2.8, fy - c.y - 5.15, 0),
@@ -1241,7 +1252,34 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 		stp.rotation.y = -sa + PI * 0.5
 	# THE RIDDLE ROOM, at the bottom of everything
 	var rc := shc + Vector3(0, fy - c.y - sdepth - 1.6, -5.6)
+	var psurf := _isurf
+	_isurf = Surfaces.STONE
 	_iroom(rc, Vector3(9.0, 3.6, 9.0), Color("#5c554c"), 0.03, [5])
+	_isurf = psurf
+	# NOTHING down here is flat plastic: stone pilasters in the corners
+	# and side walls (never in front of the riddle), a cornice line,
+	# floor slab seams, cracks
+	for pil in [Vector3(-4.0, 0, -4.0), Vector3(4.0, 0, -4.0),
+			Vector3(-4.0, 0, 4.0), Vector3(4.0, 0, 4.0),
+			Vector3(-4.0, 0, 0), Vector3(4.0, 0, 0)]:
+		_solid(rc + pil, Vector3(0.55, 3.6, 0.55), Color("#4e4840"), 0.02,
+			Surfaces.STONE)
+	for cnz in [-1.0, 1.0]:
+		_deco(rc + Vector3(0, 1.55, cnz * 4.15), Vector3(8.6, 0.22, 0.22),
+			Color("#443e37"), 0.0)
+		_deco(rc + Vector3(cnz * 4.15, 1.55, 0), Vector3(0.22, 0.22, 8.6),
+			Color("#443e37"), 0.0)
+	var srng := RandomNumberGenerator.new()
+	srng.seed = 5150
+	for sl9 in 6:
+		_deco(rc + Vector3(srng.randf_range(-3.4, 3.4), -1.78,
+			srng.randf_range(-3.4, 3.4)),
+			Vector3(srng.randf_range(1.2, 2.6), 0.05, 0.08),
+			Color("#4a443c"), 0.0)
+		_deco(rc + Vector3(srng.randf_range(-3.9, 3.9),
+			srng.randf_range(-1.0, 1.2), -3.94),
+			Vector3(0.06, srng.randf_range(0.5, 1.4), 0.06),
+			Color("#48423a"), 0.0)
 	# the +Z face carries the way in from the shaft: a doorway, not a wall
 	_solid(rc + Vector3(-3.35, 0, 4.5), Vector3(2.3, 3.6, 1), Color("#5c554c"), 0.03)
 	_solid(rc + Vector3(3.35, 0, 4.5), Vector3(2.3, 3.6, 1), Color("#5c554c"), 0.03)
@@ -1255,7 +1293,18 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	for cw in [[Vector3(1, 3.6, 6.4), Vector3(shc.x - 2.8, rc.y, shc.z + 0.4)],
 			[Vector3(1, 3.6, 6.4), Vector3(shc.x + 2.8, rc.y, shc.z + 0.4)],
 			[Vector3(5.6, 3.6, 1), Vector3(shc.x, rc.y, shc.z + 2.8)]]:
-		_solid(cw[1] as Vector3, cw[0] as Vector3, Color("#5c554c"), 0.03)
+		_solid(cw[1] as Vector3, cw[0] as Vector3, Color("#5c554c"), 0.03,
+			Surfaces.STONE)
+	# ring ledges down the shaft: the descent reads as MASONRY, courses
+	# of stone all the way down, not four plastic planes
+	for lg9 in 4:
+		var ly9 := fy - c.y - 2.2 - 2.6 * float(lg9)
+		for lspec in [[Vector3(4.6, 0.24, 0.3), Vector3(0, ly9, -2.15)],
+				[Vector3(4.6, 0.24, 0.3), Vector3(0, ly9, 2.15)],
+				[Vector3(0.3, 0.24, 4.6), Vector3(-2.15, ly9, 0)],
+				[Vector3(0.3, 0.24, 4.6), Vector3(2.15, ly9, 0)]]:
+			_deco(shc + (lspec[1] as Vector3), lspec[0] as Vector3,
+				Color("#4e4840"), 0.0)
 	# candles never burned down. nobody asks why
 	for cd in [Vector3(-3.6, -1.4, 3.6), Vector3(3.6, -1.4, 3.6)]:
 		_deco(rc + cd, Vector3(0.12, 0.5, 0.12), Color("#d8c8ae"), 0.1)
@@ -1499,13 +1548,14 @@ func _fireplace(gpos: Vector3) -> void:
 	_deco(gpos + Vector3(0.12, -0.35, 0), Vector3(0.5, 0.9, 1.0), Color("#181410"))
 	_deco(gpos + Vector3(0.2, -0.6, 0), Vector3(0.3, 0.25, 0.7), Color("#ff7a2a"), 2.2)
 
-func _solid(gpos: Vector3, size: Vector3, c: Color, e := 0.08) -> void:
+func _solid(gpos: Vector3, size: Vector3, c: Color, e := 0.08,
+		surf := Surfaces.PLASTER) -> void:
 	var body := StaticBody3D.new()
 	var mi := MeshInstance3D.new()
 	var m := BoxMesh.new()
 	m.size = size
 	mi.mesh = m
-	mi.material_override = _wallmat(c, e)
+	mi.material_override = _wallmat(c, e, surf)
 	body.add_child(mi)
 	var col := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
