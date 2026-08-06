@@ -1062,7 +1062,10 @@ func _hbook_row(parent: Node3D, at: Vector3, w: float,
 		var bm := BoxMesh.new()
 		bm.size = Vector3(bw, bh, 0.24)
 		bk.mesh = bm
-		bk.material_override = _wallmat(Color.from_hsv(rng.randf(),
+		# no decorative book is ever RED: red belongs to exactly one
+		# book in this house, and that one opens a wall
+		bk.material_override = _wallmat(Color.from_hsv(
+			0.08 + rng.randf() * 0.75,
 			rng.randf_range(0.25, 0.5), rng.randf_range(0.25, 0.55)), 0.02)
 		parent.add_child(bk)
 		bk.position = at + Vector3(x9 + bw * 0.5, bh * 0.5, 0)
