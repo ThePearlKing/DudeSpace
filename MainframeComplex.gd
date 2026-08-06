@@ -342,8 +342,7 @@ func build(b, dir: Vector3) -> void:
 		# plate -- no open seam band anywhere
 		var wxf := Transform3D(fb, _C + up * (_rF + 3.0))
 		var rooms := {3: [-1.0, "LAB"], 5: [1.0, "AQUARIUM"],
-			9: [1.0, "MAP ROOM"], 11: [-1.0, "CARGO BAY"],
-			13: [1.0, "PLANET CONTROL"]}
+			9: [1.0, "MAP ROOM"], 11: [-1.0, "CARGO BAY"]}
 		for ws in [1.0, -1.0]:
 			if rooms.has(i) and float((rooms[i] as Array)[0]) == ws:
 				# doorway to the side room: flanks + full-height header.
@@ -679,7 +678,6 @@ func build(b, dir: Vector3) -> void:
 
 	# ---- the wings ----
 	_service_wing()
-	_maze_wing(ah)
 	_comms_room(cb, ac)
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
@@ -831,6 +829,16 @@ func _bunk_wing() -> void:
 			_deco_box(Vector3(0.5, 0.06, 0.5),
 				Transform3D(fb, _C + up * (_rF + 2.28)),
 				Vector3(0, 0, zs * 2.9), Color("#f2ead8"), 1.7)
+		# OUTER SHELL: belt-and-braces backing behind and above the
+		# alcoves -- no sight line into the hollow planet anywhere
+		_plate(Vector3(5.0, 4.6, 0.5), Transform3D(fb, _C + up * (_rF + 1.85)),
+			Vector3(0, 0, 4.45), STEEL, 0.0)
+		_plate(Vector3(5.0, 4.6, 0.5), Transform3D(fb, _C + up * (_rF + 1.85)),
+			Vector3(0, 0, -4.45), STEEL, 0.0)
+		_plate(Vector3(5.0, 0.5, 3.1), Transform3D(fb, _C + up * (_rF + 2.85)),
+			Vector3(0, 0, 2.95), STEEL, 0.0)
+		_plate(Vector3(5.0, 0.5, 3.1), Transform3D(fb, _C + up * (_rF + 2.85)),
+			Vector3(0, 0, -2.95), STEEL, 0.0)
 		# corridor conduits + every-other ceiling light
 		_deco_box(Vector3(5.0, 0.1, 0.08), wxf, Vector3(0, 1.3, 1.66), AMBER, 1.5)
 		_deco_box(Vector3(5.0, 0.1, 0.08), wxf, Vector3(0, 1.3, -1.66), AMBER, 1.5)
@@ -968,8 +976,6 @@ func _side_room(i: int, s: float, kind: String) -> void:
 			_room_map(fb, up, cx)
 		"CARGO BAY":
 			_room_cargo(fb, up, cx)
-		"PLANET CONTROL":
-			_room_planet_control(fb, up, cx)
 
 func _room_lab(fb: Basis, up: Vector3, cx: float) -> void:
 	# two benches, glowing glassware, and SPECIMEN 4: a tetrahedron in a
@@ -1334,251 +1340,6 @@ func _service_wing() -> void:
 			Transform3D(gb2, _C + gup2 * (_rF + 6.9)), poff, Color("#4a5266"), 0.0)
 	_sign("GENERATOR HALL", gb2, _C + gup2 * (_rF + 5.6), Vector3(0, 0, 8.0), 180.0)
 	_chatter(Transform3D(gb2, _C + gup2 * (_rF + 2.0)).origin, 47, -8.0)
-
-## ---- the computer MAZE: tight data tunnels, crazy walls, and the
-## noodle bowl room with the escape portal at the far end ----
-func _maze_wing(ah: float) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 618
-	var ROWS := 12
-	var COLS := 7
-	var cell := 3.2
-	var stpm := cell / _r2
-	var a_of := func(row: float) -> float:
-		return ah + (7.8 + 1.8) / _r2 + stpm * row
-	# recursive-backtracker maze over ROWS x COLS
-	var walls_h := {}
-	var walls_v := {}
-	for r in ROWS:
-		for c in COLS:
-			if r < ROWS - 1:
-				walls_h[Vector2i(r, c)] = true
-			if c < COLS - 1:
-				walls_v[Vector2i(r, c)] = true
-	var seen := {}
-	var stack: Array = [Vector2i(0, 3)]
-	seen[Vector2i(0, 3)] = true
-	while not stack.is_empty():
-		var cur: Vector2i = stack.back()
-		var opts: Array = []
-		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var nxt: Vector2i = cur + (d as Vector2i)
-			if nxt.x >= 0 and nxt.x < ROWS and nxt.y >= 0 and nxt.y < COLS \
-					and not seen.has(nxt):
-				opts.append(nxt)
-		if opts.is_empty():
-			stack.pop_back()
-			continue
-		var pick: Vector2i = opts[rng.randi() % opts.size()]
-		if pick.x != cur.x:
-			walls_h.erase(Vector2i(mini(pick.x, cur.x), cur.y))
-		else:
-			walls_v.erase(Vector2i(cur.x, mini(pick.y, cur.y)))
-		seen[pick] = true
-		stack.append(pick)
-	var wmat := _data_mat()
-	# row floors + ceilings (arc strips), then walls from the maze sets
-	for r in ROWS:
-		var ar: float = a_of.call(float(r))
-		_plate(Vector3(23.2, 0.4, 3.4), Transform3D(_fr(ar), _C + _pdir(ar) * (_r2 - 0.2)),
-			Vector3.ZERO, DARK, 0.0)
-		_plate_m(Vector3(23.2, 0.4, 3.4),
-			Transform3D(_fr(ar), _C + _pdir(ar) * (_r2 + 2.6)), Vector3.ZERO, wmat)
-	for r in ROWS:
-		var ar2: float = a_of.call(float(r))
-		var wxm := Transform3D(_fr(ar2), _C + _pdir(ar2) * (_r2 + 1.2))
-		# outer side borders
-		_plate_m(Vector3(0.5, 2.8, 3.4), wxm, Vector3(-11.45, 0, 0), wmat)
-		_plate_m(Vector3(0.5, 2.8, 3.4), wxm, Vector3(11.45, 0, 0), wmat)
-		for c in COLS:
-			if walls_v.has(Vector2i(r, c)):
-				_plate_m(Vector3(0.5, 2.8, 3.4), wxm,
-					Vector3((float(c) - 3.0) * cell + cell * 0.5, 0, 0), wmat)
-		if r < ROWS - 1:
-			var ab2: float = a_of.call(float(r) + 0.5)
-			var wxb := Transform3D(_fr(ab2), _C + _pdir(ab2) * (_r2 + 1.2))
-			for c in COLS:
-				if walls_h.has(Vector2i(r, c)):
-					_plate_m(Vector3(3.4, 2.8, 0.5), wxb,
-						Vector3((float(c) - 3.0) * cell, 0, 0), wmat)
-	# entry border (gap at col 3, from the server hall) + far border
-	# (gap at col 3, into the noodle bowl room)
-	var ae2: float = a_of.call(-0.5)
-	var wxe := Transform3D(_fr(ae2), _C + _pdir(ae2) * (_r2 + 1.2))
-	for c in COLS:
-		if c != 3:
-			_plate_m(Vector3(3.4, 2.8, 0.5), wxe,
-				Vector3((float(c) - 3.0) * cell, 0, 0), wmat)
-	var af2: float = a_of.call(float(ROWS) - 0.5)
-	var wxf2 := Transform3D(_fr(af2), _C + _pdir(af2) * (_r2 + 1.2))
-	for c in COLS:
-		if c != 3:
-			_plate_m(Vector3(3.4, 2.8, 0.5), wxf2,
-				Vector3((float(c) - 3.0) * cell, 0, 0), wmat)
-	# connector tunnel: server hall far wall -> maze entry
-	var at2: float = a_of.call(-1.2)
-	_plate(Vector3(3.0, 0.4, 4.6), Transform3D(_fr(at2), _C + _pdir(at2) * (_r2 - 0.2)),
-		Vector3.ZERO, DARK, 0.0)
-	_plate_m(Vector3(3.0, 0.4, 4.6), Transform3D(_fr(at2), _C + _pdir(at2) * (_r2 + 2.6)),
-		Vector3.ZERO, wmat)
-	var wxt := Transform3D(_fr(at2), _C + _pdir(at2) * (_r2 + 1.2))
-	_plate_m(Vector3(0.5, 2.8, 4.6), wxt, Vector3(-1.7, 0, 0), wmat)
-	_plate_m(Vector3(0.5, 2.8, 4.6), wxt, Vector3(1.7, 0, 0), wmat)
-	# chatter emitters through the tunnels: the maze TALKS
-	for mr in [1.0, 4.0, 7.0, 10.0]:
-		var am2: float = a_of.call(mr)
-		_chatter(Transform3D(_fr(am2), _C + _pdir(am2) * (_r2 + 1.2)).origin,
-			int(mr) * 7 + 3, -6.0)
-	_sign("DATA MAZE", _fr(a_of.call(-1.0)), _C + _pdir(a_of.call(-1.0)) * (_r2 + 2.3),
-		Vector3(0, 0, 0), 180.0)
-	# NOODLE BOWL ROOM
-	var an2: float = a_of.call(float(ROWS) + 1.1)
-	var nb := _fr(an2)
-	var nup := _pdir(an2)
-	_plate(Vector3(9.2, 0.5, 9.2), Transform3D(nb, _C + nup * (_r2 - 0.25)),
-		Vector3.ZERO, DARK, 0.0)
-	_plate(Vector3(9.2, 0.5, 9.2), Transform3D(nb, _C + nup * (_r2 + 4.35)),
-		Vector3.ZERO, DARK, 0.0)
-	var nwx := Transform3D(nb, _C + nup * (_r2 + 2.05))
-	_plate(Vector3(0.5, 4.6, 9.2), nwx, Vector3(4.6, 0, 0), STEEL, 0.0)
-	_plate(Vector3(0.5, 4.6, 9.2), nwx, Vector3(-4.6, 0, 0), STEEL, 0.0)
-	_plate(Vector3(9.2, 4.6, 0.5), nwx, Vector3(0, 0, 4.6), STEEL, 0.0)
-	_plate(Vector3(3.3, 4.6, 0.5), nwx, Vector3(2.95, 0, -4.6), STEEL, 0.0)
-	_plate(Vector3(3.3, 4.6, 0.5), nwx, Vector3(-2.95, 0, -4.6), STEEL, 0.0)
-	_plate(Vector3(2.6, 2.2, 0.5), nwx, Vector3(0, 1.2, -4.6), STEEL, 0.0)
-	# THE BOWL: ceramic bowl, noodle coils, glowing sauce
-	var bowl := MeshInstance3D.new()
-	var bwm2 := CylinderMesh.new()
-	bwm2.top_radius = 1.6
-	bwm2.bottom_radius = 0.9
-	bwm2.height = 1.0
-	bowl.mesh = bwm2
-	bowl.material_override = Surfaces.plaster(Color("#e8e2d4"))
-	add_child(bowl)
-	bowl.global_transform = Transform3D(nb, _C + nup * (_r2 + 0.5))
-	var sauce := MeshInstance3D.new()
-	var scm := CylinderMesh.new()
-	scm.top_radius = 1.45
-	scm.bottom_radius = 1.45
-	scm.height = 0.08
-	sauce.mesh = scm
-	sauce.material_override = DatamoshStudio._fluid_material(Color("#ff8a2a"))
-	add_child(sauce)
-	sauce.global_transform = Transform3D(nb, _C + nup * (_r2 + 1.02))
-	for nd in 3:
-		var nood := MeshInstance3D.new()
-		var ndm := TorusMesh.new()
-		ndm.inner_radius = 0.25 + 0.22 * float(nd)
-		ndm.outer_radius = 0.45 + 0.22 * float(nd)
-		nood.mesh = ndm
-		nood.material_override = Surfaces.plaster(Color("#f2e3b0"))
-		add_child(nood)
-		nood.global_transform = Transform3D(nb, _C + nup * (_r2 + 1.14 + 0.05 * float(nd)))
-		nood.rotate_object_local(Vector3(1, 0, 0), 0.06 * float(nd))
-	for ch2 in [-0.3, 0.3]:
-		var stick := MeshInstance3D.new()
-		var stm3 := BoxMesh.new()
-		stm3.size = Vector3(0.06, 0.06, 1.6)
-		stick.mesh = stm3
-		stick.material_override = Surfaces.plaster(Color("#8a5a2a"))
-		add_child(stick)
-		stick.global_transform = Transform3D(nb, _C + nup * (_r2 + 1.35))
-		stick.translate_object_local(Vector3(ch2, 0, 0.4))
-		stick.rotate_object_local(Vector3(0, 1, 0), ch2)
-	var ep := Gate.new().configure({
-		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
-		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
-	add_child(ep)
-	ep.global_transform = Transform3D(nb, _C + nup * (_r2 + 1.3))
-	ep.translate_object_local(Vector3(0, 0, 3.4))
-	_sign("NOODLE BOWL ROOM", nb, _C + nup * (_r2 + 3.4), Vector3(0, 0, 4.2), 180.0)
-
-## PLANET CONTROL: the room where you control the planet itself
-func _room_planet_control(fb: Basis, up: Vector3, cx: float) -> void:
-	# live wall screen: the PLANET'S OWN shader material, same instance
-	var pmat: Material = null
-	if _b != null and _b.node != null:
-		for pc in (_b.node as Node).get_children():
-			if pc is MeshInstance3D:
-				pmat = (pc as MeshInstance3D).material_override
-				break
-	var scrf := MeshInstance3D.new()
-	scrf.mesh = IcosaColony._cham_mesh(6.4, 0.08, 3.0, 0.4)
-	scrf.material_override = Destructible.make_material(AMBER, 1.3)
-	add_child(scrf)
-	scrf.global_transform = Transform3D(fb, _C + up * (_rF + 2.6))
-	scrf.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
-	scrf.translate_object_local(Vector3(0, -(cx + 3.9) * signf(cx), 0))
-	if pmat != null:
-		var lscr := MeshInstance3D.new()
-		var lsm2 := SphereMesh.new()
-		lsm2.radius = 1.15
-		lsm2.height = 2.3
-		lscr.mesh = lsm2
-		lscr.material_override = pmat
-		add_child(lscr)
-		lscr.global_transform = Transform3D(fb, _C + up * (_rF + 2.6))
-		lscr.translate_object_local(Vector3(cx + 2.9 * signf(cx), 0, 0))
-		_spins.append({"node": lscr, "rate": 0.3})
-	for cz in [-2.6, 0.0, 2.6]:
-		_plate(Vector3(1.1, 1.05, 2.2), Transform3D(fb, _C + up * (_rF + 0.52)),
-			Vector3(cx - 2.6 * signf(cx), 0, cz), Color("#12161c"), 0.0)
-		var cpan := MeshInstance3D.new()
-		cpan.mesh = IcosaColony._cham_mesh(0.95, 0.05, 2.25, 0.22)
-		cpan.material_override = Destructible.make_material(AMBER.darkened(0.1), 1.5)
-		add_child(cpan)
-		cpan.global_transform = Transform3D(
-			fb * Basis(Vector3(0, 0, 1), -signf(cx) * 0.5),
-			_C + up * (_rF + 1.14))
-		cpan.translate_object_local(Vector3(cx - 2.45 * signf(cx), 0, cz))
-	# THE OVERCLOCK LEVER: touch it to change the whole planet's clock
-	var lped := MeshInstance3D.new()
-	var lpm2 := CylinderMesh.new()
-	lpm2.top_radius = 0.4
-	lpm2.bottom_radius = 0.55
-	lpm2.height = 1.1
-	lped.mesh = lpm2
-	lped.material_override = Surfaces.metal(Color("#12161c"))
-	add_child(lped)
-	lped.global_transform = Transform3D(fb, _C + up * (_rF + 0.55))
-	lped.translate_object_local(Vector3(cx, 0, 0))
-	var lever := MeshInstance3D.new()
-	var lvm := BoxMesh.new()
-	lvm.size = Vector3(0.1, 0.9, 0.1)
-	lever.mesh = lvm
-	lever.material_override = Destructible.make_material(Color("#ff4444"), 1.6)
-	add_child(lever)
-	lever.global_transform = Transform3D(fb, _C + up * (_rF + 1.5))
-	lever.translate_object_local(Vector3(cx, 0, 0))
-	set_meta("clk_lever", lever.get_path())
-	var trig := Area3D.new()
-	var tcs := CollisionShape3D.new()
-	var tss := SphereShape3D.new()
-	tss.radius = 1.5
-	tcs.shape = tss
-	trig.add_child(tcs)
-	add_child(trig)
-	trig.global_transform = Transform3D(fb, _C + up * (_rF + 1.2))
-	trig.translate_object_local(Vector3(cx, 0, 0))
-	trig.body_entered.connect(func(bod):
-		if _clk_cool > 0.0 or not bod.is_in_group("player"):
-			return
-		_clk_cool = 1.2
-		_clk_idx = (_clk_idx + 1) % 3
-		var spd: float = [0.3, 1.0, 3.0][_clk_idx]
-		if pmat != null and pmat is ShaderMaterial:
-			(pmat as ShaderMaterial).set_shader_parameter("clk", spd)
-		lever.rotation = Vector3.ZERO
-		lever.rotate_object_local(Vector3(0, 0, 1),
-			[-0.5, 0.0, 0.5][_clk_idx])
-		Sfx.play("click", -8.0)
-		var m9 = get_tree().current_scene
-		if m9 != null:
-			var h9 = m9.get("_hud")
-			if h9 != null:
-				h9.flash("PLANET CLOCK x%.1f" % spd))
-	_sign("PLANET CONTROL", fb, _C + up * (_rF + 3.8), Vector3(cx, 0, -4.2), 0.0)
-	_chatter(Transform3D(fb, _C + up * (_rF + 1.5)).origin, 91, -12.0)
 
 ## ---- COMMUNICATIONS: the interuniverse radio. Physical buttons, a
 ## 3D signal screen, four stations from OUTSIDE the universe. ----
