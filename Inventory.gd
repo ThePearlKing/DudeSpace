@@ -64,6 +64,7 @@ var weapons: Dictionary = {
 	"fists":     {"name": "Fists",       "dmg": 8.0,  "rate": 0.35, "range": 4.0,   "color": Color("#dddddd")},
 	"blaster":   {"name": "Blaster",     "dmg": 15.0, "rate": 0.18, "range": 120.0, "color": Color("#4cc9f0")},
 	"ak47":      {"name": "AK-47",       "dmg": 22.0, "rate": 0.09, "range": 200.0, "color": Color("#ffb347")},
+	"zapper":    {"name": "Zapper",      "dmg": 8.0,  "rate": 0.05, "range": 130.0, "color": Color("#7cf9a8")},
 	"plasma":    {"name": "Plasma Rifle","dmg": 30.0, "rate": 0.12, "range": 160.0, "color": Color("#b388ff")},
 	"voidhammer":{"name": "Voidhammer",  "dmg": 60.0, "rate": 0.45, "range": 8.0,   "color": Color("#7a1dbe")},
 	"knife":     {"name": "Knife",       "dmg": 6.0,  "rate": 0.22, "range": 4.0,   "color": Color("#c8c8d0")},
@@ -279,6 +280,7 @@ func _ready() -> void:
 		{"id": "scomputer", "tab": "Electric", "name": "Sorter Computer", "cost": {"ingot": 20, "irid": 10}, "desc": "Programmable item router: sort(funnel, port)."},
 		{"id": "eseller",   "tab": "Electric", "name": "Electric Seller","cost": {"ingot": 25, "irid": 15}, "desc": "Sells fast at 1.25x price, 2 EU per sale."},
 
+		{"id": "zapper",    "tab": "Weapons",  "name": "Zapper",         "cost": {"coins": 1600, "ingot": 4}, "desc": "Tiny zaps, torrent of them. 160 DPS hosepipe."},
 		{"id": "plasma",    "tab": "Weapons",  "name": "Plasma Rifle",   "cost": {"coins": 6000, "irid": 10}, "desc": "Heavy energy damage. 250 DPS does not come cheap."},
 		{"id": "ak47",      "tab": "Weapons",  "name": "AK-47",          "cost": {"ingot": 20, "ultima": 6}, "desc": "CRAFT. Needs the recipe from the Shadow Temple.", "recipe": true},
 		{"id": "rail",      "tab": "Weapons",  "name": "Rail Cannon",    "cost": {"coins": 2800},"desc": "Huge single-shot damage, long range."},

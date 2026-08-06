@@ -1407,6 +1407,14 @@ func _make_held_model(id: String) -> void:
 				_hm_cyl(0.018, 0.05, Vector3(0, 0.02, -0.52), metal, 0.2).rotation_degrees = Vector3(90, 0, 0) # muzzle brake
 				_hm_box(Vector3(0.02, 0.07, 0.02), Vector3(0, 0.07, -0.44), metal, 0.15)    # front sight post
 				return
+			"zapper":
+				# stubby SMG: boxy body, twin short barrels, big vents
+				_hm_box(Vector3(0.11, 0.13, 0.3), Vector3(0, 0, 0.1), dark, 0.2)
+				_hm_cyl(0.022, 0.26, Vector3(0.025, 0.03, -0.14), col, 1.1).rotation_degrees = Vector3(90, 0, 0)
+				_hm_cyl(0.022, 0.26, Vector3(-0.025, 0.03, -0.14), col, 1.1).rotation_degrees = Vector3(90, 0, 0)
+				_hm_box(Vector3(0.12, 0.03, 0.1), Vector3(0, 0.09, 0.08), col, 0.9)
+				_hm_box(Vector3(0.06, 0.16, 0.09), Vector3(0, -0.13, 0.2), dark, 0.1)
+				_hm_box(Vector3(0.05, 0.12, 0.06), Vector3(0, -0.1, 0.02), col.darkened(0.4), 0.5)
 			"knife":
 				_hm_box(Vector3(0.07, 0.09, 0.22), Vector3(0, -0.02, 0.18), Color("#4a3020"), 0.1)
 				_hm_box(Vector3(0.025, 0.11, 0.42), Vector3(0, 0.02, -0.14), Color("#d8d8e2"), 0.7)

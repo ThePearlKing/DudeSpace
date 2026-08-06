@@ -5508,9 +5508,9 @@ void fragment() {
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
 		_h_glyph(root, g, Vector3(cos(ga) * 1.5, cy + 0.2 + sin(ga) * 1.5, 1.84))
-	# and up TOP, alone on the crown tier: the circle with weird lines.
-	# the dudes carved their machine planet before it had a name.
-	_h_glyph(root, 6, Vector3(0, 11.1, 1.25))
+	# and up TOP, alone on the big crown tier: the circle with weird
+	# lines. the dudes carved their machine planet before it had a name.
+	_h_glyph(root, 6, Vector3(0, 9.9, 1.55))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
@@ -5618,24 +5618,27 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.06, 0.42), Vector2(0, -0.22), 0.0)
 			bar.call(Vector2(0.34, 0.05), Vector2(0, 0.02), 0.0)
 		6:
-			# BIG COMPUTER: a circle wearing circuit traces -- lines that
-			# run, BEND at right angles, and end in pads, like the
-			# motherboard face of the machine planet
-			ring.call(0.24, 0.3, 0.0)
-			for ti in 4:
-				var ta := TAU * float(ti) / 4.0 + TAU / 8.0
-				var dirv := Vector2(cos(ta), sin(ta))
-				var elbow := dirv * 0.42
-				var out9 := elbow + Vector2(dirv.y, -dirv.x) * 0.14
-				bar.call(Vector2(0.13, 0.04), (dirv * 0.31 + elbow) * 0.5,
-					rad_to_deg(ta))
-				bar.call(Vector2(0.15, 0.04), (elbow + out9) * 0.5,
-					rad_to_deg((out9 - elbow).angle()))
-				bar.call(Vector2(0.07, 0.07), out9, 45.0)
-			# two traces crossing the face itself, stepped
-			bar.call(Vector2(0.2, 0.035), Vector2(-0.06, 0.05), 0.0)
-			bar.call(Vector2(0.12, 0.035), Vector2(0.06, -0.04), 90.0)
-			bar.call(Vector2(0.05, 0.05), Vector2(0.06, -0.12), 0.0)
+			# BIG COMPUTER: the machine planet itself -- a circle whose
+			# FACE is etched with motherboard traces. Everything stays
+			# inside the disc: stepped lines, right-angle bends, square
+			# pads where they end. Reads as a planet wearing a circuit.
+			ring.call(0.3, 0.38, 0.0)
+			# trace 1: long horizontal across the upper face, pad at each end
+			bar.call(Vector2(0.34, 0.035), Vector2(-0.02, 0.14), 0.0)
+			bar.call(Vector2(0.055, 0.055), Vector2(-0.21, 0.14), 0.0)
+			bar.call(Vector2(0.055, 0.055), Vector2(0.17, 0.14), 0.0)
+			# trace 2: enters left, steps DOWN, runs to a centre pad
+			bar.call(Vector2(0.16, 0.035), Vector2(-0.14, 0.0), 0.0)
+			bar.call(Vector2(0.1, 0.035), Vector2(-0.06, -0.05), 90.0)
+			bar.call(Vector2(0.12, 0.035), Vector2(0.0, -0.1), 0.0)
+			bar.call(Vector2(0.055, 0.055), Vector2(0.08, -0.1), 0.0)
+			# trace 3: lower right, steps up into the fat pad
+			bar.call(Vector2(0.14, 0.035), Vector2(0.12, -0.22), 0.0)
+			bar.call(Vector2(0.09, 0.035), Vector2(0.19, -0.18), 90.0)
+			bar.call(Vector2(0.07, 0.07), Vector2(0.19, -0.1), 0.0)
+			# lone pads: the glowing vias of the motherboard face
+			bar.call(Vector2(0.045, 0.045), Vector2(-0.18, -0.2), 0.0)
+			bar.call(Vector2(0.045, 0.045), Vector2(0.02, 0.26), 0.0)
 			for pi3 in 3:
 				bar.call(Vector2(0.05, 0.24), Vector2(-0.14 + 0.14 * float(pi3), 0.16), 0.0)
 
