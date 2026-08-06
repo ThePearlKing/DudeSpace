@@ -596,6 +596,9 @@ func _open_options() -> void:
 	_options.visible = true
 
 func _quit_title() -> void:
+	# the engines do not follow you to the title screen
+	Sfx.engine(false)
+	Sfx.alien_engine(false)
 	# pet state, fresh -- not whatever the last autosave happened to see
 	var petq = get_tree().get_first_node_in_group("pet")
 	if petq != null and is_instance_valid(petq):

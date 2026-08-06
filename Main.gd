@@ -1287,8 +1287,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 	pfade.tween_callback(func() -> void:
 		if is_instance_valid(skyp):
 			skyp.queue_free())
-	var wheel := create_tween().set_loops()
-	_sky_tweens.append(wheel)
+	var wheel := skyp.create_tween().set_loops()
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
 	# lifecycle: demo = 30s and gone; the real thing lingers six minutes
 	var hold := 26.0 if linger else 4.0

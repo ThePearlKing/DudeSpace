@@ -356,14 +356,18 @@ func _physics_process(delta: float) -> void:
 	_hyper_warn_t = maxf(0.0, _hyper_warn_t - delta)
 	if hyperdrive and not ui and Input.is_key_pressed(Settings.key("hyper")) \
 			and Inventory.fuel > 0.5:
+		# the NUCLEAR engine feeds the drive URANIUM instead of ultima
+		# (cheaper rock, longer burn)
+		var hfuel := "uranium" if nuclear else "ultima"
+		var hsecs := 20.0 if nuclear else 14.0
 		if not Game.inf_fuel and hyper_charge <= 0.0 \
-				and Inventory.res_count("ultima") > 0:
-			Inventory.remove_res("ultima", 1)
+				and Inventory.res_count(hfuel) > 0:
+			Inventory.remove_res(hfuel, 1)
 			hyper_charge += 1.0
 			Sfx.play("smelt", -14.0)
 		if hyper_charge > 0.0 or Game.inf_fuel:
 			if not Game.inf_fuel:
-				hyper_charge = maxf(0.0, hyper_charge - delta / 14.0)
+				hyper_charge = maxf(0.0, hyper_charge - delta / hsecs)
 			vel = vel.lerp(fwd * 1400.0, delta * 1.6)
 			Inventory.fuel = maxf(0.0, Inventory.fuel - 4.0 * burn_eff * delta)
 			_engine_on = true
@@ -372,7 +376,7 @@ func _physics_process(delta: float) -> void:
 			Sfx.play("denied", -16.0)
 			var hudh = get_tree().get_first_node_in_group("hud")
 			if hudh:
-				hudh.flash("HYPERDRIVE INACTIVE -- no ultima aboard")
+				hudh.flash("HYPERDRIVE INACTIVE -- no %s aboard" % hfuel)
 
 	# --- RCS translation (standard): arrows + Shift/Ctrl fore/aft ---
 	if not ui and Inventory.fuel > 0.0:

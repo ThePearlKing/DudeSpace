@@ -131,28 +131,25 @@ class _NavView extends Control:
 		draw_rect(Rect2(bx, by, bw, 16), Color(0, 0, 0, 0.5))
 		var f := clampf(Inventory.fuel / maxf(1.0, cap), 0, 1)
 		draw_rect(Rect2(bx + 2, by + 2, (bw - 4) * f, 12), Color("#ffd166"))
-		# stacked above it: the ULTIMA bar (hyperdrive charge), and a
-		# green NUCLEAR status strip when that engine is aboard
-		var sy9 := by
+		# stacked above the fuel bar: the drive bar. CYAN ultima on a
+		# plain hyperdrive; the nuclear engine swaps it for a full-size
+		# GREEN uranium bar (same slot, same height)
 		if rocket.hyperdrive:
-			sy9 -= 22.0
+			var hcol := Color("#5aff3a") if rocket.nuclear else Color("#7df9ff")
+			var hres := "uranium" if rocket.nuclear else "ultima"
+			var sy9 := by - 22.0
 			draw_rect(Rect2(bx, sy9, bw, 16), Color(0, 0, 0, 0.5))
 			if Game.inf_fuel:
-				draw_rect(Rect2(bx + 2, sy9 + 2, bw - 4, 12), Color("#c86bff"))
+				draw_rect(Rect2(bx + 2, sy9 + 2, bw - 4, 12), hcol)
 				draw_string(font, Vector2(bx + bw * 0.5 - 14, sy9 + 13),
 					"INF", HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
-					Color(0.1, 0.05, 0.15))
+					Color(0.05, 0.12, 0.05))
 			else:
 				var hq := clampf(rocket.hyper_charge / rocket.HYPER_MAX, 0, 1)
-				draw_rect(Rect2(bx + 2, sy9 + 2, (bw - 4) * hq, 12),
-					Color("#c86bff"))
-				if hq <= 0.0 and Inventory.res_count("ultima") == 0:
-					draw_rect(Rect2(bx, sy9, bw, 16), Color(1, 0.25, 0.25, 0.6),
-						false, 1.0)
-		if rocket.nuclear:
-			sy9 -= 10.0
-			draw_rect(Rect2(bx, sy9, bw, 6), Color(0, 0, 0, 0.5))
-			draw_rect(Rect2(bx + 1, sy9 + 1, bw - 2, 4), Color("#5aff3a"))
+				draw_rect(Rect2(bx + 2, sy9 + 2, (bw - 4) * hq, 12), hcol)
+				if hq <= 0.0 and Inventory.res_count(hres) == 0:
+					draw_rect(Rect2(bx, sy9, bw, 16),
+						Color(1, 0.25, 0.25, 0.6), false, 1.0)
 
 		# tutorial: colour-keyed legend explaining every instrument
 		if Game.tutorial_session:
