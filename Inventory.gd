@@ -564,7 +564,8 @@ func use_item(slot: int) -> bool:
 # ------------------------------------------------------------- currency
 
 func add_coins(n: int) -> void:
-	coins += n
+	# synced with the DUDE A.I.? every sale pays ten percent more
+	coins += int(round(float(n) * (1.1 if Game.ai_blessed else 1.0)))
 	changed.emit()
 
 func lose_half() -> void:

@@ -927,6 +927,22 @@ void fragment(){
 	# through the space that provably nobody else is using ----
 	_networks()
 	_stashes()
+	# the SERVICES: what the facility is FOR
+	_svc_node(Transform3D(_abas9(1, 0.75), _C + _aup9(1, 0.75) * _rF),
+		Vector3(-8.3, 0, 3.4), "heal", "MEDBAY: FULL HEAL", Color("#66ff99"))
+	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
+		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
+		Vector3(-8.1, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
+	_svc_node(Transform3D(_abas9(1, 4.0), _C + _aup9(1, 4.0) * _rF),
+		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER -> 1 NOODLE",
+		Color("#ffcf40"))
+	_svc_node(Transform3D(_sbas(_a0 + _step * 9.0, 12.0 / _rF),
+		_C + _sdir(_a0 + _step * 9.0, 12.0 / _rF) * _rF),
+		Vector3(0, 0, -3.4), "scan", "DEEP SCAN: PING ALL MINES",
+		Color("#7df9ff"))
+	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
+		Vector3(-4.4, 0, 3.2), "sync", "A.I. SYNC: +10% SELL. FOREVER",
+		Color("#2bff6a"))
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
 		var aang := TAU * float(an9) / 4.0 + 0.5
@@ -4797,6 +4813,118 @@ func _airlock(xf: Transform3D) -> void:
 	door.add_child(dcs)
 	root.add_child(door)
 	door.position = Vector3(0, 1.4, 0)
+
+## ==================== ROOM SERVICES ====================
+## The facility WORKS for you now -- one unique service per room, the
+## kind a run detours for: healing, free fuel, noodle cooking, a deep
+## scan, and the A.I.'s permanent blessing.
+class RoomService extends StaticBody3D:
+	var host = null
+	var kind: String = ""
+	func use() -> void:
+		if host != null:
+			host._service(kind)
+
+var _svc_cd: Dictionary = {}
+
+func _service(kind: String) -> void:
+	var now := Game.playtime
+	match kind:
+		"heal":
+			if now < float(_svc_cd.get("heal", 0.0)):
+				_hud_flash("medbay recharging (%.0fs)" %
+					(float(_svc_cd["heal"]) - now))
+				Sfx.play("denied", -16.0)
+				return
+			_svc_cd["heal"] = now + 60.0
+			Game.heal(999.0)
+			Sfx.play("learn", -8.0)
+			_hud_flash("medbay: fully healed")
+		"fuel":
+			if now < float(_svc_cd.get("fuel", 0.0)):
+				_hud_flash("fuel tap recharging (%.0fs)" %
+					(float(_svc_cd["fuel"]) - now))
+				Sfx.play("denied", -16.0)
+				return
+			_svc_cd["fuel"] = now + 120.0
+			Inventory.fuel = Inventory.fuel_max
+			Inventory.jet_fuel = Inventory.jet_max
+			Inventory.changed.emit()
+			Sfx.play("place", -8.0)
+			_hud_flash("reactor tap: rocket + jet tanks FULL")
+		"noodle":
+			if Inventory.res_count("plantfiber") < 2:
+				_hud_flash("the pot wants 2 plant fiber per noodle")
+				Sfx.play("denied", -16.0)
+				return
+			Inventory.remove_res("plantfiber", 2)
+			Inventory.add_res("noodle", 1)
+			Sfx.play("eat", -8.0)
+			_hud_flash("the pot produces an appeasement noodle")
+		"scan":
+			var pts: Array = []
+			var m9 = get_tree().current_scene
+			if m9 != null and "MINE_DIRS" in m9:
+				for pname in m9.MINE_DIRS:
+					var pb9 = Universe.body_named(str(pname))
+					if pb9 != null:
+						pts.append((pb9.center as Vector3)
+							+ (m9.MINE_DIRS[pname] as Vector3) * float(pb9.radius))
+			Game.locator_planet = ""
+			Game.locator_targets = pts
+			Game.locator_until = Game.playtime + 120.0
+			Sfx.play("warp", -10.0)
+			_hud_flash("deep scan: every mine entrance pinged for 120s")
+		"sync":
+			if Game.ai_blessed:
+				_hud_flash("already synced. the A.I. remembers you")
+				Sfx.play("denied", -18.0)
+				return
+			Game.ai_blessed = true
+			Sfx.play("learn", -6.0)
+			_hud_flash("SYNCED: the A.I. routes 10% extra to every sale. forever")
+
+## a service pedestal: colored button + label, F to use
+func _svc_node(xf: Transform3D, off: Vector3, kind: String, label: String,
+		col: Color) -> void:
+	var sv := RoomService.new()
+	sv.host = self
+	sv.kind = kind
+	var ped := MeshInstance3D.new()
+	var pdm := CylinderMesh.new()
+	pdm.top_radius = 0.42
+	pdm.bottom_radius = 0.52
+	pdm.height = 1.0
+	ped.mesh = pdm
+	ped.material_override = Surfaces.metal(Color("#12161c"))
+	sv.add_child(ped)
+	ped.position = Vector3(0, 0.5, 0)
+	var orb := MeshInstance3D.new()
+	var om9 := SphereMesh.new()
+	om9.radius = 0.26
+	om9.height = 0.52
+	orb.mesh = om9
+	orb.material_override = Surfaces.cached_emissive(col, 2.0)
+	sv.add_child(orb)
+	orb.position = Vector3(0, 1.25, 0)
+	var cs := CollisionShape3D.new()
+	cs.shape = Surfaces.box_shape(Vector3(1.1, 2.2, 1.1))
+	cs.position = Vector3(0, 1.1, 0)
+	sv.add_child(cs)
+	add_child(sv)
+	sv.global_transform = xf
+	sv.translate_object_local(off)
+	var lb := Label3D.new()
+	lb.text = label + " [F]"
+	lb.font_size = 22
+	lb.pixel_size = 0.006
+	lb.modulate = col
+	lb.outline_size = 8
+	lb.outline_modulate = Color(0, 0, 0, 0.9)
+	lb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(lb)
+	lb.global_transform = xf
+	lb.translate_object_local(off + Vector3(0, 2.0, 0))
 
 class SurfBtn extends StaticBody3D:
 	var host = null
