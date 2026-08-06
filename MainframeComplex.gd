@@ -1274,6 +1274,170 @@ func _rings() -> void:
 	var tp := _ring_room(1, 4.8, -1.0, "TROPHY HALL")
 	_dress_trophy(tp)
 	_cockpit_shell()
+	_cockpit_dress()
+
+## PLANET CONTROL: a giant starship-bridge cockpit filling the antipode
+## -- NOT an airplane nose. A live globe of the planet floats over the
+## central dais, the OVERCLOCK lever stands under it, and eight console
+## banks + wall screens wrap the whole room.
+func _cockpit_dress() -> void:
+	var ab0 := _fr(PI)
+	var au := -_u0
+	# central dais + rail ring
+	var dais := MeshInstance3D.new()
+	var dm9 := CylinderMesh.new()
+	dm9.top_radius = 4.0
+	dm9.bottom_radius = 4.4
+	dm9.height = 0.5
+	dais.mesh = dm9
+	dais.material_override = Surfaces.metal(Color("#20262e"))
+	add_child(dais)
+	dais.global_transform = Transform3D(ab0, _C + au * (_rF + 0.25))
+	var drail := MeshInstance3D.new()
+	var drm := TorusMesh.new()
+	drm.inner_radius = 4.35
+	drm.outer_radius = 4.55
+	drail.mesh = drm
+	drail.material_override = Destructible.make_material(AMBER, 1.5)
+	add_child(drail)
+	drail.global_transform = Transform3D(ab0, _C + au * (_rF + 0.55))
+	# THE GLOBE: the planet's own live shader, floating and turning
+	var pmat: Material = null
+	if _b != null and _b.node != null:
+		for pc in (_b.node as Node).get_children():
+			if pc is MeshInstance3D:
+				pmat = (pc as MeshInstance3D).material_override
+				break
+	var globe := MeshInstance3D.new()
+	var gbm := SphereMesh.new()
+	gbm.radius = 2.2
+	gbm.height = 4.4
+	globe.mesh = gbm
+	globe.material_override = pmat if pmat != null \
+		else Destructible.make_material(AMBER, 1.4)
+	add_child(globe)
+	globe.global_transform = Transform3D(ab0, _C + au * (_rF + 4.4))
+	_spins.append({"node": globe, "rate": 0.25})
+	var gring := MeshInstance3D.new()
+	var grm9 := TorusMesh.new()
+	grm9.inner_radius = 2.7
+	grm9.outer_radius = 2.85
+	gring.mesh = grm9
+	gring.material_override = Destructible.make_material(AMBER, 1.9)
+	add_child(gring)
+	gring.global_transform = Transform3D(ab0, _C + au * (_rF + 4.4))
+	gring.rotate_object_local(Vector3(1, 0, 0), 0.35)
+	_core_rings.append({"node": gring, "spin": 0.5})
+	# THE OVERCLOCK LEVER on the dais, under the globe
+	var lped := MeshInstance3D.new()
+	var lpm2 := CylinderMesh.new()
+	lpm2.top_radius = 0.4
+	lpm2.bottom_radius = 0.55
+	lpm2.height = 1.1
+	lped.mesh = lpm2
+	lped.material_override = Surfaces.metal(Color("#12161c"))
+	add_child(lped)
+	lped.global_transform = Transform3D(ab0, _C + au * (_rF + 1.05))
+	lped.translate_object_local(Vector3(2.4, 0, 0))
+	var lever := MeshInstance3D.new()
+	var lvm := BoxMesh.new()
+	lvm.size = Vector3(0.1, 0.9, 0.1)
+	lever.mesh = lvm
+	lever.material_override = Destructible.make_material(Color("#ff4444"), 1.6)
+	add_child(lever)
+	lever.global_transform = Transform3D(ab0, _C + au * (_rF + 2.0))
+	lever.translate_object_local(Vector3(2.4, 0, 0))
+	var trig := Area3D.new()
+	var tcs := CollisionShape3D.new()
+	var tss := SphereShape3D.new()
+	tss.radius = 1.4
+	tcs.shape = tss
+	trig.add_child(tcs)
+	add_child(trig)
+	trig.global_transform = Transform3D(ab0, _C + au * (_rF + 1.6))
+	trig.translate_object_local(Vector3(2.4, 0, 0))
+	trig.body_entered.connect(func(bod):
+		if _clk_cool > 0.0 or not bod.is_in_group("player"):
+			return
+		_clk_cool = 1.2
+		_clk_idx = (_clk_idx + 1) % 3
+		var spd: float = [0.3, 1.0, 3.0][_clk_idx]
+		if pmat != null and pmat is ShaderMaterial:
+			(pmat as ShaderMaterial).set_shader_parameter("clk", spd)
+		lever.rotation = Vector3.ZERO
+		lever.rotate_object_local(Vector3(0, 0, 1), [-0.5, 0.0, 0.5][_clk_idx])
+		Sfx.play("click", -8.0)
+		var m9 = get_tree().current_scene
+		if m9 != null:
+			var h9 = m9.get("_hud")
+			if h9 != null:
+				h9.flash("PLANET CLOCK x%.1f" % spd))
+	_sign("OVERCLOCK", ab0, _C + au * (_rF + 3.0), Vector3(2.4, 0, 0), 180.0)
+	# eight console banks wrapping the dais, buttons everywhere
+	for cbk in 8:
+		var cang := TAU * float(cbk) / 8.0 + PI / 8.0
+		var latc := _e1 * cos(cang) + _e2 * sin(cang)
+		var dirc := (-_u0 * cos(8.5 / _rF) + latc * sin(8.5 / _rF)).normalized()
+		var tzc := (-latc + dirc * dirc.dot(latc)).normalized()
+		var cbb := Basis(dirc.cross(tzc), dirc, tzc).orthonormalized()
+		_plate(Vector3(2.8, 1.05, 1.1), Transform3D(cbb, _C + dirc * (_rF + 0.52)),
+			Vector3.ZERO, Color("#12161c"), 0.0)
+		var cpan := MeshInstance3D.new()
+		cpan.mesh = IcosaColony._cham_mesh(2.6, 0.05, 0.95, 0.22)
+		cpan.material_override = Destructible.make_material(AMBER.darkened(0.1), 1.5)
+		add_child(cpan)
+		cpan.global_transform = Transform3D(cbb * Basis(Vector3(1, 0, 0), -0.5),
+			_C + dirc * (_rF + 1.16))
+		for bt in 8:
+			var dot := MeshInstance3D.new()
+			var dm2 := BoxMesh.new()
+			dm2.size = Vector3(0.12, 0.05, 0.12)
+			dot.mesh = dm2
+			var dmat := StandardMaterial3D.new()
+			dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			var dc: Color = [Color("#66ff99"), AMBER, Color("#ff4444"),
+				Color("#7df9ff")][(cbk + bt) % 4]
+			dmat.albedo_color = dc
+			dmat.emission_enabled = true
+			dmat.emission = dc
+			dot.material_override = dmat
+			add_child(dot)
+			dot.global_transform = Transform3D(cbb, _C + dirc * (_rF + 1.1))
+			dot.translate_object_local(Vector3(-1.05 + 0.3 * float(bt),
+				0, 0.28 if bt % 2 == 0 else 0.05))
+			_blinks.append({"mat": dmat, "phase": float(cbk) * 0.7 + float(bt) * 0.35})
+	# wall screens on the four solid walls: two data-rain, two signal
+	for w in [1, 3, 5, 7]:
+		var wang := TAU * float(w) / 8.0
+		var latv := _e1 * cos(wang) + _e2 * sin(wang)
+		var dirw := (-_u0 * cos(14.4 / _rF) + latv * sin(14.4 / _rF)).normalized()
+		var tzw := (-latv + dirw * dirw.dot(latv)).normalized()
+		var wb2 := Basis(dirw.cross(tzw), dirw, tzw).orthonormalized()
+		var scr := MeshInstance3D.new()
+		var sqm2 := QuadMesh.new()
+		sqm2.size = Vector2(6.5, 3.4)
+		scr.mesh = sqm2
+		if w % 4 == 1:
+			scr.material_override = _data_mat()
+		else:
+			var sm2 := _radio_screen_mat()
+			sm2.set_shader_parameter("hue", Vector3(1.0, 0.69, 0.0))
+			sm2.set_shader_parameter("live", 1.0)
+			scr.material_override = sm2
+		add_child(scr)
+		scr.global_transform = Transform3D(wb2, _C + dirw * (_rF + 3.8))
+	# overhead light ring
+	var oring := MeshInstance3D.new()
+	var orm := TorusMesh.new()
+	orm.inner_radius = 5.6
+	orm.outer_radius = 6.0
+	oring.mesh = orm
+	oring.material_override = Destructible.make_material(Color("#f2ead8"), 2.0)
+	add_child(oring)
+	oring.global_transform = Transform3D(ab0, _C + au * (_rF + 7.4))
+	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2)).origin, 201, -9.0)
+	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2))
+		.translated_local(Vector3(-7.0, 0, 6.0)).origin, 202, -12.0)
 
 func _dress_tape(r: Dictionary) -> void:
 	# reel-to-reel tape banks: cabinets with two spinning reels each
