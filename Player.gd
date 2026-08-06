@@ -118,7 +118,11 @@ func _ready() -> void:
 			# fresh armor meshes spawn on layer 1 -- re-layer at once or the
 			# chestplate photobombs first person for a frame on hotbar scroll
 			_apply_body_vis())
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# grab the mouse ONLY once the loading screen is gone -- capturing
+	# mid-boot fails on X11 (NO GRAB) because the window isn't ready
+	var cs9 = get_tree().current_scene
+	if cs9 == null or cs9.get("_load_layer") == null:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	# dying pins a locator ping on the spot -- your stuff is THERE
 	Game.killed.connect(func() -> void:
 		Game.locator_planet = ""

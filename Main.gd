@@ -333,6 +333,8 @@ func _boot() -> void:
 		_load_layer = null
 		_load_bar = null
 		_load_lbl = null
+		# NOW the window is real: take the mouse
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if Save.had_pet() and _player:
 		# your buddy waited for you -- the SAME buddy (genome restored)
 		var pet := Animal.new()
