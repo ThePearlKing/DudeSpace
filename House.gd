@@ -1373,10 +1373,13 @@ func _harold_try_slot() -> void:
 	var ridx := int(absi(Game.world_seed)) % 5
 	var want: String = RIDDLE_ITEMS[ridx]
 	var hud = get_tree().get_first_node_in_group("hud")
-	if Inventory.res_count(want) <= 0:
+	# the slot judges what is IN YOUR HAND -- it used to rummage the
+	# whole backpack and quietly accept while you held the wrong thing
+	var held9: Dictionary = Inventory.hotbar[Inventory.selected]
+	if str(held9.get("id", "")) != want:
 		Sfx.play("denied", -14.0)
 		if hud:
-			hud.flash("the slot stays hungry. read the wall again")
+			hud.flash("the slot judges what your HAND holds. read the wall again")
 		return
 	Inventory.remove_res(want, 1)
 	Game.lime_wall_open = true
