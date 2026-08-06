@@ -2551,18 +2551,24 @@ void fragment(){
 	vec3 n = normalize(vn);
 	float sw = fbm(n * 6.0 + vec3(TIME * 0.05, 0.0, TIME * 0.03));
 	float sw2 = fbm(n * 17.0 - vec3(0.0, TIME * 0.08, 0.0));
+	// REFRACTION: everything behind the surface wobbles -- the same
+	// screen-space trick the aquarium tank uses, planet-sized
+	vec2 w = vec2(sin(TIME * 1.2 + SCREEN_UV.y * 30.0 + sw * 8.0),
+		cos(TIME * 0.9 + SCREEN_UV.x * 26.0 + sw2 * 6.0)) * 0.009;
+	vec3 bg = texture(scr, clamp(SCREEN_UV + w, vec2(0.001), vec2(0.999))).rgb;
 	vec3 deep = base * 0.45;
-	vec3 col = mix(deep, base * 1.25, sw * 0.7 + sw2 * 0.3);
+	vec3 watercol = mix(deep, base * 1.25, sw * 0.7 + sw2 * 0.3);
 	float foam = smoothstep(0.72, 0.82, sw2);
-	col = mix(col, vec3(0.85, 0.95, 1.0), foam * 0.35);
-	ALBEDO = col;
-	ALPHA = 0.62;
+	watercol = mix(watercol, vec3(0.85, 0.95, 1.0), foam * 0.35);
+	ALBEDO = mix(bg, watercol, 0.42);
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
-	EMISSION = base * 0.06;
+	EMISSION = base * 0.05;
 }
 """
-			osh.code = "shader_type spatial;\nrender_mode cull_disabled;\n" + osh.code
+			osh.code = "shader_type spatial;\nrender_mode cull_disabled, unshaded;\n" \
+				+ "uniform sampler2D scr : hint_screen_texture, filter_linear_mipmap;\n" \
+				+ osh.code
 			var om9 := ShaderMaterial.new()
 			om9.shader = osh
 			om9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))
