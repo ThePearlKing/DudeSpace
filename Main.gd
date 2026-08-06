@@ -945,7 +945,7 @@ func _readme_shots() -> void:
 	var eb = Universe.body_named("Earth")
 	var hb = Universe.body_named("Harold")
 	var bh = Universe.body_named("TIN 618")
-	var wb = Universe.body_named("Big Water")
+	var wb = Universe.body_named("Undros")
 	var db = Universe.body_named("Datamosh")
 	var mdd := (mu * cos(0.115 + 5.0 * 4.6 / mrF)
 		+ me1 * sin(0.115 + 5.0 * 4.6 / mrF)).normalized()
@@ -965,7 +965,7 @@ func _readme_shots() -> void:
 			* (eb.radius + 130.0), eb.center, Vector3(0, 1, 0)],
 		["black_hole_harold", hb.center + Vector3(0, 0.25, 1).normalized()
 			* (hb.radius + 220.0), bh.center, Vector3(0, 1, 0)],
-		["big_water", wb.center + Vector3(0.4, 0.6, 0.6).normalized()
+		["undros", wb.center + Vector3(0.4, 0.6, 0.6).normalized()
 			* (wb.radius + 160.0), wb.center, Vector3(0, 1, 0)],
 		["datamosh", db.center + Vector3(0.2, 0.5, 0.9).normalized()
 			* (db.radius + 170.0), db.center, Vector3(0, 1, 0)],
@@ -2064,7 +2064,7 @@ func _build_body(b) -> void:
 		# CLOUDS: a thin drifting shell over the water
 		var cl9 := MeshInstance3D.new()
 		var clm9 := SphereMesh.new()
-		clm9.radius = b.radius * 1.045
+		clm9.radius = b.radius * 1.13
 		clm9.height = clm9.radius * 2.0
 		clm9.radial_segments = 48
 		clm9.rings = 24

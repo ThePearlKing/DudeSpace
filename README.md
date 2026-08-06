@@ -13,12 +13,12 @@ Every world is a real body with its own gravity — walk it, orbit it, tunnel in
 | Home / Dude system | Home, Circuitia, Logica, Pi, **Big Computer** (the motherboard planet), Euclid, Donut (a torus you can walk all the way around), Verdant, Crystalia |
 | Shader system | Contrast, Pixel, Datamosh, Wireframe + Blind, Wobble — every one skinned by its own shader, three with icosahedron colonies INSIDE them |
 | Sol | Yes, that one: Mercury → Neptune, Earth with trees and small talkative humans, gas giants that are all fog inside and will crush you |
-| Tris | Sanus (lava), Extroma (volcanic), Varnisol (pines and lakes), Xero (ice moon), **Big Water** (an ocean with no land at all — sink to the sand floor) |
+| Tris | Sanus (lava), Extroma (volcanic), Varnisol (pines and lakes), Xero (ice moon), **Undros** (an ocean with no land at all — sink to the sand floor) |
 | Elsewhere | TIN 618, a black hole that broadcasts radio and eats the unwary; Harold, the tired rock beside it; and at least one wanderer that appears on no map |
 
 ![Earth](docs/shots/earth.png)
 ![Harold and the black hole](docs/shots/black_hole_harold.png)
-![Big Water](docs/shots/big_water.png)
+![Undros](docs/shots/big_water.png)
 ![Datamosh](docs/shots/datamosh.png)
 
 ## BIG COMPUTER

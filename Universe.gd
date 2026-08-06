@@ -88,10 +88,10 @@ func _ready() -> void:
 	_def("Varnisol", TC + Vector3(-3050, 1350, 1750), 100.0, 9.0, "varnisol", Color("#3f8f3a"))
 	# --- Xero: Varnisol's ice moon. Light blue, cold, quietly beautiful. ---
 	_def("Xero",     TC + Vector3(-3050, 1500, 2390), 60.0, 5.0,  "ice",      Color("#6ec2ff"))
-	# --- Big Water: the Tris system's ocean world, out past Varnisol.
+	# --- Undros: the Tris system's ocean world, out past Varnisol.
 	# ALL water, no land -- you sink through the whole ocean until the
 	# sand floor catches you. The blue monolith waits down there. ---
-	_def("Big Water", TC + Vector3(-4900, -1750, 3050), 110.0, 8.5, "ocean", Color("#1a5fae"))
+	_def("Undros",   TC + Vector3(-4900, -1750, 3050), 110.0, 8.5, "ocean", Color("#1a5fae"))
 	# --- the rogue: a pale wanderer between the systems. On no map, on
 	# no locator. The white monolith's planet. ---
 	var rog := _def_ret("Palewander", Vector3(21000, 14500, 30500), 64.0, 7.0,
