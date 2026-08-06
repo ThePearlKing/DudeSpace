@@ -301,7 +301,6 @@ const TIPS := [
 	"tip: the stele on Harold accepts exactly one shape. the lab on Big Computer keeps one.",
 	"tip: Big Computer's atrium has a map dispenser. the map dies if it leaves the planet.",
 	"tip: glowing seams on crates mean OPENABLE. the facility pays explorers.",
-	"tip: the vents on Big Computer connect more rooms than the hallways do.",
 	"tip: airlocks glow blue from the void side. jetpack required, honesty included.",
 	"tip: capacitors report net EU/s. negative means your base is bleeding.",
 	"tip: the Zapper fires twenty zaps a second. the math works out.",
