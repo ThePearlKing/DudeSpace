@@ -89,14 +89,6 @@ class _NavView extends Control:
 			"SPD  %6.1f m/s" % rocket.vel.length(),
 			"ALT  %8.0f  (%s)" % [alt, body.name],
 		]
-		# engine readouts stack ABOVE the fuel line: hyper, nuclear, fuel
-		if rocket.hyperdrive:
-			lines.append("HYPR %5.1f / %.0f ultima" % [rocket.hyper_charge,
-				rocket.HYPER_MAX] if rocket.hyper_charge > 0.0
-				or Inventory.res_count("ultima") > 0
-				else "HYPR INACTIVE -- no ultima")
-		if rocket.nuclear:
-			lines.append("NUCL ONLINE")
 		lines.append("FUEL %6.1f / %.0f" % [Inventory.fuel, cap])
 		lines.append("RCS  ON")
 		var y := c.y - rn - 10.0
@@ -139,6 +131,28 @@ class _NavView extends Control:
 		draw_rect(Rect2(bx, by, bw, 16), Color(0, 0, 0, 0.5))
 		var f := clampf(Inventory.fuel / maxf(1.0, cap), 0, 1)
 		draw_rect(Rect2(bx + 2, by + 2, (bw - 4) * f, 12), Color("#ffd166"))
+		# stacked above it: the ULTIMA bar (hyperdrive charge), and a
+		# green NUCLEAR status strip when that engine is aboard
+		var sy9 := by
+		if rocket.hyperdrive:
+			sy9 -= 22.0
+			draw_rect(Rect2(bx, sy9, bw, 16), Color(0, 0, 0, 0.5))
+			if Game.inf_fuel:
+				draw_rect(Rect2(bx + 2, sy9 + 2, bw - 4, 12), Color("#c86bff"))
+				draw_string(font, Vector2(bx + bw * 0.5 - 14, sy9 + 13),
+					"INF", HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+					Color(0.1, 0.05, 0.15))
+			else:
+				var hq := clampf(rocket.hyper_charge / rocket.HYPER_MAX, 0, 1)
+				draw_rect(Rect2(bx + 2, sy9 + 2, (bw - 4) * hq, 12),
+					Color("#c86bff"))
+				if hq <= 0.0 and Inventory.res_count("ultima") == 0:
+					draw_rect(Rect2(bx, sy9, bw, 16), Color(1, 0.25, 0.25, 0.6),
+						false, 1.0)
+		if rocket.nuclear:
+			sy9 -= 10.0
+			draw_rect(Rect2(bx, sy9, bw, 6), Color(0, 0, 0, 0.5))
+			draw_rect(Rect2(bx + 1, sy9 + 1, bw - 2, 4), Color("#5aff3a"))
 
 		# tutorial: colour-keyed legend explaining every instrument
 		if Game.tutorial_session:
