@@ -94,6 +94,9 @@ func depart() -> void:
 	_departing = true
 
 func _process(delta: float) -> void:
+	if global_position.length() > Universe.BOUNDARY - 250.0:
+		global_position = global_position.normalized() \
+			* (Universe.BOUNDARY - 250.0)
 	_t += delta
 	if _p == null or not is_instance_valid(_p):
 		_p = get_tree().get_first_node_in_group("player")

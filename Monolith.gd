@@ -32,6 +32,8 @@ render_mode unshaded, cull_front;
 uniform vec3 ccol = vec3(1.0, 0.82, 0.25);
 uniform float intensity = 0.3;   // stage density: more cracks each link
 uniform float fade = 0.0;
+uniform float speed = 0.35;      // how fast the fracture web writhes
+uniform float boost = 1.0;       // finale multiplier: brighter, denser
 vec2 h2(vec2 p){
 	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
 		dot(p, vec2(269.5, 183.3)))) * 43758.5453);
@@ -47,7 +49,10 @@ void fragment(){
 	vec2 uv = UV * vec2(14.0, 7.0);
 	// JAGGED: warp the domain hard at two scales so edges kink and
 	// branch like real fracture lines, not smooth cell walls
-	uv += vec2(vn2(uv * 3.1), vn2(uv * 3.1 + 7.7)) * 0.9 - 0.45;
+	// the web WRITHES: the warp field itself drifts, so crack lines
+	// creep and re-branch instead of sitting painted on the sky
+	uv += vec2(vn2(uv * 3.1 + TIME * speed * 0.05),
+		vn2(uv * 3.1 + 7.7 - TIME * speed * 0.045)) * 0.9 - 0.45;
 	uv += vec2(vn2(uv * 9.0), vn2(uv * 9.0 + 3.3)) * 0.25 - 0.125;
 	vec2 i = floor(uv);
 	vec2 f = fract(uv);
@@ -69,11 +74,12 @@ void fragment(){
 	// PROCEDURAL density: each fracture line exists only if its cell
 	// rolls under the stage's intensity -- early links crack sparsely,
 	// the seventh is a spiderweb
-	float exists = step(h2(cell1 + 5.5).x, intensity);
-	float flick = 0.75 + 0.25 * sin(TIME * 7.0 + h2(cell1).x * 40.0);
+	float exists = step(h2(cell1 + 5.5).x, intensity * boost);
+	float flick = 0.75 + 0.25 * sin(TIME * (7.0 + boost * 2.0) + h2(cell1).x * 40.0);
 	ALBEDO = ccol;
-	EMISSION = ccol * (crack * 2.6 + glow9 * 0.35) * exists * fade * flick;
-	ALPHA = clamp((crack * 0.95 + glow9 * 0.18) * exists * fade, 0.0, 1.0);
+	EMISSION = ccol * (crack * 2.6 + glow9 * 0.35) * exists * fade * flick * boost;
+	ALPHA = clamp((crack * 0.95 + glow9 * 0.18) * exists * fade
+		* min(boost, 1.6), 0.0, 1.0);
 }
 """
 	return _crack_sh

@@ -929,7 +929,42 @@ func mono_sky_demo(stage: int) -> void:
 ## THE SHATTER: the boundary breaks. White flash, then the sky-shell
 ## bursts into giant glass shards that tumble inward and fade. The
 ## eighth activation's finale -- previewable from the cheat menu.
+var _shatter_seq := false
+
 func sky_shatter() -> void:
+	# PHASE 1 -- THE BUILD-UP. The lattice stays hidden until the blast.
+	_shatter_seq = true
+	if _boundary_mesh != null:
+		_boundary_mesh.visible = false
+	var ckm := sky_show(Color(1.0, 0.97, 0.9), 7, false)
+	Sfx.play("nuke", -30.0)
+	var esc := create_tween()
+	_sky_tweens.append(esc)
+	esc.tween_method(func(v: float) -> void:
+		if ckm != null:
+			ckm.set_shader_parameter("boost", 1.0 + 2.6 * v * v)
+			ckm.set_shader_parameter("speed", 0.35 + 5.0 * v * v),
+		0.0, 1.0, 17.0)
+	if _skyfx.size() > 0:
+		# the shard sky spins up from a drift to a churn
+		var shell9: Node3D = _skyfx.back()
+		var acc := create_tween()
+		_sky_tweens.append(acc)
+		acc.tween_property(shell9, "rotation:y", TAU * 1.5, 17.0) \
+			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	var boom := create_tween()
+	boom.tween_interval(6.0)
+	boom.tween_callback(func() -> void: Sfx.play("nuke", -22.0))
+	boom.tween_interval(5.0)
+	boom.tween_callback(func() -> void: Sfx.play("nuke", -15.0))
+	boom.tween_interval(3.5)
+	boom.tween_callback(func() -> void: Sfx.play("nuke", -11.0))
+	var det := create_tween()
+	det.tween_interval(17.0)
+	det.tween_callback(_sky_detonate)
+
+func _sky_detonate() -> void:
+	_shatter_seq = false
 	mono_sky_clear()
 	var flash := CanvasLayer.new()
 	flash.layer = 60
@@ -947,6 +982,28 @@ func sky_shatter() -> void:
 	# the sound of a universe losing its lid: the full nuke waveform,
 	# sub punch and rolling rumble, at full voice
 	Sfx.play("nuke", -8.0)
+	# the ECHO: the same blast rolling back off everything, three times,
+	# quieter each return -- and when the roar dies, the choir of the
+	# OUTSIDE, heard through the new hole where the sky used to be
+	var ech := create_tween()
+	ech.tween_interval(1.3)
+	ech.tween_callback(func() -> void: Sfx.play("nuke", -17.0))
+	ech.tween_interval(1.5)
+	ech.tween_callback(func() -> void: Sfx.play("nuke", -24.0))
+	ech.tween_interval(1.7)
+	ech.tween_callback(func() -> void: Sfx.play("nuke", -30.0))
+	ech.tween_interval(1.0)
+	ech.tween_callback(func() -> void:
+		var gp := AudioStreamPlayer.new()
+		gp.stream = _void_ambience()
+		gp.volume_db = -40.0
+		add_child(gp)
+		gp.play()
+		var gtw := create_tween()
+		gtw.tween_property(gp, "volume_db", -5.0, 4.0)
+		gtw.tween_interval(8.0)
+		gtw.tween_property(gp, "volume_db", -44.0, 6.0)
+		gtw.tween_callback(gp.queue_free))
 	# and out of the wreckage, the dying scaffold FADES IN -- the bars
 	# were always there; now you get to see them
 	if _boundary_mesh != null:
@@ -1009,7 +1066,7 @@ func sky_shatter() -> void:
 		if is_instance_valid(shroot):
 			shroot.queue_free())
 
-func sky_show(col: Color, stage: int, linger: bool) -> void:
+func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 	mono_sky_clear()
 	# CRACKS: a dome at cosmic distance, always around you
 	var crack := MeshInstance3D.new()
@@ -1032,55 +1089,82 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 	add_child(crack)
 	crack.global_position = Vector3.ZERO
 	var cktw := create_tween()
+	_sky_tweens.append(cktw)
 	cktw.tween_method(func(v: float) -> void:
 		if is_instance_valid(crack):
 			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 2.5)
-	# TRIANGLES: two counter-wheeling shells of colossal tetrahedra at
-	# sky distance, breathing light
+	# SHATTERED GLASS: pieces of the universe's own boundary shaken
+	# loose -- wire triangles exactly like the edge-of-the-universe
+	# plates, but in the piece's color, tilted off the shell, DRIFTING
+	# and tumbling. More pieces every link.
 	var skyp := Node3D.new()
 	skyp.add_to_group("mono_sky")
 	add_child(skyp)
+	skyp.global_position = Vector3.ZERO
 	_skyfx.append(skyp)
 	var tris: Array = []
-	for shell in 2:
-		var n9 := 36 if shell == 0 else 20
-		var rad9 := 21000.0 if shell == 0 else 14500.0
-		var size9 := 900.0 if shell == 0 else 520.0
-		var host := skyp if shell == 0 else Node3D.new()
-		if shell == 1:
-			skyp.add_child(host)
-			var ctw := create_tween().set_loops()
-			_sky_tweens.append(ctw)
-			ctw.tween_property(host, "rotation:y", -TAU, 300.0).as_relative()
-		for i in n9:
-			var t9 := MeshInstance3D.new()
-			t9.mesh = MainframeComplex._tetra_mesh(
-				size9 + size9 * 0.7 * fmod(float(i) * 0.618, 1.0))
-			var tmat := StandardMaterial3D.new()
-			tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			tmat.albedo_color = col if shell == 0 else col.lightened(0.3)
-			tmat.emission_enabled = true
-			tmat.emission = col
-			t9.material_override = tmat
-			t9.extra_cull_margin = 16384.0
-			host.add_child(t9)
-			var ph := TAU * float(i) / float(n9)
-			var lat := -0.85 + 1.7 * fmod(float(i) * 0.382, 1.0)
-			t9.position = Vector3(cos(ph) * cos(lat), sin(lat),
-				sin(ph) * cos(lat)) * rad9
-			tris.append(t9)
-			var st9 := create_tween().set_loops()
-			_sky_tweens.append(st9)
-			st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0),
-				11.0 + 3.0 * fmod(float(i) * 0.7, 1.0)).as_relative()
-			var brt := create_tween().set_loops()
-			_sky_tweens.append(brt)
-			brt.tween_property(tmat, "emission_energy_multiplier", 2.2,
-				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)).from(0.6) \
-				.set_trans(Tween.TRANS_SINE)
-			brt.tween_property(tmat, "emission_energy_multiplier", 0.6,
-				1.7 + 0.9 * fmod(float(i) * 0.53, 1.0)) \
-				.set_trans(Tween.TRANS_SINE)
+	var rngs := RandomNumberGenerator.new()
+	rngs.seed = 991 + stage * 31
+	var nplates := 26 + 12 * stage
+	var srad := Universe.BOUNDARY - 3000.0
+	var side := Universe.BOUNDARY * 0.048
+	var rim_mat := StandardMaterial3D.new()
+	rim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rim_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rim_mat.albedo_color = Color(col.r, col.g, col.b, 0.34)
+	rim_mat.emission_enabled = true
+	rim_mat.emission = col
+	rim_mat.emission_energy_multiplier = 1.5
+	rim_mat.render_priority = -4
+	for i in nplates:
+		var ky := 1.0 - 2.0 * (float(i) + 0.5) / float(nplates)
+		var kr := sqrt(maxf(0.0, 1.0 - ky * ky))
+		var kphi := PI * (1.0 + sqrt(5.0)) * float(i)
+		var dir9 := Vector3(cos(kphi) * kr, ky, sin(kphi) * kr)
+		var tx := dir9.cross(Vector3(0, 1, 0))
+		if tx.length() < 0.01:
+			tx = dir9.cross(Vector3(1, 0, 0))
+		tx = tx.normalized()
+		var tz := tx.cross(dir9).normalized()
+		var plate := Node3D.new()
+		skyp.add_child(plate)
+		plate.position = dir9 * srad
+		plate.transform.basis = Basis(tx, dir9, tz).orthonormalized()
+		plate.rotate_object_local(Vector3(0, 1, 0), rngs.randf() * TAU)
+		plate.rotate_object_local(Vector3(1, 0, 0),
+			deg_to_rad(rngs.randf_range(4.0, 34.0))
+			* (-1.0 if rngs.randf() < 0.65 else 1.0))
+		var s9 := side * rngs.randf_range(0.55, 1.25)
+		for e9 in 3:
+			var va := Vector3(cos(TAU * (float(e9) + 0.25) / 3.0), 0,
+				sin(TAU * (float(e9) + 0.25) / 3.0)) * s9 * 0.577
+			var vb := Vector3(cos(TAU * (float(e9) + 1.25) / 3.0), 0,
+				sin(TAU * (float(e9) + 1.25) / 3.0)) * s9 * 0.577
+			var ed := MeshInstance3D.new()
+			var em9 := BoxMesh.new()
+			em9.size = Vector3(va.distance_to(vb) * 1.02, s9 * 0.02, s9 * 0.02)
+			ed.mesh = em9
+			ed.material_override = rim_mat
+			ed.extra_cull_margin = 16384.0
+			plate.add_child(ed)
+			ed.position = (va + vb) * 0.5
+			ed.rotation.y = -atan2((vb - va).z, (vb - va).x)
+		tris.append(plate)
+		var tum := create_tween().set_loops()
+		_sky_tweens.append(tum)
+		tum.tween_property(plate, "rotation",
+			Vector3(TAU * rngs.randf_range(0.1, 0.35),
+				TAU * rngs.randf_range(0.15, 0.5),
+				TAU * rngs.randf_range(0.05, 0.25)),
+			70.0 + 90.0 * rngs.randf()).as_relative()
+		var drf := create_tween().set_loops()
+		_sky_tweens.append(drf)
+		var dv := (tx * rngs.randf_range(-0.4, 0.4)
+			+ tz * rngs.randf_range(-0.4, 0.4)) * side
+		drf.tween_property(plate, "position", dv, 45.0 + 60.0 * rngs.randf()) \
+			.as_relative().set_trans(Tween.TRANS_SINE)
+		drf.tween_property(plate, "position", -dv, 45.0 + 60.0 * rngs.randf()) \
+			.as_relative().set_trans(Tween.TRANS_SINE)
 	var wheel := create_tween().set_loops()
 	_sky_tweens.append(wheel)
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
@@ -1088,9 +1172,11 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 	var hold := 26.0 if linger else 4.0
 	var fade9 := 360.0 if linger else 24.0
 	var life := create_tween()
+	_sky_tweens.append(life)
 	life.tween_interval(hold)
 	life.tween_callback(func() -> void:
 		var f2 := create_tween()
+		_sky_tweens.append(f2)
 		f2.tween_method(func(v: float) -> void:
 			if is_instance_valid(crack):
 				ckmat.set_shader_parameter("fade", v), 1.0, 0.0, fade9)
@@ -1111,6 +1197,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 		if is_instance_valid(skyp):
 			skyp.queue_free()
 		_skyfx.clear())
+	return ckmat
 
 ## The EDGE OF THE UNIVERSE, visible when you get close: a red warning
 ## lattice that fades in over the last 2km before the god throws you
@@ -2267,7 +2354,7 @@ func _process(delta: float) -> void:
 			elif gd < b.radius:
 				Game.hurt(22.0 * delta, false, str(b.name) + "'s clouds")
 		for r in get_tree().get_nodes_in_group("rocket"):
-			if r is Rocket and is_instance_valid(r) \
+			if r is Rocket and is_instance_valid(r) and not r.piloted \
 					and r.global_position.distance_to(b.center) < b.radius * 0.75:
 				Destructible.spawn_debris(self, r.global_position,
 					Vector3(1.6, 3.0, 1.6), Color("#d8d8e0"), Vector3.UP)
@@ -2388,6 +2475,11 @@ func _notification(what: int) -> void:
 		Save.save_progress()
 
 func _active_node() -> Node:
+	if Game.mode == Game.Mode.IN_ROCKET:
+		# the FLOWN ship, not whichever parked hull joined the group first
+		for r in get_tree().get_nodes_in_group("rocket"):
+			if r is Rocket and r.piloted:
+				return r
 	var g := "rocket" if Game.mode == Game.Mode.IN_ROCKET else "player"
 	return get_tree().get_first_node_in_group(g)
 
@@ -2419,15 +2511,18 @@ func _void_ambience() -> AudioStreamWAV:
 		for vp in [[110.0, 0.09], [165.0, 0.07], [220.0, 0.06], [275.0, 0.05]]:
 			var fq: float = vp[0]
 			var amp: float = vp[1]
+			# the detuned twin must land on an INTEGER cycle count per
+			# loop or the seam clicks -- quantize it to the loop length
+			var fq2: float = round(fq * 1.006 * secs) / secs
 			var breathe := 0.6 + 0.4 * sin(TAU * ts / 14.0
 				+ fq * 0.013)
-			v += (sin(TAU * fq * ts) + sin(TAU * fq * 1.006 * ts)) \
+			v += (sin(TAU * fq * ts) + sin(TAU * fq2 * ts)) \
 				* amp * 0.5 * breathe
 		# the sub swell: the void inhaling
-		v += 0.10 * sin(TAU * 41.25 * ts) * (0.5 + 0.5 * sin(TAU * ts / 7.0))
+		v += 0.10 * sin(TAU * (578.0 / secs) * ts) * (0.5 + 0.5 * sin(TAU * ts / 7.0))
 		# silver shimmer, barely there
-		v += 0.018 * sin(TAU * 1760.0 * ts + 3.0 * sin(TAU * ts / 5.0)) \
-			* (0.5 + 0.5 * sin(TAU * ts / 9.0 + 2.0))
+		v += 0.018 * sin(TAU * 1760.0 * ts + 3.0 * sin(TAU * ts / 7.0)) \
+			* (0.5 + 0.5 * sin(TAU * ts / 7.0 + 2.0))
 		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
 		data[i * 2] = s9 & 0xFF
 		data[i * 2 + 1] = (s9 >> 8) & 0xFF
@@ -5130,6 +5225,8 @@ var _stalker_cd := 0.0
 ## The stalker-thulhus answer wrath. Above 40 they gather (three of
 ## them, one at a time); below 25 they fold away. They only ever watch.
 var _stalker_scan_t := 0.0
+var _big_cd := 0.0
+var _big_seen := false
 
 func _update_stalkers(delta: float) -> void:
 	if Game.tutorial_session or Game.dead:
@@ -5153,10 +5250,18 @@ func _update_stalkers(delta: float) -> void:
 			if st9.has_method("depart"):
 				st9.depart()
 		return
+	var bigs9 := get_tree().get_nodes_in_group("big_stalker")
+	if bigs9.is_empty():
+		if _big_seen:
+			_big_seen = false
+			_big_cd = 240.0
+	else:
+		_big_seen = true
+	_big_cd = maxf(0.0, _big_cd - 0.5)
 	if Game.wrath >= 55.0:
-		# deep wrath: the BIG one surfaces (one at a time is plenty)
-		if get_tree().get_nodes_in_group("big_stalker").is_empty() \
-				and _player != null:
+		# deep wrath: the BIG one surfaces (one at a time is plenty),
+		# and a slain one stays dead four minutes before another comes
+		if bigs9.is_empty() and _big_cd <= 0.0 and _player != null:
 			var big := BigStalker.new()
 			add_child(big)
 			var upB: Vector3 = _player.global_transform.basis.y
@@ -6427,13 +6532,7 @@ func _monolith_snap() -> void:
 
 func _on_monolith_advanced() -> void:
 	if _boundary_mesh != null:
-		_boundary_mesh.visible = Game.monolith_stage >= 8
-	# THE UNIVERSE FROM OUTSIDE: a ball of night. Front faces only, so
-	# it is invisible from within -- but stand in the white void and
-	# look back, and there it is: black, full of stars, everything you
-	# know inside it.
-# (night veil removed -- the star ball + white shell do this with
-	# real geometry now)
+		_boundary_mesh.visible = Game.monolith_stage >= 8 and not _shatter_seq
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
 			and not _earth_monolith.risen:
 		_earth_monolith.rise()

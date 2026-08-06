@@ -7,7 +7,7 @@ extends StaticBody3D
 ## Unlike the old god-event, this one is a creature: it hunts at deep
 ## wrath, it hurts, and enough firepower drops it.
 
-var hp := 400.0
+var hp := 4000.0
 var _t := 0.0
 var _phase := 0.0
 var _tents: Array = []
@@ -90,15 +90,16 @@ func _build() -> void:
 	for i in 10:
 		var ang := TAU * float(i) / 10.0
 		var root := Node3D.new()
-		root.position = Vector3(cos(ang) * 38.0 * SIZE, -35.0 * SIZE,
-			sin(ang) * 38.0 * SIZE)
+		root.position = Vector3(cos(ang) * 16.0 * SIZE, -22.0 * SIZE,
+			sin(ang) * 16.0 * SIZE)
 		add_child(root)
+		root.rotate(Vector3(-sin(ang), 0, cos(ang)).normalized(), 0.42)
 		var segs: Array = [root]
 		var parent: Node3D = root
 		for k in 6:
 			var seg := Node3D.new()
 			parent.add_child(seg)
-			seg.position = Vector3(0, -30.0 * SIZE, 0)
+			seg.position = Vector3(0, (-12.0 if k == 0 else -30.0) * SIZE, 0)
 			var mi := MeshInstance3D.new()
 			var sm := CylinderMesh.new()
 			sm.top_radius = (6.5 - float(k) * 0.85) * SIZE
@@ -140,6 +141,10 @@ func take_damage(d: float, _from: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	# nothing this holy leaves the universe
+	if global_position.length() > Universe.BOUNDARY - 250.0:
+		global_position = global_position.normalized() \
+			* (Universe.BOUNDARY - 250.0)
 	if _departing:
 		scale = scale * maxf(0.0, 1.0 - delta * 1.1)
 		if scale.x < 0.04:

@@ -1153,7 +1153,9 @@ func _physics_process(delta: float) -> void:
 		if can_input and Input.is_key_pressed(KEY_SPACE):
 			v_up = JUMP_VEL              # fixed launch -> low gravity jumps higher
 		v_up -= _g * delta
-		velocity = wish * WALK_SPEED + up * v_up
+		var spd9 := WALK_SPEED \
+			* (1.35 if Game.playtime < Game.suit_boost_until else 1.0)
+		velocity = wish * spd9 + up * v_up
 	elif Game.underwater:
 		# SWIMMING: the water carries you. Heavy drag, a slow sink,
 		# Space strokes up, C strokes down, WASD swims -- no jetpack

@@ -39,6 +39,10 @@ var _drones: Array = []
 var _blinks: Array = []
 var _fish: Array = []
 var _spins: Array = []
+var _algates: Array = []   # airlock no-go volumes (AABB), claimed at build
+var _nogo_on := false      # true while the late networks are being laid
+var _gate_skips := 0       # boxes the airlock gates rejected (want ZERO)
+var _cur_run := ""         # which network run is being laid (diagnostics)
 var _pulses: Array = []      # {mat, phase} pulsing emissive columns
 var _core_discs: Array = []  # rising energy discs inside the core sleeve
 var _arcs: Array = []        # flickering lightning bolts around the heart
@@ -468,7 +472,8 @@ void fragment(){
 			[Vector3(6.0, shln, 0.5), Vector3(0, 0, 3.0)],
 			[Vector3(6.0, shln, 0.5), Vector3(0, 0, -3.0)]]:
 		_plate(sspec[0], shxf, sspec[1], DARK, 0.0)
-	for gsx in [Vector3(2.9, 0, 2.9), Vector3(-2.9, 0, -2.9)]:
+	for gsx in [Vector3(2.9, 0, 2.9), Vector3(-2.9, 0, -2.9),
+			Vector3(2.9, 0, -2.9), Vector3(-2.9, 0, 2.9)]:
 		var gs := MeshInstance3D.new()
 		var gm := BoxMesh.new()
 		gm.size = Vector3(0.12, shln, 0.12)
@@ -477,6 +482,30 @@ void fragment(){
 		add_child(gs)
 		gs.global_transform = shxf
 		gs.translate_object_local(gsx)
+	# glow hoops up the whole throat: look up from the atrium and the
+	# way OUT is unmistakably open, ring after lit ring to the sky
+	var nh9 := int(shln / 6.0)
+	for hi9 in nh9:
+		var hy9 := -shln * 0.5 + 3.0 + 6.0 * float(hi9)
+		for hs9 in [[Vector3(5.7, 0.1, 0.1), Vector3(0, hy9, 2.86)],
+				[Vector3(5.7, 0.1, 0.1), Vector3(0, hy9, -2.86)],
+				[Vector3(0.1, 0.1, 5.7), Vector3(2.86, hy9, 0)],
+				[Vector3(0.1, 0.1, 5.7), Vector3(-2.86, hy9, 0)]]:
+			var hg9 := MeshInstance3D.new()
+			var hgm9 := BoxMesh.new()
+			hgm9.size = hs9[0] as Vector3
+			hg9.mesh = hgm9
+			hg9.material_override = _femissive(AMBER, 2.2)
+			add_child(hg9)
+			hg9.global_transform = shxf
+			hg9.translate_object_local(hs9[1] as Vector3)
+	var shl9 := OmniLight3D.new()
+	shl9.light_color = AMBER
+	shl9.omni_range = 14.0
+	shl9.light_energy = 1.4
+	add_child(shl9)
+	shl9.global_transform = shxf
+	shl9.translate_object_local(Vector3(0, -shln * 0.5 + 4.0, 0))
 
 	# ---- atrium ----
 	# floor in three ARC STRIPS like the deck: flat plates meeting the
@@ -1053,12 +1082,34 @@ void fragment(){
 	bpan.material_override = _femissive(AMBER.darkened(0.1), 1.6)
 	add_child(bpan)
 	bpan.global_transform = Transform3D(
-		bthb * Basis(Vector3(0, 0, 1), 0.5), _C + bthd * (_rF + 1.25))
+		bthb * Basis(Vector3(1, 0, 0), 0.5), _C + bthd * (_rF + 1.25))
 	bpan.translate_object_local(Vector3(0, 0, 1.4))
 	_sign("CONTROL BOOTH", bthb, _C + bthd * (_rF + 4.1),
 		Vector3(0, 0, -1.0), 0.0)
 	_sign("REACTOR CORE", cb, _C + cup * (_rF + 6.4),
 		Vector3(0, 0, -14.4), 0.0)
+	# the CORE READOUT: facility power in digits meters tall, readable
+	# from clean across the cavern. Amber while healthy, red when dying.
+	_power_lbl = Label3D.new()
+	_power_lbl.text = "----"
+	_power_lbl.font_size = 320
+	_power_lbl.pixel_size = 0.012
+	_power_lbl.modulate = AMBER
+	_power_lbl.outline_size = 26
+	_power_lbl.outline_modulate = Color(0, 0, 0, 0.95)
+	add_child(_power_lbl)
+	var plx := Transform3D(cb, _C + cup * (_rF + 10.2))
+	plx = plx.translated_local(Vector3(0, 0, -14.3))
+	_power_lbl.global_transform = plx
+	var plb := Label3D.new()
+	plb.text = "CORE POWER"
+	plb.font_size = 64
+	plb.pixel_size = 0.012
+	plb.modulate = AMBER.darkened(0.25)
+	plb.outline_size = 12
+	plb.outline_modulate = Color(0, 0, 0, 0.95)
+	add_child(plb)
+	plb.global_transform = plx.translated_local(Vector3(0, 2.6, 0))
 	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 3.9),
 		Vector3(14.6, 0, 0), -90.0)
 	_sign("CONTROL DECK / ATRIUM", cb, _C + cup * (_rF + 7.6),
@@ -1078,7 +1129,12 @@ void fragment(){
 	# ---- LAST, once every room exists: the secret networks, laid
 	# through the space that provably nobody else is using ----
 	_networks()
+	_nogo_on = false
+	if OS.get_environment("CTD_TEST") != "":
+		print("MFTEST gate skips: ", _gate_skips,
+			"  (0 = no vent crosses an airlock)")
 	_stashes()
+	call_deferred("_snap_services")
 	# exterior REPAIR BOXES -- the hull grows four maintenance points,
 	# each tied to a system that can fault. Jetpack out, 2 iridium in.
 	_fault_box("elevator", _C + _u0 * (_rF - 1.1),
@@ -1097,10 +1153,11 @@ void fragment(){
 		Vector3(-8.3, 0, 3.4), "heal", "MEDBAY: FULL HEAL", Color("#66ff99"))
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
-		Vector3(-8.1, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
+		Vector3(-9.6, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
-		Vector3(-8.1, 0, 3.2), "feed", "FEED REACTOR: COAL 120s / URANIUM 300s",
+		Vector3(-9.6, 0, 3.2), "feed",
+		"FEED REACTOR: COAL +90 / URANIUM +300 POWER",
 		Color("#ff6a4a"))
 	_svc_node(Transform3D(_abas9(1, 4.0), _C + _aup9(1, 4.0) * _rF),
 		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER -> 1 NOODLE",
@@ -1110,7 +1167,7 @@ void fragment(){
 		Vector3(0, 0, -3.4), "charts", "STAR CHARTS: THE HIDDEN WORLDS",
 		Color("#7df9ff"))
 	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
-		Vector3(-4.4, 0, 3.2), "sync", "A.I. SYNC: +10% SELL. FOREVER",
+		Vector3(-4.4, 0, 3.2), "sync", "A.I. SYNC: 150 POWER. +10% SELL FOREVER",
 		Color("#2bff6a"))
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
@@ -1511,6 +1568,9 @@ func _rings() -> void:
 	_vp["tape"] = tr["vents"]
 	_vp["farm"] = nf["vents"]
 	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.", [[5, -1.0]])
+	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
+		Vector3(3.4, 0, 3.4), "bounty",
+		"A.I. CONTRACTS: HAUL FOR COINS", Color("#66ff99"))
 	set_meta("ai_room_a", 2.685)
 	_dress_ai()
 	_e_pts["ai"] = Transform3D(_fr(2.8033), _C + _pdir(2.8033) * (_rF - 0.25))\
@@ -3058,6 +3118,9 @@ func _service_wing() -> void:
 			Transform3D(hb2, _C + hup2 * (_rF + 8.85)), Vector3(lb2, 0, 3.0),
 			Color("#f2ead8"), 2.2)
 	_sign("ASSEMBLY", hb2, _C + hup2 * (_rF + 6.4), Vector3(0, 0, 6.9), 180.0)
+	_svc_node(Transform3D(hb2, _C + hup2 * _rF),
+		Vector3(4.6, 0, 4.2), "print",
+		"FABRICATOR: PARTS PACK. 60 POWER", Color("#7df9ff"))
 	_sign("GENERATOR", hb2, _C + hup2 * (_rF + 4.6), Vector3(0, 0, -6.9), 0.0)
 	_chatter(Transform3D(hb2, _C + hup2 * (_rF + 2.0)).origin, 31, -10.0)
 	# GENERATOR HALL
@@ -3118,6 +3181,9 @@ func _service_wing() -> void:
 		_deco_box(Vector3(0.18, 1.6, 0.18),
 			Transform3D(gb2, _C + gup2 * (_rF + 6.9)), poff, Color("#4a5266"), 0.0)
 	_sign("GENERATOR HALL", gb2, _C + gup2 * (_rF + 5.6), Vector3(0, 0, 8.0), 180.0)
+	_svc_node(Transform3D(gb2, _C + gup2 * _rF),
+		Vector3(5.2, 0, 4.6), "boost",
+		"SUIT OVERCLOCK: 5 MIN FAST LEGS. 40 POWER", Color("#b388ff"))
 	_chatter(Transform3D(gb2, _C + gup2 * (_rF + 2.0)).origin, 47, -8.0)
 
 ## ---- COMMUNICATIONS: the interuniverse radio. Physical buttons, a
@@ -3136,6 +3202,7 @@ var _radio_idx := 0
 var _radio_cool := 0.0
 var _radio_sp: AudioStreamPlayer3D = null
 var _radio_lbl: Label3D = null
+var _power_lbl: Label3D = null
 var _radio_smat: ShaderMaterial = null
 var _radio_streams: Array = []
 const RADIO_NAMES := ["CHANNEL 1", "CHANNEL 2", "CHANNEL 3", "CHANNEL 4"]
@@ -3165,7 +3232,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	sfr.material_override = _femissive(AMBER, 1.3)
 	add_child(sfr)
 	sfr.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.4))
-	sfr.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+	sfr.rotate_object_local(Vector3(0, 0, 1), -PI * 0.5)
 	sfr.translate_object_local(Vector3(0, 5.72, 0))
 	var scr9 := MeshInstance3D.new()
 	var sqm := QuadMesh.new()
@@ -3190,13 +3257,13 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	dial.material_override = _femissive(AMBER, 1.5)
 	add_child(dial)
 	dial.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.1))
-	dial.translate_object_local(Vector3(2.6, 0, 0))
+	dial.translate_object_local(Vector3(2.6, 0, -2.05))
 	_spins.append({"node": dial, "rate": 0.8})
 	# THE TUNER: three real F-buttons -- POWER, tune LEFT, tune RIGHT.
 	# POWER stays dark until the radio is actually on.
 	for btn in [[Vector3(2.6, 0, 1.7), Color("#ff4444"), 0, "POWER"],
-			[Vector3(2.6, 0, 0.2), Color("#ffb000"), 1, "<"],
-			[Vector3(2.6, 0, -0.9), Color("#ffb000"), 2, ">"]]:
+			[Vector3(2.6, 0, -0.9), Color("#ffb000"), 1, "<"],
+			[Vector3(2.6, 0, 0.2), Color("#ffb000"), 2, ">"]]:
 		var mode: int = int(btn[2])
 		var rb := RadioBtn.new()
 		rb.host = self
@@ -4063,6 +4130,34 @@ func _vent_stub(A: Dictionary) -> Vector3:
 	_plate(Vector3(0.4, 3.3, ln + 0.9), xf, Vector3(-1.5, 1.3, 0), STEEL, 0.0)
 	_deco_box(Vector3(0.05, 0.1, ln), xf, Vector3(1.28, 0.6, 0),
 		Color("#66ff99"), 1.1)
+	# EVERY vent door gets its fan: ring + four blades turning in the
+	# throat of the stub, same rig as the atrium duct's
+	var fring := MeshInstance3D.new()
+	var frm9 := TorusMesh.new()
+	frm9.inner_radius = 0.95
+	frm9.outer_radius = 1.08
+	fring.mesh = frm9
+	fring.material_override = Surfaces.metal(STEEL)
+	add_child(fring)
+	fring.global_transform = xf
+	fring.translate_object_local(Vector3(0, 1.3, 0))
+	fring.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	var fhub := Node3D.new()
+	add_child(fhub)
+	fhub.global_transform = xf
+	fhub.translate_object_local(Vector3(0, 1.3, 0))
+	fhub.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	for fbl in 4:
+		var fblade := MeshInstance3D.new()
+		var fbm := BoxMesh.new()
+		fbm.size = Vector3(0.9, 0.05, 0.24)
+		fblade.mesh = fbm
+		fblade.rotation_degrees = Vector3(0, 90.0 * float(fbl), 0)
+		fblade.position = Vector3.ZERO
+		fblade.translate_object_local(Vector3(0.55, 0, 0))
+		fblade.material_override = Surfaces.metal(Color("#2a3038"))
+		fhub.add_child(fblade)
+	_spins.append({"node": fhub, "rate": 4.0})
 	return p1 + (b9 * Vector3(0, 0, 1)) * ln
 
 func _vent_legs(A: Dictionary, band: float) -> Array:
@@ -4953,6 +5048,11 @@ func _airlock(xf: Transform3D) -> void:
 		alb.rotation_degrees = Vector3(0, float(als9[1]), 0)
 		root.add_child(alb)
 		alb.position = als9[0] as Vector3
+	# claim door + runway as NO-GO for everything built after us --
+	# stored as an ORIENTED box (AABB slop on these tilted frames was
+	# flagging tubes passing harmlessly underneath)
+	_algates.append({"inv": xf.affine_inverse(),
+		"lo": Vector3(-1.7, 0.05, -0.6), "hi": Vector3(1.7, 3.0, 8.3)})
 	# outside landing RUNWAY with GLOWING guard rails down both sides --
 	# the far end stays open: that is the jump
 	mk.call(Vector3(3.4, 0.4, 7.5), Vector3(0, -0.2, 4.05), STEEL, 0.0)
@@ -5011,16 +5111,47 @@ func _airlock(xf: Transform3D) -> void:
 class RoomService extends StaticBody3D:
 	var host = null
 	var kind: String = ""
+	var lbl: Label3D = null
 	func use() -> void:
 		if host != null:
 			host._service(kind)
 
 var _svc_cd: Dictionary = {}
+var _svcs: Array = []
+var _print_n := 0
+var _bounty_res := ""
+var _bounty_n := 0
+var _bounty_pay := 0
+var _bounty_i := -1
+const _BOUNTIES: Array = [["coal", 12, 90], ["wire", 8, 130],
+	["plantfiber", 10, 100], ["uranium", 3, 300], ["irid", 2, 380]]
+
+## drop every service pedestal onto the surface it actually stands on --
+## laid out by arithmetic, verified by raycast
+func _snap_services() -> void:
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var sp9 := get_world_3d().direct_space_state
+	for sv in _svcs:
+		if not is_instance_valid(sv):
+			continue
+		var up9: Vector3 = ((sv as Node3D).global_position - _C).normalized()
+		var q9 := PhysicsRayQueryParameters3D.create(
+			(sv as Node3D).global_position + up9 * 2.2,
+			(sv as Node3D).global_position - up9 * 9.0)
+		q9.exclude = [(sv as RoomService).get_rid()]
+		var hit9 := sp9.intersect_ray(q9)
+		if hit9.size() > 0:
+			var dely: Vector3 = (hit9["position"] as Vector3) \
+				- (sv as Node3D).global_position
+			(sv as Node3D).global_position = hit9["position"] as Vector3
+			if (sv as RoomService).lbl != null:
+				(sv as RoomService).lbl.global_position += dely
 
 func _service(kind: String) -> void:
 	var now := Game.playtime
 	if kind == "feed":
-		# the MAINTENANCE act: coal +120, uranium +600
+		# the MAINTENANCE act: coal +90, uranium +300
 		if Inventory.res_count("uranium") > 0:
 			Inventory.remove_res("uranium", 1)
 			Game.facility_power = minf(Game.FACILITY_MAX,
@@ -5028,7 +5159,7 @@ func _service(kind: String) -> void:
 		elif Inventory.res_count("coal") > 0:
 			Inventory.remove_res("coal", 1)
 			Game.facility_power = minf(Game.FACILITY_MAX,
-				Game.facility_power + 120.0)
+				Game.facility_power + 90.0)
 		else:
 			_hud_flash("the reactor eats coal or uranium. bring some")
 			Sfx.play("denied", -14.0)
@@ -5089,11 +5220,79 @@ func _service(kind: String) -> void:
 			Game.charts_unlocked = true
 			Sfx.play("learn", -6.0)
 			_hud_flash("STAR CHARTS: worlds that appear on no map... now appear on yours")
+		"print":
+			if now < float(_svc_cd.get("print", 0.0)):
+				_hud_flash("fabricator cycling (%.0fs)" %
+					(float(_svc_cd["print"]) - now))
+				Sfx.play("denied", -18.0)
+				return
+			if Game.facility_power < 70.0:
+				_hud_flash("a print run eats 60 power. feed the reactor")
+				Sfx.play("denied", -14.0)
+				return
+			Game.facility_power -= 60.0
+			_svc_cd["print"] = now + 240.0
+			_print_n += 1
+			var pool: Array = [["wire", 5], ["coal", 4], ["irid", 1],
+				["wire", 6], ["uranium", 1], ["coal", 5]]
+			var pick: Array = pool[_print_n % pool.size()]
+			Inventory.add_res(str(pick[0]), int(pick[1]))
+			Sfx.play("smelt", -8.0)
+			_hud_flash("FABRICATOR: printed %d %s (-60 power)"
+				% [int(pick[1]), str(pick[0])])
+		"boost":
+			if Game.playtime < Game.suit_boost_until:
+				_hud_flash("suit already overclocked (%.0fs left)"
+					% (Game.suit_boost_until - Game.playtime))
+				Sfx.play("denied", -18.0)
+				return
+			if Game.facility_power < 50.0:
+				_hud_flash("an overclock eats 40 power. feed the reactor")
+				Sfx.play("denied", -14.0)
+				return
+			Game.facility_power -= 40.0
+			Game.suit_boost_until = Game.playtime + 300.0
+			Sfx.play("learn", -8.0)
+			_hud_flash("SUIT OVERCLOCKED: fast legs for five minutes (-40 power)")
+		"bounty":
+			if _bounty_res == "":
+				if now < float(_svc_cd.get("bounty", 0.0)):
+					_hud_flash("the A.I. is drafting the next contract (%.0fs)"
+						% (float(_svc_cd["bounty"]) - now))
+					Sfx.play("denied", -18.0)
+					return
+				_bounty_i = (_bounty_i + 1) % _BOUNTIES.size()
+				var b9: Array = _BOUNTIES[_bounty_i]
+				_bounty_res = str(b9[0])
+				_bounty_n = int(b9[1])
+				_bounty_pay = int(b9[2])
+				Sfx.play("click", -8.0)
+				_hud_flash("A.I. CONTRACT: bring %d %s -> %d coins"
+					% [_bounty_n, _bounty_res, _bounty_pay])
+				return
+			if Inventory.res_count(_bounty_res) < _bounty_n:
+				_hud_flash("contract wants %d %s -- you carry %d"
+					% [_bounty_n, _bounty_res,
+					Inventory.res_count(_bounty_res)])
+				Sfx.play("denied", -18.0)
+				return
+			Inventory.remove_res(_bounty_res, _bounty_n)
+			Inventory.add_coins(_bounty_pay)
+			Sfx.play("coin", -8.0)
+			_hud_flash("CONTRACT PAID: %d coins. next one in three minutes"
+				% _bounty_pay)
+			_bounty_res = ""
+			_svc_cd["bounty"] = now + 180.0
 		"sync":
 			if Game.ai_blessed:
 				_hud_flash("already synced. the A.I. remembers you")
 				Sfx.play("denied", -18.0)
 				return
+			if Game.facility_power < 160.0:
+				_hud_flash("a full sync eats 150 power. feed the reactor first")
+				Sfx.play("denied", -14.0)
+				return
+			Game.facility_power -= 150.0
 			Game.ai_blessed = true
 			Sfx.play("learn", -6.0)
 			_hud_flash("SYNCED: the A.I. routes 10% extra to every sale. forever")
@@ -5139,6 +5338,8 @@ func _svc_node(xf: Transform3D, off: Vector3, kind: String, label: String,
 	add_child(lb)
 	lb.global_transform = xf
 	lb.translate_object_local(off + Vector3(0, 2.0, 0))
+	sv.lbl = lb
+	_svcs.append(sv)
 
 class SurfBtn extends StaticBody3D:
 	var host = null
@@ -5195,12 +5396,41 @@ func _escape_gate(xf: Transform3D, off: Vector3) -> void:
 	ep.global_transform = xf
 	ep.translate_object_local(off)
 
+func _hits_gate(size: Vector3, xf: Transform3D, off: Vector3) -> bool:
+	if not _nogo_on or _algates.is_empty():
+		return false
+	var bx := xf.translated_local(off)
+	var c9 := bx.origin
+	for gi9 in _algates.size():
+		var g9: Dictionary = _algates[gi9]
+		var inv: Transform3D = g9["inv"]
+		var lo: Vector3 = (g9["lo"] as Vector3) - Vector3(0.3, 0.3, 0.3)
+		var hi: Vector3 = (g9["hi"] as Vector3) + Vector3(0.3, 0.3, 0.3)
+		var inside := false
+		for sx9 in [-0.5, 0.0, 0.5]:
+			for sy9 in [-0.5, 0.0, 0.5]:
+				for sz9 in [-0.5, 0.0, 0.5]:
+					var w9 := bx * Vector3(size.x * float(sx9),
+						size.y * float(sy9), size.z * float(sz9))
+					var l9 := inv * w9
+					if l9.x > lo.x and l9.x < hi.x and l9.y > lo.y \
+							and l9.y < hi.y and l9.z > lo.z and l9.z < hi.z:
+						inside = true
+		if inside:
+			if OS.get_environment("CTD_TEST") != "":
+				print("MFTEST gate hit: lock ", gi9, " run=", _cur_run,
+					" r=%.1f" % (c9 - _C).length())
+			return true
+	return false
+
 func _networks() -> void:
+	# nothing in the late web may cross an airlock's claimed volume
+	_nogo_on = true
 	# ---- THE VENTS v2: grille stub -> steep dive -> cruise in one of
 	# three radius bands (58 / 54.5 / 51.5) so no vent ever crosses
 	# another, with bulkhead collars sealing every kink ----
 	var vpairs: Array = [
-		["medbay", 1, "gym", 0, 58.8, true],
+		["medbay", 1, "gym", 0, 51.5, true],
 		["gym", 1, "archive", 0, 58.8, false],
 		["archive", 1, "tape", 1, 58.8, false],
 		["tape", 0, "farm", 0, 58.8, true],
@@ -5209,10 +5439,15 @@ func _networks() -> void:
 		["workshop", 0, "kitchen", 0, 58.8, true],
 	]
 	for vp9 in vpairs:
+		_cur_run = str(vp9[0]) + "->" + str(vp9[2])
 		_vent_run((_vp[vp9[0]] as Array)[int(vp9[1])],
 			(_vp[vp9[2]] as Array)[int(vp9[3])], float(vp9[4]), bool(vp9[5]))
-	_vent_run({"p": _duct_end, "o": _duct_out, "b": _duct_bas},
-		(_vp["medbay"] as Array)[0], 58.8, false)
+	# the old duct->medbay run is DEAD: its dive legs ran straight
+	# through the lobby airlock's runway. The atrium duct goes back to
+	# being a capped dead-end crawl (fan and all).
+	_plate(Vector3(2.6, 3.4, 0.4), Transform3D(_duct_bas, _duct_end),
+		Vector3(0, 1.3, 0.4), STEEL, 0.0)
+	_cur_run = "tunnels"
 	# ---- THE COMPUTER TUNNELS: six hub junction boxes deep in the
 	# hollow (all below radius 49 -- verified clear of every room and
 	# every vent), wired as a branching web. The ONLY ways down are the
@@ -5222,7 +5457,7 @@ func _networks() -> void:
 		[_sdir(1.9, -0.7), 43.5],
 		[_sdir(2.9, 0.9), 45.0],
 		[(_pdx(4.6) + _e1 * 0.5).normalized(), 41.0],
-		[(_pdx(1.6) + _e1 * -0.6).normalized(), 44.5],
+		[(_pdx(1.6) + _e1 * -0.75).normalized(), 42.0],
 		[(-_u0 + _e1 * 0.4 + _e2 * -0.5).normalized(), 40.5],
 	]
 	var edges: Array = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 2]]
@@ -5355,6 +5590,9 @@ func _ghost(size: Vector3, xf: Transform3D, off: Vector3) -> void:
 
 func _plate(size: Vector3, xf: Transform3D, off: Vector3,
 		col: Color, emit: float) -> void:
+	if _hits_gate(size, xf, off):
+		_gate_skips += 1
+		return
 	var sb := StaticBody3D.new()
 	var mi := MeshInstance3D.new()
 	mi.mesh = Surfaces.box_mesh(size)
@@ -5370,6 +5608,9 @@ func _plate(size: Vector3, xf: Transform3D, off: Vector3,
 
 func _deco_box(size: Vector3, xf: Transform3D, off: Vector3,
 		col: Color, emit: float) -> void:
+	if _hits_gate(size, xf, off):
+		_gate_skips += 1
+		return
 	var mi := MeshInstance3D.new()
 	mi.mesh = Surfaces.box_mesh(size)
 	mi.material_override = Surfaces.metal(col) if emit <= 0.3 \
@@ -5391,6 +5632,10 @@ func _process(delta: float) -> void:
 		_set_power(false)
 	elif Game.facility_power > 0.0 and not _powered:
 		_set_power(true)
+	if _power_lbl != null:
+		_power_lbl.text = "%04d" % int(Game.facility_power)
+		_power_lbl.modulate = AMBER if Game.facility_power >= 300.0 \
+			else Color("#ff4444")
 	if Game.facility_power < 180.0 and _powered and not _pwr_warned \
 			and on_site:
 		_pwr_warned = true
