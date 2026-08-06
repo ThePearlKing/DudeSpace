@@ -54,6 +54,65 @@ const DARK := Color("#1c2026")
 const SEGS := 14
 const HATCH_SEG := 7
 
+## facility-LOCAL emissive cache: every glowing plate in the building
+## shares these materials, so a blackout can kill every light at once
+## without touching the rest of the universe
+var _fmat_cache: Dictionary = {}
+var _powered := true
+var _pwr_warned := false
+
+func _femissive(c: Color, emit: float) -> StandardMaterial3D:
+	var key := c.to_html(true) + ("_%.2f" % emit)
+	if _fmat_cache.has(key):
+		return _fmat_cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = emit
+	m.metallic = 0.1
+	m.roughness = 0.6
+	m.set_meta("lit_emit", emit)
+	m.set_meta("lit_col", c)
+	_fmat_cache[key] = m
+	return m
+
+## THE BREAKER. false = every facility light dies, the core goes cold,
+## the A.I. goes mute, every sound stops, every service refuses.
+func _set_power(on: bool) -> void:
+	if _powered == on:
+		return
+	_powered = on
+	for key in _fmat_cache:
+		var m: StandardMaterial3D = _fmat_cache[key]
+		m.emission_energy_multiplier = float(m.get_meta("lit_emit")) if on else 0.0
+		m.albedo_color = (m.get_meta("lit_col") as Color) if on \
+			else (m.get_meta("lit_col") as Color).darkened(0.82)
+	for bl in _blinks:
+		var bm9 := bl["mat"] as StandardMaterial3D
+		if not on:
+			bm9.emission_energy_multiplier = 0.0
+			bm9.albedo_color = bm9.emission * 0.05
+	if _core_mat != null:
+		_core_mat.emission_energy_multiplier = 1.5 if on else 0.0
+		_core_mat.albedo_color = Color("#fff2cf") if on else Color("#141210")
+	if _ai_mat != null:
+		_ai_mat.set_shader_parameter("talking", 0.0)
+	if _ai_sp != null and not on:
+		_ai_sp.stop()
+	if _radio_sp != null and not on:
+		_radio_on = false
+		_radio_apply()
+	if _spectro_cache != null and not on:
+		_spectro_cache.set_shader_parameter("live", 0.0)
+	# every speaker in the building obeys the breaker
+	for ch9 in get_children():
+		if ch9 is AudioStreamPlayer3D:
+			(ch9 as AudioStreamPlayer3D).stream_paused = not on
+	Sfx.play("denied" if not on else "learn", -10.0)
+	_hud_flash("BIG COMPUTER: POWER LOST -- feed the reactor" if not on
+		else "BIG COMPUTER: power restored")
+
 var _e_pts: Dictionary = {}    # hidden data-tunnel entrances
 var _vp: Dictionary = {}       # room vent-hole endpoints
 var _duct_end: Vector3
@@ -256,7 +315,7 @@ void fragment(){
 	tmm.inner_radius = 3.4
 	tmm.outer_radius = 4.6
 	rim.mesh = tmm
-	rim.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+	rim.material_override = _femissive(AMBER, 1.6)
 	add_child(rim)
 	rim.global_transform = Transform3D(abas, _C + _u0 * (R + 0.1))
 	for cspec in [[Vector3(14.0, 9.0, 0.6), Vector3(0, 0, 3.4)],
@@ -321,7 +380,7 @@ void fragment(){
 		var gm := BoxMesh.new()
 		gm.size = Vector3(0.12, shln, 0.12)
 		gs.mesh = gm
-		gs.material_override = Surfaces.cached_emissive(AMBER, 1.8)
+		gs.material_override = _femissive(AMBER, 1.8)
 		add_child(gs)
 		gs.global_transform = shxf
 		gs.translate_object_local(gsx)
@@ -419,7 +478,7 @@ void fragment(){
 	var mbm := BoxMesh.new()
 	mbm.size = Vector3(0.34, 0.34, 0.2)
 	mmi.mesh = mbm
-	mmi.material_override = Surfaces.cached_emissive(Color("#66ff99"), 1.9)
+	mmi.material_override = _femissive(Color("#66ff99"), 1.9)
 	mbtn.add_child(mmi)
 	var mcs := CollisionShape3D.new()
 	var mbs := BoxShape3D.new()
@@ -448,7 +507,7 @@ void fragment(){
 	alm.bottom_radius = 1.1
 	alm.height = 0.1
 	al.mesh = alm
-	al.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 2.0)
+	al.material_override = _femissive(Color("#f2ead8"), 2.0)
 	add_child(al)
 	al.global_transform = Transform3D(abas, _C + _u0 * (_rF + 6.4))
 	al.translate_object_local(Vector3(3.2, 0, 0))
@@ -478,7 +537,7 @@ void fragment(){
 				var hzb := BoxMesh.new()
 				hzb.size = hz[0]
 				hzm.mesh = hzb
-				hzm.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+				hzm.material_override = _femissive(AMBER, 1.6)
 				add_child(hzm)
 				hzm.global_transform = flxf
 				hzm.translate_object_local(hz[1])
@@ -598,7 +657,7 @@ void fragment(){
 	slm.bottom_radius = 1.0
 	slm.height = 0.08
 	sl9.mesh = slm
-	sl9.material_override = Surfaces.cached_emissive(Color("#cfe6d8"), 1.7)
+	sl9.material_override = _femissive(Color("#cfe6d8"), 1.7)
 	add_child(sl9)
 	sl9.global_transform = Transform3D(hb, _C + hup * (_r2 + 5.15))
 	sl9.translate_object_local(Vector3(0, 0, 3.2))
@@ -764,7 +823,7 @@ void fragment(){
 		clm9.bottom_radius = 0.6
 		clm9.height = 2.6
 		col9.mesh = clm9
-		col9.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+		col9.material_override = _femissive(AMBER, 1.6)
 		add_child(col9)
 		col9.global_transform = Transform3D(cb, _C + cup * (rC + fc))
 	var sleeve := MeshInstance3D.new()
@@ -786,7 +845,7 @@ void fragment(){
 		rgm.inner_radius = 5.4 + 0.9 * float(ri)
 		rgm.outer_radius = 5.85 + 0.9 * float(ri)
 		ring.mesh = rgm
-		ring.material_override = Surfaces.cached_emissive(
+		ring.material_override = _femissive(
 			AMBER.lightened(0.2), 1.8)
 		add_child(ring)
 		ring.global_transform = Transform3D(cb, _C + cup * (rC + 6.2))
@@ -809,7 +868,7 @@ void fragment(){
 		tpm2.radius = 0.32
 		tpm2.height = 0.64
 		tip.mesh = tpm2
-		tip.material_override = Surfaces.cached_emissive(AMBER, 2.2)
+		tip.material_override = _femissive(AMBER, 2.2)
 		add_child(tip)
 		tip.global_transform = Transform3D(cb, _C + cup * (rC + 8.0))
 		tip.translate_object_local(Vector3(cos(pang) * 6.6, 0, sin(pang) * 6.6))
@@ -820,7 +879,7 @@ void fragment(){
 		dcm.bottom_radius = 3.3
 		dcm.height = 0.07
 		disc.mesh = dcm
-		disc.material_override = Surfaces.cached_emissive(
+		disc.material_override = _femissive(
 			AMBER.lightened(0.35), 2.0)
 		add_child(disc)
 		_core_discs.append({"node": disc, "cb": cb, "cup": cup,
@@ -839,7 +898,7 @@ void fragment(){
 	frm.inner_radius = 8.0
 	frm.outer_radius = 8.4
 	fring.mesh = frm
-	fring.material_override = Surfaces.cached_emissive(AMBER, 1.3)
+	fring.material_override = _femissive(AMBER, 1.3)
 	add_child(fring)
 	fring.global_transform = Transform3D(cb, _C + cup * (rC + 0.1))
 	# lightning: jagged arc bolts that flicker around the heart
@@ -857,7 +916,7 @@ void fragment(){
 				0.9 - 0.9 * float(seg9), 0)
 			bolt.rotation_degrees = Vector3(0, 24.0 * float(seg9) - 20.0,
 				38.0 - 34.0 * float(seg9))
-			bolt.material_override = Surfaces.cached_emissive(
+			bolt.material_override = _femissive(
 				Color("#fff2cf"), 2.6)
 			arc9.add_child(bolt)
 		_arcs.append({"node": arc9, "phase": float(ab) * 1.3})
@@ -898,7 +957,7 @@ void fragment(){
 		Vector3(0, 0, 1.4), Color("#12161c"), 0.0)
 	var bpan := MeshInstance3D.new()
 	bpan.mesh = IcosaColony._cham_mesh(0.9, 0.05, 3.3, 0.22)
-	bpan.material_override = Surfaces.cached_emissive(AMBER.darkened(0.1), 1.6)
+	bpan.material_override = _femissive(AMBER.darkened(0.1), 1.6)
 	add_child(bpan)
 	bpan.global_transform = Transform3D(
 		bthb * Basis(Vector3(0, 0, 1), 0.5), _C + bthd * (_rF + 1.25))
@@ -933,6 +992,10 @@ void fragment(){
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
 		Vector3(-8.1, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
+	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
+		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
+		Vector3(-8.1, 0, 3.2), "feed", "FEED REACTOR: COAL / URANIUM",
+		Color("#ff6a4a"))
 	_svc_node(Transform3D(_abas9(1, 4.0), _C + _aup9(1, 4.0) * _rF),
 		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER -> 1 NOODLE",
 		Color("#ffcf40"))
@@ -1014,7 +1077,7 @@ void fragment(){
 		tpm.height = 0.1
 		tip.mesh = tpm
 		tip.position = Vector3(0, 0.58, 0)
-		tip.material_override = Surfaces.cached_emissive(AMBER, 2.4)
+		tip.material_override = _femissive(AMBER, 2.4)
 		d.add_child(tip)
 		var pod9 := MeshInstance3D.new()
 		var pdm := CylinderMesh.new()
@@ -1023,7 +1086,7 @@ void fragment(){
 		pdm.height = 0.12
 		pod9.mesh = pdm
 		pod9.position = Vector3(0, -0.21, 0)
-		pod9.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.9)
+		pod9.material_override = _femissive(Color("#7df9ff"), 1.9)
 		d.add_child(pod9)
 		_drones.append({"node": d, "lane": -2.5 + 2.5 * float(di),
 			"phase": float(di) * 2.3, "speed": 0.10 + 0.03 * float(di)})
@@ -1071,13 +1134,13 @@ func _bunk_wing() -> void:
 			grm.inner_radius = 0.6
 			grm.outer_radius = 1.0
 			gring.mesh = grm
-			gring.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+			gring.material_override = _femissive(AMBER, 1.6)
 			add_child(gring)
 			gring.global_transform = Transform3D(fb, _C + up * (_rF + 0.14))
 			gring.translate_object_local(Vector3(0, 0, zs * 3.0))
 			var bunk := MeshInstance3D.new()
 			bunk.mesh = IcosaColony._cham_mesh(2.4, 0.3, 1.6, 0.3)
-			bunk.material_override = Surfaces.cached_emissive(STEEL, 0.25)
+			bunk.material_override = _femissive(STEEL, 0.25)
 			add_child(bunk)
 			bunk.global_transform = Transform3D(fb, _C + up * (_rF + 0.6))
 			bunk.translate_object_local(Vector3(0, 0, zs * 3.0))
@@ -1224,7 +1287,7 @@ func _ring_room(fam: int, ac: float, s: float, name: String,
 	rlm.bottom_radius = 0.8
 	rlm.height = 0.08
 	rl.mesh = rlm
-	rl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 1.9)
+	rl.material_override = _femissive(Color("#f2ead8"), 1.9)
 	add_child(rl)
 	rl.global_transform = Transform3D(fb, _C + up * (_rF + 4.45))
 	rl.translate_object_local(Vector3(s * 8.3, 0, 0))
@@ -1454,7 +1517,7 @@ func _cockpit_dress() -> void:
 	drm.inner_radius = 4.35
 	drm.outer_radius = 4.55
 	drail.mesh = drm
-	drail.material_override = Surfaces.cached_emissive(AMBER, 1.5)
+	drail.material_override = _femissive(AMBER, 1.5)
 	add_child(drail)
 	drail.global_transform = Transform3D(ab0, _C + au * (_rF + 0.55))
 	# THE GLOBE: the planet's own live shader, floating and turning
@@ -1470,7 +1533,7 @@ func _cockpit_dress() -> void:
 	gbm.height = 4.4
 	globe.mesh = gbm
 	globe.material_override = pmat if pmat != null \
-		else Surfaces.cached_emissive(AMBER, 1.4)
+		else _femissive(AMBER, 1.4)
 	add_child(globe)
 	globe.global_transform = Transform3D(ab0, _C + au * (_rF + 4.4))
 	_spins.append({"node": globe, "rate": 0.25})
@@ -1479,7 +1542,7 @@ func _cockpit_dress() -> void:
 	grm9.inner_radius = 2.7
 	grm9.outer_radius = 2.85
 	gring.mesh = grm9
-	gring.material_override = Surfaces.cached_emissive(AMBER, 1.9)
+	gring.material_override = _femissive(AMBER, 1.9)
 	add_child(gring)
 	gring.global_transform = Transform3D(ab0, _C + au * (_rF + 4.4))
 	gring.rotate_object_local(Vector3(1, 0, 0), 0.35)
@@ -1499,7 +1562,7 @@ func _cockpit_dress() -> void:
 	var lvm := BoxMesh.new()
 	lvm.size = Vector3(0.1, 0.9, 0.1)
 	lever.mesh = lvm
-	lever.material_override = Surfaces.cached_emissive(Color("#ff4444"), 1.6)
+	lever.material_override = _femissive(Color("#ff4444"), 1.6)
 	add_child(lever)
 	lever.global_transform = Transform3D(ab0, _C + au * (_rF + 2.0))
 	lever.translate_object_local(Vector3(2.4, 0, 0))
@@ -1552,7 +1615,7 @@ func _cockpit_dress() -> void:
 			Vector3.ZERO, Color("#12161c"), 0.0)
 		var cpan := MeshInstance3D.new()
 		cpan.mesh = IcosaColony._cham_mesh(2.6, 0.05, 0.95, 0.22)
-		cpan.material_override = Surfaces.cached_emissive(AMBER.darkened(0.1), 1.5)
+		cpan.material_override = _femissive(AMBER.darkened(0.1), 1.5)
 		add_child(cpan)
 		cpan.global_transform = Transform3D(cbb * Basis(Vector3(1, 0, 0), -0.5),
 			_C + dirc * (_rF + 1.16))
@@ -1600,7 +1663,7 @@ func _cockpit_dress() -> void:
 	orm.inner_radius = 5.6
 	orm.outer_radius = 6.0
 	oring.mesh = orm
-	oring.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 2.0)
+	oring.material_override = _femissive(Color("#f2ead8"), 2.0)
 	add_child(oring)
 	oring.global_transform = Transform3D(ab0, _C + au * (_rF + 7.4))
 	_chatter(Transform3D(ab0, _C + au * (_rF + 1.2)).origin, 201, -9.0)
@@ -1644,7 +1707,7 @@ func _dress_ai() -> void:
 		Vector3(-4.4, 0, 0), Color("#12161c"), 0.0)
 	var tpan := MeshInstance3D.new()
 	tpan.mesh = IcosaColony._cham_mesh(0.95, 0.05, 2.4, 0.22)
-	tpan.material_override = Surfaces.cached_emissive(Color("#2a8f4a"), 1.6)
+	tpan.material_override = _femissive(Color("#2a8f4a"), 1.6)
 	add_child(tpan)
 	tpan.global_transform = Transform3D(fb9 * Basis(Vector3(0, 0, 1), 0.5),
 		_C + fup * (_rF + 1.16))
@@ -1706,7 +1769,7 @@ func _dress_ai() -> void:
 			Vector3(cs9 * 3.2, 0, 0), Color("#12161c"), 0.0)
 		var cpan := MeshInstance3D.new()
 		cpan.mesh = IcosaColony._cham_mesh(2.4, 0.05, 0.95, 0.22)
-		cpan.material_override = Surfaces.cached_emissive(
+		cpan.material_override = _femissive(
 			Color("#2a8f4a"), 1.5)
 		add_child(cpan)
 		cpan.global_transform = Transform3D(cbb * Basis(Vector3(1, 0, 0), -0.5),
@@ -1733,6 +1796,10 @@ class AiTerminal extends StaticBody3D:
 			host._ai_speak()
 
 func _ai_speak() -> void:
+	if not _powered:
+		_hud_flash("the terminal is dead. the A.I. sleeps with the power")
+		Sfx.play("denied", -16.0)
+		return
 	if _ai_sp == null or _ai_sp.playing:
 		return
 	var w = HumanVoice.render(AI_LINES[_ai_line], RadioLib.ALIEN_HOSTS[1])
@@ -1941,21 +2008,21 @@ func _grand_aquarium(ac: float) -> void:
 		fbody.mesh = fcm
 		fbody.rotation_degrees = Vector3(90, 0, 0)
 		fbody.scale = Vector3(0.55, 1.0, 1.0)
-		fbody.material_override = Surfaces.cached_emissive(fcol, 1.2)
+		fbody.material_override = _femissive(fcol, 1.2)
 		fish.add_child(fbody)
 		var dorsal := MeshInstance3D.new()
 		var dfm := BoxMesh.new()
 		dfm.size = Vector3(0.07, 0.6, 0.7)
 		dorsal.mesh = dfm
 		dorsal.position = Vector3(0, 0.58, -0.1)
-		dorsal.material_override = Surfaces.cached_emissive(fcol.darkened(0.25), 0.9)
+		dorsal.material_override = _femissive(fcol.darkened(0.25), 0.9)
 		fish.add_child(dorsal)
 		var tail := MeshInstance3D.new()
 		var tfm := BoxMesh.new()
 		tfm.size = Vector3(0.1, 0.85, 0.85)
 		tail.mesh = tfm
 		tail.position = Vector3(0, 0, -1.45)
-		tail.material_override = Surfaces.cached_emissive(fcol.darkened(0.15), 1.0)
+		tail.material_override = _femissive(fcol.darkened(0.15), 1.0)
 		fish.add_child(tail)
 		_fish.append({"node": fish, "tail": tail, "fb": fb, "up": up,
 			"x": 15.6, "phase": float(fi) * 1.9, "zr": 6.0,
@@ -1970,14 +2037,14 @@ func _grand_aquarium(ac: float) -> void:
 	wbody.mesh = wcm
 	wbody.rotation_degrees = Vector3(90, 0, 0)
 	wbody.scale = Vector3(0.7, 1.0, 1.0)
-	wbody.material_override = Surfaces.cached_emissive(Color("#3a6fae"), 0.9)
+	wbody.material_override = _femissive(Color("#3a6fae"), 0.9)
 	whale.add_child(wbody)
 	var wtail := MeshInstance3D.new()
 	var wtm := BoxMesh.new()
 	wtm.size = Vector3(1.6, 0.14, 1.0)
 	wtail.mesh = wtm
 	wtail.position = Vector3(0, 0, -2.9)
-	wtail.material_override = Surfaces.cached_emissive(Color("#2a5288"), 0.9)
+	wtail.material_override = _femissive(Color("#2a5288"), 0.9)
 	whale.add_child(wtail)
 	var wbel := MeshInstance3D.new()
 	var wbm2 := CapsuleMesh.new()
@@ -1986,7 +2053,7 @@ func _grand_aquarium(ac: float) -> void:
 	wbel.mesh = wbm2
 	wbel.rotation_degrees = Vector3(90, 0, 0)
 	wbel.position = Vector3(0, -0.4, 0.2)
-	wbel.material_override = Surfaces.cached_emissive(Color("#cfd8e2"), 0.7)
+	wbel.material_override = _femissive(Color("#cfd8e2"), 0.7)
 	whale.add_child(wbel)
 	_fish.append({"node": whale, "tail": wtail, "fb": fb, "up": up,
 		"x": 15.6, "phase": 4.7, "zr": 5.2, "yb": 3.6})
@@ -2000,7 +2067,7 @@ func _grand_aquarium(ac: float) -> void:
 	abody.mesh = acm
 	abody.rotation_degrees = Vector3(90, 0, 0)
 	abody.scale = Vector3(0.7, 1.1, 1.0)
-	abody.material_override = Surfaces.cached_emissive(Color("#1c2026"), 0.4)
+	abody.material_override = _femissive(Color("#1c2026"), 0.4)
 	ang.add_child(abody)
 	var lrod := MeshInstance3D.new()
 	var lrm := CylinderMesh.new()
@@ -2017,7 +2084,7 @@ func _grand_aquarium(ac: float) -> void:
 	lum.radius = 0.09
 	lum.height = 0.18
 	lure.mesh = lum
-	lure.material_override = Surfaces.cached_emissive(Color("#b7ffe0"), 2.6)
+	lure.material_override = _femissive(Color("#b7ffe0"), 2.6)
 	lure.position = Vector3(0, 0.62, 0.55)
 	ang.add_child(lure)
 	_fish.append({"node": ang, "tail": lrod, "fb": fb, "up": up,
@@ -2046,7 +2113,7 @@ func _grand_aquarium(ac: float) -> void:
 			tent.mesh = ttm
 			tent.position = Vector3(cos(TAU * float(tn) / 5.0) * 0.2, -0.35,
 				sin(TAU * float(tn) / 5.0) * 0.2)
-			tent.material_override = Surfaces.cached_emissive(
+			tent.material_override = _femissive(
 				Color("#ff9ad9"), 0.8)
 			jelly.add_child(tent)
 		_creatures.append({"node": jelly, "kind": 0, "fb": fb, "up": up,
@@ -2061,7 +2128,7 @@ func _grand_aquarium(ac: float) -> void:
 		esm.height = 0.5
 		es9.mesh = esm
 		es9.rotation_degrees = Vector3(90, 0, 0)
-		es9.material_override = Surfaces.cached_emissive(
+		es9.material_override = _femissive(
 			Color("#7dff5a") if si % 2 == 0 else Color("#4aa32a"), 1.1)
 		eel.add_child(es9)
 		esegs.append(es9)
@@ -2074,7 +2141,7 @@ func _grand_aquarium(ac: float) -> void:
 	var mbm := BoxMesh.new()
 	mbm.size = Vector3(0.7, 0.16, 1.3)
 	mbody.mesh = mbm
-	mbody.material_override = Surfaces.cached_emissive(Color("#31384a"), 0.8)
+	mbody.material_override = _femissive(Color("#31384a"), 0.8)
 	manta.add_child(mbody)
 	var wings: Array = []
 	for wsd in [-1.0, 1.0]:
@@ -2083,7 +2150,7 @@ func _grand_aquarium(ac: float) -> void:
 		wgm.size = Vector3(1.5, 0.06, 1.0)
 		wing.mesh = wgm
 		wing.position = Vector3(wsd * 1.05, 0, -0.05)
-		wing.material_override = Surfaces.cached_emissive(Color("#48536e"), 0.8)
+		wing.material_override = _femissive(Color("#48536e"), 0.8)
 		manta.add_child(wing)
 		wings.append(wing)
 	var mtail := MeshInstance3D.new()
@@ -2091,7 +2158,7 @@ func _grand_aquarium(ac: float) -> void:
 	mtm2.size = Vector3(0.05, 0.05, 1.4)
 	mtail.mesh = mtm2
 	mtail.position = Vector3(0, 0, -1.3)
-	mtail.material_override = Surfaces.cached_emissive(Color("#31384a"), 0.7)
+	mtail.material_override = _femissive(Color("#31384a"), 0.7)
 	manta.add_child(mtail)
 	_creatures.append({"node": manta, "kind": 2, "fb": fb, "up": up,
 		"phase": 1.1, "x": 15.6, "wings": wings})
@@ -2108,7 +2175,7 @@ func _grand_aquarium(ac: float) -> void:
 		tf.position = Vector3(fmod(float(sfi) * 0.71, 1.4) - 0.7,
 			fmod(float(sfi) * 0.43, 1.0) - 0.5,
 			fmod(float(sfi) * 1.13, 1.6) - 0.8)
-		tf.material_override = Surfaces.cached_emissive(
+		tf.material_override = _femissive(
 			Color("#cfe0ec") if sfi % 3 else Color("#9fc2dc"), 1.4)
 		school.add_child(tf)
 	_creatures.append({"node": school, "kind": 3, "fb": fb, "up": up,
@@ -2120,7 +2187,7 @@ func _grand_aquarium(ac: float) -> void:
 	um.radial_segments = 5
 	um.rings = 3
 	urch.mesh = um
-	urch.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.6)
+	urch.material_override = _femissive(Color("#7df9ff"), 1.6)
 	add_child(urch)
 	urch.global_transform = Transform3D(fb, _C + up * (_rF + 0.85))
 	urch.translate_object_local(Vector3(16.8, 0, -4.5))
@@ -2152,7 +2219,7 @@ func _dress_medbay(r: Dictionary) -> void:
 		fm9.radius = 0.14
 		fm9.height = 0.28
 		flask.mesh = fm9
-		flask.material_override = Surfaces.cached_emissive(
+		flask.material_override = _femissive(
 			[Color("#66ff99"), Color("#7df9ff"), Color("#ff66aa")][fx], 1.6)
 		add_child(flask)
 		flask.global_transform = Transform3D(r["fb"] as Basis,
@@ -2167,7 +2234,7 @@ func _dress_gym(r: Dictionary) -> void:
 		gm9.inner_radius = 0.7
 		gm9.outer_radius = 1.0
 		gr9.mesh = gm9
-		gr9.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.6)
+		gr9.material_override = _femissive(Color("#7df9ff"), 1.6)
 		add_child(gr9)
 		gr9.global_transform = Transform3D(r["fb"] as Basis,
 			_C + (r["up"] as Vector3) * (_rF + 1.6))
@@ -2263,7 +2330,7 @@ func _dress_trophy(r: Dictionary) -> void:
 		ped.translate_object_local(off)
 		var tro := MeshInstance3D.new()
 		tro.mesh = shapes[pz]
-		tro.material_override = Surfaces.cached_emissive(Color("#ffd700"), 1.8)
+		tro.material_override = _femissive(Color("#ffd700"), 1.8)
 		add_child(tro)
 		tro.global_transform = Transform3D(r["fb"] as Basis,
 			_C + (r["up"] as Vector3) * (_rF + 1.55))
@@ -2301,7 +2368,7 @@ func _side_room(i: int, s: float, kind: String) -> void:
 		rlm.bottom_radius = 0.8
 		rlm.height = 0.08
 		rl.mesh = rlm
-		rl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 1.9)
+		rl.material_override = _femissive(Color("#f2ead8"), 1.9)
 		add_child(rl)
 		rl.global_transform = Transform3D(fb, _C + up * (_rF + 4.95))
 		rl.translate_object_local(Vector3(cx, 0, 0))
@@ -2383,7 +2450,7 @@ func _room_lab(a: float, s: float) -> void:
 			fm9.radius = 0.16 + 0.06 * float(bx % 2)
 			fm9.height = fm9.radius * 2.0
 			flask.mesh = fm9
-			flask.material_override = Surfaces.cached_emissive(
+			flask.material_override = _femissive(
 				[Color("#66ff99"), Color("#ff66aa"), Color("#7df9ff")][bx], 1.7)
 			add_child(flask)
 			flask.global_transform = _lat(a, s * (7.6 + 2.0 * float(bx)), 1.18)
@@ -2402,7 +2469,7 @@ func _room_lab(a: float, s: float) -> void:
 	rgm.inner_radius = 0.55
 	rgm.outer_radius = 0.72
 	ring.mesh = rgm
-	ring.material_override = Surfaces.cached_emissive(AMBER, 1.9)
+	ring.material_override = _femissive(AMBER, 1.9)
 	add_child(ring)
 	ring.global_transform = _lat(a, s * 8.85, 1.35)
 	_spec_xf = _lat(a, s * 8.85, 1.75)
@@ -2414,7 +2481,7 @@ func _room_lab(a: float, s: float) -> void:
 	var bbm := BoxMesh.new()
 	bbm.size = Vector3(0.26, 0.26, 0.26)
 	bmi.mesh = bbm
-	bmi.material_override = Surfaces.cached_emissive(Color("#ff4444"), 1.9)
+	bmi.material_override = _femissive(Color("#ff4444"), 1.9)
 	tbn.add_child(bmi)
 	var bcs := CollisionShape3D.new()
 	var bbs := BoxShape3D.new()
@@ -2458,7 +2525,7 @@ func _room_lab(a: float, s: float) -> void:
 	mem.radius = 0.12
 	mem.height = 0.24
 	meye.mesh = mem
-	meye.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.8)
+	meye.material_override = _femissive(Color("#7df9ff"), 1.8)
 	add_child(meye)
 	meye.global_transform = _lat(a, s * 18.9, 1.62)
 	meye.translate_object_local(Vector3(0.4, 0, -2.6))
@@ -2482,7 +2549,7 @@ func _room_lab(a: float, s: float) -> void:
 	hzm9.inner_radius = 2.0
 	hzm9.outer_radius = 2.2
 	hz9.mesh = hzm9
-	hz9.material_override = Surfaces.cached_emissive(AMBER, 1.5)
+	hz9.material_override = _femissive(AMBER, 1.5)
 	add_child(hz9)
 	hz9.global_transform = _lat(a, s * 28.1, 0.06)
 	var cped := MeshInstance3D.new()
@@ -2514,7 +2581,7 @@ func _room_lab(a: float, s: float) -> void:
 	stm9.inner_radius = 0.4
 	stm9.outer_radius = 0.55
 	smi.mesh = stm9
-	smi.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.8)
+	smi.material_override = _femissive(Color("#7df9ff"), 1.8)
 	sck.add_child(smi)
 	var scs := CollisionShape3D.new()
 	var sbs := BoxShape3D.new()
@@ -2525,7 +2592,7 @@ func _room_lab(a: float, s: float) -> void:
 	sck.global_transform = _lat(a, s * 28.1, 1.25)
 	_sock_tetra = MeshInstance3D.new()
 	_sock_tetra.mesh = _tetra_mesh(0.42)
-	_sock_tetra.material_override = Surfaces.cached_emissive(
+	_sock_tetra.material_override = _femissive(
 		AMBER.lightened(0.25), 2.2)
 	_sock_tetra.visible = false
 	add_child(_sock_tetra)
@@ -2539,7 +2606,7 @@ func _spawn_specimen() -> void:
 	sp.host = self
 	var mi := MeshInstance3D.new()
 	mi.mesh = _tetra_mesh(0.42)
-	mi.material_override = Surfaces.cached_emissive(AMBER.lightened(0.25), 2.2)
+	mi.material_override = _femissive(AMBER.lightened(0.25), 2.2)
 	sp.add_child(mi)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
@@ -2643,21 +2710,21 @@ func _room_aquarium(fb: Basis, up: Vector3, cx: float, s: float) -> void:
 		fbody.mesh = fcm
 		fbody.rotation_degrees = Vector3(90, 0, 0)
 		fbody.scale = Vector3(0.55, 1.0, 1.0)
-		fbody.material_override = Surfaces.cached_emissive(fcol, 1.2)
+		fbody.material_override = _femissive(fcol, 1.2)
 		fish.add_child(fbody)
 		var dorsal := MeshInstance3D.new()
 		var dfm := BoxMesh.new()
 		dfm.size = Vector3(0.02, 0.14, 0.16)
 		dorsal.mesh = dfm
 		dorsal.position = Vector3(0, 0.14, -0.02)
-		dorsal.material_override = Surfaces.cached_emissive(fcol.darkened(0.25), 0.9)
+		dorsal.material_override = _femissive(fcol.darkened(0.25), 0.9)
 		fish.add_child(dorsal)
 		var tail := MeshInstance3D.new()
 		var tfm := BoxMesh.new()
 		tfm.size = Vector3(0.03, 0.2, 0.2)
 		tail.mesh = tfm
 		tail.position = Vector3(0, 0, -0.34)
-		tail.material_override = Surfaces.cached_emissive(fcol.darkened(0.15), 1.0)
+		tail.material_override = _femissive(fcol.darkened(0.15), 1.0)
 		fish.add_child(tail)
 		_fish.append({"node": fish, "tail": tail, "fb": fb, "up": up,
 			"x": s * 12.5, "phase": float(fi) * 1.7, "zr": 3.6,
@@ -2718,7 +2785,7 @@ func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 	rgm.inner_radius = 1.5
 	rgm.outer_radius = 1.66
 	ring.mesh = rgm
-	ring.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+	ring.material_override = _femissive(AMBER, 1.6)
 	add_child(ring)
 	ring.global_transform = Transform3D(fb, _C + up * (_rF + 0.84))
 	ring.translate_object_local(Vector3(cx, 0, 0))
@@ -2757,7 +2824,7 @@ func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 		gm9.height = gm9.radius * 2.0
 		g.mesh = gm9
 		g.material_override = pmat9 if pmat9 != null else \
-			Surfaces.cached_emissive((db.color as Color).lightened(0.15), 1.4)
+			_femissive((db.color as Color).lightened(0.15), 1.4)
 		add_child(g)
 		g.global_transform = holo
 		g.translate_object_local(Vector3(cx, 0.6, 0) + (db.center as Vector3) * k)
@@ -2788,7 +2855,7 @@ func _room_map(fb: Basis, up: Vector3, cx: float) -> void:
 			mkm.inner_radius = gm9.radius + 0.1
 			mkm.outer_radius = gm9.radius + 0.2
 			mk.mesh = mkm
-			mk.material_override = Surfaces.cached_emissive(AMBER, 2.2)
+			mk.material_override = _femissive(AMBER, 2.2)
 			add_child(mk)
 			mk.global_transform = g.global_transform
 			var yah := Label3D.new()
@@ -2855,7 +2922,7 @@ func _service_wing() -> void:
 	var hpm2 := BoxMesh.new()
 	hpm2.size = Vector3(1.1, 1.1, 0.1)
 	hpanel.mesh = hpm2
-	hpanel.material_override = Surfaces.cached_emissive(AMBER.darkened(0.3), 0.9)
+	hpanel.material_override = _femissive(AMBER.darkened(0.3), 0.9)
 	add_child(hpanel)
 	hpanel.global_transform = Transform3D(hb2, _C + hup2 * (_rF + 1.5))
 	hpanel.translate_object_local(Vector3(-3.9, 0, 2.9))
@@ -2936,7 +3003,7 @@ func _service_wing() -> void:
 		prm.inner_radius = 1.4
 		prm.outer_radius = 1.6
 		pring.mesh = prm
-		pring.material_override = Surfaces.cached_emissive(AMBER, 1.5)
+		pring.material_override = _femissive(AMBER, 1.5)
 		add_child(pring)
 		pring.global_transform = Transform3D(gb2, _C + gup2 * (_rF + 0.08))
 		pring.translate_object_local(poff)
@@ -2987,7 +3054,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	# the 3D SIGNAL SCREEN on the +X wall
 	var sfr := MeshInstance3D.new()
 	sfr.mesh = IcosaColony._cham_mesh(3.0, 0.08, 6.0, 0.45)
-	sfr.material_override = Surfaces.cached_emissive(AMBER, 1.3)
+	sfr.material_override = _femissive(AMBER, 1.3)
 	add_child(sfr)
 	sfr.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.4))
 	sfr.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
@@ -3012,7 +3079,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	dlm.bottom_radius = 0.5
 	dlm.height = 0.14
 	dial.mesh = dlm
-	dial.material_override = Surfaces.cached_emissive(AMBER, 1.5)
+	dial.material_override = _femissive(AMBER, 1.5)
 	add_child(dial)
 	dial.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.1))
 	dial.translate_object_local(Vector3(2.6, 0, 0))
@@ -3030,7 +3097,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 		var bpm2 := BoxMesh.new()
 		bpm2.size = Vector3(0.5, 0.24, 0.5) if mode == 0 else Vector3(0.44, 0.22, 0.44)
 		bmi.mesh = bpm2
-		bmi.material_override = Surfaces.cached_emissive(btn[1], 1.8)
+		bmi.material_override = _femissive(btn[1], 1.8)
 		if mode == 0:
 			_radio_pwr_mat = bmi.material_override
 		rb.add_child(bmi)
@@ -3058,7 +3125,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	# on the -Z wall
 	var spfr := MeshInstance3D.new()
 	spfr.mesh = IcosaColony._cham_mesh(2.2, 0.08, 5.0, 0.4)
-	spfr.material_override = Surfaces.cached_emissive(AMBER, 1.3)
+	spfr.material_override = _femissive(AMBER, 1.3)
 	add_child(spfr)
 	spfr.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.2))
 	spfr.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
@@ -3083,6 +3150,9 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	_chatter(Transform3D(cb2, _C + up2 * (_rF + 1.0)).origin, 77, -14.0)
 
 func _radio_btn(mode: int) -> void:
+	if not _powered:
+		Sfx.play("denied", -16.0)
+		return
 	if _radio_cool > 0.0:
 		return
 	_radio_cool = 0.35
@@ -3333,7 +3403,7 @@ func _console(fb: Basis, up: Vector3, s: float) -> void:
 	_plate(Vector3(1.1, 1.05, 2.4), bxf, Vector3(s * 4.35, 0, 0), Color("#12161c"), 0.0)
 	var pan := MeshInstance3D.new()
 	pan.mesh = IcosaColony._cham_mesh(0.95, 0.05, 2.45, 0.22)
-	pan.material_override = Surfaces.cached_emissive(AMBER.darkened(0.15), 1.5)
+	pan.material_override = _femissive(AMBER.darkened(0.15), 1.5)
 	add_child(pan)
 	pan.global_transform = Transform3D(
 		fb * Basis(Vector3(0, 0, 1), deg_to_rad(-s * 28.0)),
@@ -3430,7 +3500,7 @@ func _void_pois() -> void:
 		var ckm := BoxMesh.new()
 		ckm.size = Vector3(0.12, 2.2, 0.5)
 		crack.mesh = ckm
-		crack.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+		crack.material_override = _femissive(AMBER, 1.6)
 		add_child(crack)
 		crack.global_transform = pxf.translated_local(Vector3(1.0, 0.2, 0))
 		var vc := VoidCache.new()
@@ -3472,7 +3542,7 @@ func _void_pois() -> void:
 		vm9.radius = 0.4
 		vm9.height = 0.8
 		vein.mesh = vm9
-		vein.material_override = Surfaces.cached_emissive(Color("#7dff5a"), 2.2)
+		vein.material_override = _femissive(Color("#7dff5a"), 2.2)
 		add_child(vein)
 		vein.global_transform = axf.translated_local(Vector3(0.9, 0.1, 0))
 		var tap := VoidCache.new()
@@ -3536,7 +3606,7 @@ func _void_pois() -> void:
 	_plate(Vector3(2.6, 0.4, 2.6), sxf, Vector3(0, -0.2, 0), Color("#12161c"), 0.0)
 	var st9 := MeshInstance3D.new()
 	st9.mesh = _tetra_mesh(0.6)
-	st9.material_override = Surfaces.cached_emissive(Color("#ffd23f"), 2.0)
+	st9.material_override = _femissive(Color("#ffd23f"), 2.0)
 	add_child(st9)
 	st9.global_transform = sxf.translated_local(Vector3(0, 1.6, 0))
 	_spins.append({"node": st9, "rate": 0.5})
@@ -3673,7 +3743,7 @@ func _hub(dir: Vector3, r: float, doors: Array) -> Array:
 	jlm.bottom_radius = 0.7
 	jlm.height = 0.08
 	jl.mesh = jlm
-	jl.material_override = Surfaces.cached_emissive(Color("#66ff99"), 1.9)
+	jl.material_override = _femissive(Color("#66ff99"), 1.9)
 	add_child(jl)
 	jl.global_transform = xf0.translated_local(Vector3(0, 3.5, 0))
 	_chatter(xf0.translated_local(Vector3(0, 1.2, 0)).origin,
@@ -3722,7 +3792,7 @@ func _checkpoint(from_pt: Vector3, away: Vector3, idx: int) -> void:
 	clm2.bottom_radius = 0.5
 	clm2.height = 0.08
 	cl.mesh = clm2
-	cl.material_override = Surfaces.cached_emissive(Color("#ff8a2a"), 1.8)
+	cl.material_override = _femissive(Color("#ff8a2a"), 1.8)
 	add_child(cl)
 	cl.global_transform = xf0.translated_local(Vector3(0, 2.8, 0))
 	# the connecting stub
@@ -3807,7 +3877,7 @@ func _noodle_room(dir: Vector3, r: float, door_from: Vector3) -> Vector3:
 	nlm.bottom_radius = 1.0
 	nlm.height = 0.08
 	nl9.mesh = nlm
-	nl9.material_override = Surfaces.cached_emissive(Color("#fff3d0"), 2.0)
+	nl9.material_override = _femissive(Color("#fff3d0"), 2.0)
 	add_child(nl9)
 	nl9.global_transform = xf0.translated_local(Vector3(0, 4.0, 0))
 	_net_probes.append(xf0.origin)
@@ -3964,7 +4034,7 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 		var dbm := BoxMesh.new()
 		dbm.size = Vector3(0.8, 2.3, 0.14)
 		dm.mesh = dbm
-		dm.material_override = Surfaces.cached_emissive(AMBER.darkened(0.35), 0.8)
+		dm.material_override = _femissive(AMBER.darkened(0.35), 0.8)
 		d.add_child(dm)
 		var dc := CollisionShape3D.new()
 		var dbs := BoxShape3D.new()
@@ -3980,7 +4050,7 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 	clm.bottom_radius = 0.5
 	clm.height = 0.06
 	cl.mesh = clm
-	cl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 2.0)
+	cl.material_override = _femissive(Color("#f2ead8"), 2.0)
 	root.add_child(cl)
 	cl.position = Vector3(0, 2.62, 0)
 	# it LOOKS like an elevator now: glowing amber door frame + a lit
@@ -3992,7 +4062,7 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 		var fbm := BoxMesh.new()
 		fbm.size = dfr[0]
 		fmi.mesh = fbm
-		fmi.material_override = Surfaces.cached_emissive(AMBER, 1.7)
+		fmi.material_override = _femissive(AMBER, 1.7)
 		root.add_child(fmi)
 		fmi.position = dfr[1]
 	var sgn := Label3D.new()
@@ -4018,7 +4088,7 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 		var bbm := BoxMesh.new()
 		bbm.size = Vector3(0.1, 0.24, 0.24)
 		bmi.mesh = bbm
-		bmi.material_override = Surfaces.cached_emissive(AMBER, 1.9)
+		bmi.material_override = _femissive(AMBER, 1.9)
 		btn.add_child(bmi)
 		var bcs := CollisionShape3D.new()
 		var bbs := BoxShape3D.new()
@@ -4052,6 +4122,10 @@ func _doors_set(stop: Dictionary, open: bool, snap: bool) -> void:
 			tw.tween_property(d, "position:x", sx, 0.4)
 
 func _lift_go(l: int, target: int) -> void:
+	if not _powered:
+		_hud_flash("elevator dead. the facility is dark")
+		Sfx.play("denied", -14.0)
+		return
 	if _lift_busy > 0.0 or l >= _lifts.size():
 		return
 	var st: Array = _lifts[l]
@@ -4112,7 +4186,7 @@ func _lower_floors() -> void:
 	vlm.bottom_radius = 1.0
 	vlm.height = 0.08
 	vl.mesh = vlm
-	vl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 2.0)
+	vl.material_override = _femissive(Color("#f2ead8"), 2.0)
 	add_child(vl)
 	vl.global_transform = vxf.translated_local(Vector3(0, 4.9, 0))
 	_sign("DATA VAULT", vb, vxf.origin + vd * 3.6, Vector3(0, 0, -5.7), 0.0)
@@ -4328,7 +4402,7 @@ func _stash(xf: Transform3D, off: Vector3, key: String, loot: Dictionary,
 	st9.add_child(bmi)
 	var seam := MeshInstance3D.new()
 	seam.mesh = Surfaces.box_mesh(Vector3(1.14, 0.08, 0.84))
-	seam.material_override = Surfaces.cached_emissive(col, 1.8)
+	seam.material_override = _femissive(col, 1.8)
 	seam.position = Vector3(0, 0.2, 0)
 	st9.add_child(seam)
 	var cs := CollisionShape3D.new()
@@ -4421,7 +4495,7 @@ func _gold_suite() -> void:
 	chm.inner_radius = 2.0
 	chm.outer_radius = 2.25
 	chand.mesh = chm
-	chand.material_override = Surfaces.cached_emissive(GOLD, 2.0)
+	chand.material_override = _femissive(GOLD, 2.0)
 	add_child(chand)
 	chand.global_transform = xf0.translated_local(Vector3(-10.2, 4.8, 0))
 	_spins.append({"node": chand, "rate": 0.3})
@@ -4431,7 +4505,7 @@ func _gold_suite() -> void:
 	rugm.bottom_radius = 3.2
 	rugm.height = 0.06
 	rug.mesh = rugm
-	rug.material_override = Surfaces.cached_emissive(Color("#4a1a2e"), 0.2)
+	rug.material_override = _femissive(Color("#4a1a2e"), 0.2)
 	add_child(rug)
 	rug.global_transform = xf0.translated_local(Vector3(-10.2, 0.03, 0))
 	# FOUR oversized gold bunks with grav rings and reading pearls
@@ -4441,13 +4515,13 @@ func _gold_suite() -> void:
 		gr2m.inner_radius = 1.1
 		gr2m.outer_radius = 1.7
 		gr2.mesh = gr2m
-		gr2.material_override = Surfaces.cached_emissive(GOLD, 1.8)
+		gr2.material_override = _femissive(GOLD, 1.8)
 		add_child(gr2)
 		gr2.global_transform = xf0.translated_local(
 			Vector3(float(vb[0]), 0.14, float(vb[1])))
 		var vbk := MeshInstance3D.new()
 		vbk.mesh = IcosaColony._cham_mesh(4.6, 0.55, 2.6, 0.45)
-		vbk.material_override = Surfaces.cached_emissive(Color("#3a2436"), 0.3)
+		vbk.material_override = _femissive(Color("#3a2436"), 0.3)
 		add_child(vbk)
 		vbk.global_transform = xf0.translated_local(
 			Vector3(float(vb[0]), 0.95, float(vb[1])))
@@ -4456,7 +4530,7 @@ func _gold_suite() -> void:
 		plwm.radius = 0.45
 		plwm.height = 0.55
 		plw.mesh = plwm
-		plw.material_override = Surfaces.cached_emissive(GOLD.lightened(0.3), 0.7)
+		plw.material_override = _femissive(GOLD.lightened(0.3), 0.7)
 		add_child(plw)
 		plw.global_transform = xf0.translated_local(
 			Vector3(float(vb[0]) + 1.6, 1.4, float(vb[1])))
@@ -4466,7 +4540,7 @@ func _gold_suite() -> void:
 	vlm.bottom_radius = 1.2
 	vlm.height = 0.08
 	vl.mesh = vlm
-	vl.material_override = Surfaces.cached_emissive(Color("#fff3d0"), 2.0)
+	vl.material_override = _femissive(Color("#fff3d0"), 2.0)
 	add_child(vl)
 	vl.global_transform = xf0.translated_local(Vector3(-10.2, 5.4, 0))
 	_sign("SPECIAL DUDES ONLY", fb, _C + up * (R_LOW + 3.6),
@@ -4504,7 +4578,7 @@ func _lring_room(ac: float, sd: float, name: String) -> Dictionary:
 	rlm.bottom_radius = 0.8
 	rlm.height = 0.08
 	rl.mesh = rlm
-	rl.material_override = Surfaces.cached_emissive(Color("#f2ead8"), 1.9)
+	rl.material_override = _femissive(Color("#f2ead8"), 1.9)
 	add_child(rl)
 	rl.global_transform = Transform3D(fb, _C + up * (R_LOW + 4.45))
 	rl.translate_object_local(Vector3(sd * 7.9, 0, 0))
@@ -4592,7 +4666,7 @@ func _lower_ring() -> void:
 		whm.inner_radius = 0.28
 		whm.outer_radius = 0.42
 		wheel.mesh = whm
-		wheel.material_override = Surfaces.cached_emissive(Color("#ff6a6a"), 1.2)
+		wheel.material_override = _femissive(Color("#ff6a6a"), 1.2)
 		add_child(wheel)
 		wheel.global_transform = uxf.translated_local(
 			Vector3(float(pr["cx"]) - 2.1, 0.9, pz))
@@ -4622,7 +4696,7 @@ func _lower_ring() -> void:
 		var lvm := BoxMesh.new()
 		lvm.size = Vector3(0.1, 2.6, 0.3)
 		lvl.mesh = lvm
-		lvl.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 1.7)
+		lvl.material_override = _femissive(Color("#7df9ff"), 1.7)
 		add_child(lvl)
 		lvl.global_transform = txf.translated_local(
 			Vector3(float(cr["cx"]) + float(tz[0]) - 1.58, 1.8, float(tz[1])))
@@ -4713,7 +4787,7 @@ func _airlock(xf: Transform3D) -> void:
 		bm.size = size
 		mi.mesh = bm
 		mi.material_override = Surfaces.metal(col) if emit <= 0.3 \
-			else Surfaces.cached_emissive(col, emit)
+			else _femissive(col, emit)
 		sb.add_child(mi)
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
@@ -4733,7 +4807,7 @@ func _airlock(xf: Transform3D) -> void:
 		var gb := BoxMesh.new()
 		gb.size = gspec[0]
 		gd.mesh = gb
-		gd.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 2.6)
+		gd.material_override = _femissive(Color("#7df9ff"), 2.6)
 		root.add_child(gd)
 		gd.position = gspec[1]
 	# the beacon over the outside face -- visible across the hollow
@@ -4775,7 +4849,7 @@ func _airlock(xf: Transform3D) -> void:
 		var fgb := BoxMesh.new()
 		fgb.size = fg9[0]
 		fgm.mesh = fgb
-		fgm.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 2.6)
+		fgm.material_override = _femissive(Color("#7df9ff"), 2.6)
 		root.add_child(fgm)
 		fgm.position = fg9[1]
 	for rs9 in [-1.0, 1.0]:
@@ -4787,7 +4861,7 @@ func _airlock(xf: Transform3D) -> void:
 			var rgb9 := BoxMesh.new()
 			rgb9.size = rg9[0]
 			rgm9.mesh = rgb9
-			rgm9.material_override = Surfaces.cached_emissive(
+			rgm9.material_override = _femissive(
 				Color("#7df9ff"), 2.4)
 			root.add_child(rgm9)
 			rgm9.position = rg9[1]
@@ -4797,13 +4871,13 @@ func _airlock(xf: Transform3D) -> void:
 	var dbm := BoxMesh.new()
 	dbm.size = Vector3(2.25, 2.85, 0.3)
 	dmi.mesh = dbm
-	dmi.material_override = Surfaces.cached_emissive(Color("#31384a"), 0.5)
+	dmi.material_override = _femissive(Color("#31384a"), 0.5)
 	door.add_child(dmi)
 	var dstripe := MeshInstance3D.new()
 	var dsm := BoxMesh.new()
 	dsm.size = Vector3(1.7, 0.14, 0.34)
 	dstripe.mesh = dsm
-	dstripe.material_override = Surfaces.cached_emissive(AMBER, 1.8)
+	dstripe.material_override = _femissive(AMBER, 1.8)
 	door.add_child(dstripe)
 	dstripe.position = Vector3(0, 0.6, 0)
 	var dcs := CollisionShape3D.new()
@@ -4829,6 +4903,28 @@ var _svc_cd: Dictionary = {}
 
 func _service(kind: String) -> void:
 	var now := Game.playtime
+	if kind == "feed":
+		# the MAINTENANCE act: coal +120, uranium +600
+		if Inventory.res_count("uranium") > 0:
+			Inventory.remove_res("uranium", 1)
+			Game.facility_power = minf(Game.FACILITY_MAX,
+				Game.facility_power + 600.0)
+		elif Inventory.res_count("coal") > 0:
+			Inventory.remove_res("coal", 1)
+			Game.facility_power = minf(Game.FACILITY_MAX,
+				Game.facility_power + 120.0)
+		else:
+			_hud_flash("the reactor eats coal or uranium. bring some")
+			Sfx.play("denied", -14.0)
+			return
+		Sfx.play("smelt" if Inventory.res_count("coal") >= 0 else "place", -8.0)
+		_hud_flash("reactor fed: %d / %d power" % [int(Game.facility_power),
+			int(Game.FACILITY_MAX)])
+		return
+	if not _powered:
+		_hud_flash("the facility is DARK. feed the reactor first")
+		Sfx.play("denied", -14.0)
+		return
 	match kind:
 		"heal":
 			if now < float(_svc_cd.get("heal", 0.0)):
@@ -4898,7 +4994,7 @@ func _svc_node(xf: Transform3D, off: Vector3, kind: String, label: String,
 	om9.radius = 0.26
 	om9.height = 0.52
 	orb.mesh = om9
-	orb.material_override = Surfaces.cached_emissive(col, 2.0)
+	orb.material_override = _femissive(col, 2.0)
 	sv.add_child(orb)
 	orb.position = Vector3(0, 1.25, 0)
 	var cs := CollisionShape3D.new()
@@ -4943,7 +5039,7 @@ func _surface_btn(pt: Vector3) -> void:
 	var bbm := BoxMesh.new()
 	bbm.size = Vector3(0.34, 0.34, 0.18)
 	bmi.mesh = bbm
-	bmi.material_override = Surfaces.cached_emissive(Color("#66ff99"), 1.9)
+	bmi.material_override = _femissive(Color("#66ff99"), 1.9)
 	btn.add_child(bmi)
 	var bcs := CollisionShape3D.new()
 	var bbs := BoxShape3D.new()
@@ -5139,7 +5235,7 @@ func _plate(size: Vector3, xf: Transform3D, off: Vector3,
 	var mi := MeshInstance3D.new()
 	mi.mesh = Surfaces.box_mesh(size)
 	mi.material_override = Surfaces.metal(col) if emit <= 0.3 \
-		else Surfaces.cached_emissive(col, emit)
+		else _femissive(col, emit)
 	sb.add_child(mi)
 	var cs := CollisionShape3D.new()
 	cs.shape = Surfaces.box_shape(size)
@@ -5153,12 +5249,26 @@ func _deco_box(size: Vector3, xf: Transform3D, off: Vector3,
 	var mi := MeshInstance3D.new()
 	mi.mesh = Surfaces.box_mesh(size)
 	mi.material_override = Surfaces.metal(col) if emit <= 0.3 \
-		else Surfaces.cached_emissive(col, emit)
+		else _femissive(col, emit)
 	add_child(mi)
 	mi.global_transform = xf
 	mi.translate_object_local(off)
 
 func _process(delta: float) -> void:
+	# the facility BURNS fuel while the world runs. Empty = blackout.
+	Game.facility_power = maxf(0.0, Game.facility_power - delta)
+	if Game.facility_power <= 0.0 and _powered:
+		_set_power(false)
+	elif Game.facility_power > 0.0 and not _powered:
+		_set_power(true)
+	if Game.facility_power < 180.0 and _powered and not _pwr_warned:
+		_pwr_warned = true
+		_hud_flash("BIG COMPUTER: reserves under 10 percent")
+		Sfx.play("denied", -14.0)
+	elif Game.facility_power > 300.0:
+		_pwr_warned = false
+	if not _powered:
+		return   # a dark facility does not animate, blink, or speak
 	_t += delta
 	for bl in _blinks:
 		# unshaded materials show ALBEDO regardless of emission -- to

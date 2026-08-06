@@ -288,6 +288,7 @@ func apply_progress() -> void:
 	Game.void_loot = _progress.get("void_loot", {})
 	Game.ai_blessed = bool(_progress.get("ai_blessed", false))
 	Game.charts_unlocked = bool(_progress.get("charts_unlocked", false))
+	Game.facility_power = float(_progress.get("facility_power", 1800.0))
 	Game.mind_core = bool(_progress.get("mind_core", false))
 	Game.cheated = bool(_progress.get("cheated", false))
 	Game.godmode = bool(_progress.get("c_god", false))
@@ -374,6 +375,7 @@ func save_progress() -> void:
 		"void_loot": Game.void_loot,
 		"ai_blessed": Game.ai_blessed,
 		"charts_unlocked": Game.charts_unlocked,
+		"facility_power": Game.facility_power,
 		"mind_core": Game.mind_core,
 		"cheated": Game.cheated,
 		"c_god": Game.godmode,

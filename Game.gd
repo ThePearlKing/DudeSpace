@@ -166,7 +166,11 @@ var monolith_stage: int = 0
 var void_loot: Dictionary = {}
 var underwater: bool = false     # inside an ocean world's water right now
 var ai_blessed: bool = false     # synced with the DUDE A.I.: sells pay +10%
-var charts_unlocked: bool = false  # map room star charts: hidden worlds shown   # hollow-POI caches already claimed
+var charts_unlocked: bool = false  # map room star charts: hidden worlds shown
+# BIG COMPUTER runs on fuel now. Drains while you play; feed the
+# reactor coal/uranium or the whole facility goes DARK.
+var facility_power: float = 1800.0
+const FACILITY_MAX := 1800.0   # hollow-POI caches already claimed
 const MONO_COLORS: Array = [Color("#ffd23f"), Color("#7fff3a"),
 	Color("#ff8a2a"), Color("#2a6fff"), Color("#ff3a2a"), Color("#ff7ce9"),
 	Color("#7df9ff"), Color("#f2f2f2")]
