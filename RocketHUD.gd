@@ -36,8 +36,7 @@ class _NavView extends Control:
 	func _place_name(body) -> String:
 		var rr := rocket.global_position.length()
 		if Game.zone == "" and rr > Universe.BOUNDARY:
-			return "THE DARK" if rr > Universe.BOUNDARY * 1.5 \
-				else "THE WHITE ZONE"
+			return "SPACE"
 		return str(body.name)
 
 	func _draw() -> void:
