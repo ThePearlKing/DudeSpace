@@ -749,6 +749,22 @@ func _mainframe_test() -> void:
 				dflr, dcei,
 				"PASS" if dflr >= 0.0 and dcei >= 0.0 else "FAIL"])
 			idx9 += 1
+	# 9. DOORWAY SWEEP: a knee-height ray THROUGH every deck side-room
+	# door. Anything it hits inside the span is a step/blocker bug.
+	for dspec in [[3, -1.0, "LAB"], [5, 1.0, "AQUARIUM"],
+			[9, 1.0, "MAP ROOM"], [11, -1.0, "CARGO BAY"]]:
+		var ad9: float = 0.115 + step * float(int(dspec[0]))
+		var pd9b := (u0 * cos(ad9) + e1 * sin(ad9)).normalized()
+		var tb9 := (-u0 * sin(ad9) + e1 * cos(ad9)).normalized()
+		var e2b := pd9b.cross(tb9).normalized()
+		var sgn9: float = float(dspec[1])
+		var from9b := C + pd9b * (rF + 0.28) + e2b * sgn9 * 3.4
+		var to9b := C + pd9b * (rF + 0.28) + e2b * sgn9 * 7.6
+		var q9 := PhysicsRayQueryParameters3D.create(from9b, to9b)
+		var hit9 := space.intersect_ray(q9)
+		print("MFTEST door %s: knee ray %s" % [str(dspec[2]),
+			"CLEAR PASS" if hit9.is_empty() else
+			"BLOCKED at %.2fm FAIL" % (hit9.position as Vector3).distance_to(from9b)])
 	print("MFTEST done")
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot

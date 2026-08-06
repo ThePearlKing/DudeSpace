@@ -58,6 +58,7 @@ var _e_pts: Dictionary = {}    # hidden data-tunnel entrances
 var _vp: Dictionary = {}       # room vent-hole endpoints
 var _duct_end: Vector3
 var _duct_out: Vector3
+var _duct_bas: Basis
 var _lifts: Array = []         # elevator stop lists
 var _lift_busy := 0.0
 var _net_probes: Array = []    # world positions MFTEST can floor-check
@@ -98,23 +99,27 @@ func _rack(fbR: Basis, upR: Vector3, rbase: float, off: Vector3,
 		_deco_box(Vector3(0.06, 0.07, 0.8),
 			Transform3D(fbR, _C + upR * (rbase + 0.7 + 0.65 * float(sl))),
 			off + Vector3(-fs * 0.66, 0, 0), Color("#66ff99"), 1.8)
-	for db9 in 2:
+	# FOUR fat status lights per rack, staggered phases, mixed colors --
+	# a server wall should look like it is THINKING
+	for db9 in 4:
 		var rdot := MeshInstance3D.new()
 		var rdm := BoxMesh.new()
-		rdm.size = Vector3(0.09, 0.09, 0.09)
+		rdm.size = Vector3(0.14, 0.14, 0.1)
 		rdot.mesh = rdm
 		var rdmat := StandardMaterial3D.new()
 		rdmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		var rdc: Color = AMBER if db9 == 0 else Color("#66ff99")
+		var rdc: Color = [AMBER, Color("#66ff99"), Color("#ff4444"),
+			Color("#7df9ff")][db9]
 		rdmat.albedo_color = rdc
 		rdmat.emission_enabled = true
 		rdmat.emission = rdc
 		rdot.material_override = rdmat
 		add_child(rdot)
-		rdot.global_transform = Transform3D(fbR, _C + upR * (rbase + 3.05))
+		rdot.global_transform = Transform3D(fbR,
+			_C + upR * (rbase + 2.75 + 0.35 * float(db9 % 2)))
 		rdot.translate_object_local(off + Vector3(-fs * 0.66, 0,
-			0.3 - 0.6 * float(db9)))
-		_blinks.append({"mat": rdmat, "phase": ph + float(db9) * 0.45})
+			0.33 - 0.22 * float(db9)))
+		_blinks.append({"mat": rdmat, "phase": ph + float(db9) * 0.37})
 
 ## spherical helpers: direction / frame at arc angle a, lateral angle b
 func _sdir(a: float, beta: float) -> Vector3:
@@ -196,6 +201,22 @@ func build(b, dir: Vector3) -> void:
 	_a0 = 0.115
 	var abas := _fr(0.0)
 
+	# ---- the crust, visible from INSIDE: a big inward-facing shell so
+	# the hollow planet reads as rock overhead, not floating furniture
+	var crust := MeshInstance3D.new()
+	var crm := SphereMesh.new()
+	crm.radius = R - 1.2
+	crm.height = (R - 1.2) * 2.0
+	crm.radial_segments = 48
+	crm.rings = 24
+	crust.mesh = crm
+	var crmat := StandardMaterial3D.new()
+	crmat.cull_mode = BaseMaterial3D.CULL_FRONT
+	crmat.albedo_color = Color("#0c1017")
+	crmat.roughness = 1.0
+	crust.material_override = crmat
+	add_child(crust)
+	crust.global_position = _C
 	# ---- surface kit: rim, collar, apron, masts ----
 	var rim := MeshInstance3D.new()
 	var tmm := TorusMesh.new()
@@ -288,22 +309,22 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(5.1, 7.0, 0.5), awxf, Vector3(-3.75, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.4, 4.0, 0.5), awxf, Vector3(0, 1.75, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.15, 7.0, 0.5), awxf, Vector3(2.275, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(1.1, 4.3, 0.5), awxf, Vector3(3.9, 1.35, -6.05), STEEL, 0.0)
-	_plate(Vector3(1.85, 7.0, 0.5), awxf, Vector3(5.375, 0, -6.05), STEEL, 0.0)
-	for vg in [[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -1.0, -6.0)],
-			[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -3.3, -6.0)],
-			[Vector3(0.1, 2.4, 0.1), Vector3(3.25, -2.15, -6.0)],
-			[Vector3(0.1, 2.4, 0.1), Vector3(4.55, -2.15, -6.0)]]:
+	_plate(Vector3(1.3, 4.1, 0.5), awxf, Vector3(3.9, 1.45, -6.05), STEEL, 0.0)
+	_plate(Vector3(1.6, 7.0, 0.5), awxf, Vector3(5.5, 0, -6.05), STEEL, 0.0)
+	for vg in [[Vector3(1.5, 0.1, 0.1), Vector3(3.9, -0.75, -6.0)],
+			[Vector3(0.1, 2.9, 0.1), Vector3(3.1, -2.1, -6.0)],
+			[Vector3(0.1, 2.9, 0.1), Vector3(4.7, -2.1, -6.0)]]:
 		_deco_box(vg[0], awxf, vg[1], AMBER, 1.3)
-	# the duct: tall enough to WALK now -- it no longer dead-ends, it is
+	# the duct: a full 2.4-wide WALK-IN, flush with the atrium floor --
 	# the atrium's mouth of the secret vent network
-	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -3.65, -8.1), STEEL, 0.0)
-	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -0.95, -8.1), STEEL, 0.0)
-	_plate(Vector3(0.4, 3.1, 3.6), awxf, Vector3(3.15, -2.3, -8.1), STEEL, 0.0)
-	_plate(Vector3(0.4, 3.1, 3.6), awxf, Vector3(4.65, -2.3, -8.1), STEEL, 0.0)
+	_plate(Vector3(3.2, 0.4, 4.3), awxf, Vector3(3.9, -3.65, -8.1), STEEL, 0.0)
+	_plate(Vector3(3.2, 0.4, 4.3), awxf, Vector3(3.9, -0.75, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.3, 4.3), awxf, Vector3(2.9, -2.05, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.3, 4.3), awxf, Vector3(4.9, -2.05, -8.1), STEEL, 0.0)
 	_duct_end = Transform3D(abas, _C + _u0 * (_rF + 3.25)) \
-		.translated_local(Vector3(3.9, -3.45, -9.6)).origin
+		.translated_local(Vector3(3.9, -3.45, -9.9)).origin
 	_duct_out = (abas * Vector3(0, 0, -1)).normalized()
+	_duct_bas = Basis(abas * Vector3(1, 0, 0), _u0, _duct_out).orthonormalized()
 	_deco_box(Vector3(0.04, 0.08, 3.4), awxf, Vector3(3.4, -2.2, -8.1),
 		Color("#66ff99"), 1.1)
 	var vring := MeshInstance3D.new()
@@ -467,7 +488,10 @@ func build(b, dir: Vector3) -> void:
 			_deco_box(Vector3(0.5, 0.08, 3.4),
 				Transform3D(fb, _C + up * (_rF + 5.85)), Vector3.ZERO,
 				Color("#f2ead8"), 2.2)
-		if i % 2 == 1 and i != HATCH_SEG:
+		if i % 2 == 1 and i != HATCH_SEG and not rooms.has(i):
+			# consoles NEVER share a segment with a doorway -- four of
+			# them used to sit exactly in the door paths ("stepping
+			# stones" that blocked every side room)
 			_console(fb, up, 1.0 if (i / 2) % 2 == 0 else -1.0)
 	var aend := _a0 + _step * float(SEGS - 1)
 	_sign("CORE >>", _fr(aend), _C + _pdir(aend) * (_rF + 4.6),
@@ -1218,25 +1242,25 @@ func _ring_room(fam: int, ac: float, s: float, name: String,
 	else:
 		var zs9: Array = [0.0] if vholes == 1 else [-2.8, 2.8]
 		if vholes == 1:
-			_plate(Vector3(0.5, 5.5, 4.05), wxf, Vector3(s * 13.05, 0, 2.775), STEEL, 0.0)
-			_plate(Vector3(0.5, 5.5, 4.05), wxf, Vector3(s * 13.05, 0, -2.775), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 3.35), wxf, Vector3(s * 13.05, 0, 3.125), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 3.35), wxf, Vector3(s * 13.05, 0, -3.125), STEEL, 0.0)
 		else:
-			_plate(Vector3(0.5, 5.5, 4.1), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
-			_plate(Vector3(0.5, 5.5, 1.25), wxf, Vector3(s * 13.05, 0, 4.175), STEEL, 0.0)
-			_plate(Vector3(0.5, 5.5, 1.25), wxf, Vector3(s * 13.05, 0, -4.175), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 3.0), wxf, Vector3(s * 13.05, 0, 0), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 0.7), wxf, Vector3(s * 13.05, 0, 4.45), STEEL, 0.0)
+			_plate(Vector3(0.5, 5.5, 0.7), wxf, Vector3(s * 13.05, 0, -4.45), STEEL, 0.0)
 		for z9 in zs9:
 			var zf: float = float(z9)
-			# a SQUARE-ish grille, raised off the floor, with a step
-			_plate(Vector3(0.5, 0.9, 1.5), wxf, Vector3(s * 13.05, -2.3, zf), STEEL, 0.0)
-			_plate(Vector3(0.5, 2.55, 1.5), wxf, Vector3(s * 13.05, 1.475, zf), STEEL, 0.0)
-			_plate(Vector3(1.5, 0.4, 0.7), wxf, Vector3(s * 12.55, -2.05, zf), STEEL, 0.0)
-			_deco_box(Vector3(0.08, 2.2, 0.08), wxf, Vector3(s * 12.78, -0.85, zf - 0.5), AMBER, 1.3)
-			_deco_box(Vector3(0.08, 2.2, 0.08), wxf, Vector3(s * 12.78, -0.85, zf + 0.5), AMBER, 1.3)
-			_deco_box(Vector3(0.08, 0.08, 1.6), wxf, Vector3(s * 12.78, -1.2, zf), AMBER, 1.3)
-			_deco_box(Vector3(0.08, 0.08, 1.6), wxf, Vector3(s * 12.78, -0.4, zf), AMBER, 1.3)
-			vent_pts.append({"p": Transform3D(fb, _C + up * (_rF + 0.35)) \
-				.translated_local(Vector3(s * 14.2, 0, zf)).origin,
-				"o": (fb * Vector3(s, 0, 0)).normalized()})
+			# a WALK-IN vent: 2.6 x 2.6 opening flush with the floor.
+			# nothing to step over, nothing clipping your hitbox.
+			_plate(Vector3(0.5, 2.65, 2.6), wxf, Vector3(s * 13.05, 1.425, zf), STEEL, 0.0)
+			_deco_box(Vector3(0.08, 2.7, 0.08), wxf, Vector3(s * 12.78, -0.9, zf - 1.36), AMBER, 1.3)
+			_deco_box(Vector3(0.08, 2.7, 0.08), wxf, Vector3(s * 12.78, -0.9, zf + 1.36), AMBER, 1.3)
+			_deco_box(Vector3(0.08, 0.08, 2.85), wxf, Vector3(s * 12.78, 0.48, zf), AMBER, 1.3)
+			vent_pts.append({"p": Transform3D(fb, _C + up * (_rF - 0.25)) \
+				.translated_local(Vector3(s * 13.3, 0, zf)).origin,
+				"o": (fb * Vector3(s, 0, 0)).normalized(),
+				"b": Basis(fb * Vector3(0, 0, 1), up, fb * Vector3(s, 0, 0))
+				.orthonormalized()})
 	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, 4.55), STEEL, 0.0)
 	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(s * 8.3, 0, -4.55), STEEL, 0.0)
 	var rl := MeshInstance3D.new()
@@ -1594,10 +1618,11 @@ func _cockpit_dress() -> void:
 ## conduits converging on it, and two operator consoles nobody sits at.
 func _dress_ai() -> void:
 	var aA := 2.685
-	var fw := aA + 12.9 / _rF
-	var fb9 := _fr(fw)
-	var fup := _pdir(fw)
-	# the FACE: a 10x5 screen on the far end wall
+	var fb9 := _fr(aA)
+	var fup := _pdir(aA)
+	# the FACE: a 10x5 screen on the +X SIDE wall -- the end walls carry
+	# the ring doorways to PLANET CONTROL, and the A.I. does not block
+	# the way to anywhere
 	var face := MeshInstance3D.new()
 	var fqm := QuadMesh.new()
 	fqm.size = Vector2(10.0, 5.0)
@@ -1606,7 +1631,8 @@ func _dress_ai() -> void:
 	face.material_override = _ai_mat
 	add_child(face)
 	face.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.6))
-	face.rotate_object_local(Vector3(0, 1, 0), PI)
+	face.rotate_object_local(Vector3(0, 1, 0), PI * 0.5)
+	face.translate_object_local(Vector3(0, 0, -6.9))
 	# background visuals flanking the face: two data-rain panels
 	for bx9 in [-1.0, 1.0]:
 		var bgp := MeshInstance3D.new()
@@ -1616,29 +1642,29 @@ func _dress_ai() -> void:
 		bgp.material_override = _data_mat()
 		add_child(bgp)
 		bgp.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.6))
-		bgp.rotate_object_local(Vector3(0, 1, 0), PI)
+		bgp.rotate_object_local(Vector3(0, 1, 0), PI * 0.5)
 		bgp.translate_object_local(Vector3(bx9 * 6.6, 0, 0.1))
-	# the TERMINAL: a desk console below the face. F wakes the A.I. --
-	# it speaks THROUGH the face, one line at a time, in order.
-	_plate(Vector3(2.6, 1.05, 1.1), Transform3D(fb9, _C + fup * (_rF + 0.52)),
-		Vector3(0, 0, 2.2), Color("#12161c"), 0.0)
+	# the TERMINAL: a desk console in front of the face. F wakes the
+	# A.I. -- it speaks THROUGH the face, one line at a time, in order.
+	_plate(Vector3(1.1, 1.05, 2.6), Transform3D(fb9, _C + fup * (_rF + 0.52)),
+		Vector3(-4.4, 0, 0), Color("#12161c"), 0.0)
 	var tpan := MeshInstance3D.new()
-	tpan.mesh = IcosaColony._cham_mesh(2.4, 0.05, 0.95, 0.22)
+	tpan.mesh = IcosaColony._cham_mesh(0.95, 0.05, 2.4, 0.22)
 	tpan.material_override = Destructible.make_material(Color("#2a8f4a"), 1.6)
 	add_child(tpan)
-	tpan.global_transform = Transform3D(fb9 * Basis(Vector3(1, 0, 0), 0.5),
+	tpan.global_transform = Transform3D(fb9 * Basis(Vector3(0, 0, 1), 0.5),
 		_C + fup * (_rF + 1.16))
-	tpan.translate_object_local(Vector3(0, 0, 1.9))
+	tpan.translate_object_local(Vector3(-4.2, 0, 0))
 	var term := AiTerminal.new()
 	term.host = self
 	var tcs9 := CollisionShape3D.new()
 	var tbs9 := BoxShape3D.new()
-	tbs9.size = Vector3(2.8, 1.6, 1.4)
+	tbs9.size = Vector3(1.4, 1.6, 2.8)
 	tcs9.shape = tbs9
 	term.add_child(tcs9)
 	add_child(term)
 	term.global_transform = Transform3D(fb9, _C + fup * (_rF + 0.9))
-	term.translate_object_local(Vector3(0, 0, 2.2))
+	term.translate_object_local(Vector3(-4.4, 0, 0))
 	var tl9 := Label3D.new()
 	tl9.text = "TERMINAL [F]"
 	tl9.font_size = 20
@@ -1647,19 +1673,20 @@ func _dress_ai() -> void:
 	tl9.outline_size = 8
 	tl9.outline_modulate = Color(0, 0, 0, 0.9)
 	add_child(tl9)
-	tl9.global_transform = Transform3D(fb9 * Basis(Vector3(0, 1, 0), PI),
+	tl9.global_transform = Transform3D(fb9 * Basis(Vector3(0, 1, 0), PI * 0.5),
 		Transform3D(fb9, _C + fup * (_rF + 1.75))
-		.translated_local(Vector3(0, 0, 2.2)).origin)
+		.translated_local(Vector3(-4.4, 0, 0)).origin)
 	_ai_sp = AudioStreamPlayer3D.new()
 	_ai_sp.volume_db = -4.0
 	_ai_sp.max_distance = 40.0
 	add_child(_ai_sp)
 	_ai_sp.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.4))
+	_ai_sp.translate_object_local(Vector3(-6.5, 0, 0))
 	# cable conduits converging on the face along the floor
 	for cv in 5:
 		var cz: float = -5.6 + 2.8 * float(cv)
 		var cvxf := Transform3D(_fr(aA), _C + _pdir(aA) * (_rF + 0.06))
-		_deco_box(Vector3(0.22, 0.1, 22.0), cvxf, Vector3(cz * 0.5, 0, 0),
+		_deco_box(Vector3(11.0, 0.1, 0.22), cvxf, Vector3(-1.2, 0, cz * 0.9),
 			[Color("#66ff99"), AMBER, Color("#7df9ff"), AMBER,
 			Color("#ff6a6a")][cv], 1.2)
 	# two operator consoles facing the face
@@ -2801,7 +2828,16 @@ func _service_wing() -> void:
 
 ## ---- COMMUNICATIONS: the interuniverse radio. Physical buttons, a
 ## 3D signal screen, four stations from OUTSIDE the universe. ----
+class RadioBtn extends StaticBody3D:
+	var host = null
+	var mode := 0   # 0 power, 1 tune left, 2 tune right
+	func use() -> void:
+		if host != null:
+			host._radio_btn(mode)
+
 var _radio_on := false
+var _radio_pwr_mat: Material = null
+var _spectro_cache: ShaderMaterial = null
 var _radio_idx := 0
 var _radio_cool := 0.0
 var _radio_sp: AudioStreamPlayer3D = null
@@ -2862,56 +2898,43 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	dial.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.1))
 	dial.translate_object_local(Vector3(2.6, 0, 0))
 	_spins.append({"node": dial, "rate": 0.8})
-	# FULL CHANNEL CONTROLLER: a red POWER button plus one physical
-	# button per channel, each wearing its channel's colour. No titles
-	# -- the colour and the sound ARE the channel.
-	var btns: Array = [[Vector3(2.6, 0, 2.1), Color("#ff4444"), -1]]
-	for ci in 4:
-		btns.append([Vector3(2.6, 0, 1.0 - 0.9 * float(ci)), RADIO_HUES[ci], ci])
-	for btn in btns:
+	# THE TUNER: three real F-buttons -- POWER, tune LEFT, tune RIGHT.
+	# POWER stays dark until the radio is actually on.
+	for btn in [[Vector3(2.6, 0, 1.7), Color("#ff4444"), 0, "POWER"],
+			[Vector3(2.6, 0, 0.2), Color("#ffb000"), 1, "<"],
+			[Vector3(2.6, 0, -0.9), Color("#ffb000"), 2, ">"]]:
 		var mode: int = int(btn[2])
-		var bped := MeshInstance3D.new()
+		var rb := RadioBtn.new()
+		rb.host = self
+		rb.mode = mode
+		var bmi := MeshInstance3D.new()
 		var bpm2 := BoxMesh.new()
-		bpm2.size = Vector3(0.5, 0.24, 0.5) if mode < 0 else Vector3(0.42, 0.22, 0.42)
-		bped.mesh = bpm2
-		bped.material_override = Destructible.make_material(btn[1], 1.8)
-		add_child(bped)
-		bped.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.12))
-		bped.translate_object_local(btn[0])
-		if true:
-			var lb2 := Label3D.new()
-			lb2.text = "POWER" if mode < 0 else \
-				["88.1", "104.3", "666.0", "1420.4"][mode]
-			lb2.font_size = 22
-			lb2.pixel_size = 0.005
-			lb2.modulate = btn[1]
-			lb2.outline_size = 8
-			lb2.outline_modulate = Color(0, 0, 0, 0.9)
-			add_child(lb2)
-			lb2.global_transform = Transform3D(
-				cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
-				Transform3D(cb2, _C + up2 * (_rF + 1.55)) \
-				.translated_local(btn[0]).origin)
-		var trig := Area3D.new()
-		var tcs := CollisionShape3D.new()
-		var tss := SphereShape3D.new()
-		tss.radius = 0.42
-		tcs.shape = tss
-		trig.add_child(tcs)
-		add_child(trig)
-		trig.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.3))
-		trig.translate_object_local(btn[0])
-		trig.body_entered.connect(func(bod):
-			if _radio_cool > 0.0 or not bod.is_in_group("player"):
-				return
-			_radio_cool = 0.6
-			if mode < 0:
-				_radio_on = not _radio_on
-			else:
-				_radio_idx = mode
-				_radio_on = true
-			Sfx.play("click", -8.0)
-			_radio_apply())
+		bpm2.size = Vector3(0.5, 0.24, 0.5) if mode == 0 else Vector3(0.44, 0.22, 0.44)
+		bmi.mesh = bpm2
+		bmi.material_override = Destructible.make_material(btn[1], 1.8)
+		if mode == 0:
+			_radio_pwr_mat = bmi.material_override
+		rb.add_child(bmi)
+		var bcs := CollisionShape3D.new()
+		var bbs := BoxShape3D.new()
+		bbs.size = Vector3(0.55, 0.3, 0.55)
+		bcs.shape = bbs
+		rb.add_child(bcs)
+		add_child(rb)
+		rb.global_transform = Transform3D(cb2, _C + up2 * (_rF + 1.12))
+		rb.translate_object_local(btn[0] as Vector3)
+		var lb2 := Label3D.new()
+		lb2.text = str(btn[3])
+		lb2.font_size = 22
+		lb2.pixel_size = 0.005
+		lb2.modulate = btn[1]
+		lb2.outline_size = 8
+		lb2.outline_modulate = Color(0, 0, 0, 0.9)
+		add_child(lb2)
+		lb2.global_transform = Transform3D(
+			cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
+			Transform3D(cb2, _C + up2 * (_rF + 1.55))
+			.translated_local(btn[0] as Vector3).origin)
 	# the SPECTROGRAM: yellow, fast -- much faster than the radio's --
 	# on the -Z wall
 	var spfr := MeshInstance3D.new()
@@ -2925,7 +2948,8 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	var spm := QuadMesh.new()
 	spm.size = Vector2(4.5, 1.8)
 	spq.mesh = spm
-	spq.material_override = _spectro_mat()
+	_spectro_cache = _spectro_mat()
+	spq.material_override = _spectro_cache
 	add_child(spq)
 	spq.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.2))
 	spq.translate_object_local(Vector3(0, 0, -5.62))
@@ -2939,7 +2963,26 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	_radio_streams = [_st_music(), _st_numbers(), _st_static(), _st_drone()]
 	_chatter(Transform3D(cb2, _C + up2 * (_rF + 1.0)).origin, 77, -14.0)
 
+func _radio_btn(mode: int) -> void:
+	if _radio_cool > 0.0:
+		return
+	_radio_cool = 0.35
+	if mode == 0:
+		_radio_on = not _radio_on
+	elif _radio_on:
+		_radio_idx = posmod(_radio_idx + (1 if mode == 2 else -1),
+			RADIO_NAMES.size())
+	Sfx.play("click", -8.0)
+	_radio_apply()
+
 func _radio_apply() -> void:
+	# the POWER button IS the pilot light
+	if _radio_pwr_mat is StandardMaterial3D:
+		(_radio_pwr_mat as StandardMaterial3D).emission_energy_multiplier = \
+			2.2 if _radio_on else 0.12
+	# the spectrogram sleeps with the radio
+	if _spectro_cache != null:
+		_spectro_cache.set_shader_parameter("live", 1.0 if _radio_on else 0.0)
 	if _radio_smat != null:
 		var hc: Color = RADIO_HUES[_radio_idx] if _radio_on else Color("#332a10")
 		_radio_smat.set_shader_parameter("hue", Vector3(hc.r, hc.g, hc.b))
@@ -2957,9 +3000,10 @@ func _spectro_mat() -> ShaderMaterial:
 	sh.code = """
 shader_type spatial;
 render_mode unshaded;
+uniform float live = 0.0;
 void fragment(){
 	vec2 uv = UV;
-	float t = TIME;
+	float t = TIME * live;
 	float xs = fract(uv.x + t * 0.85);
 	float col9 = floor(xs * 44.0);
 	float tq = floor(t * 18.0);
@@ -2968,8 +3012,8 @@ void fragment(){
 	float amp = 0.12 + 0.88 * h * (0.55 + 0.45 * h2);
 	float bar = step(1.0 - uv.y, amp);
 	vec3 gold = vec3(1.0, 0.72, 0.05);
-	vec3 col = gold * bar * (0.35 + 0.65 * (1.0 - uv.y))
-		+ gold * 0.07;
+	vec3 col = (gold * bar * (0.35 + 0.65 * (1.0 - uv.y))
+		+ gold * 0.07) * (0.12 + 0.88 * live);
 	ALBEDO = col;
 	EMISSION = col * 1.9;
 }
@@ -3336,11 +3380,7 @@ func _checkpoint(from_pt: Vector3, away: Vector3, idx: int) -> void:
 		else:
 			_plate(Vector3(0.5, 3.9, 5.6) if absf(nl.x) > 0.5
 				else Vector3(5.6, 3.9, 0.5), xf0, woff, STEEL, 0.0)
-	var ep := Gate.new().configure({
-		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
-		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
-	add_child(ep)
-	ep.global_transform = xf0.translated_local(Vector3(0, 1.3, 0))
+	_escape_gate(xf0, Vector3(0, 1.3, 0))
 	var cl := MeshInstance3D.new()
 	var clm2 := CylinderMesh.new()
 	clm2.top_radius = 0.5
@@ -3423,11 +3463,7 @@ func _noodle_room(dir: Vector3, r: float, door_from: Vector3) -> Vector3:
 		add_child(stick)
 		stick.global_transform = xf0.translated_local(Vector3(ch2, 1.35, 0.4))
 		stick.rotate_object_local(Vector3(0, 1, 0), ch2)
-	var ep := Gate.new().configure({
-		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
-		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
-	add_child(ep)
-	ep.global_transform = xf0.translated_local(Vector3(0, 1.3, 3.4))
+	_escape_gate(xf0, Vector3(0, 1.3, 3.4))
 	_sign("NOODLE BOWL ROOM", bb, xf0.origin + (bb * Vector3(0, 1, 0)) * 3.4,
 		Vector3(0, 0, 0), 180.0)
 	var nl9 := MeshInstance3D.new()
@@ -3496,15 +3532,28 @@ func _core_noise(pos: Vector3) -> void:
 	sp.global_position = pos
 	sp.play()
 
-## a vent's approach: stub end and dive point for one wall grille
-func _vent_legs(A: Dictionary, band: float) -> Array:
+## a vent's approach: a STRAIGHT stub in the grille's own frame (so the
+## tunnel mouth sits square on the wall vent, never tilted into the
+## room), then the dive point down to the cruise band
+func _vent_stub(A: Dictionary) -> Vector3:
 	var p1: Vector3 = A["p"]
+	var b9: Basis = A["b"]
+	var ln := 4.2
+	var xf := Transform3D(b9, p1 + (b9 * Vector3(0, 0, 1)) * (ln * 0.5))
+	_plate(Vector3(3.4, 0.4, ln + 0.9), xf, Vector3(0, -0.2, 0), STEEL, 0.0)
+	_plate(Vector3(3.4, 0.4, ln + 0.9), xf, Vector3(0, 2.8, 0), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.3, ln + 0.9), xf, Vector3(1.5, 1.3, 0), STEEL, 0.0)
+	_plate(Vector3(0.4, 3.3, ln + 0.9), xf, Vector3(-1.5, 1.3, 0), STEEL, 0.0)
+	_deco_box(Vector3(0.05, 0.1, ln), xf, Vector3(1.28, 0.6, 0),
+		Color("#66ff99"), 1.1)
+	return p1 + (b9 * Vector3(0, 0, 1)) * ln
+
+func _vent_legs(A: Dictionary, band: float) -> Array:
+	var p2 := _vent_stub(A)
 	var o: Vector3 = A["o"]
-	var r1 := (p1 - _C).length()
-	var p2 := _C + ((p1 - _C) + o * 2.8).normalized() * r1
 	var d3 := ((p2 - _C) + o * 7.5).normalized()
 	var p3 := _C + d3 * band
-	return [p1, p2, p3]
+	return [p2, p3]
 
 ## bulkhead collar sealing a tunnel kink: a thick 4-plate donut whose
 ## hole matches the tube cross-section
@@ -3524,18 +3573,20 @@ func _collar(p: Vector3, da: Vector3, db: Vector3, w: float, h: float) -> void:
 func _vent_run(A: Dictionary, B: Dictionary, band: float, fan: bool) -> void:
 	var la := _vent_legs(A, band)
 	var lb := _vent_legs(B, band)
-	for lg in [la, lb]:
-		_gc_tunnel(lg[0], lg[1], 1.6, 2.2, 0)
-		_gc_tunnel(lg[1], lg[2], 1.6, 2.2, 0)
-		_collar(lg[1], ((lg[1] as Vector3) - (lg[0] as Vector3)).normalized(),
-			((lg[2] as Vector3) - (lg[1] as Vector3)).normalized(), 1.6, 2.2)
-	var mid := _gc_tunnel(la[2], lb[2], 2.0, 2.3, 0)
-	_collar(la[2], ((la[2] as Vector3) - (la[1] as Vector3)).normalized(),
-		((lb[2] as Vector3) - (la[2] as Vector3)).normalized(), 2.0, 2.3)
-	_collar(lb[2], ((lb[2] as Vector3) - (lb[1] as Vector3)).normalized(),
-		((la[2] as Vector3) - (lb[2] as Vector3)).normalized(), 2.0, 2.3)
+	for lg9 in [[A, la], [B, lb]]:
+		var lg: Array = lg9[1]
+		var stub_dir: Vector3 = ((lg9[0] as Dictionary)["b"] as Basis) \
+			* Vector3(0, 0, 1)
+		_gc_tunnel(lg[0], lg[1], 2.6, 2.6, 0)
+		_collar(lg[0], stub_dir,
+			((lg[1] as Vector3) - (lg[0] as Vector3)).normalized(), 2.7, 2.8)
+	var mid := _gc_tunnel(la[1], lb[1], 2.6, 2.6, 0)
+	_collar(la[1], ((la[1] as Vector3) - (la[0] as Vector3)).normalized(),
+		((lb[1] as Vector3) - (la[1] as Vector3)).normalized(), 2.6, 2.6)
+	_collar(lb[1], ((lb[1] as Vector3) - (lb[0] as Vector3)).normalized(),
+		((la[1] as Vector3) - (lb[1] as Vector3)).normalized(), 2.6, 2.6)
 	if fan:
-		_vent_fan(mid, 1.0)
+		_vent_fan(mid, 1.25)
 	_net_probes.append(mid.origin + mid.basis.y * 0.1)
 
 ## an elevator cabin. xf: floor centre, Y up, +Z the doorway. Doors
@@ -3717,63 +3768,35 @@ func _lower_floors() -> void:
 	add_child(vl)
 	vl.global_transform = vxf.translated_local(Vector3(0, 4.9, 0))
 	_sign("DATA VAULT", vb, vxf.origin + vd * 3.6, Vector3(0, 0, -5.7), 0.0)
-	_escape_gate(vxf, Vector3(-4.6, 1.3, -4.6))
+	_vault_land = vxf.translated_local(Vector3(0, 1.2, 3.9)).origin
+	# the pipe. nobody knows what it carries. it blocks the way anyway.
+	var bpipe := StaticBody3D.new()
+	var bpm := MeshInstance3D.new()
+	var bpc := CylinderMesh.new()
+	bpc.top_radius = 0.55
+	bpc.bottom_radius = 0.55
+	bpc.height = 12.6
+	bpm.mesh = bpc
+	bpm.material_override = Surfaces.metal(Color("#5e4a34"))
+	bpipe.add_child(bpm)
+	var bps := CollisionShape3D.new()
+	var bpsc := CylinderShape3D.new()
+	bpsc.radius = 0.55
+	bpsc.height = 12.6
+	bps.shape = bpsc
+	bpipe.add_child(bps)
+	add_child(bpipe)
+	bpipe.global_transform = vxf.translated_local(Vector3(0, 1.1, 1.4))
+	bpipe.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+	bpipe.rotate_object_local(Vector3(0, 1, 0), 0.35)
 	_chatter(vxf.translated_local(Vector3(0, 1.4, 0)).origin, 240, -8.0)
 	_net_probes.append(vxf.origin)
 	_lift_cabin(0, 1, Transform3D(vb * Basis(Vector3(0, 1, 0), PI * 0.75),
 		vxf.translated_local(Vector3(4.35, 0, 4.35)).origin), "ELEVATOR", mains)
-	# stop 2: UNDERCROFT, radius 50 beside the reactor root -- pumps,
-	# pipes, the plumbing the reactor never talks about
-	var ud := _sdir(1.37, 0.55)
-	var ub := _bup(ud)
-	var uxf := Transform3D(ub, _C + ud * 50.0)
-	_plate(Vector3(13.0, 0.5, 13.0), uxf, Vector3(0, -0.25, 0), DARK, 0.0)
-	_plate(Vector3(13.0, 0.5, 13.0), uxf, Vector3(0, 4.25, 0), DARK, 0.0)
-	for uw in [[Vector3(0.5, 5.0, 13.0), Vector3(6.25, 2.0, 0)],
-			[Vector3(0.5, 5.0, 13.0), Vector3(-6.25, 2.0, 0)],
-			[Vector3(13.0, 5.0, 0.5), Vector3(0, 2.0, 6.25)],
-			[Vector3(13.0, 5.0, 0.5), Vector3(0, 2.0, -6.25)]]:
-		_plate(uw[0], uxf, uw[1], STEEL, 0.0)
-	for pz in [-3.0, 0.0, 3.0]:
-		var pipe := MeshInstance3D.new()
-		var ppm := CylinderMesh.new()
-		ppm.top_radius = 0.5
-		ppm.bottom_radius = 0.5
-		ppm.height = 12.4
-		pipe.mesh = ppm
-		pipe.material_override = Surfaces.metal(Color("#4a5266"))
-		add_child(pipe)
-		pipe.global_transform = uxf.translated_local(Vector3(0, 3.3, pz))
-		pipe.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
-		var pump := MeshInstance3D.new()
-		var pum := BoxMesh.new()
-		pum.size = Vector3(1.6, 1.4, 1.6)
-		pump.mesh = pum
-		var pmat := StandardMaterial3D.new()
-		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		pmat.albedo_color = AMBER.darkened(0.5)
-		pmat.emission_enabled = true
-		pmat.emission = AMBER
-		pump.material_override = pmat
-		add_child(pump)
-		pump.global_transform = uxf.translated_local(Vector3(-3.6, 0.7, pz))
-		_pulses.append({"mat": pmat, "phase": pz})
-		var wheel := MeshInstance3D.new()
-		var whm := TorusMesh.new()
-		whm.inner_radius = 0.28
-		whm.outer_radius = 0.42
-		wheel.mesh = whm
-		wheel.material_override = Destructible.make_material(Color("#ff6a6a"), 1.2)
-		add_child(wheel)
-		wheel.global_transform = uxf.translated_local(Vector3(-2.7, 0.9, pz))
-		wheel.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
-		_spins.append({"node": wheel, "rate": 0.9})
-	_sign("UNDERCROFT", ub, uxf.origin + ud * 3.2, Vector3(0, 0, -5.7), 0.0)
-	_escape_gate(uxf, Vector3(4.6, 1.3, -4.6))
-	_chatter(uxf.translated_local(Vector3(0, 1.4, 0)).origin, 241, -7.0)
-	_net_probes.append(uxf.origin)
-	_lift_cabin(0, 2, Transform3D(ub * Basis(Vector3(0, 1, 0), PI * 0.75),
-		uxf.translated_local(Vector3(4.35, 0, 4.35)).origin), "ELEVATOR", mains)
+	# stop 2: the UNDERCROFT -- not a room, a whole LOWER LEVEL: a full
+	# 360-degree service ring at radius 47, twelve meters under the main
+	# floor, with four working rooms hanging off it
+	_lower_ring()
 	# stop 3: THE PLANETARY CORE -- a real molten heart at the centre,
 	# glass containment, and a glass-floored viewing ring around it
 	var core := MeshInstance3D.new()
@@ -3915,12 +3938,203 @@ func map_use() -> void:
 		mk.global_position = _C + dd * lerpf(r1, r2c, t)
 		_map_holo.append(mk)
 
-## an ESCAPE portal for a lower room -- the bail-out; the elevator is
-## the way down
+## ==================== THE LOWER RING (r=47) ====================
+## A second full circle of facility below everything walkable above:
+## service hallway wrapping the whole planet + four rooms. Elevator
+## stop 2 lands here.
+const R_LOW := 47.0
+
+func _lring_room(ac: float, sd: float, name: String) -> Dictionary:
+	var fb := _fr(ac)
+	var up := _pdir(ac)
+	var xf0 := Transform3D(fb, _C + up * R_LOW)
+	_plate(Vector3(9.7, 0.5, 9.6), xf0, Vector3(sd * 7.9, -0.25, 0), DARK, 0.0)
+	_plate(Vector3(9.7, 0.5, 9.6), xf0, Vector3(sd * 7.9, 4.75, 0), DARK, 0.0)
+	var wxf := Transform3D(fb, _C + up * (R_LOW + 2.25))
+	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(sd * 3.15, 0, 3.0), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 3.6), wxf, Vector3(sd * 3.15, 0, -3.0), STEEL, 0.0)
+	_plate(Vector3(0.5, 2.0, 2.4), wxf, Vector3(sd * 3.15, 1.75, 0), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 9.6), wxf, Vector3(sd * 12.65, 0, 0), STEEL, 0.0)
+	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(sd * 7.9, 0, 4.55), STEEL, 0.0)
+	_plate(Vector3(9.5, 5.5, 0.5), wxf, Vector3(sd * 7.9, 0, -4.55), STEEL, 0.0)
+	var rl := MeshInstance3D.new()
+	var rlm := CylinderMesh.new()
+	rlm.top_radius = 0.8
+	rlm.bottom_radius = 0.8
+	rlm.height = 0.08
+	rl.mesh = rlm
+	rl.material_override = Destructible.make_material(Color("#f2ead8"), 1.9)
+	add_child(rl)
+	rl.global_transform = Transform3D(fb, _C + up * (R_LOW + 4.45))
+	rl.translate_object_local(Vector3(sd * 7.9, 0, 0))
+	_sign(name, fb, _C + up * (R_LOW + 3.6), Vector3(sd * 2.4, 0, 0),
+		90.0 if sd < 0.0 else -90.0)
+	_net_probes.append(xf0.translated_local(Vector3(sd * 7.9, 1.0, 0)).origin)
+	return {"fb": fb, "up": up, "cx": sd * 7.9}
+
+func _lower_ring() -> void:
+	# the hallway: full 360 in arc-strip segments, doors where rooms sit
+	var doors: Array = [[0.6, -1.0], [2.2, 1.0], [3.9, -1.0], [5.3, 1.0]]
+	var m := TAU * R_LOW
+	var n := int(ceil(m / 4.3))
+	var stp := TAU / float(n)
+	for k in n:
+		var a2 := stp * (float(k) + 0.5)
+		var fb := _fr(a2)
+		var up := _pdir(a2)
+		_plate(Vector3(6.6, 0.5, 4.6), Transform3D(fb, _C + up * (R_LOW - 0.25)),
+			Vector3.ZERO, DARK, 0.0)
+		_plate(Vector3(6.6, 0.5, 4.6), Transform3D(fb, _C + up * (R_LOW + 4.75)),
+			Vector3.ZERO, DARK, 0.0)
+		var wxf := Transform3D(fb, _C + up * (R_LOW + 2.25))
+		for ws in [1.0, -1.0]:
+			var door := false
+			for d in doors:
+				if float(d[1]) == ws and absf(_awrap(a2 - float(d[0]))) * R_LOW < 2.4:
+					door = true
+			if not door:
+				_plate(Vector3(0.5, 5.5, 4.6), wxf, Vector3(ws * 3.05, 0, 0), STEEL, 0.0)
+				_deco_box(Vector3(0.06, 0.16, 4.6), wxf,
+					Vector3(ws * 2.72, -1.3, 0), AMBER, 1.6)
+		_deco_box(Vector3(0.2, 4.5, 0.2), wxf, Vector3(2.62, 0, 2.1), STEEL, 0.0)
+		_deco_box(Vector3(0.2, 4.5, 0.2), wxf, Vector3(-2.62, 0, 2.1), STEEL, 0.0)
+		if k % 3 == 0:
+			_deco_box(Vector3(0.5, 0.08, 3.0),
+				Transform3D(fb, _C + up * (R_LOW + 4.35)), Vector3.ZERO,
+				Color("#f2ead8"), 2.2)
+	_sign("UNDERCROFT RING", _fr(0.25), _C + _pdir(0.25) * (R_LOW + 3.4),
+		Vector3.ZERO, 180.0)
+	# ---- room 1: PUMP HALL (the old undercroft, now one of four) ----
+	var pr := _lring_room(0.6, -1.0, "PUMP HALL")
+	for pz in [-3.0, 0.0, 3.0]:
+		var uxf := Transform3D(pr["fb"] as Basis,
+			_C + (pr["up"] as Vector3) * R_LOW)
+		var pipe := MeshInstance3D.new()
+		var ppm := CylinderMesh.new()
+		ppm.top_radius = 0.5
+		ppm.bottom_radius = 0.5
+		ppm.height = 8.6
+		pipe.mesh = ppm
+		pipe.material_override = Surfaces.metal(Color("#4a5266"))
+		add_child(pipe)
+		pipe.global_transform = uxf.translated_local(
+			Vector3(float(pr["cx"]), 3.3, pz))
+		pipe.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+		var pump := MeshInstance3D.new()
+		var pum := BoxMesh.new()
+		pum.size = Vector3(1.6, 1.4, 1.6)
+		pump.mesh = pum
+		var pmat := StandardMaterial3D.new()
+		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		pmat.albedo_color = AMBER.darkened(0.5)
+		pmat.emission_enabled = true
+		pmat.emission = AMBER
+		pump.material_override = pmat
+		add_child(pump)
+		pump.global_transform = uxf.translated_local(
+			Vector3(float(pr["cx"]) - 3.0, 0.7, pz))
+		_pulses.append({"mat": pmat, "phase": pz})
+		var wheel := MeshInstance3D.new()
+		var whm := TorusMesh.new()
+		whm.inner_radius = 0.28
+		whm.outer_radius = 0.42
+		wheel.mesh = whm
+		wheel.material_override = Destructible.make_material(Color("#ff6a6a"), 1.2)
+		add_child(wheel)
+		wheel.global_transform = uxf.translated_local(
+			Vector3(float(pr["cx"]) - 2.1, 0.9, pz))
+		wheel.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+		_spins.append({"node": wheel, "rate": 0.9})
+	_chatter(Transform3D(pr["fb"] as Basis, _C + (pr["up"] as Vector3)
+		* (R_LOW + 1.4)).translated_local(Vector3(float(pr["cx"]), 0, 0)).origin,
+		241, -7.0)
+	_escape_gate(Transform3D(pr["fb"] as Basis, _C + (pr["up"] as Vector3)
+		* (R_LOW + 1.3)), Vector3(float(pr["cx"]) - 3.6, 0, -3.6))
+	# ---- room 2: COOLANT TANKS ----
+	var cr := _lring_room(2.2, 1.0, "COOLANT TANKS")
+	for tz in [[-2.6, -2.4], [-2.6, 2.4], [2.6, 0.0]]:
+		var txf := Transform3D(cr["fb"] as Basis,
+			_C + (cr["up"] as Vector3) * R_LOW)
+		var tank := MeshInstance3D.new()
+		var tkm := CylinderMesh.new()
+		tkm.top_radius = 1.5
+		tkm.bottom_radius = 1.5
+		tkm.height = 4.2
+		tank.mesh = tkm
+		tank.material_override = Surfaces.metal(Color("#31384a"))
+		add_child(tank)
+		tank.global_transform = txf.translated_local(
+			Vector3(float(cr["cx"]) + float(tz[0]), 2.1, float(tz[1])))
+		var lvl := MeshInstance3D.new()
+		var lvm := BoxMesh.new()
+		lvm.size = Vector3(0.1, 2.6, 0.3)
+		lvl.mesh = lvm
+		lvl.material_override = Destructible.make_material(Color("#7df9ff"), 1.7)
+		add_child(lvl)
+		lvl.global_transform = txf.translated_local(
+			Vector3(float(cr["cx"]) + float(tz[0]) - 1.58, 1.8, float(tz[1])))
+		var tcb := StaticBody3D.new()
+		var tcc := CollisionShape3D.new()
+		var tcs2 := CylinderShape3D.new()
+		tcs2.radius = 1.6
+		tcs2.height = 4.2
+		tcc.shape = tcs2
+		tcb.add_child(tcc)
+		add_child(tcb)
+		tcb.global_transform = txf.translated_local(
+			Vector3(float(cr["cx"]) + float(tz[0]), 2.1, float(tz[1])))
+	# ---- room 3: PIPE GALLERY ----
+	var gr := _lring_room(3.9, -1.0, "PIPE GALLERY")
+	for gy in 3:
+		for gz9 in [-3.4, 3.4]:
+			var gxf := Transform3D(gr["fb"] as Basis,
+				_C + (gr["up"] as Vector3) * (R_LOW + 0.9 + 1.3 * float(gy)))
+			var pipe2 := MeshInstance3D.new()
+			var pp2 := CylinderMesh.new()
+			pp2.top_radius = 0.24 + 0.08 * float(gy % 2)
+			pp2.bottom_radius = pp2.top_radius
+			pp2.height = 8.8
+			pipe2.mesh = pp2
+			pipe2.material_override = Surfaces.metal(
+				[Color("#4a5266"), Color("#5e4a34"), Color("#3a5246")][gy])
+			add_child(pipe2)
+			pipe2.global_transform = gxf.translated_local(
+				Vector3(float(gr["cx"]), 0, float(gz9)))
+			pipe2.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
+	_chatter(Transform3D(gr["fb"] as Basis, _C + (gr["up"] as Vector3)
+		* (R_LOW + 1.4)).translated_local(Vector3(float(gr["cx"]), 0, 0)).origin,
+		242, -10.0)
+	# ---- room 4: THE SUMP (fluid-glow pool, grated walkway) ----
+	var sr := _lring_room(5.3, 1.0, "THE SUMP")
+	var sxf := Transform3D(sr["fb"] as Basis, _C + (sr["up"] as Vector3) * R_LOW)
+	var pool := MeshInstance3D.new()
+	var plm2 := BoxMesh.new()
+	plm2.size = Vector3(7.6, 0.06, 7.6)
+	pool.mesh = plm2
+	pool.material_override = DatamoshStudio._fluid_material(Color("#2a9df4"))
+	add_child(pool)
+	pool.global_transform = sxf.translated_local(Vector3(float(sr["cx"]), 0.25, 0))
+	_plate(Vector3(2.0, 0.3, 9.4), sxf, Vector3(float(sr["cx"]), 0.55, 0),
+		Color("#12161c"), 0.0)
+	_escape_gate(sxf.translated_local(Vector3(0, 1.3, 0)),
+		Vector3(float(sr["cx"]), 0.7, 3.4))
+	# ring probes for MFTEST
+	_net_probes.append(Transform3D(_fr(1.4), _C + _pdir(1.4) * R_LOW).origin)
+	_net_probes.append(Transform3D(_fr(4.6), _C + _pdir(4.6) * R_LOW).origin)
+	# the elevator cabin, in the ring beside PUMP HALL's door
+	var cb0 := _fr(0.32)
+	_lift_cabin(0, 2, Transform3D(cb0 * Basis(Vector3(0, 1, 0), PI),
+		Transform3D(cb0, _C + _pdir(0.32) * R_LOW).origin), "ELEVATOR",
+		["ATRIUM", "DATA VAULT", "UNDERCROFT", "CORE VIEW"])
+
+## an EXIT gate: teleports to the DATA VAULT (pipe included), where the
+## elevator waits. The only surface portal in the facility is the
+## atrium's -- everything else routes through here.
+var _vault_land: Vector3
 func _escape_gate(xf: Transform3D, off: Vector3) -> void:
 	var ep := Gate.new().configure({
-		"target": _C + _u0 * (float(_b.radius) + 1.5) - _e1 * 7.0, "zone": "",
-		"label": "ESCAPE", "color": Color("#ff8a2a"), "cube": true})
+		"target": _vault_land, "zone": "",
+		"label": "EXIT", "color": Color("#ff8a2a"), "cube": true})
 	add_child(ep)
 	ep.global_transform = xf
 	ep.translate_object_local(off)
@@ -3931,19 +4145,19 @@ func _networks() -> void:
 	# another, with bulkhead collars sealing every kink ----
 	var vpairs: Array = [
 		["medbay", 0, "gym", 0, 58.0, true],
-		["gym", 1, "archive", 0, 54.5, false],
-		["archive", 1, "tape", 0, 51.5, false],
+		["gym", 1, "archive", 0, 55.5, false],
+		["archive", 1, "tape", 0, 53.0, false],
 		["tape", 1, "farm", 0, 58.0, true],
-		["farm", 1, "workshop", 0, 51.5, false],
-		["workshop", 1, "storage", 0, 54.5, false],
+		["farm", 1, "workshop", 0, 53.0, false],
+		["workshop", 1, "storage", 0, 55.5, false],
 		["storage", 1, "kitchen", 0, 58.0, true],
-		["kitchen", 1, "trophy", 0, 54.5, false],
+		["kitchen", 1, "trophy", 0, 55.5, false],
 	]
 	for vp9 in vpairs:
 		_vent_run((_vp[vp9[0]] as Array)[int(vp9[1])],
 			(_vp[vp9[2]] as Array)[int(vp9[3])], float(vp9[4]), bool(vp9[5]))
-	_vent_run({"p": _duct_end, "o": _duct_out},
-		(_vp["medbay"] as Array)[1], 51.5, false)
+	_vent_run({"p": _duct_end, "o": _duct_out, "b": _duct_bas},
+		(_vp["medbay"] as Array)[1], 53.0, false)
 	# ---- THE COMPUTER TUNNELS: six hub junction boxes deep in the
 	# hollow (all below radius 49 -- verified clear of every room and
 	# every vent), wired as a branching web. The ONLY ways down are the

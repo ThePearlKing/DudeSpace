@@ -10,6 +10,7 @@ class Body:
 	var g_surf: float
 	var kind: String     # home / circuit / logic / pi / torus / ...
 	var color: Color
+	var hidden: bool = false   # off the map, off the locator. it exists anyway
 	var node: Node3D = null   # the built visual/collider root (movers need it)
 	func gm() -> float:
 		return g_surf * radius * radius
@@ -85,6 +86,15 @@ func _ready() -> void:
 	_def("Varnisol", TC + Vector3(-3400, 420, 1500), 100.0, 9.0,  "varnisol", Color("#3f8f3a"))
 	# --- Xero: Varnisol's ice moon. Light blue, cold, quietly beautiful. ---
 	_def("Xero",     TC + Vector3(-3400, 540, 2150), 60.0, 5.0,  "ice",      Color("#6ec2ff"))
+	# --- Big Water: the Tris system's ocean world, out past Varnisol.
+	# ALL water, no land -- you sink through the whole ocean until the
+	# sand floor catches you. The blue monolith waits down there. ---
+	_def("Big Water", TC + Vector3(-5200, 700, 2600), 110.0, 8.5, "ocean", Color("#1a5fae"))
+	# --- the rogue: a pale wanderer between the systems. On no map, on
+	# no locator. The white monolith's planet. ---
+	var rog := _def_ret("Palewander", Vector3(21000, 14500, 30500), 64.0, 7.0,
+		"rogue", Color("#d8d4cc"))
+	rog.hidden = true
 
 ## Tutorial universe: ONLY the tutorial planet + its moon exist. The real
 ## body list is stashed and put back when the title screen returns.
