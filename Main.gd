@@ -1080,15 +1080,13 @@ func _sky_detonate() -> void:
 		var away := (dir9 * (0.8 if brng.randf() < 0.5 else -0.45)
 			+ tx * brng.randf_range(-0.6, 0.6)
 			+ tz * brng.randf_range(-0.6, 0.6)).normalized()
-		var sc9 := create_tween()
-		_sky_tweens.append(sc9)
+		var sc9 := plate.create_tween()
 		sc9.tween_interval(brng.randf_range(0.3, 1.5))
 		sc9.tween_property(plate, "position",
 			away * Universe.BOUNDARY * brng.randf_range(0.2, 0.55),
 			brng.randf_range(5.0, 9.0)) \
 			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		var tb9 := create_tween()
-		_sky_tweens.append(tb9)
+		var tb9 := plate.create_tween()
 		tb9.tween_property(plate, "rotation",
 			Vector3(brng.randf_range(-2.0, 2.0), brng.randf_range(-2.0, 2.0),
 				brng.randf_range(-1.0, 1.0)), 8.0).as_relative()
@@ -1232,8 +1230,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 			ed.position = (va + vb) * 0.5
 			ed.rotation.y = -atan2((vb - va).z, (vb - va).x)
 		tris.append(plate)
-		var tum := create_tween().set_loops()
-		_sky_tweens.append(tum)
+		var tum := plate.create_tween().set_loops()
 		tum.tween_property(plate, "rotation",
 			Vector3(TAU * rngs.randf_range(0.2, 0.6),
 				TAU * rngs.randf_range(0.3, 0.8),
@@ -1242,8 +1239,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 		# the RUSH: each shard tears off radially -- half dive inward,
 		# half flee outward -- fast, and gone
 		var rsign := 1.0 if rngs.randf() < 0.5 else -1.0
-		var rush := create_tween()
-		_sky_tweens.append(rush)
+		var rush := plate.create_tween()
 		rush.tween_property(plate, "position",
 			dir9 * rsign * Universe.BOUNDARY * rngs.randf_range(0.3, 0.7),
 			8.0 + 3.0 * rngs.randf()) \
