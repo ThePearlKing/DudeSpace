@@ -60,26 +60,81 @@ func _on_chat(from_name: String, text: String) -> void:
 		if is_instance_valid(old["label"]):
 			old["label"].queue_free()
 
-var _tab: Label
+var _tab: PanelContainer
+var _tabrows: VBoxContainer
+var _face_cache: Dictionary = {}   # peer id (0 = me) -> ImageTexture
+
+func _face_tex(id: int) -> Texture2D:
+	if _face_cache.has(id):
+		return _face_cache[id]
+	var bytes := PackedByteArray()
+	if id == 0:
+		bytes = Net.my_identity().get("paint", PackedByteArray())
+	elif Net.player_infos.has(id):
+		bytes = Net.player_infos[id].get("paint", PackedByteArray())
+	var tex: Texture2D = null
+	if not bytes.is_empty():
+		var img := Image.new()
+		if img.load_png_from_buffer(bytes) == OK:
+			tex = ImageTexture.create_from_image(img)
+	_face_cache[id] = tex
+	return tex
+
+func _tab_row(tex: Texture2D, txt: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	if tex != null:
+		var tr9 := TextureRect.new()
+		tr9.texture = tex
+		tr9.custom_minimum_size = Vector2(34, 34)
+		tr9.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr9.stretch_mode = TextureRect.STRETCH_SCALE
+		row.add_child(tr9)
+	else:
+		var ph := ColorRect.new()
+		ph.color = Color(1, 1, 1, 0.12)
+		ph.custom_minimum_size = Vector2(34, 34)
+		row.add_child(ph)
+	var lb := Label.new()
+	lb.text = txt
+	lb.add_theme_font_size_override("font_size", 19)
+	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lb.add_theme_constant_override("outline_size", 7)
+	lb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(lb)
+	_tabrows.add_child(row)
 
 func _process(delta: float) -> void:
-	# hold TAB: who's online + where (Minecraft player list, plus distance)
+	# hold TAB: the player roster -- face, username, distance
 	if _tab == null:
-		_tab = Label.new()
+		_tab = PanelContainer.new()
 		_tab.set_anchors_preset(Control.PRESET_CENTER_TOP)
-		_tab.position = Vector2(-260, 160)
-		_tab.custom_minimum_size = Vector2(520, 0)
-		_tab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_tab.add_theme_font_size_override("font_size", 20)
-		_tab.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-		_tab.add_theme_constant_override("outline_size", 8)
+		_tab.position = Vector2(-190, 150)
+		_tab.custom_minimum_size = Vector2(380, 0)
+		var sb9 := StyleBoxFlat.new()
+		sb9.bg_color = Color(0.04, 0.05, 0.09, 0.82)
+		sb9.set_corner_radius_all(10)
+		sb9.set_content_margin_all(12)
+		_tab.add_theme_stylebox_override("panel", sb9)
 		add_child(_tab)
-	_tab.visible = Input.is_key_pressed(KEY_TAB) and not _input.visible \
+		_tabrows = VBoxContainer.new()
+		_tabrows.add_theme_constant_override("separation", 6)
+		_tab.add_child(_tabrows)
+	var want_tab := Input.is_key_pressed(KEY_TAB) and not _input.visible \
 		and not Game.dead
+	if want_tab and not _tab.visible:
+		_face_cache.erase(0)   # repaint between holds is possible
+	_tab.visible = want_tab
 	if _tab.visible:
+		for c in _tabrows.get_children():
+			c.queue_free()
 		var me = get_tree().get_first_node_in_group("player")
-		var rows := ["— PLAYERS (%d) —" % (Net.player_names.size() if Net.player_names.size() > 0 else 1)]
-		rows.append("%s (you)" % Net.my_name())
+		var hd := Label.new()
+		hd.text = "— PLAYERS (%d) —" % maxi(Net.player_names.size(), 1)
+		hd.add_theme_font_size_override("font_size", 17)
+		hd.modulate = Color(1, 1, 1, 0.7)
+		_tabrows.add_child(hd)
+		_tab_row(_face_tex(0), "%s (you)" % Net.my_name())
 		for id in Net.player_names:
 			if id == multiplayer.get_unique_id():
 				continue
@@ -87,8 +142,7 @@ func _process(delta: float) -> void:
 			if me and Net.player_pos.has(id):
 				var d: float = me.global_position.distance_to(Net.player_pos[id])
 				line += "   ·   %s" % ("%.0f m" % d if d < 1000.0 else "%.1f km" % (d / 1000.0))
-			rows.append(line)
-		_tab.text = "\n".join(rows)
+			_tab_row(_face_tex(id), line)
 	# chat open: the input owns the keyboard, no matter what got clicked
 	if _input.visible and not _input.has_focus():
 		_input.grab_focus()
