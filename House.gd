@@ -1265,7 +1265,14 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	var rc := shc + Vector3(0, fy - c.y - sdepth - 1.6, -5.6)
 	var psurf := _isurf
 	_isurf = Surfaces.STONE
-	_iroom(rc, Vector3(9.0, 3.6, 9.0), Color("#5c554c"), 0.03, [5])
+	_iroom(rc, Vector3(9.0, 3.6, 9.0), Color("#5c554c"), 0.03, [5, 3])
+	# the east face is hand-built AROUND the secret wall's opening --
+	# the room helper's own east wall used to stand BEHIND the sinking
+	# wall, sealing the alcove it was supposed to reveal
+	_solid(rc + Vector3(4.5, 0, -3.25), Vector3(1, 3.6, 2.5),
+		Color("#5c554c"), 0.03, Surfaces.STONE)
+	_solid(rc + Vector3(4.5, 0, 3.25), Vector3(1, 3.6, 2.5),
+		Color("#5c554c"), 0.03, Surfaces.STONE)
 	_isurf = psurf
 	# NOTHING down here is flat plastic: stone pilasters in the corners
 	# and side walls (never in front of the riddle), a cornice line,
