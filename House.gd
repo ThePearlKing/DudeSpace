@@ -1098,16 +1098,26 @@ func _hshelf_unit(at: Vector3, rng: RandomNumberGenerator,
 		sm9.position = Vector3(0, 0.85 + 0.75 * float(sh), 0)
 		if sh == gap_row:
 			_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15,
-				rng, 0.42, 0.86)
+				rng, 0.555, 0.675)
 		else:
 			_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15, rng)
 	_hbook_row(un, Vector3(0, 0.14, 0.02), 2.15, rng)
-	var cs9 := CollisionShape3D.new()
-	var cb9 := BoxShape3D.new()
-	cb9.size = Vector3(2.4, 3.2, 0.55)
-	cs9.shape = cb9
-	cs9.position = Vector3(0, 1.6, 0)
-	un.add_child(cs9)
+	# collision hugs the FRAME (top, bottom, sides, back) so a look-ray
+	# reaches the shelves themselves -- one book in this house answers
+	for cspec in [[Vector3(2.4, 0.12, 0.5), Vector3(0, 0.05, 0)],
+			[Vector3(2.4, 0.12, 0.5), Vector3(0, 3.15, 0)],
+			[Vector3(0.12, 3.2, 0.5), Vector3(-1.15, 1.6, 0)],
+			[Vector3(0.12, 3.2, 0.5), Vector3(1.15, 1.6, 0)],
+			[Vector3(2.4, 3.2, 0.1), Vector3(0, 1.6, 0.24)],
+			[Vector3(2.2, 0.08, 0.44), Vector3(0, 0.85, 0)],
+			[Vector3(2.2, 0.08, 0.44), Vector3(0, 1.6, 0)],
+			[Vector3(2.2, 0.08, 0.44), Vector3(0, 2.35, 0)]]:
+		var cs9 := CollisionShape3D.new()
+		var cb9 := BoxShape3D.new()
+		cb9.size = cspec[0] as Vector3
+		cs9.shape = cb9
+		cs9.position = cspec[1] as Vector3
+		un.add_child(cs9)
 	_iroot.add_child(un)
 	un.global_position = at
 	return un
@@ -1152,19 +1162,21 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	bk.host = self
 	var bmi := MeshInstance3D.new()
 	var bbm := BoxMesh.new()
-	bbm.size = Vector3(0.09, 0.36, 0.3)
+	bbm.size = Vector3(0.1, 0.36, 0.26)
 	bmi.mesh = bbm
 	bmi.material_override = _wallmat(Color("#7a1f1f"), 0.12)
 	bk.add_child(bmi)
 	var bcs := CollisionShape3D.new()
 	var bcb := BoxShape3D.new()
-	bcb.size = Vector3(0.14, 0.42, 0.4)
+	# collider a whisker prouder than the mesh: the look-ray must find
+	# THE BOOK, not the shelf board it stands on
+	bcb.size = Vector3(0.16, 0.44, 0.56)
 	bcs.shape = bcb
 	bk.add_child(bcs)
 	_hshelf.add_child(bk)
-	# STANDING ON the middle shelf, in its own carved gap, a hand
-	# prouder than its neighbours -- not fused into board or book
-	bk.position = Vector3(0.62, 1.815, 0.1)
+	# shoulder to shoulder in the middle row: same height, same depth,
+	# flush with its neighbours. Only the COLOR tells.
+	bk.position = Vector3(0.615, 1.815, 0.02)
 	# THE PASSAGE: corridor west, then the shaft
 	var cx := c + Vector3(-hx - 2.2, 0, -2.0)   # corridor center
 	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn)
