@@ -941,7 +941,22 @@ func sky_shatter() -> void:
 	ftw.tween_property(fr, "color:a", 0.9, 0.5)
 	ftw.tween_property(fr, "color:a", 0.0, 2.0)
 	ftw.tween_callback(flash.queue_free)
-	Sfx.play("explode", -2.0)
+	# the sound of a universe losing its lid: the full nuke waveform,
+	# sub punch and rolling rumble, at full voice
+	Sfx.play("nuke", 2.0)
+	Sfx.play("explode", -4.0)
+	# and out of the wreckage, the dying scaffold FADES IN -- the bars
+	# were always there; now you get to see them
+	if _boundary_mesh != null:
+		_boundary_mesh.visible = true
+		if _boundary_mat != null:
+			_boundary_mat.set_shader_parameter("reveal", 0.0)
+			var rtw := create_tween()
+			rtw.tween_interval(2.0)
+			rtw.tween_method(func(v: float) -> void:
+				if _boundary_mat != null:
+					_boundary_mat.set_shader_parameter("reveal", v),
+				0.0, 1.0, 9.0)
 	var rng9 := RandomNumberGenerator.new()
 	rng9.seed = 8888
 	var shroot := Node3D.new()
@@ -1095,6 +1110,7 @@ func _build_boundary() -> void:
 shader_type spatial;
 render_mode unshaded, cull_front;
 uniform float bradius = 95000.0;
+uniform float reveal = 1.0;
 varying vec3 wpos;
 void vertex(){ wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -1127,9 +1143,9 @@ void fragment(){
 	float alive = step(0.18, h21(cid + 9.1) + 0.6 * sin(TIME * 0.07 + hp * 6.28));
 	float d = bradius - length(wpos);
 	float near = 1.0 - smoothstep(400.0, 6000.0, abs(d));
-	ALPHA = wire * alive * (0.035 + 0.10 * near) + 0.004;
+	ALPHA = (wire * alive * (0.035 + 0.10 * near) + 0.004) * reveal;
 	ALBEDO = blue;
-	EMISSION = blue * wire * alive * (0.18 + 0.4 * near);
+	EMISSION = blue * wire * alive * (0.18 + 0.4 * near) * reveal;
 }
 """
 	var bmesh := SphereMesh.new()
@@ -1140,6 +1156,7 @@ void fragment(){
 	var bmat := ShaderMaterial.new()
 	bmat.shader = sh
 	bmat.set_shader_parameter("bradius", Universe.BOUNDARY)
+	_boundary_mat = bmat
 	_boundary_mesh = MeshInstance3D.new()
 	_boundary_mesh.mesh = bmesh
 	_boundary_mesh.material_override = bmat
@@ -6277,6 +6294,7 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 var _h_monolith: Monolith = null
 var _earth_monolith: Monolith = null
 var _boundary_mesh: MeshInstance3D = null
+var _boundary_mat: ShaderMaterial = null
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
