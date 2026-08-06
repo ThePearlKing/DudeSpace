@@ -32,10 +32,15 @@ func _process(_delta: float) -> void:
 class _NavView extends Control:
 	var rocket: Rocket
 
-	## outside the universe no planet owns you, whatever is nearest
+	## a planet's name only while it meaningfully OWNS you -- deep
+	## nowhere (between worlds or outside everything) is just SPACE
 	func _place_name(body) -> String:
-		var rr := rocket.global_position.length()
-		if Game.zone == "" and rr > Universe.BOUNDARY:
+		if Game.zone == "" \
+				and rocket.global_position.length() > Universe.BOUNDARY:
+			return "SPACE"
+		var alt9: float = rocket.global_position.distance_to(body.center) \
+			- float(body.radius)
+		if alt9 > maxf(float(body.radius) * 6.0, 2500.0):
 			return "SPACE"
 		return str(body.name)
 
