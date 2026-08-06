@@ -1726,16 +1726,18 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
-	# the edge RESISTS first: over the last 1800m the boundary shoves
-	# you back toward the center, harder the closer you get -- it takes
-	# real thrust to even touch the lattice. Unless the sky is broken.
+	# the edge RESISTS first: over the last 1200m the boundary shoves
+	# you back toward the center, harder the closer you get. Integrated,
+	# the field stops anything slower than ~140 m/s -- come in hot
+	# (overdrive, hyperdrive, a good burn) and you punch through to
+	# meet the ME. Unless the sky is broken; then it is just space.
 	if Game.zone == "" and Game.monolith_stage < 8:
 		var edge_d := Universe.BOUNDARY - pos.length()
-		if edge_d < 1800.0:
+		if edge_d < 1200.0:
 			var node0 := _active_node()
 			if node0 != null and "velocity" in node0:
-				var push := clampf(1.0 - edge_d / 1800.0, 0.0, 1.0)
-				node0.velocity += -pos.normalized() * push * push * 60.0 \
+				var push := clampf(1.0 - edge_d / 1200.0, 0.0, 1.0)
+				node0.velocity += -pos.normalized() * push * push * 25.0 \
 					* get_physics_process_delta_time()
 	if Game.zone == "" and pos.length() > Universe.BOUNDARY \
 			and Game.monolith_stage < 8:
