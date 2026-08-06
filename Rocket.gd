@@ -342,12 +342,14 @@ func _physics_process(delta: float) -> void:
 	_hyper_warn_t = maxf(0.0, _hyper_warn_t - delta)
 	if hyperdrive and not ui and Input.is_key_pressed(Settings.key("hyper")) \
 			and Inventory.fuel > 0.5:
-		if hyper_charge <= 0.0 and Inventory.res_count("ultima") > 0:
+		if not Game.inf_fuel and hyper_charge <= 0.0 \
+				and Inventory.res_count("ultima") > 0:
 			Inventory.remove_res("ultima", 1)
 			hyper_charge += 1.0
 			Sfx.play("smelt", -14.0)
-		if hyper_charge > 0.0:
-			hyper_charge = maxf(0.0, hyper_charge - delta / 14.0)
+		if hyper_charge > 0.0 or Game.inf_fuel:
+			if not Game.inf_fuel:
+				hyper_charge = maxf(0.0, hyper_charge - delta / 14.0)
 			vel = vel.lerp(fwd * 1400.0, delta * 1.6)
 			Inventory.fuel = maxf(0.0, Inventory.fuel - 4.0 * burn_eff * delta)
 			_engine_on = true
