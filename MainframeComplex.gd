@@ -3945,9 +3945,11 @@ func _lower_floors() -> void:
 	var mains: Array = ["ATRIUM", "DATA VAULT", "UNDERCROFT", "CORE VIEW"]
 	# stop 0: atrium corner cabin
 	var abas := _fr(0.0)
-	var a_xf := Transform3D(abas * Basis(Vector3(0, 1, 0), PI * 0.25),
+	# +X/+Z corner: clear of the airlock wall, the vent duct, the bunk
+	# door AND the surface gate (which owns the opposite corner)
+	var a_xf := Transform3D(abas * Basis(Vector3(0, 1, 0), PI * 1.25),
 		Transform3D(abas, _C + _u0 * _rF)
-		.translated_local(Vector3(-4.3, 0, -4.3)).origin)
+		.translated_local(Vector3(4.3, 0, 4.3)).origin)
 	_lift_cabin(0, 0, a_xf, "ELEVATOR", mains)
 	# stop 1: DATA VAULT, radius 52 under the northwest hallway
 	var vd := _sdir(-0.35, 0.0)
