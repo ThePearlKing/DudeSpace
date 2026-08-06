@@ -2030,6 +2030,25 @@ func _use_selected() -> void:
 				Sfx.play("learn")
 			else:
 				Sfx.play("denied")
+		"engine_mk2":
+			# the Mk2 is a GLOBAL fit: right-click near any ship installs
+			# it for good (holding it used to do nothing at all)
+			var rm2 := _nearest_in("rocket", 8.0)
+			var hudm = get_tree().get_first_node_in_group("hud")
+			if Inventory.engine_mk2:
+				Sfx.play("denied")
+				if hudm:
+					hudm.flash("the Mk2 is already fitted -- every burn is +60%%")
+			elif rm2 and rm2 is Rocket:
+				Inventory.engine_mk2 = true
+				Inventory.clear_slot(slot)
+				Sfx.play("learn")
+				if hudm:
+					hudm.flash("ENGINE MK2 fitted: +60%% thrust, forever")
+			else:
+				Sfx.play("denied")
+				if hudm:
+					hudm.flash("stand next to a rocket to fit the Mk2")
 		"nucengine":
 			# mk2-only ship part
 			var rn := _nearest_in("rocket", 8.0)
