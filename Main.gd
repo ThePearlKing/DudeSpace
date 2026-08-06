@@ -950,14 +950,16 @@ func sky_shatter() -> void:
 	# were always there; now you get to see them
 	if _boundary_mesh != null:
 		_boundary_mesh.visible = true
-		if _boundary_mat != null:
-			_boundary_mat.set_shader_parameter("reveal", 0.0)
-			var rtw := create_tween()
-			rtw.tween_interval(2.0)
-			rtw.tween_method(func(v: float) -> void:
-				if _boundary_mat != null:
-					_boundary_mat.set_shader_parameter("reveal", v),
-				0.0, 1.0, 9.0)
+		for fm in _boundary_fade_mats:
+			(fm as StandardMaterial3D).albedo_color.a = 0.0
+			(fm as StandardMaterial3D).emission_energy_multiplier = 0.0
+		var rtw := create_tween()
+		rtw.tween_interval(2.0)
+		rtw.tween_method(func(v: float) -> void:
+			for fm in _boundary_fade_mats:
+				(fm as StandardMaterial3D).albedo_color.a = 0.12 * v
+				(fm as StandardMaterial3D).emission_energy_multiplier = 1.1 * v,
+			0.0, 1.0, 9.0)
 	var rng9 := RandomNumberGenerator.new()
 	rng9.seed = 8888
 	var shroot := Node3D.new()
@@ -1113,71 +1115,85 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 ## lattice that fades in over the last 2km before the god throws you
 ## back. Inward faces only.
 func _build_boundary() -> void:
-	var sh := Shader.new()
-	sh.code = """
-shader_type spatial;
-render_mode unshaded, cull_front;
-uniform float bradius = 95000.0;
-uniform float reveal = 1.0;
-varying vec3 wpos;
-void vertex(){ wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
-float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-void fragment(){
-	vec3 dirn = normalize(wpos);
-	// GIANT triangular wireframe: ~24 cells around the equator, so each
-	// triangle is thousands of meters of dim blue scaffolding
-	vec2 P = vec2(atan(dirn.z, dirn.x) * 12.0, asin(clamp(dirn.y, -1.0, 1.0)) * 12.0);
-	// each cell FALLS APART: sliding drift + slow shear, per-cell clocks
-	vec2 cell0 = floor(vec2(P.x - P.y / 1.7320508, P.y * 1.1547005));
-	float hc = h21(cell0);
-	P += vec2(sin(TIME * (0.13 + hc * 0.2) + hc * 6.28),
-		cos(TIME * (0.11 + hc * 0.17) + hc * 12.0)) * (0.14 + 0.20 * hc);
-	// tri lattice barycentric edge distance
-	vec2 q = vec2(P.x - P.y / 1.7320508, P.y * 1.1547005);
-	vec2 f = fract(q);
-	float upTri = step(f.x + f.y, 1.0);
-	vec3 bc = (upTri > 0.5) ? vec3(f.x, f.y, 1.0 - f.x - f.y)
-		: vec3(1.0 - f.x, 1.0 - f.y, f.x + f.y - 1.0);
-	float e = min(bc.x, min(bc.y, bc.z));
-	float wire = 1.0 - smoothstep(0.015, 0.05, e);
-	// crazy blue: hue breathes cyan-violet per cell, pulses race edges
-	vec2 cid = floor(q) + vec2(upTri * 0.5);
-	float hp = h21(cid + 3.7);
-	vec3 blue = mix(vec3(0.20, 0.55, 1.0), vec3(0.45, 0.30, 1.0),
-		0.5 + 0.5 * sin(TIME * 0.6 + hp * 6.28));
-	blue = mix(blue, vec3(0.4, 0.95, 1.0),
-		0.5 + 0.5 * sin(TIME * 2.3 + hp * 20.0 + e * 40.0));
-	// some triangles have already fallen dark -- the shell is DYING
-	float alive = step(0.18, h21(cid + 9.1) + 0.6 * sin(TIME * 0.07 + hp * 6.28));
-	float d = bradius - length(wpos);
-	float near = 1.0 - smoothstep(400.0, 6000.0, abs(d));
-	ALPHA = (wire * alive * (0.018 + 0.06 * near) + 0.002) * reveal;
-	ALBEDO = blue;
-	EMISSION = blue * wire * alive * (0.10 + 0.25 * near) * reveal;
-}
-"""
-	var bmesh := SphereMesh.new()
-	# INSIDE the star ball (which is opaque at B-200) or it can never
-	# be seen again
-	bmesh.radius = Universe.BOUNDARY - 700.0
-	bmesh.height = bmesh.radius * 2.0
-	bmesh.radial_segments = 64
-	bmesh.rings = 32
-	var bmat := ShaderMaterial.new()
-	bmat.shader = sh
-	bmat.set_shader_parameter("bradius", Universe.BOUNDARY)
-	bmat.render_priority = -4
-	_boundary_mat = bmat
-	_boundary_mesh = MeshInstance3D.new()
-	_boundary_mesh.mesh = bmesh
-	_boundary_mesh.material_override = bmat
-	_boundary_mesh.extra_cull_margin = 16384.0
+	# THE BROKEN SCAFFOLD: ~300 real triangle plates scattered over the
+	# boundary sphere -- each one a thin wire OUTLINE, spaced apart,
+	# and TILTED on its own axis (many leaning inward off the shell
+	# entirely). Not a pattern on a sphere: actual shattered geometry.
+	_boundary_mesh = Node3D.new()
 	add_child(_boundary_mesh)
 	_boundary_mesh.global_position = Vector3.ZERO
-	# the lattice only EXISTS once the eighth monolith cracks the sky
-	# open -- until then the edge is invisible: just the shove, and the
-	# hand
 	_boundary_mesh.visible = Game.monolith_stage >= 8
+	var rngb := RandomNumberGenerator.new()
+	rngb.seed = 6180
+	var mats: Array = []
+	for c9 in [Color(0.20, 0.55, 1.0), Color(0.45, 0.30, 1.0),
+			Color(0.4, 0.95, 1.0)]:
+		var m9 := StandardMaterial3D.new()
+		m9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m9.albedo_color = Color(c9.r, c9.g, c9.b, 0.12)
+		m9.emission_enabled = true
+		m9.emission = c9
+		m9.emission_energy_multiplier = 1.1
+		mats.append(m9)
+		_boundary_fade_mats.append(m9)
+	# TWO shells of shards, Astroneer-artifact style: the sky fills with
+	# tilted glowing triangles at two depths, each drifting on a clock
+	# so slow you feel it more than see it
+	for layer9 in 2:
+		var N9 := 380 if layer9 == 0 else 260
+		var lrad := (Universe.BOUNDARY - 900.0) if layer9 == 0 \
+			else (Universe.BOUNDARY - 7500.0)
+		var side := Universe.BOUNDARY * (0.052 if layer9 == 0 else 0.036)
+		var ew := side * 0.03
+		for i in N9:
+			if rngb.randf() < 0.2:
+				continue   # a broken shell has holes
+			# fibonacci sphere point
+			var ky := 1.0 - 2.0 * (float(i) + 0.5) / float(N9)
+			var kr := sqrt(maxf(0.0, 1.0 - ky * ky))
+			var kphi := PI * (1.0 + sqrt(5.0)) * float(i) + float(layer9) * 2.4
+			var dir9 := Vector3(cos(kphi) * kr, ky, sin(kphi) * kr)
+			var up9 := dir9
+			var tx := up9.cross(Vector3(0, 1, 0))
+			if tx.length() < 0.01:
+				tx = up9.cross(Vector3(1, 0, 0))
+			tx = tx.normalized()
+			var tz := tx.cross(up9).normalized()
+			var plate := Node3D.new()
+			_boundary_mesh.add_child(plate)
+			plate.global_position = dir9 * lrad
+			plate.global_transform.basis = Basis(tx, up9, tz).orthonormalized()
+			# the SHATTER: spin in plane, then LEAN -- up to 40 degrees,
+			# biased inward: plates hang off the shell like broken glass
+			plate.rotate_object_local(Vector3(0, 1, 0), rngb.randf() * TAU)
+			var lean := deg_to_rad(rngb.randf_range(6.0, 40.0)) \
+				* (-1.0 if rngb.randf() < 0.65 else 1.0)
+			plate.rotate_object_local(Vector3(1, 0, 0), lean)
+			# the DRIFT: each shard turns on its own normal, minutes per
+			# revolution -- alive, never wobbling
+			var dtw := plate.create_tween().set_loops()
+			dtw.tween_property(plate, "rotation:y", TAU
+				* (1.0 if rngb.randf() < 0.5 else -1.0),
+				rngb.randf_range(200.0, 420.0)).as_relative()
+			# wire-outline triangle: three thin bars, vertex up
+			var mat9: StandardMaterial3D = mats[i % mats.size()]
+			var vA := Vector3(0, 0, -side * 0.577)
+			var vB := Vector3(-side * 0.5, 0, side * 0.289)
+			var vC := Vector3(side * 0.5, 0, side * 0.289)
+			for pr9 in [[vA, vB], [vB, vC], [vC, vA]]:
+				var pa9: Vector3 = pr9[0]
+				var pb9: Vector3 = pr9[1]
+				var bar9 := MeshInstance3D.new()
+				var bm9 := BoxMesh.new()
+				bm9.size = Vector3(ew, ew, pa9.distance_to(pb9))
+				bar9.mesh = bm9
+				bar9.material_override = mat9
+				plate.add_child(bar9)
+				bar9.position = (pa9 + pb9) * 0.5
+				bar9.look_at_from_position(bar9.global_position,
+					plate.to_global(pb9), plate.global_transform.basis.y)
+				bar9.extra_cull_margin = 999999.0
 	# THE VOID ARCHITECTURE -- no overlays, only real geometry, so
 	# depth sorting can never draw anything over a planet:
 	# 1. a WHITE SHELL far outside everything (inward faces): the void's
@@ -1238,7 +1254,7 @@ void fragment(){
 ## sky broken (lattice + cracks).
 func _edge_shots() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	DisplayServer.window_set_size(Vector2i(1280, 720))
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	await get_tree().create_timer(1.0).timeout
 	Game.monolith_stage = 8
 	_on_monolith_advanced()
@@ -1253,7 +1269,7 @@ func _edge_shots() -> void:
 	cam.look_at(Vector3.ZERO, Vector3.UP)
 	await get_tree().create_timer(0.5).timeout
 	get_viewport().get_texture().get_image().save_png("res://docs/shots/edge_outside.png")
-	cam.global_position = Vector3(B * 0.965, 0, 0)
+	cam.global_position = Vector3(B * 0.35, 0, 0)
 	cam.look_at(Vector3(B * 2.0, 0, 0), Vector3.UP)
 	await get_tree().create_timer(0.5).timeout
 	get_viewport().get_texture().get_image().save_png("res://docs/shots/edge_inside.png")
@@ -1263,7 +1279,7 @@ func _edge_shots() -> void:
 ## CTD_TEST=29: stand INSIDE the Pixel mouth, look outward + inward.
 func _hole_shot() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	DisplayServer.window_set_size(Vector2i(1280, 720))
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	await get_tree().create_timer(1.0).timeout
 	var b = Universe.body_named("Pixel")
 	var u0: Vector3 = COLONY_DIRS["Pixel"]
@@ -1288,7 +1304,7 @@ func _hole_shot() -> void:
 func _readme_shots() -> void:
 	# shot rig runs in a small window that never steals the screen
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	DisplayServer.window_set_size(Vector2i(1280, 720))
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	await get_tree().create_timer(3.0).timeout
 	DirAccess.make_dir_recursive_absolute("res://docs/shots")
 	var cam := Camera3D.new()
@@ -6354,8 +6370,9 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 ## It does nothing. Yet.
 var _h_monolith: Monolith = null
 var _earth_monolith: Monolith = null
-var _boundary_mesh: MeshInstance3D = null
+var _boundary_mesh: Node3D = null
 var _boundary_mat: ShaderMaterial = null
+var _boundary_fade_mats: Array = []
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
