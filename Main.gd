@@ -1021,6 +1021,17 @@ func _sky_detonate() -> void:
 				(fm as StandardMaterial3D).albedo_color.a = 0.12 * v
 				(fm as StandardMaterial3D).emission_energy_multiplier = 1.1 * v,
 			0.0, 1.0, 9.0)
+		if Game.monolith_stage < 8:
+			# PREVIEW: the lattice shows off, then goes back to hiding
+			rtw.tween_interval(8.0)
+			rtw.tween_method(func(v: float) -> void:
+				for fm in _boundary_fade_mats:
+					(fm as StandardMaterial3D).albedo_color.a = 0.12 * v
+					(fm as StandardMaterial3D).emission_energy_multiplier = 1.1 * v,
+				1.0, 0.0, 5.0)
+			rtw.tween_callback(func() -> void:
+				if _boundary_mesh != null and Game.monolith_stage < 8:
+					_boundary_mesh.visible = false)
 	var rng9 := RandomNumberGenerator.new()
 	rng9.seed = 8888
 	var shroot := Node3D.new()
@@ -2475,6 +2486,8 @@ func _process(delta: float) -> void:
 				var gh := GodHand.new()
 				add_child(gh)
 				gh.begin(node, Vector3.ZERO)
+				if _hud:
+					_hud.flash("the god hurls you back. the sky is not broken yet")
 	else:
 		_threw_back = false
 

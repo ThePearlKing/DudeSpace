@@ -450,7 +450,7 @@ func _open_mono() -> void:
 			cs.mono_sky_clear()
 		Sfx.play("click")))
 	var sk := Label.new()
-	sk.text = "preview a sky (30s, at the nearest planet):"
+	sk.text = "preview a sky (VISUAL ONLY -- the god still guards the edge\nunless you BREAK THE UNIVERSE above):"
 	sk.add_theme_font_size_override("font_size", 13)
 	col.add_child(sk)
 	var srow := HBoxContainer.new()
