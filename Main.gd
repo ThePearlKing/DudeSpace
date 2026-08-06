@@ -1217,6 +1217,10 @@ func _build_boundary() -> void:
 	wmat.cull_mode = BaseMaterial3D.CULL_FRONT
 	wshell.material_override = wmat
 	wshell.extra_cull_margin = 999999.0
+	# OUTSIDE-ONLY: from inside, the sky must be the real infinite
+	# starfield skybox -- never a wall the god can stand in front of
+	wshell.visible = false
+	_void_shells.append(wshell)
 	add_child(wshell)
 	wshell.global_position = Vector3.ZERO
 	var starball := MeshInstance3D.new()
@@ -1247,6 +1251,8 @@ void fragment(){
 	smt.shader = ssh
 	starball.material_override = smt
 	starball.extra_cull_margin = 999999.0
+	starball.visible = false
+	_void_shells.append(starball)
 	add_child(starball)
 	starball.global_position = Vector3.ZERO
 
@@ -2149,6 +2155,8 @@ func _process(delta: float) -> void:
 		var outside := pos.length() > Universe.BOUNDARY
 		if outside != _outside_white:
 			_outside_white = outside
+			for sh9 in _void_shells:
+				(sh9 as Node3D).visible = outside
 			if _env_ref != null:
 				_env_ref.glow_intensity = 1.9 if outside else 0.8
 				_env_ref.glow_bloom = 0.5 if outside else 0.25
@@ -6372,6 +6380,7 @@ var _earth_monolith: Monolith = null
 var _boundary_mesh: Node3D = null
 var _boundary_mat: ShaderMaterial = null
 var _boundary_fade_mats: Array = []
+var _void_shells: Array = []   # white shell + star ball: outside-only
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
