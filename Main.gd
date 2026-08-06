@@ -4398,6 +4398,19 @@ func _update_stalkers(delta: float) -> void:
 	for st in get_tree().get_nodes_in_group("stalker"):
 		if is_instance_valid(st):
 			live.append(st)
+	if Game.wrath >= 55.0:
+		# deep wrath: the BIG one surfaces (one at a time is plenty)
+		if get_tree().get_nodes_in_group("big_stalker").is_empty() \
+				and _player != null:
+			var big := BigStalker.new()
+			add_child(big)
+			var upB: Vector3 = _player.global_transform.basis.y
+			var sideB: Vector3 = upB.cross(Vector3(randf_range(-1, 1),
+				randf_range(-1, 1), randf_range(-1, 1))).normalized()
+			if sideB.length() < 0.5:
+				sideB = upB.cross(Vector3.RIGHT).normalized()
+			big.global_position = _player.global_position \
+				+ sideB * 60.0 + upB * randf_range(8.0, 16.0)
 	if Game.wrath >= 40.0:
 		if live.size() < 3 and _stalker_cd <= 0.0 and _player != null:
 			_stalker_cd = 7.0

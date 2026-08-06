@@ -1358,7 +1358,7 @@ const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
-	"nreactor", "waypoint"]
+	"nreactor", "waypoint", "rocket", "rocket2"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -1452,11 +1452,6 @@ func _make_held_model(id: String) -> void:
 		_armor_model(id)
 		return
 	match id:
-		"rocket":
-			_hm_cyl(0.11, 0.42, Vector3(0, -0.05, 0), Color("#d8d8e0"), 0.4)
-			_hm_cyl(0.11, 0.16, Vector3(0, 0.24, 0), Color("#ff5964"), 0.6, 0.0)
-			for fx in [-0.12, 0.12]:
-				_hm_box(Vector3(0.05, 0.14, 0.02), Vector3(fx, -0.22, 0), Color("#ff5964"), 0.4)
 		"nchip":
 			# the neuralink chip: a proper little implant, not a pebble --
 			# rounded disc, gold pin ring, glowing trace cross

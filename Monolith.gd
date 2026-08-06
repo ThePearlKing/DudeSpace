@@ -414,6 +414,9 @@ void fragment(){
 	# 8. the chain advances -- for EVERYBODY
 	Game.monolith_stage = stage + 1
 	Net.broadcast_monolith(Game.monolith_stage)
+	# the noodle god HATES this. and the closer the chain gets to
+	# breaking the universe, the harder he takes it.
+	Game.anger(10.0 + 8.0 * float(stage))
 	_flash("the %s stone remembers" % ["yellow", "lime", "orange", "blue",
 		"red", "pink", "cyan", "white"][stage])
 	var m9 = get_tree().current_scene
