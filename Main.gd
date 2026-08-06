@@ -2213,17 +2213,23 @@ func _process(delta: float) -> void:
 		if Game.permadead:
 			get_tree().change_scene_to_file("res://Title.tscn")
 		else:
-			# death sends you HOME (or to your chosen beacon) -- never back
-			# to the spot that just killed you. The reload reads the SAVE's
-			# pos, so write the save NOW (and before reset(), which wipes
-			# cheats/score that the reload then restores from this save).
+			# death sends you HOME (or to your chosen beacon) -- never
+			# back to the spot that just killed you. IN PLACE now: the
+			# world is already built and unchanged, so there is nothing
+			# to reload and no loading screen to sit through -- save,
+			# reset, restore, teleport, done.
 			Game.zone = ""
 			if _world_load_ok:
-				Save.set_world(collect_world())   # spilled items survive reload
+				Save.set_world(collect_world())
 			Save.set_player_pos(Game.spawn_pos + Game.spawn_up * 1.5, false, false)
 			Save.save_progress()
 			Game.reset()
-			get_tree().reload_current_scene()
+			Save.apply_progress()
+			_monolith_snap()
+			if _player != null and is_instance_valid(_player):
+				_player.respawn_at(Game.spawn_pos + Game.spawn_up * 1.5,
+					Game.spawn_up)
+				_player.restore_jet()
 
 var _refocus_capture := false
 
