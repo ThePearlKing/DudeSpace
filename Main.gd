@@ -2054,10 +2054,23 @@ func _process(delta: float) -> void:
 				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 				_env_ref.ambient_light_color = Color(1, 1, 1)
 				_env_ref.ambient_light_energy = 1.0
+				# the choir was waiting for you
+				if _void_amb == null:
+					_void_amb = AudioStreamPlayer.new()
+					_void_amb.stream = _void_ambience()
+					_void_amb.volume_db = -60.0
+					add_child(_void_amb)
+				_void_amb.play()
+				var vtw := create_tween()
+				vtw.tween_property(_void_amb, "volume_db", -7.0, 3.0)
 			else:
 				_env_ref.background_mode = Environment.BG_SKY
 				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_BG
 				_env_ref.ambient_light_energy = 1.0
+				if _void_amb != null and _void_amb.playing:
+					var vtw2 := create_tween()
+					vtw2.tween_property(_void_amb, "volume_db", -60.0, 2.0)
+					vtw2.tween_callback(_void_amb.stop)
 
 	# the cracked sky follows you like a skybox
 	for fx in _skyfx:
@@ -2279,6 +2292,45 @@ func _active_pos() -> Vector3:
 
 var _env_ref: Environment = null
 var _outside_white := false
+var _void_amb: AudioStreamPlayer = null
+
+## the sound of the space OUTSIDE space: a vast slow choir that was
+## here before the universe and will be here after. Detuned voice
+## pairs beating against each other, a sub swell breathing underneath,
+## and a thin silver shimmer far above.
+func _void_ambience() -> AudioStreamWAV:
+	var rate := 22050
+	var secs := 14.0
+	var n := int(rate * secs)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var ts := float(i) / float(rate)
+		var v := 0.0
+		# the choir: four voice-pairs, each pair detuned a few cents so
+		# they BEAT slowly -- the classic endless-holy sound
+		for vp in [[110.0, 0.09], [165.0, 0.07], [220.0, 0.06], [275.0, 0.05]]:
+			var fq: float = vp[0]
+			var amp: float = vp[1]
+			var breathe := 0.6 + 0.4 * sin(TAU * ts / 14.0
+				+ fq * 0.013)
+			v += (sin(TAU * fq * ts) + sin(TAU * fq * 1.006 * ts)) \
+				* amp * 0.5 * breathe
+		# the sub swell: the void inhaling
+		v += 0.10 * sin(TAU * 41.25 * ts) * (0.5 + 0.5 * sin(TAU * ts / 7.0))
+		# silver shimmer, barely there
+		v += 0.018 * sin(TAU * 1760.0 * ts + 3.0 * sin(TAU * ts / 5.0)) \
+			* (0.5 + 0.5 * sin(TAU * ts / 9.0 + 2.0))
+		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
+		data[i * 2] = s9 & 0xFF
+		data[i * 2 + 1] = (s9 >> 8) & 0xFF
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.data = data
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = n
+	return wav
 
 func _setup_environment() -> void:
 	var we := WorldEnvironment.new()
