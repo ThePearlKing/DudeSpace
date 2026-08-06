@@ -1049,11 +1049,15 @@ var _hshelf: StaticBody3D = null
 var _hshelf_open := false
 var _hwall: StaticBody3D = null
 
-func _hbook_row(parent: Node3D, at: Vector3, w: float, rng: RandomNumberGenerator) -> void:
+func _hbook_row(parent: Node3D, at: Vector3, w: float,
+		rng: RandomNumberGenerator, gap0 := 99.0, gap1 := 99.0) -> void:
 	var x9 := -w * 0.5
 	while x9 < w * 0.5 - 0.06:
 		var bw := rng.randf_range(0.05, 0.1)
 		var bh := rng.randf_range(0.28, 0.42)
+		if x9 + bw > gap0 and x9 < gap1:
+			x9 = gap1 + rng.randf_range(0.01, 0.03)
+			continue
 		var bk := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = Vector3(bw, bh, 0.24)
@@ -1064,7 +1068,8 @@ func _hbook_row(parent: Node3D, at: Vector3, w: float, rng: RandomNumberGenerato
 		bk.position = at + Vector3(x9 + bw * 0.5, bh * 0.5, 0)
 		x9 += bw + rng.randf_range(0.005, 0.03)
 
-func _hshelf_unit(at: Vector3, rng: RandomNumberGenerator) -> StaticBody3D:
+func _hshelf_unit(at: Vector3, rng: RandomNumberGenerator,
+		gap_row := -1) -> StaticBody3D:
 	# a full bookcase: frame, four shelves, books crammed in
 	var un := StaticBody3D.new()
 	var wood := Color("#4a3b28")
@@ -1088,7 +1093,11 @@ func _hshelf_unit(at: Vector3, rng: RandomNumberGenerator) -> StaticBody3D:
 		sm9.material_override = _wallmat(wood.lightened(0.12), 0.03)
 		un.add_child(sm9)
 		sm9.position = Vector3(0, 0.85 + 0.75 * float(sh), 0)
-		_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15, rng)
+		if sh == gap_row:
+			_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15,
+				rng, 0.42, 0.86)
+		else:
+			_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15, rng)
 	_hbook_row(un, Vector3(0, 0.14, 0.02), 2.15, rng)
 	var cs9 := CollisionShape3D.new()
 	var cb9 := BoxShape3D.new()
@@ -1133,7 +1142,7 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 		.rotation_degrees.y = -90.0
 	_hshelf_unit(c + Vector3(2.2, fy - c.y, -hz + 0.85), rng) \
 		.rotation_degrees.y = 180.0
-	_hshelf = _hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, -2.0), rng)
+	_hshelf = _hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, -2.0), rng, 1)
 	_hshelf.rotation_degrees.y = -90.0
 	# the book that is not a book: bound in red, sitting too proud
 	var bk := SecretBook.new()
@@ -1150,7 +1159,9 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	bcs.shape = bcb
 	bk.add_child(bcs)
 	_hshelf.add_child(bk)
-	bk.position = Vector3(0.62, 1.62, 0.12)
+	# STANDING ON the middle shelf, in its own carved gap, a hand
+	# prouder than its neighbours -- not fused into board or book
+	bk.position = Vector3(0.62, 1.815, 0.1)
 	# THE PASSAGE: corridor west, then the shaft
 	var cx := c + Vector3(-hx - 2.2, 0, -2.0)   # corridor center
 	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn)
