@@ -4442,8 +4442,12 @@ func _deco_box(size: Vector3, xf: Transform3D, off: Vector3,
 func _process(delta: float) -> void:
 	_t += delta
 	for bl in _blinks:
-		(bl["mat"] as StandardMaterial3D).emission_energy_multiplier = \
-			2.4 if fmod(_t + float(bl["phase"]), 1.4) < 0.75 else 0.35
+		# unshaded materials show ALBEDO regardless of emission -- to
+		# blink for real, the color itself must go dark
+		var bm9 := bl["mat"] as StandardMaterial3D
+		var lit9 := fmod(_t + float(bl["phase"]), 1.4) < 0.75
+		bm9.emission_energy_multiplier = 2.4 if lit9 else 0.05
+		bm9.albedo_color = bm9.emission * (1.0 if lit9 else 0.07)
 	if _core_mat != null:
 		_core_mat.emission_energy_multiplier = 1.5 + 0.8 * sin(_t * 2.2)
 	for cr in _core_rings:
