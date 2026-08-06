@@ -5029,7 +5029,7 @@ func _update_stalkers(delta: float) -> void:
 			if sideB.length() < 0.5:
 				sideB = upB.cross(Vector3.RIGHT).normalized()
 			big.global_position = _player.global_position \
-				+ sideB * 60.0 + upB * randf_range(8.0, 16.0)
+				+ sideB * 220.0 + upB * randf_range(40.0, 80.0)
 	if Game.wrath >= 40.0:
 		if live.size() < 3 and _stalker_cd <= 0.0 and _player != null:
 			_stalker_cd = 7.0
