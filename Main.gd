@@ -853,10 +853,14 @@ func _mainframe_test() -> void:
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
 ## straight down -- checks the mesh-cut opening actually clears the
 var _uw_layer: CanvasLayer = null
+var _ocean_mats: Array = []
 
 ## fullscreen ocean effect: screen-space wave distortion + blue fog,
 ## the aquarium treatment applied to your whole eyeball
 func _set_underwater(on: bool) -> void:
+	for om in _ocean_mats:
+		(om as ShaderMaterial).set_shader_parameter("submerged",
+			1.0 if on else 0.0)
 	if on and _uw_layer == null:
 		_uw_layer = CanvasLayer.new()
 		_uw_layer.layer = 20
@@ -2609,11 +2613,12 @@ void fragment(){
 	if (FRONT_FACING) {
 		ALBEDO = mix(bg, watercol, 0.42);
 	} else {
-		// from UNDERNEATH: barely there -- the wobbled world above with
-		// just a whisper of surface sheen so you can SEE the ceiling
-		// without it turning into a strobing mirror
-		ALBEDO = mix(bg, watercol, 0.10)
-			+ vec3(0.05, 0.07, 0.09) * sw2;
+		// from UNDERNEATH: invisible until YOU are underwater -- then a
+		// soft ceiling of long smooth waves, not noise
+		float wave = (0.5 + 0.5 * sin(n.x * 42.0 + n.y * 17.0 + TIME * 1.4))
+			* (0.5 + 0.5 * sin(n.z * 36.0 - TIME * 1.1));
+		ALBEDO = mix(bg, watercol, 0.08 * submerged)
+			+ vec3(0.10, 0.14, 0.18) * wave * submerged;
 	}
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
@@ -2622,10 +2627,12 @@ void fragment(){
 """
 			osh.code = "shader_type spatial;\nrender_mode cull_disabled, unshaded;\n" \
 				+ "uniform sampler2D scr : hint_screen_texture, filter_linear_mipmap;\n" \
+				+ "uniform float submerged = 0.0;\n" \
 				+ osh.code
 			var om9 := ShaderMaterial.new()
 			om9.shader = osh
 			om9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))
+			_ocean_mats.append(om9)
 			return om9
 		"rogue":
 			# the pale wanderer: bleached bone-grey stone, no sun to warm it
