@@ -128,6 +128,18 @@ class _MapView extends Control:
 		owner_ui._last_scale = scale
 		var origin := Vector3(me.x + owner_ui.pan.x, 0, me.z + owner_ui.pan.y)
 
+		# the EDGE: a white dotted circle where the universe ends. no
+		# label -- the shape says it
+		var bc := c + (Vector2.ZERO - Vector2(origin.x, origin.z)) * scale
+		var brad := Universe.BOUNDARY * scale
+		var segs9 := 160
+		for di9 in segs9:
+			if di9 % 2 == 1:
+				continue
+			var a0 := TAU * float(di9) / float(segs9)
+			var a1 := TAU * (float(di9) + 1.0) / float(segs9)
+			draw_arc(bc, brad, a0, a1, 4, Color(1, 1, 1, 0.35), 1.5)
+
 		# solar system names floating over their clusters
 		for sysspec in [["DUDE SYSTEM", Vector2(0, 900)],
 				["SOL SYSTEM", Vector2(-52000, 14000)],
