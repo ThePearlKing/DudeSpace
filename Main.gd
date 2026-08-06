@@ -715,6 +715,13 @@ func _mainframe_test() -> void:
 		C + pd13 * (rF + 6.6) + t13 * 12.0)
 	print("MFTEST core doorway band: hit at %.1fm (must hit) %s" % [dseal,
 		"PASS" if dseal >= 0.0 else "FAIL"])
+	# 7. the atrium wall vent dead-ends in its duct (hollow planet --
+	# an unsealed vent is an escape hole). Expect the end cap ~4.3m in;
+	# <2 means the ray hit the wall face (bad aim), miss/far means leak.
+	var vfrom := C + u0 * (rF + 0.5) + e2 * 3.9 - e1 * 5.6
+	var dv: float = cast.call(vfrom, vfrom - e1 * 12.0)
+	print("MFTEST vent duct seal: hit at %.1fm (~4.3) %s" % [dv,
+		"PASS" if dv >= 2.0 and dv < 7.0 else "FAIL"])
 	print("MFTEST done")
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot

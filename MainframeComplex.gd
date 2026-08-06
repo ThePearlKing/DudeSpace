@@ -80,11 +80,13 @@ func _bup(up: Vector3) -> Basis:
 	return Basis(x, up, x.cross(up).normalized()).orthonormalized()
 
 ## floor/ceiling as chained ARC STRIPS: every big room curves with
-## gravity exactly like the deck, so no flat plate ever leaves a step
-## lip where it meets the arc. n strips of 4.6, centred on a_c.
-func _arc_floor(a_c: float, width: float, n: int, rad: float,
+## gravity exactly like the deck. len_z is the FULL span to cover --
+## strips are laid edge to edge so the floor always reaches the walls
+## (short floors were the mystery door-steps).
+func _arc_floor(a_c: float, width: float, len_z: float, rad: float,
 		xoff: float) -> void:
-	var stp := 4.3 / rad
+	var n := maxi(1, int(ceil((len_z - 0.4) / 4.3)))
+	var stp := ((len_z - 4.6) / float(n - 1)) / rad if n > 1 else 0.0
 	for k in n:
 		var a := a_c + stp * (float(k) - float(n - 1) * 0.5)
 		_plate(Vector3(width, 0.5, 4.6),
@@ -215,7 +217,7 @@ func build(b, dir: Vector3) -> void:
 	# ---- atrium ----
 	# floor in three ARC STRIPS like the deck: flat plates meeting the
 	# curved deck used to leave a step lip right in the doorway
-	_arc_floor(0.0, 12.6, 3, _rF - 0.25, 0.0)
+	_arc_floor(0.0, 12.6, 13.4, _rF - 0.25, 0.0)
 	var acxf := Transform3D(abas, _C + _u0 * (_rF + 6.75))
 	_plate(Vector3(12.6, 0.5, 3.7), acxf, Vector3(0, 0, 4.45), DARK, 0.0)
 	_plate(Vector3(12.6, 0.5, 3.7), acxf, Vector3(0, 0, -4.45), DARK, 0.0)
@@ -223,10 +225,52 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(3.7, 0.5, 5.2), acxf, Vector3(-4.45, 0, 0), DARK, 0.0)
 	# walls 7.0 tall, top overlapping the ceiling plate: no seam band
 	var awxf := Transform3D(abas, _C + _u0 * (_rF + 3.25))
-	# -Z wall: low 1.8x2.0 hatchway into the VENTILATION wing
-	_plate(Vector3(5.4, 7.0, 0.5), awxf, Vector3(3.6, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(5.4, 7.0, 0.5), awxf, Vector3(-3.6, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(1.8, 4.75, 0.5), awxf, Vector3(0, 1.125, -6.05), STEEL, 0.0)
+	# -Z wall: a PROPER 2.4x3.0 doorway to the service hallway, plus a
+	# little grated wall vent with a fan turning in the duct behind it
+	_plate(Vector3(5.1, 7.0, 0.5), awxf, Vector3(-3.75, 0, -6.05), STEEL, 0.0)
+	_plate(Vector3(2.4, 4.0, 0.5), awxf, Vector3(0, 1.75, -6.05), STEEL, 0.0)
+	_plate(Vector3(2.15, 7.0, 0.5), awxf, Vector3(2.275, 0, -6.05), STEEL, 0.0)
+	_plate(Vector3(1.1, 5.55, 0.5), awxf, Vector3(3.9, 0.725, -6.05), STEEL, 0.0)
+	_plate(Vector3(1.85, 7.0, 0.5), awxf, Vector3(5.375, 0, -6.05), STEEL, 0.0)
+	for vg in [[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -2.0, -6.0)],
+			[Vector3(1.3, 0.1, 0.1), Vector3(3.9, -3.3, -6.0)],
+			[Vector3(0.1, 1.3, 0.1), Vector3(3.25, -2.6, -6.0)],
+			[Vector3(0.1, 1.3, 0.1), Vector3(4.55, -2.6, -6.0)]]:
+		_deco_box(vg[0], awxf, vg[1], AMBER, 1.3)
+	# the duct itself: a short sealed run behind the grille (the planet
+	# is hollow -- an open vent would be an escape hole)
+	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -3.65, -8.1), STEEL, 0.0)
+	_plate(Vector3(1.9, 0.4, 3.6), awxf, Vector3(3.9, -1.85, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 2.2, 3.6), awxf, Vector3(3.15, -2.75, -8.1), STEEL, 0.0)
+	_plate(Vector3(0.4, 2.2, 3.6), awxf, Vector3(4.65, -2.75, -8.1), STEEL, 0.0)
+	_plate(Vector3(1.9, 2.4, 0.4), awxf, Vector3(3.9, -2.75, -10.1), STEEL, 0.0)
+	_deco_box(Vector3(0.04, 0.08, 3.4), awxf, Vector3(3.4, -2.2, -8.1),
+		Color("#66ff99"), 1.1)
+	var vring := MeshInstance3D.new()
+	var vrm := TorusMesh.new()
+	vrm.inner_radius = 0.42
+	vrm.outer_radius = 0.5
+	vring.mesh = vrm
+	vring.material_override = Surfaces.metal(STEEL)
+	add_child(vring)
+	vring.global_transform = Transform3D(abas, _C + _u0 * (_rF + 3.25))
+	vring.translate_object_local(Vector3(3.9, -2.75, -9.7))
+	vring.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	var vhub := Node3D.new()
+	add_child(vhub)
+	vhub.global_transform = Transform3D(abas, _C + _u0 * (_rF + 3.25))
+	vhub.translate_object_local(Vector3(3.9, -2.75, -9.7))
+	vhub.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+	for vbl in 4:
+		var vblade := MeshInstance3D.new()
+		var vbm := BoxMesh.new()
+		vbm.size = Vector3(0.4, 0.04, 0.11)
+		vblade.mesh = vbm
+		vblade.rotation_degrees = Vector3(0, 90.0 * float(vbl), 0)
+		vblade.translate_object_local(Vector3(0.24, 0, 0))
+		vblade.material_override = Surfaces.metal(Color("#4a5266"))
+		vhub.add_child(vblade)
+	_spins.append({"node": vhub, "rate": 5.0})
 	_plate(Vector3(1.3, 7.0, 0.5), awxf, Vector3(5.65, 0, 6.05), STEEL, 0.0)
 	_plate(Vector3(1.3, 7.0, 0.5), awxf, Vector3(-5.65, 0, 6.05), STEEL, 0.0)
 	_plate(Vector3(0.5, 7.0, 12.6), awxf, Vector3(6.05, 0, 0), STEEL, 0.0)
@@ -318,9 +362,14 @@ func build(b, dir: Vector3) -> void:
 		_deco_box(Vector3(0.24, 6.5, 0.24), wxf, Vector3(5.0, 0, 2.3), STEEL, 0.0)
 		_deco_box(Vector3(0.24, 6.5, 0.24), wxf, Vector3(-5.0, 0, 2.3), STEEL, 0.0)
 		_deco_box(Vector3(10.24, 0.24, 0.24), wxf, Vector3(0, 3.15, 2.3), STEEL, 0.0)
-		# conduit strips, both walls, continuous
-		_deco_box(Vector3(0.06, 0.16, 5.0), wxf, Vector3(4.9, -1.85, 0), AMBER, 1.6)
-		_deco_box(Vector3(0.06, 0.16, 5.0), wxf, Vector3(-4.9, -1.85, 0), AMBER, 1.6)
+		# conduit strips, both walls -- split around doorways so no
+		# glowing stripe ever floats across an opening
+		for cs9 in [1.0, -1.0]:
+			if rooms.has(i) and float((rooms[i] as Array)[0]) == cs9:
+				_deco_box(Vector3(0.06, 0.16, 1.3), wxf, Vector3(cs9 * 4.9, -1.85, 1.85), AMBER, 1.6)
+				_deco_box(Vector3(0.06, 0.16, 1.3), wxf, Vector3(cs9 * 4.9, -1.85, -1.85), AMBER, 1.6)
+			else:
+				_deco_box(Vector3(0.06, 0.16, 5.0), wxf, Vector3(cs9 * 4.9, -1.85, 0), AMBER, 1.6)
 		if i % 2 == 0:
 			_deco_box(Vector3(0.5, 0.08, 3.4),
 				Transform3D(fb, _C + up * (_rF + 5.85)), Vector3.ZERO,
@@ -422,8 +471,8 @@ func build(b, dir: Vector3) -> void:
 	var ac := aend + (2.5 + 11.55) / _rF
 	var cb := _fr(ac)
 	var cup := _pdir(ac)
-	_arc_floor(ac, 22.6, 5, _rF - 0.25, 0.0)
-	_arc_floor(ac, 22.6, 5, _rF + 12.25, 0.0)
+	_arc_floor(ac, 22.6, 23.4, _rF - 0.25, 0.0)
+	_arc_floor(ac, 22.6, 23.4, _rF + 12.25, 0.0)
 	var cwxf := Transform3D(cb, _C + cup * (_rF + 6.0))
 	# -Z wall: deck-sized opening + a DEEP header sealing the band above
 	# the deck ceiling (the old escape hole)
@@ -436,7 +485,7 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(0.5, 12.5, 10.1), cwxf, Vector3(11.3, 0, -6.25), STEEL, 0.0)
 	_plate(Vector3(0.5, 9.5, 2.4), cwxf, Vector3(11.3, 1.5, 0), STEEL, 0.0)
 	_plate(Vector3(0.5, 12.5, 22.6), cwxf, Vector3(-11.3, 0, 0), STEEL, 0.0)
-	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 4.2),
+	_sign("COMMUNICATIONS", cb, _C + cup * (_rF + 5.7),
 		Vector3(10.7, 0, 0), -90.0)
 	# fusion assembly: plinth, plasma heart in a translucent sleeve,
 	# feed columns, three tilted spin rings, six pylons, rising discs
@@ -789,6 +838,10 @@ func _bunk_wing() -> void:
 			_deco_box(Vector3(2.6, 0.08, 0.5),
 				Transform3D(fb, _C + up * (_rF + 3.15)), Vector3.ZERO,
 				Color("#f2ead8"), 2.0)
+	# END CAP: the corridor stops HERE, sealed -- no hole into the rock
+	var bend := -(_a0 + _step * 4.0)
+	var cxf9 := Transform3D(_fx(bend), _C + _pdx(bend) * (_rF + 1.6))
+	_plate(Vector3(0.4, 3.9, 3.9), cxf9, Vector3(-2.65, 0, 0), STEEL, 0.0)
 	# chute + the SPECIAL DUDES deck
 	var b4 := -(_a0 + _step * 4.0)
 	var fb4 := _fx(b4)
@@ -1170,8 +1223,8 @@ func _service_wing() -> void:
 	var ah2 := -(_a0 + _step * 6.0 + (2.5 + 7.5) / _rF)
 	var hb2 := _fr(ah2)
 	var hup2 := _pdir(ah2)
-	_arc_floor(ah2, 22.6, 3, _rF - 0.25, 0.0)
-	_arc_floor(ah2, 22.6, 3, _rF + 9.25, 0.0)
+	_arc_floor(ah2, 22.6, 15.4, _rF - 0.25, 0.0)
+	_arc_floor(ah2, 22.6, 15.4, _rF + 9.25, 0.0)
 	var awx2 := Transform3D(hb2, _C + hup2 * (_rF + 4.5))
 	_plate(Vector3(10.4, 9.5, 0.5), awx2, Vector3(6.1, 0, 7.3), STEEL, 0.0)
 	_plate(Vector3(10.4, 9.5, 0.5), awx2, Vector3(-6.1, 0, 7.3), STEEL, 0.0)
@@ -1229,8 +1282,8 @@ func _service_wing() -> void:
 	var ag2 := ah2 - (7.3 + 8.55) / _rF
 	var gb2 := _fr(ag2)
 	var gup2 := _pdir(ag2)
-	_arc_floor(ag2, 16.6, 4, _rF - 0.25, 0.0)
-	_arc_floor(ag2, 16.6, 4, _rF + 8.25, 0.0)
+	_arc_floor(ag2, 16.6, 17.4, _rF - 0.25, 0.0)
+	_arc_floor(ag2, 16.6, 17.4, _rF + 8.25, 0.0)
 	var gwx2 := Transform3D(gb2, _C + gup2 * (_rF + 4.0))
 	_plate(Vector3(7.0, 8.5, 0.5), gwx2, Vector3(4.8, 0, 8.3), STEEL, 0.0)
 	_plate(Vector3(7.0, 8.5, 0.5), gwx2, Vector3(-4.8, 0, 8.3), STEEL, 0.0)
@@ -1536,7 +1589,7 @@ var _radio_sp: AudioStreamPlayer3D = null
 var _radio_lbl: Label3D = null
 var _radio_smat: ShaderMaterial = null
 var _radio_streams: Array = []
-const RADIO_NAMES := ["VOID WALTZ", "THE NUMBERS", "STATIC SEA", "DRONE CHOIR"]
+const RADIO_NAMES := ["CHANNEL 1", "CHANNEL 2", "CHANNEL 3", "CHANNEL 4"]
 const RADIO_HUES := [Color("#b388ff"), Color("#66ff99"),
 	Color("#7df9ff"), Color("#ff6a6a")]
 
@@ -1575,18 +1628,7 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	scr9.global_transform = Transform3D(cb2, _C + up2 * (_rF + 3.4))
 	scr9.rotate_object_local(Vector3(0, 1, 0), -PI * 0.5)
 	scr9.translate_object_local(Vector3(0, 0, -5.62))
-	_radio_lbl = Label3D.new()
-	_radio_lbl.text = "SIGNAL LOST"
-	_radio_lbl.font_size = 40
-	_radio_lbl.pixel_size = 0.008
-	_radio_lbl.modulate = AMBER
-	_radio_lbl.outline_size = 10
-	_radio_lbl.outline_modulate = Color(0, 0, 0, 0.9)
-	add_child(_radio_lbl)
-	_radio_lbl.global_transform = Transform3D(
-		cb2 * Basis(Vector3(0, 1, 0), -PI * 0.5),
-		Transform3D(cb2, _C + up2 * (_rF + 5.2))
-		.translated_local(Vector3(5.55, 0, 0)).origin)
+	# no titles: the screen's colour and the sound ARE the channel
 	# console desk + two physical buttons: POWER and STATION
 	_plate(Vector3(1.4, 1.0, 5.0), Transform3D(cb2, _C + up2 * (_rF + 0.5)),
 		Vector3(2.6, 0, 0), Color("#12161c"), 0.0)
@@ -1654,9 +1696,6 @@ func _comms_room(cb: Basis, _ac: float) -> void:
 	_chatter(Transform3D(cb2, _C + up2 * (_rF + 1.0)).origin, 77, -14.0)
 
 func _radio_apply() -> void:
-	if _radio_lbl != null:
-		_radio_lbl.text = RADIO_NAMES[_radio_idx] if _radio_on else "SIGNAL LOST"
-		_radio_lbl.modulate = RADIO_HUES[_radio_idx] if _radio_on else AMBER
 	if _radio_smat != null:
 		var hc: Color = RADIO_HUES[_radio_idx] if _radio_on else Color("#332a10")
 		_radio_smat.set_shader_parameter("hue", Vector3(hc.r, hc.g, hc.b))
@@ -1737,19 +1776,27 @@ func _st_numbers():
 	return w
 
 func _st_static() -> AudioStreamWAV:
-	# the static sea, with something tapping morse underneath
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 606
-	var taps: Array = []
-	for i in 9:
-		taps.append([rng.randf() * 6.0, 0.06 + 0.09 * float(rng.randi() % 2)])
-	return _bake_pcm(6.0, func(ts: float) -> float:
+	# the static sea -- and underneath, REAL morse. It spells HAROLD.
+	# dit=1u dah=3u, gaps 1/3/7, standard timing at 0.09s a unit.
+	const MORSE := {"H": "....", "A": ".-", "R": ".-.", "O": "---",
+		"L": ".-..", "D": "-.."}
+	var unit := 0.09
+	var tones: Array = []   # [start, length]
+	var tcur := 0.8
+	for chr9 in "HAROLD":
+		for sym in MORSE[chr9]:
+			var ln := unit if sym == "." else unit * 3.0
+			tones.append([tcur, ln])
+			tcur += ln + unit
+		tcur += unit * 2.0   # char gap totals 3u with the trailing 1u
+	var total := tcur + unit * 7.0 + 0.8
+	return _bake_pcm(total, func(ts: float) -> float:
 		var v := 0.07 * (fmod(sin(ts * 91731.7) * 43758.5453, 2.0) - 1.0)
 		v += 0.03 * sin(TAU * 0.4 * ts) * (fmod(sin(ts * 55117.1) * 12345.6, 2.0) - 1.0)
-		for tp in taps:
+		for tp in tones:
 			var dt9: float = ts - float(tp[0])
 			if dt9 >= 0.0 and dt9 < float(tp[1]):
-				v += 0.15 * sin(TAU * 620.0 * ts)
+				v += 0.16 * sin(TAU * 620.0 * ts)
 		return v)
 
 func _st_drone() -> AudioStreamWAV:
