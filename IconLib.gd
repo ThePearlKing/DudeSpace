@@ -30,8 +30,12 @@ static func _host(tree: SceneTree) -> Node:
 				hh.free())
 	return h
 
-## The one true model pipeline: real world object > the player's own
-## hand model > curated minis > resource silhouette. Never a bare cube.
+## THE ONE MODEL PIPELINE. An item has exactly one model, used for the
+## ground drop, the inventory icon, and the hand alike: the real world
+## object if it is placeable, else the hand model, else the curated
+## registry. There is no icon-only model and there never will be again.
+## (Armor keeps its separate WEARING model -- that is the one allowed
+## exception.)
 static func build_model_world(id: String, tree: SceneTree) -> Node3D:
 	var holder := Node3D.new()
 	var cs = tree.current_scene
@@ -47,6 +51,11 @@ static func build_model_world(id: String, tree: SceneTree) -> Node3D:
 			real.scale = Vector3(sc, sc, sc)
 			real.position = Vector3(0, -0.25, 0)
 			return holder
+	var hm := _hand_model(id, tree)
+	if hm != null:
+		hm.scale = Vector3(1.4, 1.4, 1.4)
+		holder.add_child(hm)
+		return holder
 	holder.add_child(build_model(id, tree))
 	return holder
 
@@ -135,11 +144,6 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 	var c := _color_of(id)
 	var box := BoxMesh.new()
 	match id:
-		"ytetra":
-			# SPECIMEN 4: one real tetrahedron, glowing amber. Same model
-			# everywhere -- world drop, inventory icon, hand.
-			_p(r, MainframeComplex._tetra_mesh(0.34), Vector3.ZERO,
-				Color("#ffd23f"), 1.6)
 		"dudemap":
 			# the facility map: an amber slate with a glowing route line
 			var slate := BoxMesh.new()
@@ -153,6 +157,50 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			tr2.size = Vector3(0.16, 0.02, 0.03)
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
+		"raw_ingot", "raw_irid", "coal", "uranium":
+			var lump := SphereMesh.new()
+			lump.radius = [0.32, 0.34, 0.24, 0.26][["raw_ingot", "raw_irid",
+				"coal", "uranium"].find(id)]
+			lump.height = [0.5, 0.4, 0.36, 0.44][["raw_ingot", "raw_irid",
+				"coal", "uranium"].find(id)]
+			lump.radial_segments = 6 if id == "raw_ingot" else 5
+			lump.rings = 3 if id == "raw_ingot" else 2
+			_p(r, lump, Vector3.ZERO, c, 0.5)
+		"ingot":
+			_p(r, _bx(0.62, 0.18, 0.3), Vector3.ZERO, c, 0.4)
+		"irid":
+			var puck := CylinderMesh.new()
+			puck.top_radius = 0.28
+			puck.bottom_radius = 0.28
+			puck.height = 0.16
+			puck.radial_segments = 6
+			_p(r, puck, Vector3.ZERO, c, 0.5)
+		"ultima":
+			var gem := SphereMesh.new()
+			gem.radius = 0.26
+			gem.height = 0.62
+			gem.radial_segments = 4
+			gem.rings = 2
+			_p(r, gem, Vector3.ZERO, c, 1.0)
+		"prism":
+			var shard := PrismMesh.new()
+			shard.size = Vector3(0.34, 0.6, 0.24)
+			_p(r, shard, Vector3.ZERO, c, 0.8)
+		"sulfur":
+			var wedge := PrismMesh.new()
+			wedge.size = Vector3(0.4, 0.34, 0.3)
+			_p(r, wedge, Vector3.ZERO, c, 0.4)
+		"semicircle":
+			var dome := SphereMesh.new()
+			dome.radius = 0.32
+			dome.height = 0.32
+			dome.is_hemisphere = true
+			_p(r, dome, Vector3.ZERO, c, 0.5)
+		"circle":
+			var ring9 := TorusMesh.new()
+			ring9.inner_radius = 0.16
+			ring9.outer_radius = 0.34
+			_p(r, ring9, Vector3.ZERO, c, 0.5)
 		"meat", "cooked_meat":
 			var slab := BoxMesh.new()
 			slab.size = Vector3(0.55, 0.22, 0.4)
@@ -315,7 +363,7 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 				var hm := _hand_model(id, tree)
 				hm.scale = Vector3(1.4, 1.4, 1.4)
 				r.add_child(hm)
-			elif ItemDrop._resource_mesh(id) is BoxMesh:
+			else:
 				# machine/misc fallback: chassis + face panel + little
 				# stack, so NOTHING is ever a bare spinning cube
 				var ch := BoxMesh.new()
@@ -329,10 +377,4 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 				stack2.bottom_radius = 0.07
 				stack2.height = 0.2
 				_p(r, stack2, Vector3(0.12, 0.3, 0.1), Color("#3a3f46"), 0.1)
-			else:
-				# a resource with its own silhouette: use it
-				var mi2 := MeshInstance3D.new()
-				mi2.mesh = ItemDrop._resource_mesh(id)
-				mi2.material_override = Destructible.make_material(c, 0.35)
-				r.add_child(mi2)
 	return r

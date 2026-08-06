@@ -14,6 +14,8 @@ var risen := true             # false = still buried, waiting for its turn
 var _root: Node3D = null      # the stone itself (lowered/raised/removed)
 var _socket_tet: MeshInstance3D = null
 var _busy := false
+var _show_tweens: Array = []   # looped tweens killed at cleanup -- a
+                               # freed target + set_loops = infinite-loop spam
 
 const RISE_DEPTH := 14.0
 const ITEM_IDS := ["ytetra", "ltetra", "otetra", "btetra", "rtetra",
@@ -242,18 +244,22 @@ func activate() -> void:
 			sin(ph2) * cos(lat2)) * (float(body.radius) + 210.0)
 		tris.append(t9)
 		var brt := create_tween().set_loops()
+		_show_tweens.append(brt)
 		brt.tween_property(tmat, "emission_energy_multiplier", 2.6,
 			1.6 + 0.8 * fmod(float(i) * 0.7, 1.0)).from(0.7) \
 			.set_trans(Tween.TRANS_SINE)
 		brt.tween_property(tmat, "emission_energy_multiplier", 0.7,
 			1.6 + 0.8 * fmod(float(i) * 0.7, 1.0)).set_trans(Tween.TRANS_SINE)
 		var ctw := create_tween().set_loops()
+		_show_tweens.append(ctw)
 		ctw.tween_property(t2, "rotation:y", -TAU, 28.0).as_relative()
 	var skytw := create_tween().set_loops()
+	_show_tweens.append(skytw)
 	skytw.tween_property(skyp, "rotation:y", TAU, 40.0) \
 		.from(0.0).as_relative()
 	for t9 in tris:
 		var st9 := create_tween().set_loops()
+		_show_tweens.append(st9)
 		st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0), 9.0) \
 			.as_relative()
 	# THE CRACKS: glowing fractures spread across the sky in the piece's
@@ -395,6 +401,10 @@ void fragment(){
 	var cleanup := create_tween()
 	cleanup.tween_interval(362.0)
 	cleanup.tween_callback(func() -> void:
+		for tw9 in _show_tweens:
+			if tw9 != null and (tw9 as Tween).is_valid():
+				(tw9 as Tween).kill()
+		_show_tweens.clear()
 		if is_instance_valid(skyp):
 			skyp.queue_free()
 		if is_instance_valid(sp):

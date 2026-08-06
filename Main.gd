@@ -867,9 +867,9 @@ void fragment(){
 	vec2 g2 = fract(wpos.zy * 0.002) - 0.5;
 	float lat = max(step(abs(g.x), 0.03) + step(abs(g.y), 0.03),
 		step(abs(g2.x), 0.03));
-	ALPHA = near * (0.10 + 0.55 * min(lat, 1.0));
-	ALBEDO = vec3(1.0, 0.15, 0.1);
-	EMISSION = vec3(1.0, 0.15, 0.1) * near * 1.6;
+	ALPHA = near * (0.02 + 0.16 * min(lat, 1.0));
+	ALBEDO = vec3(1.0, 0.3, 0.2);
+	EMISSION = vec3(1.0, 0.3, 0.2) * near * 0.5;
 }
 """
 	var bmesh := SphereMesh.new()
@@ -880,12 +880,16 @@ void fragment(){
 	var bmat := ShaderMaterial.new()
 	bmat.shader = sh
 	bmat.set_shader_parameter("bradius", Universe.BOUNDARY)
-	var bmi := MeshInstance3D.new()
-	bmi.mesh = bmesh
-	bmi.material_override = bmat
-	bmi.extra_cull_margin = 16384.0
-	add_child(bmi)
-	bmi.global_position = Vector3.ZERO
+	_boundary_mesh = MeshInstance3D.new()
+	_boundary_mesh.mesh = bmesh
+	_boundary_mesh.material_override = bmat
+	_boundary_mesh.extra_cull_margin = 16384.0
+	add_child(_boundary_mesh)
+	_boundary_mesh.global_position = Vector3.ZERO
+	# the lattice only EXISTS once the eighth monolith cracks the sky
+	# open -- until then the edge is invisible: just the shove, and the
+	# hand
+	_boundary_mesh.visible = Game.monolith_stage >= 8
 
 ## CTD_TEST=28: the README tour. Flies a camera to every showpiece and
 ## saves docs/shots/*.png.
@@ -5602,10 +5606,13 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 ## It does nothing. Yet.
 var _h_monolith: Monolith = null
 var _earth_monolith: Monolith = null
+var _boundary_mesh: MeshInstance3D = null
 
 ## a monolith was fed (locally or by a peer): raise the next stele,
 ## refresh every tracker strip
 func _on_monolith_advanced() -> void:
+	if _boundary_mesh != null:
+		_boundary_mesh.visible = Game.monolith_stage >= 8
 	if Game.monolith_stage >= 1 and _earth_monolith != null \
 			and not _earth_monolith.risen:
 		_earth_monolith.rise()

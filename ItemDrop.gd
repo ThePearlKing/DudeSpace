@@ -25,23 +25,16 @@ func setup(id_in: String, n: int) -> void:
 
 func _ready() -> void:
 	add_to_group("itemdrop")
+	# ONE MODEL: ground drops render the item's one true model -- same
+	# pipeline as the inventory icon and the hand. No silhouettes, no
+	# stand-ins, no exceptions.
 	_mesh = MeshInstance3D.new()
-	_mesh.mesh = _resource_mesh(id)
-	var col: Color = Inventory.items[id]["color"] if Inventory.items.has(id) \
-		else (Inventory.weapons[id]["color"] if Inventory.weapons.has(id) else Color("#cccccc"))
-	_mesh.material_override = Destructible.make_material(col, 1.2)
 	_mesh.position = Vector3(0, 0.5, 0)
 	add_child(_mesh)
-	# generic cube? the item HAS a real look -- wear it on the ground too
-	if _mesh.mesh is BoxMesh:
-		var mdl := IconLib.build_model_world(id, get_tree())
-		if mdl.get_child_count() > 0:
-			_mesh.mesh = null
-			mdl.scale = Vector3(0.85, 0.85, 0.85)
-			mdl.position = Vector3(0, 0.1, 0)
-			_mesh.add_child(mdl)
-		else:
-			mdl.queue_free()
+	var mdl := IconLib.build_model_world(id, get_tree())
+	mdl.scale = Vector3(0.85, 0.85, 0.85)
+	mdl.position = Vector3(0, 0.1, 0)
+	_mesh.add_child(mdl)
 	var lbl := Label3D.new()
 	lbl.text = (Inventory.hotbar_name(id) + (" ×%d" % count if count > 1 else ""))
 	lbl.font_size = 20
@@ -78,65 +71,6 @@ func _physics_process(delta: float) -> void:
 		_rest = true
 	else:
 		global_position += move
-
-## Each ore/resource gets its own silhouette; everything else stays a cube.
-static func _resource_mesh(rid: String) -> Mesh:
-	match rid:
-		"raw_ingot":   # lumpy low-poly ore rock
-			var m := SphereMesh.new()
-			m.radius = 0.32; m.height = 0.5
-			m.radial_segments = 6; m.rings = 3
-			return m
-		"raw_irid":    # squatter, coarser lump
-			var m := SphereMesh.new()
-			m.radius = 0.34; m.height = 0.4
-			m.radial_segments = 5; m.rings = 2
-			return m
-		"coal":        # small dark nugget
-			var m := SphereMesh.new()
-			m.radius = 0.24; m.height = 0.36
-			m.radial_segments = 5; m.rings = 2
-			return m
-		"ingot":       # smelted bar
-			var m := BoxMesh.new()
-			m.size = Vector3(0.62, 0.18, 0.3)
-			return m
-		"irid":        # refined hex puck
-			var m := CylinderMesh.new()
-			m.top_radius = 0.28; m.bottom_radius = 0.28; m.height = 0.16
-			m.radial_segments = 6
-			return m
-		"ultima":      # octahedral gem
-			var m := SphereMesh.new()
-			m.radius = 0.26; m.height = 0.62
-			m.radial_segments = 4; m.rings = 2
-			return m
-		"prism":       # triangular shard, name says it all
-			var m := PrismMesh.new()
-			m.size = Vector3(0.34, 0.6, 0.24)
-			return m
-		"uranium":     # jagged hot pebble -- you can tell it's bad for you
-			var m := SphereMesh.new()
-			m.radius = 0.26; m.height = 0.44
-			m.radial_segments = 5; m.rings = 2
-			return m
-		"sulfur":      # crumbly yellow crystal wedge
-			var m := PrismMesh.new()
-			m.size = Vector3(0.4, 0.34, 0.3)
-			return m
-		"semicircle":  # half a dome
-			var m := SphereMesh.new()
-			m.radius = 0.32; m.height = 0.32
-			m.is_hemisphere = true
-			return m
-		"circle":      # a perfect ring
-			var m := TorusMesh.new()
-			m.inner_radius = 0.16; m.outer_radius = 0.34
-			return m
-		_:
-			var m := BoxMesh.new()
-			m.size = Vector3(0.5, 0.5, 0.5)
-			return m
 
 func _process(delta: float) -> void:
 	_t += delta
