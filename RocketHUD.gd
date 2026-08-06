@@ -32,7 +32,14 @@ func _process(_delta: float) -> void:
 class _NavView extends Control:
 	var rocket: Rocket
 
-	func _draw() -> void:
+	## outside the universe no planet owns you, whatever is nearest
+func _place_name(body) -> String:
+	var rr := rocket.global_position.length()
+	if Game.zone == "" and rr > Universe.BOUNDARY:
+		return "THE DARK" if rr > Universe.BOUNDARY * 1.5 else "THE WHITE ZONE"
+	return str(body.name)
+
+func _draw() -> void:
 		if rocket == null or not is_instance_valid(rocket):
 			return
 		var font := ThemeDB.fallback_font
@@ -87,7 +94,7 @@ class _NavView extends Control:
 		var alt := rocket.global_position.distance_to(body.center) - body.radius
 		var lines := [
 			"SPD  %6.1f m/s" % rocket.vel.length(),
-			"ALT  %8.0f  (%s)" % [alt, body.name],
+			"ALT  %8.0f  (%s)" % [alt, _place_name(body)],
 		]
 		lines.append("FUEL %6.1f / %.0f" % [Inventory.fuel, cap])
 		lines.append("RCS  ON")

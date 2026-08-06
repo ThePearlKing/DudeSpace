@@ -2447,7 +2447,7 @@ func _process(delta: float) -> void:
 	# sphere-of-influence change notice (KSP-style) -- suppressed in
 	# pocket dimensions: walking into your living room is not a
 	# gravitational event
-	if Game.zone != "":
+	if Game.zone != "" or pos.length() > Universe.BOUNDARY:
 		_last_soi = ""
 	else:
 		var soi := Universe.nearest(pos).name
