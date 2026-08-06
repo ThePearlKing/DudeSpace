@@ -220,6 +220,35 @@ func activate() -> void:
 		t9.position = Vector3(cos(ph) * cos(lat), sin(lat),
 			sin(ph) * cos(lat)) * (float(body.radius) + 320.0)
 		tris.append(t9)
+	# second ring, counter-turning, smaller and brighter -- the sky gets
+	# DEPTH: two shells of triangles wheeling against each other, each
+	# piece breathing light
+	for i in 20:
+		var t9 := MeshInstance3D.new()
+		t9.mesh = MainframeComplex._tetra_mesh(
+			7.0 + 6.0 * fmod(float(i) * 0.618, 1.0))
+		var tmat := StandardMaterial3D.new()
+		tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		tmat.albedo_color = col.lightened(0.35)
+		tmat.emission_enabled = true
+		tmat.emission = col.lightened(0.2)
+		var t2 := Node3D.new()
+		skyp.add_child(t2)
+		t2.add_child(t9)
+		t9.material_override = tmat
+		var ph2 := TAU * float(i) / 20.0
+		var lat2 := -0.6 + 1.2 * fmod(float(i) * 0.382, 1.0)
+		t9.position = Vector3(cos(ph2) * cos(lat2), sin(lat2),
+			sin(ph2) * cos(lat2)) * (float(body.radius) + 210.0)
+		tris.append(t9)
+		var brt := create_tween().set_loops()
+		brt.tween_property(tmat, "emission_energy_multiplier", 2.6,
+			1.6 + 0.8 * fmod(float(i) * 0.7, 1.0)).from(0.7) \
+			.set_trans(Tween.TRANS_SINE)
+		brt.tween_property(tmat, "emission_energy_multiplier", 0.7,
+			1.6 + 0.8 * fmod(float(i) * 0.7, 1.0)).set_trans(Tween.TRANS_SINE)
+		var ctw := create_tween().set_loops()
+		ctw.tween_property(t2, "rotation:y", -TAU, 28.0).as_relative()
 	var skytw := create_tween().set_loops()
 	skytw.tween_property(skyp, "rotation:y", TAU, 40.0) \
 		.from(0.0).as_relative()
@@ -227,6 +256,61 @@ func activate() -> void:
 		var st9 := create_tween().set_loops()
 		st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0), 9.0) \
 			.as_relative()
+	# THE CRACKS: glowing fractures spread across the sky in the piece's
+	# color -- brighter with every monolith fed. At the eighth the sky
+	# is meant to SHATTER and take the universe boundary with it (that
+	# finale is planned, not yet staged -- the boundary already yields
+	# once monolith_stage hits 8).
+	var crack := MeshInstance3D.new()
+	var ckm := SphereMesh.new()
+	ckm.radius = float(body.radius) + 600.0
+	ckm.height = ckm.radius * 2.0
+	ckm.radial_segments = 32
+	ckm.rings = 16
+	crack.mesh = ckm
+	var cksh := Shader.new()
+	cksh.code = """
+shader_type spatial;
+render_mode unshaded, cull_front;
+uniform vec3 ccol = vec3(1.0, 0.82, 0.25);
+uniform float intensity = 0.3;
+uniform float fade = 0.0;
+vec2 h2(vec2 p){
+	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
+		dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+}
+void fragment(){
+	vec2 uv = UV * vec2(10.0, 5.0);
+	vec2 i = floor(uv);
+	vec2 f = fract(uv);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	for (int x = -1; x <= 1; x++) {
+		for (int y = -1; y <= 1; y++) {
+			vec2 g = vec2(float(x), float(y));
+			vec2 o = h2(i + g);
+			float d = length(g + o - f);
+			if (d < f1) { f2 = f1; f1 = d; }
+			else if (d < f2) { f2 = d; }
+		}
+	}
+	float edge = 1.0 - smoothstep(0.0, 0.09, f2 - f1);
+	ALBEDO = ccol;
+	EMISSION = ccol * edge * 2.2 * intensity * fade;
+	ALPHA = edge * intensity * fade * 0.9;
+}
+"""
+	var ckmat := ShaderMaterial.new()
+	ckmat.shader = cksh
+	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
+	ckmat.set_shader_parameter("intensity",
+		0.25 + 0.75 * float(stage + 1) / 8.0)
+	crack.material_override = ckmat
+	add_child(crack)
+	crack.global_position = body.center as Vector3
+	var cktw := create_tween()
+	cktw.tween_method(func(v: float) -> void:
+		ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 2.5)
 	# 5. the monolith lowers into the ground while all of it happens
 	if _root != null:
 		var twl := create_tween()
@@ -279,7 +363,7 @@ func activate() -> void:
 		hmat.albedo_color = Color(col.r, col.g, col.b, 0.75)
 		hmat.emission_enabled = true
 		hmat.emission = col
-		_planet_pictogram(holo, hmat)
+		_planet_pictogram(holo, hmat, nxt)
 		var htw := create_tween()
 		htw.tween_property(holo, "rotation:y", TAU * 2.0, 6.0).as_relative()
 		Sfx.play("warp", -8.0)
@@ -291,17 +375,32 @@ func activate() -> void:
 		holo.queue_free()
 		cone.queue_free()
 		_floor_glyph(top, bas, col)
-		# 7. wind down: sky fades, bloom eases back
-	await get_tree().create_timer(3.0).timeout
-	for t9 in tris:
-		var ftw2 := create_tween()
-		ftw2.tween_property(t9, "scale", Vector3(0.01, 0.01, 0.01), 2.5)
+		# 7. the AFTERMATH lingers: bloom eases back now, but the triangles
+	# keep wheeling and the cracks keep glowing for six more minutes,
+	# fading out so slowly you only notice when they are gone. The
+	# sound stays too -- quieter, coming off the planet.
 	if env != null:
 		var twg3 := create_tween()
 		twg3.tween_property(env, "glow_intensity", old_glow, 3.0)
-	await get_tree().create_timer(3.0).timeout
-	skyp.queue_free()
-	sp.queue_free()
+	var svtw := create_tween()
+	svtw.tween_property(sp, "volume_db", -16.0, 4.0)
+	var cktw2 := create_tween()
+	cktw2.tween_method(func(v: float) -> void:
+		if is_instance_valid(crack):
+			ckmat.set_shader_parameter("fade", v), 1.0, 0.0, 360.0)
+	for t9 in tris:
+		var ftw2 := create_tween()
+		ftw2.tween_property(t9, "scale", Vector3(0.01, 0.01, 0.01), 360.0) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	var cleanup := create_tween()
+	cleanup.tween_interval(362.0)
+	cleanup.tween_callback(func() -> void:
+		if is_instance_valid(skyp):
+			skyp.queue_free()
+		if is_instance_valid(sp):
+			sp.queue_free()
+		if is_instance_valid(crack):
+			crack.queue_free())
 	# 8. the chain advances -- for EVERYBODY
 	Game.monolith_stage = stage + 1
 	Net.broadcast_monolith(Game.monolith_stage)
@@ -315,7 +414,8 @@ func activate() -> void:
 ## the flat 2D planet pictogram: outline ring, three latitude bands,
 ## an equator bar. Drawn in the XZ plane of its parent, engraved-bar
 ## style like the Harold glyphs.
-func _planet_pictogram(parent: Node3D, mat: Material) -> void:
+func _planet_pictogram(parent: Node3D, mat: Material,
+		pname: String = "") -> void:
 	var ring := MeshInstance3D.new()
 	var rm := TorusMesh.new()
 	rm.inner_radius = 3.3
@@ -323,27 +423,52 @@ func _planet_pictogram(parent: Node3D, mat: Material) -> void:
 	ring.mesh = rm
 	ring.material_override = mat
 	parent.add_child(ring)
-	for i in 3:
-		var band := MeshInstance3D.new()
-		var bm2 := BoxMesh.new()
-		var half := sqrt(maxf(0.1, 3.3 * 3.3 - pow(1.1 * float(i + 1), 2.0)))
-		bm2.size = Vector3(half * 2.0, 0.06, 0.22)
-		band.mesh = bm2
-		band.material_override = mat
-		band.position = Vector3(0, 0, -1.1 * float(i + 1))
-		parent.add_child(band)
-		if i > 0:
-			var band2 := MeshInstance3D.new()
-			band2.mesh = bm2
-			band2.material_override = mat
-			band2.position = Vector3(0, 0, 1.1 * float(i))
-			parent.add_child(band2)
-	var bar := MeshInstance3D.new()
-	var bbm := BoxMesh.new()
-	bbm.size = Vector3(6.6, 0.06, 0.26)
-	bar.mesh = bbm
-	bar.material_override = mat
-	parent.add_child(bar)
+	if pname != "Earth":
+		for i in 3:
+			var band := MeshInstance3D.new()
+			var bm2 := BoxMesh.new()
+			var half := sqrt(maxf(0.1, 3.3 * 3.3 - pow(1.1 * float(i + 1), 2.0)))
+			bm2.size = Vector3(half * 2.0, 0.06, 0.22)
+			band.mesh = bm2
+			band.material_override = mat
+			band.position = Vector3(0, 0, -1.1 * float(i + 1))
+			parent.add_child(band)
+			if i > 0:
+				var band2 := MeshInstance3D.new()
+				band2.mesh = bm2
+				band2.material_override = mat
+				band2.position = Vector3(0, 0, 1.1 * float(i))
+				parent.add_child(band2)
+	if pname == "Earth":
+		# EARTH: the bands become continents -- clustered land blobs,
+		# one long diagonal, a small moon dot off the rim
+		for lb9 in [[Vector3(1.6, 0.06, 0.9), Vector3(-1.2, 0, -0.9), 25.0],
+				[Vector3(1.1, 0.06, 0.7), Vector3(-1.7, 0, 0.9), -15.0],
+				[Vector3(2.0, 0.06, 1.1), Vector3(1.1, 0, -0.5), -30.0],
+				[Vector3(1.3, 0.06, 0.8), Vector3(1.5, 0, 1.2), 10.0],
+				[Vector3(0.8, 0.06, 0.5), Vector3(0.1, 0, 1.9), 40.0]]:
+			var land := MeshInstance3D.new()
+			land.mesh = Surfaces.box_mesh(lb9[0] as Vector3)
+			land.material_override = mat
+			land.position = lb9[1] as Vector3
+			land.rotation_degrees.y = float(lb9[2])
+			parent.add_child(land)
+		var moon := MeshInstance3D.new()
+		var mm9 := CylinderMesh.new()
+		mm9.top_radius = 0.35
+		mm9.bottom_radius = 0.35
+		mm9.height = 0.06
+		moon.mesh = mm9
+		moon.material_override = mat
+		moon.position = Vector3(4.6, 0, -1.4)
+		parent.add_child(moon)
+	else:
+		var bar := MeshInstance3D.new()
+		var bbm := BoxMesh.new()
+		bbm.size = Vector3(6.6, 0.06, 0.26)
+		bar.mesh = bbm
+		bar.material_override = mat
+		parent.add_child(bar)
 
 ## the permanent scar: the same pictogram, burned flat into the ground
 ## where the monolith stood
@@ -351,7 +476,8 @@ func _floor_glyph(top: Vector3, bas: Basis, col: Color) -> void:
 	var g := Node3D.new()
 	add_child(g)
 	g.global_transform = Transform3D(bas, top + dir * 0.06)
-	_planet_pictogram(g, Destructible.make_material(col, 1.4))
+	_planet_pictogram(g, Destructible.make_material(col, 1.4),
+		Game.MONO_PLANETS[stage + 1] if stage + 1 < 8 else "")
 
 func _env() -> Environment:
 	for c in get_tree().current_scene.get_children():

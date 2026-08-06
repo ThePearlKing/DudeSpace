@@ -1722,10 +1722,25 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
-	if Game.zone == "" and pos.length() > Universe.BOUNDARY:
+	# the edge RESISTS first: over the last 1800m the boundary shoves
+	# you back toward the center, harder the closer you get -- it takes
+	# real thrust to even touch the lattice. Unless the sky is broken.
+	if Game.zone == "" and Game.monolith_stage < 8:
+		var edge_d := Universe.BOUNDARY - pos.length()
+		if edge_d < 1800.0:
+			var node0 := _active_node()
+			if node0 != null and "velocity" in node0:
+				var push := clampf(1.0 - edge_d / 1800.0, 0.0, 1.0)
+				node0.velocity += -pos.normalized() * push * push * 60.0 \
+					* get_physics_process_delta_time()
+	if Game.zone == "" and pos.length() > Universe.BOUNDARY \
+			and Game.monolith_stage < 8:
 		# no announcement anymore. a colossal "me" fades into the dark
 		# and a colossal hand throws you back toward the center of
 		# everything. the god does not narrate.
+		# (feed all eight monoliths and the ME stops policing: the
+		# eighth activation shatters the sky and the boundary with it
+		# -- that sequence is planned, not yet staged.)
 		if not _threw_back:
 			_threw_back = true
 			Game.anger(15.0)
