@@ -267,7 +267,9 @@ func activate() -> void:
 	sp.bus = "MonolithEcho"
 	sp.volume_db = -2.0
 	sp.max_distance = 400.0
-	sp.add_to_group("mono_sky")
+	# NOT in "mono_sky": step 4's sky_show clears that whole group --
+	# it was freeing this speaker mid-sequence, and the tween at the
+	# end then stepped a freed player. That was the segfault.
 	add_child(sp)
 	sp.global_position = top + dir * 6.0
 	sp.play()
@@ -338,8 +340,10 @@ func activate() -> void:
 		ftw.tween_property(hmat, "albedo_color:a", 0.0, 2.0)
 		ftw.parallel().tween_property(cmat, "albedo_color:a", 0.0, 2.0)
 		await ftw.finished
-		holo.queue_free()
-		cone.queue_free()
+		if is_instance_valid(holo):
+			holo.queue_free()
+		if is_instance_valid(cone):
+			cone.queue_free()
 		_floor_glyph(top, bas, col)
 		# 7. the AFTERMATH lingers: bloom eases back now, but the triangles
 	# keep wheeling and the cracks keep glowing for six more minutes,
@@ -348,8 +352,9 @@ func activate() -> void:
 	if env != null:
 		var twg3 := create_tween()
 		twg3.tween_property(env, "glow_intensity", old_glow, 3.0)
-	var svtw := create_tween()
-	svtw.tween_property(sp, "volume_db", -16.0, 4.0)
+	if is_instance_valid(sp):
+		var svtw := create_tween()
+		svtw.tween_property(sp, "volume_db", -16.0, 4.0)
 	var cleanup := create_tween()
 	cleanup.tween_interval(362.0)
 	cleanup.tween_callback(func() -> void:
