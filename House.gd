@@ -1297,7 +1297,8 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	pcs.position = Vector3(0, 0.8, 0)
 	slot9.add_child(pcs)
 	_iroot.add_child(slot9)
-	slot9.global_position = rc + Vector3(0, -1.8, 2.0)
+	# right beneath the words that name its price
+	slot9.global_position = rc + Vector3(0, -1.8, -2.7)
 	# THE WALL that knows the answer (east face), and what waits behind
 	_hwall = StaticBody3D.new()
 	var wmi := MeshInstance3D.new()
