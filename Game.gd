@@ -295,9 +295,9 @@ func hurt(d: float, vaporize: bool = false, cause: String = "") -> void:
 	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
 	health = maxf(0.0, health - d)
 	_since_hit = 0.0
-	if playtime - _hurt_sfx_t > 0.55:   # throttle for per-frame burns
+	if playtime - _hurt_sfx_t > 1.5:   # one long note, never a burst
 		_hurt_sfx_t = playtime
-		Sfx.play("hurt", -16.0)
+		Sfx.play("hurt", -20.0)
 	if health <= 0.0:
 		if hardcore:
 			permadeath()   # hardcore: every death is THE death (charm can save)

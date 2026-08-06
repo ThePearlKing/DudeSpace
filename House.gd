@@ -1450,11 +1450,13 @@ func _harold_try_slot() -> void:
 	var hud = get_tree().get_first_node_in_group("hud")
 	# the slot judges what is IN YOUR HAND -- it used to rummage the
 	# whole backpack and quietly accept while you held the wrong thing
-	var held9: Dictionary = Inventory.hotbar[Inventory.selected]
-	if str(held9.get("id", "")) != want:
+	var hid9 := Inventory.slot_id(Inventory.selected)
+	if hid9 != want:
 		Sfx.play("denied", -14.0)
 		if hud:
-			hud.flash("the slot judges what your HAND holds. read the wall again")
+			var hnm9: String = "empty air" if hid9 == "" else str(
+				(Inventory.items.get(hid9, {}) as Dictionary).get("name", hid9))
+			hud.flash("the slot weighs your hand: %s. the wall asks for something else" % hnm9)
 		return
 	Inventory.remove_res(want, 1)
 	Game.lime_wall_open = true

@@ -42,12 +42,11 @@ func _ready() -> void:
 	# the OLD hurt was a raw sawtooth -- a harsh machine-gun rattle that
 	# genuinely hurt at god volumes. Now: a soft round THUMP, sine-based,
 	# quick and low, with the faintest knock of noise up front.
-	_sounds["hurt"] = _bake(0.2, func(t: float, n: float) -> float:
-		var f := lerpf(210.0, 68.0, n)
-		var v := sin(TAU * f * t) * 0.3 * exp(-5.0 * n)
-		if n < 0.05:
-			v += (fmod(sin(t * 91731.7) * 43758.5453, 2.0) - 1.0) * 0.05
-		return v)
+	# ONE soft, LONG whoomp -- rapid damage ticks used to re-fire a
+	# short thump into a machine-gun burst that hurt real ears
+	_sounds["hurt"] = _bake(0.9, func(t: float, n: float) -> float:
+		var f := lerpf(140.0, 52.0, n)
+		return sin(TAU * f * t) * 0.22 * (1.0 - n) * (1.0 - n))
 	_sounds["eat"] = _bake(0.2, func(t: float, n: float) -> float:
 		var f := 500.0 + 200.0 * sin(n * 9.0)
 		return sin(TAU * f * t) * 0.4 * exp(-2.5 * n))
