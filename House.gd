@@ -1057,6 +1057,7 @@ var _hshelf: StaticBody3D = null
 var _hshelf_open := false
 var _hwall: StaticBody3D = null
 var _hwall_home := Vector3.ZERO
+var _hriddle_want := ""
 var _halcove := Vector3.ZERO
 
 func _hbook_row(parent: Node3D, at: Vector3, w: float,
@@ -1321,6 +1322,9 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 		_deco(rc + cd + Vector3(0, 0.32, 0), Vector3(0.06, 0.14, 0.06),
 			Color("#ffb84d"), 2.2)
 	var ridx := int(absi(Game.world_seed)) % 5
+	# the ANSWER locks to the words on the wall at build time -- the
+	# two can never disagree, whatever the seed does later
+	_hriddle_want = RIDDLE_ITEMS[ridx]
 	var rl := Label3D.new()
 	rl.text = RIDDLES[ridx]
 	rl.font_size = 40
@@ -1445,18 +1449,17 @@ func _harold_open_shelf() -> void:
 func _harold_try_slot() -> void:
 	if Game.lime_wall_open:
 		return   # the open wall says everything
-	var ridx := int(absi(Game.world_seed)) % 5
-	var want: String = RIDDLE_ITEMS[ridx]
+	var want: String = _hriddle_want if _hriddle_want != "" \
+		else str(RIDDLE_ITEMS[int(absi(Game.world_seed)) % 5])
 	var hud = get_tree().get_first_node_in_group("hud")
 	# the slot judges what is IN YOUR HAND -- it used to rummage the
 	# whole backpack and quietly accept while you held the wrong thing
-	var hid9 := Inventory.slot_id(Inventory.selected)
-	if hid9 != want:
+	print("RIDDLE dbg: held=", Inventory.slot_id(Inventory.selected),
+		" want=", want, " seed=", Game.world_seed)
+	if Inventory.res_count(want) <= 0:
 		Sfx.play("denied", -14.0)
 		if hud:
-			var hnm9: String = "empty air" if hid9 == "" else str(
-				(Inventory.items.get(hid9, {}) as Dictionary).get("name", hid9))
-			hud.flash("the slot weighs your hand: %s. the wall asks for something else" % hnm9)
+			hud.flash("wrong. read the wall again")
 		return
 	Inventory.remove_res(want, 1)
 	Game.lime_wall_open = true
