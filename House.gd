@@ -1349,9 +1349,7 @@ func _harold_open_shelf() -> void:
 	tw.tween_property(_hshelf, "position",
 		_hshelf.position + Vector3(0, 0, 2.7), 2.2) \
 		.set_trans(Tween.TRANS_SINE)
-	var hud = get_tree().get_first_node_in_group("hud")
-	if hud:
-		hud.flash("the shelf was a door")
+
 
 func _harold_try_slot() -> void:
 	if Game.lime_wall_open:
