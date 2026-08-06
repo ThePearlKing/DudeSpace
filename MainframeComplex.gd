@@ -4118,13 +4118,13 @@ func _lower_floors() -> void:
 	bps.shape = bpsc
 	bpipe.add_child(bps)
 	add_child(bpipe)
-	bpipe.global_transform = vxf.translated_local(Vector3(0, 1.1, 1.4))
+	bpipe.global_transform = vxf.translated_local(Vector3(0, 0.5, 1.4))
 	bpipe.rotate_object_local(Vector3(0, 0, 1), PI * 0.5)
 	bpipe.rotate_object_local(Vector3(0, 1, 0), 0.35)
 	_chatter(vxf.translated_local(Vector3(0, 1.4, 0)).origin, 240, -8.0)
 	_net_probes.append(vxf.origin)
-	_lift_cabin(0, 1, Transform3D(vb * Basis(Vector3(0, 1, 0), PI * 1.25),
-		vxf.translated_local(Vector3(4.35, 0, 4.35)).origin), "ELEVATOR", mains)
+	_lift_cabin(0, 1, Transform3D(vb * Basis(Vector3(0, 1, 0), PI),
+		vxf.translated_local(Vector3(0, 0, 4.55)).origin), "ELEVATOR", mains)
 	# stop 2: the UNDERCROFT -- not a room, a whole LOWER LEVEL: a full
 	# 360-degree service ring at radius 47, twelve meters under the main
 	# floor, with four working rooms hanging off it
