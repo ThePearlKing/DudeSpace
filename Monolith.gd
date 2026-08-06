@@ -30,31 +30,50 @@ static func _crack_shader() -> Shader:
 shader_type spatial;
 render_mode unshaded, cull_front;
 uniform vec3 ccol = vec3(1.0, 0.82, 0.25);
-uniform float intensity = 0.3;
+uniform float intensity = 0.3;   // stage density: more cracks each link
 uniform float fade = 0.0;
 vec2 h2(vec2 p){
 	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
 		dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 }
+float vn2(vec2 p){
+	vec2 i = floor(p); vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = h2(i).x, b = h2(i + vec2(1, 0)).x;
+	float c = h2(i + vec2(0, 1)).x, d = h2(i + vec2(1, 1)).x;
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 void fragment(){
-	vec2 uv = UV * vec2(10.0, 5.0);
+	vec2 uv = UV * vec2(14.0, 7.0);
+	// JAGGED: warp the domain hard at two scales so edges kink and
+	// branch like real fracture lines, not smooth cell walls
+	uv += vec2(vn2(uv * 3.1), vn2(uv * 3.1 + 7.7)) * 0.9 - 0.45;
+	uv += vec2(vn2(uv * 9.0), vn2(uv * 9.0 + 3.3)) * 0.25 - 0.125;
 	vec2 i = floor(uv);
 	vec2 f = fract(uv);
-	float f1 = 8.0;
-	float f2 = 8.0;
+	float f1 = 8.0; float f2 = 8.0;
+	vec2 cell1 = i;
 	for (int x = -1; x <= 1; x++) {
 		for (int y = -1; y <= 1; y++) {
 			vec2 g = vec2(float(x), float(y));
 			vec2 o = h2(i + g);
 			float d = length(g + o - f);
-			if (d < f1) { f2 = f1; f1 = d; }
+			if (d < f1) { f2 = f1; f1 = d; cell1 = i + g; }
 			else if (d < f2) { f2 = d; }
 		}
 	}
-	float edge = 1.0 - smoothstep(0.0, 0.09, f2 - f1);
+	// a THIN sharp line where two cells meet -- width hairline, hard edge
+	float e = f2 - f1;
+	float crack = 1.0 - smoothstep(0.0, 0.018, e);
+	float glow9 = 1.0 - smoothstep(0.0, 0.10, e);
+	// PROCEDURAL density: each fracture line exists only if its cell
+	// rolls under the stage's intensity -- early links crack sparsely,
+	// the seventh is a spiderweb
+	float exists = step(h2(cell1 + 5.5).x, intensity);
+	float flick = 0.75 + 0.25 * sin(TIME * 7.0 + h2(cell1).x * 40.0);
 	ALBEDO = ccol;
-	EMISSION = ccol * edge * 2.2 * intensity * fade;
-	ALPHA = edge * intensity * fade * 0.9;
+	EMISSION = ccol * (crack * 2.6 + glow9 * 0.35) * exists * fade * flick;
+	ALPHA = clamp((crack * 0.95 + glow9 * 0.18) * exists * fade, 0.0, 1.0);
 }
 """
 	return _crack_sh

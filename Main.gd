@@ -917,26 +917,87 @@ func mono_sky_clear() -> void:
 func mono_sky_demo(stage: int) -> void:
 	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7), false)
 
+## THE SHATTER: the boundary breaks. White flash, then the sky-shell
+## bursts into giant glass shards that tumble inward and fade. The
+## eighth activation's finale -- previewable from the cheat menu.
+func sky_shatter() -> void:
+	mono_sky_clear()
+	var flash := CanvasLayer.new()
+	flash.layer = 60
+	flash.add_to_group("mono_sky")
+	add_child(flash)
+	var fr := ColorRect.new()
+	fr.color = Color(1, 1, 1, 0.0)
+	fr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.add_child(fr)
+	var ftw := create_tween()
+	ftw.tween_property(fr, "color:a", 0.9, 0.5)
+	ftw.tween_property(fr, "color:a", 0.0, 2.0)
+	ftw.tween_callback(flash.queue_free)
+	Sfx.play("explode", -2.0)
+	var rng9 := RandomNumberGenerator.new()
+	rng9.seed = 8888
+	var shroot := Node3D.new()
+	shroot.add_to_group("mono_sky")
+	add_child(shroot)
+	for i in 70:
+		var d9 := Vector3(rng9.randf_range(-1, 1), rng9.randf_range(-1, 1),
+			rng9.randf_range(-1, 1)).normalized()
+		var shard := MeshInstance3D.new()
+		var pm9 := PrismMesh.new()
+		pm9.size = Vector3(rng9.randf_range(2200.0, 5200.0),
+			rng9.randf_range(2600.0, 6200.0), 90.0)
+		shard.mesh = pm9
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smat.albedo_color = Color(0.55, 0.75, 1.0, 0.5)
+		smat.emission_enabled = true
+		smat.emission = Color(0.55, 0.75, 1.0)
+		shard.material_override = smat
+		shard.extra_cull_margin = 16384.0
+		shroot.add_child(shard)
+		shard.global_position = d9 * (Universe.BOUNDARY - 200.0)
+		shard.rotation = Vector3(rng9.randf() * TAU, rng9.randf() * TAU, 0)
+		var fall := create_tween()
+		fall.tween_property(shard, "global_position",
+			d9 * (Universe.BOUNDARY * rng9.randf_range(0.55, 0.8)),
+			rng9.randf_range(9.0, 16.0)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fall.parallel().tween_property(smat, "albedo_color:a", 0.0,
+			rng9.randf_range(9.0, 16.0))
+		var spin9 := create_tween().set_loops()
+		spin9.tween_property(shard, "rotation",
+			Vector3(TAU * rng9.randf_range(0.2, 0.7),
+			TAU * rng9.randf_range(0.2, 0.7), 0), 8.0).as_relative()
+	var cln := create_tween()
+	cln.tween_interval(18.0)
+	cln.tween_callback(func() -> void:
+		if is_instance_valid(shroot):
+			shroot.queue_free())
+
 func sky_show(col: Color, stage: int, linger: bool) -> void:
 	mono_sky_clear()
 	# CRACKS: a dome at cosmic distance, always around you
 	var crack := MeshInstance3D.new()
 	var ckm := SphereMesh.new()
-	ckm.radius = 38000.0
-	ckm.height = 76000.0
-	ckm.radial_segments = 48
-	ckm.rings = 24
+	ckm.radius = Universe.BOUNDARY - 60.0
+	ckm.height = ckm.radius * 2.0
+	ckm.radial_segments = 64
+	ckm.rings = 32
 	crack.mesh = ckm
 	var ckmat := ShaderMaterial.new()
 	ckmat.shader = Monolith._crack_shader()
 	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
+	# density is PROGRESS: each link cracks the sky harder than the last
 	ckmat.set_shader_parameter("intensity",
-		0.25 + 0.75 * float(stage + 1) / 8.0)
+		0.12 + 0.88 * float(stage + 1) / 8.0)
 	crack.material_override = ckmat
 	crack.extra_cull_margin = 16384.0
 	crack.add_to_group("mono_sky")
 	add_child(crack)
-	_skyfx.append(crack)
+	crack.global_position = Vector3.ZERO
 	var cktw := create_tween()
 	cktw.tween_method(func(v: float) -> void:
 		if is_instance_valid(crack):
@@ -2322,7 +2383,7 @@ void fragment(){
 		var cmt9 := ShaderMaterial.new()
 		cmt9.shader = csh9
 		cmt9.render_priority = 2   # clouds draw AFTER the water: no
-		                           # transparency-sort flicker with it
+								   # transparency-sort flicker with it
 		cl9.material_override = cmt9
 		p.add_child(cl9)
 	if b.kind == "ocean":

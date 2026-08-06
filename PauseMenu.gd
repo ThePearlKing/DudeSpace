@@ -431,6 +431,13 @@ func _open_mono() -> void:
 		Game.monolith_stage = 2
 		msync.call()
 		Sfx.play("learn")))
+	col.add_child(_btn("BREAK THE UNIVERSE (set stage 8)", func() -> void:
+		Game.cheated = true
+		Game.monolith_stage = 8
+		msync.call()
+		var cs2 := get_tree().current_scene
+		if cs2 and cs2.has_method("sky_shatter"):
+			cs2.sky_shatter()))
 	col.add_child(_btn("Reset ALL monolith progress", func() -> void:
 		Game.cheated = true
 		Game.monolith_stage = 0
@@ -451,14 +458,20 @@ func _open_mono() -> void:
 	col.add_child(srow)
 	for si in 8:
 		var sb2 := Button.new()
-		sb2.text = str(si + 1)
+		sb2.text = str(si + 1) if si < 7 else "8💥"
 		sb2.custom_minimum_size = Vector2(38, 38)
 		sb2.modulate = Game.MONO_COLORS[si]
 		var idx := si
 		sb2.pressed.connect(func() -> void:
 			Game.cheated = true
 			var cs := get_tree().current_scene
-			if cs and cs.has_method("mono_sky_demo"):
+			# 8 previews the SHATTER itself; 1-7 preview crack skies.
+			# previews are VISUAL ONLY -- the boundary still stands
+			# unless you BREAK THE UNIVERSE above.
+			if idx == 7:
+				if cs and cs.has_method("sky_shatter"):
+					cs.sky_shatter()
+			elif cs and cs.has_method("mono_sky_demo"):
 				cs.mono_sky_demo(idx)
 			Sfx.play("warp", -12.0))
 		srow.add_child(sb2)
