@@ -137,12 +137,6 @@ func _build_main_menu() -> void:
 			_roll_tip())
 	col.add_child(_tip)
 	_roll_tip()
-	# tips rotate on their own every seven seconds (click still skips)
-	var tiptimer := Timer.new()
-	tiptimer.wait_time = 7.0
-	tiptimer.autostart = true
-	tiptimer.timeout.connect(_roll_tip)
-	add_child(tiptimer)
 
 ## LAN server browser: hosts on the network announce themselves and show
 ## up here by name, Minecraft style. Manual IP entry as a fallback.
