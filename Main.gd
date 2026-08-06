@@ -1009,7 +1009,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> void:
 	# CRACKS: a dome at cosmic distance, always around you
 	var crack := MeshInstance3D.new()
 	var ckm := SphereMesh.new()
-	ckm.radius = Universe.BOUNDARY - 60.0
+	ckm.radius = Universe.BOUNDARY - 900.0
 	ckm.height = ckm.radius * 2.0
 	ckm.radial_segments = 64
 	ckm.rings = 32
@@ -1149,14 +1149,16 @@ void fragment(){
 	float alive = step(0.18, h21(cid + 9.1) + 0.6 * sin(TIME * 0.07 + hp * 6.28));
 	float d = bradius - length(wpos);
 	float near = 1.0 - smoothstep(400.0, 6000.0, abs(d));
-	ALPHA = (wire * alive * (0.035 + 0.10 * near) + 0.004) * reveal;
+	ALPHA = (wire * alive * (0.018 + 0.06 * near) + 0.002) * reveal;
 	ALBEDO = blue;
-	EMISSION = blue * wire * alive * (0.18 + 0.4 * near) * reveal;
+	EMISSION = blue * wire * alive * (0.10 + 0.25 * near) * reveal;
 }
 """
 	var bmesh := SphereMesh.new()
-	bmesh.radius = Universe.BOUNDARY
-	bmesh.height = Universe.BOUNDARY * 2.0
+	# INSIDE the star ball (which is opaque at B-200) or it can never
+	# be seen again
+	bmesh.radius = Universe.BOUNDARY - 700.0
+	bmesh.height = bmesh.radius * 2.0
 	bmesh.radial_segments = 64
 	bmesh.rings = 32
 	var bmat := ShaderMaterial.new()
