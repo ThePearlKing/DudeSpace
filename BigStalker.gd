@@ -156,6 +156,10 @@ func _build() -> void:
 		mem.material_override = wingm
 		wroot.add_child(mem)
 
+var _departing := false
+func depart() -> void:
+	_departing = true
+
 func take_damage(d: float, _from: Vector3) -> void:
 	if _dead:
 		return
