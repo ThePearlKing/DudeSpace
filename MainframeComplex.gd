@@ -938,7 +938,7 @@ void fragment(){
 		Color("#ffcf40"))
 	_svc_node(Transform3D(_sbas(_a0 + _step * 9.0, 12.0 / _rF),
 		_C + _sdir(_a0 + _step * 9.0, 12.0 / _rF) * _rF),
-		Vector3(0, 0, -3.4), "scan", "DEEP SCAN: PING ALL MINES",
+		Vector3(0, 0, -3.4), "charts", "STAR CHARTS: THE HIDDEN WORLDS",
 		Color("#7df9ff"))
 	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
 		Vector3(-4.4, 0, 3.2), "sync", "A.I. SYNC: +10% SELL. FOREVER",
@@ -4861,20 +4861,14 @@ func _service(kind: String) -> void:
 			Inventory.add_res("noodle", 1)
 			Sfx.play("eat", -8.0)
 			_hud_flash("the pot produces an appeasement noodle")
-		"scan":
-			var pts: Array = []
-			var m9 = get_tree().current_scene
-			if m9 != null and "MINE_DIRS" in m9:
-				for pname in m9.MINE_DIRS:
-					var pb9 = Universe.body_named(str(pname))
-					if pb9 != null:
-						pts.append((pb9.center as Vector3)
-							+ (m9.MINE_DIRS[pname] as Vector3) * float(pb9.radius))
-			Game.locator_planet = ""
-			Game.locator_targets = pts
-			Game.locator_until = Game.playtime + 120.0
-			Sfx.play("warp", -10.0)
-			_hud_flash("deep scan: every mine entrance pinged for 120s")
+		"charts":
+			if Game.charts_unlocked:
+				_hud_flash("the charts are already yours")
+				Sfx.play("denied", -18.0)
+				return
+			Game.charts_unlocked = true
+			Sfx.play("learn", -6.0)
+			_hud_flash("STAR CHARTS: worlds that appear on no map... now appear on yours")
 		"sync":
 			if Game.ai_blessed:
 				_hud_flash("already synced. the A.I. remembers you")

@@ -4109,12 +4109,25 @@ func _crater(b, dir: Vector3, size: float, col: Color) -> void:
 	var ckey := str(b.name)
 	if not _crater_spots.has(ckey):
 		_crater_spots[ckey] = []
+	var mouths: Array = []
+	if MINE_DIRS.has(b.name):
+		mouths.append(MINE_DIRS[b.name])
+	if COLONY_DIRS.has(b.name):
+		mouths.append(COLONY_DIRS[b.name])
+	if b.name == "Big Computer":
+		mouths.append(MAINFRAME_DIR)
 	var tries := 0
 	while tries < 8:
 		var ok := true
 		for e in _crater_spots[ckey]:
 			var mind: float = (float(e[1]) + size) * 1.15 / float(b.radius)
 			if (e[0] as Vector3).angle_to(dir) < mind:
+				ok = false
+				break
+		# NEVER on a mouth: a crater floor disc over a mine hole reads
+		# as a wall from both sides
+		for mdir in mouths:
+			if (mdir as Vector3).angle_to(dir) < (size + 7.0) / float(b.radius):
 				ok = false
 				break
 		if ok:

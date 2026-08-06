@@ -46,7 +46,7 @@ func body_at(screen: Vector2) -> Variant:
 	var best = null
 	var best_d := 1e9
 	for b in Universe.bodies:
-		if b.hidden:
+		if b.hidden and not Game.charts_unlocked:
 			continue
 		var sp: Vector2 = c + Vector2(b.center.x - origin.x, b.center.z - origin.z) * _last_scale
 		var d := sp.distance_to(screen)
@@ -149,7 +149,7 @@ class _MapView extends Control:
 			draw_string(font, syp + Vector2(-110, -46), str(sysspec[0]),
 				HORIZONTAL_ALIGNMENT_CENTER, 220, 19, Color(1, 1, 1, 0.3))
 		for b in Universe.bodies:
-			if b.hidden:
+			if b.hidden and not Game.charts_unlocked:
 				continue
 			var p: Vector3 = b.center
 			var sp := c + Vector2(p.x - origin.x, p.z - origin.z) * scale
