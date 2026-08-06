@@ -1930,6 +1930,22 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
+	# beyond the edge there is only WHITE. inside, the stars stay.
+	if _env_ref != null and Game.zone == "":
+		var outside := pos.length() > Universe.BOUNDARY
+		if outside != _outside_white:
+			_outside_white = outside
+			if outside:
+				_env_ref.background_mode = Environment.BG_COLOR
+				_env_ref.background_color = Color(1, 1, 1)
+				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+				_env_ref.ambient_light_color = Color(1, 1, 1)
+				_env_ref.ambient_light_energy = 1.0
+			else:
+				_env_ref.background_mode = Environment.BG_SKY
+				_env_ref.ambient_light_source = Environment.AMBIENT_SOURCE_BG
+				_env_ref.ambient_light_energy = 1.0
+
 	# the cracked sky follows you like a skybox
 	for fx in _skyfx:
 		if is_instance_valid(fx):
@@ -2143,9 +2159,13 @@ func _active_pos() -> Vector3:
 
 # ------------------------------------------------------------- universe
 
+var _env_ref: Environment = null
+var _outside_white := false
+
 func _setup_environment() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
+	_env_ref = env
 	# subtle starfield sky (not distracting)
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()

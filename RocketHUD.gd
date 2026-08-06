@@ -101,8 +101,18 @@ class _NavView extends Control:
 		var total_w := chip_w * 10.0 + 9.0 * 4.0
 		var tx := vp.x * 0.5 - total_w * 0.5
 		var ty := 30.0
-		draw_string(font, Vector2(tx, ty - 8), "TIME WARP   1-9 keys · 0 = 10x · coasting only",
+		draw_string(font, Vector2(tx, ty - 8),
+			"TIME WARP   1-9 keys · 0 = 10x · double-tap 0 = 20x · coasting only",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.55))
+		# OVERDRIVE chip: lives past the 10x chip, lit only at 20x
+		var orect := Rect2(tx + 10.0 * (chip_w + 4.0) + 8.0, ty, chip_w + 10.0, 26.0)
+		var od := tw >= 20
+		draw_rect(orect, Color("#ff8a2a") if od else Color(0, 0, 0, 0.45))
+		if not od:
+			draw_rect(orect, Color(1, 0.7, 0.3, 0.25), false, 1.0)
+		draw_string(font, Vector2(orect.position.x, orect.position.y + 19.0),
+			"20x", HORIZONTAL_ALIGNMENT_CENTER, orect.size.x, 15,
+			Color(0.1, 0.05, 0, 1) if od else Color(1, 0.75, 0.4, 0.6))
 		for i in 10:
 			var val := i + 1
 			var r := Rect2(tx + float(i) * (chip_w + 4.0), ty, chip_w, 26.0)
