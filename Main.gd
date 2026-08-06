@@ -2694,32 +2694,31 @@ void fragment(){
 	vec3 n = normalize(vn);
 	float sw = fbm(n * 6.0 + vec3(TIME * 0.05, 0.0, TIME * 0.03));
 	float sw2 = fbm(n * 17.0 - vec3(0.0, TIME * 0.08, 0.0));
-	// REFRACTION: everything behind the surface wobbles -- the same
-	// screen-space trick the aquarium tank uses, planet-sized
-	vec2 w = vec2(sin(TIME * 1.2 + SCREEN_UV.y * 30.0 + sw * 8.0),
-		cos(TIME * 0.9 + SCREEN_UV.x * 26.0 + sw2 * 6.0)) * 0.009;
-	vec3 bg = texture(scr, clamp(SCREEN_UV + w, vec2(0.001), vec2(0.999))).rgb;
 	vec3 deep = base * 0.45;
 	vec3 watercol = mix(deep, base * 1.25, sw * 0.7 + sw2 * 0.3);
 	float foam = smoothstep(0.72, 0.82, sw2);
 	watercol = mix(watercol, vec3(0.85, 0.95, 1.0), foam * 0.35);
 	if (FRONT_FACING) {
-		ALBEDO = mix(bg, watercol, 0.42);
+		// from OUTSIDE: honest blue-fog water -- translucent, deep-
+		// tinted, foam riding the swell. (the wobble lives on the
+		// fullscreen underwater effect, where it belongs)
+		ALBEDO = watercol;
+		ALPHA = 0.66;
 	} else {
-		// from UNDERNEATH: invisible until YOU are underwater -- then a
-		// soft ceiling of long smooth waves, not noise
+		// from UNDERNEATH: invisible until YOU are submerged, then a
+		// ceiling of long smooth light-waves
 		float wave = (0.5 + 0.5 * sin(n.x * 42.0 + n.y * 17.0 + TIME * 1.4))
 			* (0.5 + 0.5 * sin(n.z * 36.0 - TIME * 1.1));
-		ALBEDO = mix(bg, watercol, 0.08 * submerged)
+		ALBEDO = watercol * 0.25 * submerged
 			+ vec3(0.10, 0.14, 0.18) * wave * submerged;
+		ALPHA = clamp((0.12 + 0.3 * wave) * submerged, 0.0, 0.6);
 	}
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
 	EMISSION = base * 0.05;
 }
 """
-			osh.code = "shader_type spatial;\nrender_mode cull_disabled, unshaded;\n" \
-				+ "uniform sampler2D scr : hint_screen_texture, filter_linear_mipmap;\n" \
+			osh.code = "shader_type spatial;\nrender_mode cull_disabled;\n" \
 				+ "uniform float submerged = 0.0;\n" \
 				+ osh.code
 			var om9 := ShaderMaterial.new()
