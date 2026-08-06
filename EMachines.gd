@@ -448,6 +448,9 @@ static func cap_update_fill(m: Machine, fill: MeshInstance3D) -> void:
 ## Big dumb battery. 1 in, 1 out.
 class Capacitor extends Machine:
 	var _fill: MeshInstance3D
+	var _rate := 0.0
+	var _rate_buf := 0.0
+	var _rate_t := 0.0
 	func _init() -> void:
 		title = "CAPACITOR"
 		box_color = Color("#44446a")
@@ -458,14 +461,26 @@ class Capacitor extends Machine:
 	func _ready() -> void:
 		super._ready()
 		_fill = EMachines.cap_visual(self, Color("#9a9aa8"))   # gray outline
+		_rate_buf = buf
 	func work(_d: float) -> void:
 		EMachines.cap_update_fill(self, _fill)
+	func _process(delta: float) -> void:
+		super._process(delta)
+		_rate_t += delta
+		if _rate_t >= 1.0:
+			_rate = (buf - _rate_buf) / _rate_t
+			_rate_buf = buf
+			_rate_t = 0.0
 	func info_text() -> String:
-		return "energy: %.0f / %.0f EU" % [buf, buf_cap]
+		return "energy: %.0f / %.0f EU
+net: %+.1f EU/s" % [buf, buf_cap, _rate]
 
 ## ULTRA capacitor: 10x the storage, feeds wires faster. Late game.
 class UltraCapacitor extends Machine:
 	var _fill: MeshInstance3D
+	var _rate := 0.0
+	var _rate_buf := 0.0
+	var _rate_t := 0.0
 	func _init() -> void:
 		title = "ULTRA CAPACITOR"
 		box_color = Color("#6a5aff")
@@ -477,6 +492,7 @@ class UltraCapacitor extends Machine:
 	func _ready() -> void:
 		super._ready()
 		_fill = EMachines.cap_visual(self, Color("#a06aff"))   # purple outline
+		_rate_buf = buf
 	func work(_d: float) -> void:
 		EMachines.cap_update_fill(self, _fill)
 	func _process(delta: float) -> void:
@@ -488,8 +504,13 @@ class UltraCapacitor extends Machine:
 				if t > 0.0:
 					buf -= t
 					w.buf += t
+		_rate_t += delta
+		if _rate_t >= 1.0:
+			_rate = (buf - _rate_buf) / _rate_t
+			_rate_buf = buf
+			_rate_t = 0.0
 	func info_text() -> String:
-		return "energy: %.0f / %.0f EU\ndouble-rate output wires" % [buf, buf_cap]
+		return "energy: %.0f / %.0f EU\nnet: %+.1f EU/s\ndouble-rate output wires" % [buf, buf_cap, _rate]
 
 ## Electric furnace: instant smelt, 4 EU per item.
 class EFurnace extends Machine:

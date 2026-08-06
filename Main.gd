@@ -2201,8 +2201,15 @@ void fragment(){
 	vec3 copper = vec3(0.85, 0.55, 0.2);
 	vec3 col = mix(board, copper, clamp(tr, 0.0, 1.0) * 0.9);
 	float pulse = 0.5 + 0.5 * sin(TIME * 2.0 * clk + h * 12.0);
+	// CURRENT: bright packets racing along the traces -- the visible
+	// heartbeat the OVERCLOCK lever actually changes (x0.3 / x1 / x3)
+	float lane = (h < 0.34) ? f.x : ((h < 0.67) ? f.y : f.x + f.y);
+	float cur = tr * smoothstep(0.12, 0.0,
+		abs(fract(lane * 2.0 - TIME * 0.8 * clk + h * 7.0) - 0.5));
 	ALBEDO = col;
-	EMISSION = vec3(0.3, 1.0, 0.5) * pad * (0.5 + pulse) + copper * tr * 0.15;
+	EMISSION = vec3(0.3, 1.0, 0.5) * pad * (0.5 + pulse)
+		+ copper * tr * 0.15
+		+ vec3(1.0, 0.85, 0.3) * cur * (0.9 + 0.6 * pulse);
 	METALLIC = tr * 0.7;
 	ROUGHNESS = 0.5;
 }

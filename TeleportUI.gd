@@ -103,6 +103,17 @@ func _rename() -> void:
 			Sfx.play("click", -12.0)
 			_rebuild()
 
+var _stat_t := 0.0
+func _process(delta: float) -> void:
+	# the pad charges while you stare at the panel -- show it happening
+	if not visible or _pad == null or not is_instance_valid(_pad):
+		return
+	_stat_t -= delta
+	if _stat_t <= 0.0:
+		_stat_t = 0.2
+		_status.text = "charge %.0f / %.0f EU  ·  %d coins per warp" % [
+			_pad.buf, _pad.buf_cap, _pad.TP_COINS]
+
 func _rebuild() -> void:
 	if _pad == null or not is_instance_valid(_pad):
 		return
@@ -135,10 +146,12 @@ func _warp_to(dst) -> void:
 	if _pad.buf < _pad.buf_cap:
 		Sfx.play("denied")
 		_status.text = "NOT CHARGED: %.0f / %.0f EU" % [_pad.buf, _pad.buf_cap]
+		_stat_t = 2.0
 		return
 	if Inventory.coins < _pad.TP_COINS:
 		Sfx.play("denied")
 		_status.text = "needs %d coins (you have %d)" % [_pad.TP_COINS, Inventory.coins]
+		_stat_t = 2.0
 		return
 	var p := get_tree().get_first_node_in_group("player")
 	if p == null or Game.mode != Game.Mode.ON_FOOT:
