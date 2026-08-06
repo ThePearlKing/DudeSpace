@@ -60,6 +60,99 @@ const HATCH_SEG := 7
 var _fmat_cache: Dictionary = {}
 var _powered := true
 var _pwr_warned := false
+# random FAULTS: a system dies, its repair box (outside, in the hollow)
+# goes red, and 2 iridium at the box brings it back. Jetpack required.
+var _faults: Dictionary = {"elevator": false, "comms": false,
+	"medbay": false, "fueltap": false}
+var _fault_boxes: Dictionary = {}   # sys -> {mat, pos}
+var _fault_t := 300.0
+
+class FaultBox extends StaticBody3D:
+	var host = null
+	var sys: String = ""
+	func use() -> void:
+		if host != null:
+			host._fault_fix(sys)
+
+func _fault_fix(sys: String) -> void:
+	if not _faults.get(sys, false):
+		_hud_flash("this system is fine")
+		Sfx.play("denied", -18.0)
+		return
+	if Inventory.res_count("irid") < 2:
+		_hud_flash("repair needs 2 iridium")
+		Sfx.play("denied", -14.0)
+		return
+	Inventory.remove_res("irid", 2)
+	_faults[sys] = false
+	_fault_light(sys)
+	Sfx.play("smelt", -8.0)
+	_hud_flash("%s REPAIRED" % sys.to_upper())
+
+func _fault_light(sys: String) -> void:
+	if not _fault_boxes.has(sys):
+		return
+	var m: StandardMaterial3D = _fault_boxes[sys]["mat"]
+	var bad: bool = _faults[sys]
+	var c := Color("#ff2a2a") if bad else Color("#2bff6a")
+	m.albedo_color = c
+	m.emission = c
+	m.emission_energy_multiplier = 2.6 if bad else 1.2
+
+func _fault_roll(delta: float) -> void:
+	_fault_t -= delta
+	if _fault_t > 0.0:
+		return
+	_fault_t = randf_range(240.0, 420.0)
+	var healthy: Array = []
+	for sys in _faults:
+		if not _faults[sys]:
+			healthy.append(sys)
+	if healthy.is_empty():
+		return
+	var sys: String = healthy[randi() % healthy.size()]
+	_faults[sys] = true
+	_fault_light(sys)
+	Sfx.play("denied", -10.0)
+	_hud_flash("FAULT: %s OFFLINE -- repair box on the hull outside (2 iridium)"
+		% sys.to_upper())
+
+## one exterior repair box: hull plate + glowing status cube + label
+func _fault_box(sys: String, pos: Vector3, label: String) -> void:
+	var up9 := (pos - _C).normalized()
+	var bb := _bup(up9)
+	var fb9 := FaultBox.new()
+	fb9.host = self
+	fb9.sys = sys
+	var plate9 := MeshInstance3D.new()
+	plate9.mesh = Surfaces.box_mesh(Vector3(1.6, 0.3, 1.6))
+	plate9.material_override = Surfaces.metal(Color("#2c3242"))
+	fb9.add_child(plate9)
+	var cube := MeshInstance3D.new()
+	cube.mesh = Surfaces.box_mesh(Vector3(0.6, 0.6, 0.6))
+	var cmat := StandardMaterial3D.new()
+	cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cube.material_override = cmat
+	cube.position = Vector3(0, 0.6, 0)
+	fb9.add_child(cube)
+	var cs := CollisionShape3D.new()
+	cs.shape = Surfaces.box_shape(Vector3(1.7, 1.4, 1.7))
+	cs.position = Vector3(0, 0.5, 0)
+	fb9.add_child(cs)
+	add_child(fb9)
+	fb9.global_transform = Transform3D(bb, pos)
+	var lb := Label3D.new()
+	lb.text = label
+	lb.font_size = 20
+	lb.pixel_size = 0.006
+	lb.modulate = Color("#ffb000")
+	lb.outline_size = 8
+	lb.outline_modulate = Color(0, 0, 0, 0.9)
+	lb.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(lb)
+	lb.global_position = pos + up9 * 1.6
+	_fault_boxes[sys] = {"mat": cmat, "pos": pos}
+	_fault_light(sys)
 
 func _femissive(c: Color, emit: float) -> StandardMaterial3D:
 	var key := c.to_html(true) + ("_%.2f" % emit)
@@ -986,6 +1079,19 @@ void fragment(){
 	# through the space that provably nobody else is using ----
 	_networks()
 	_stashes()
+	# exterior REPAIR BOXES -- the hull grows four maintenance points,
+	# each tied to a system that can fault. Jetpack out, 2 iridium in.
+	_fault_box("elevator", _C + _u0 * (_rF - 1.1),
+		"ELEVATOR BREAKER")
+	var cgam := 22.05 / _rF
+	var ccb := _fr(1.3708).rotated((_fr(1.3708) * Vector3(0, 0, 1)).normalized(), -cgam)
+	_fault_box("comms", _C + (ccb * Vector3(0, 1, 0)).normalized() * (_rF + 7.9),
+		"COMMS BREAKER")
+	_fault_box("medbay", _C + _aup9(1, 0.75) * (_rF - 1.1)
+		+ (_abas9(1, 0.75) * Vector3(-8.3, 0, 0)).normalized() * 0.0,
+		"MEDBAY BREAKER")
+	_fault_box("fueltap", _C + _pdir(1.3708) * (_rF + 16.2),
+		"FUEL TAP BREAKER")
 	# the SERVICES: what the facility is FOR
 	_svc_node(Transform3D(_abas9(1, 0.75), _C + _aup9(1, 0.75) * _rF),
 		Vector3(-8.3, 0, 3.4), "heal", "MEDBAY: FULL HEAL", Color("#66ff99"))
@@ -994,7 +1100,7 @@ void fragment(){
 		Vector3(-8.1, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
-		Vector3(-8.1, 0, 3.2), "feed", "FEED REACTOR: COAL / URANIUM",
+		Vector3(-8.1, 0, 3.2), "feed", "FEED REACTOR: COAL 120s / URANIUM 300s",
 		Color("#ff6a4a"))
 	_svc_node(Transform3D(_abas9(1, 4.0), _C + _aup9(1, 4.0) * _rF),
 		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER -> 1 NOODLE",
@@ -3153,6 +3259,10 @@ func _radio_btn(mode: int) -> void:
 	if not _powered:
 		Sfx.play("denied", -16.0)
 		return
+	if _faults.get("comms", false):
+		_hud_flash("COMMS FAULT -- repair box above the comms roof")
+		Sfx.play("denied", -14.0)
+		return
 	if _radio_cool > 0.0:
 		return
 	_radio_cool = 0.35
@@ -4126,6 +4236,10 @@ func _lift_go(l: int, target: int) -> void:
 		_hud_flash("elevator dead. the facility is dark")
 		Sfx.play("denied", -14.0)
 		return
+	if _faults.get("elevator", false):
+		_hud_flash("ELEVATOR FAULT -- repair box on the atrium's underside")
+		Sfx.play("denied", -14.0)
+		return
 	if _lift_busy > 0.0 or l >= _lifts.size():
 		return
 	var st: Array = _lifts[l]
@@ -4908,7 +5022,7 @@ func _service(kind: String) -> void:
 		if Inventory.res_count("uranium") > 0:
 			Inventory.remove_res("uranium", 1)
 			Game.facility_power = minf(Game.FACILITY_MAX,
-				Game.facility_power + 600.0)
+				Game.facility_power + 300.0)
 		elif Inventory.res_count("coal") > 0:
 			Inventory.remove_res("coal", 1)
 			Game.facility_power = minf(Game.FACILITY_MAX,
@@ -4927,6 +5041,10 @@ func _service(kind: String) -> void:
 		return
 	match kind:
 		"heal":
+			if _faults.get("medbay", false):
+				_hud_flash("MEDBAY FAULT -- repair box under the medbay hull")
+				Sfx.play("denied", -14.0)
+				return
 			if now < float(_svc_cd.get("heal", 0.0)):
 				_hud_flash("medbay recharging (%.0fs)" %
 					(float(_svc_cd["heal"]) - now))
@@ -4937,6 +5055,10 @@ func _service(kind: String) -> void:
 			Sfx.play("learn", -8.0)
 			_hud_flash("medbay: fully healed")
 		"fuel":
+			if _faults.get("fueltap", false):
+				_hud_flash("FUEL TAP FAULT -- repair box over the reactor roof")
+				Sfx.play("denied", -14.0)
+				return
 			if now < float(_svc_cd.get("fuel", 0.0)):
 				_hud_flash("fuel tap recharging (%.0fs)" %
 					(float(_svc_cd["fuel"]) - now))
@@ -5269,6 +5391,7 @@ func _process(delta: float) -> void:
 		_pwr_warned = false
 	if not _powered:
 		return   # a dark facility does not animate, blink, or speak
+	_fault_roll(delta)
 	_t += delta
 	for bl in _blinks:
 		# unshaded materials show ALBEDO regardless of emission -- to
