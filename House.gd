@@ -1047,6 +1047,7 @@ class LimeTetra extends StaticBody3D:
 			return
 		Inventory.add_res("ltetra", 1)
 		Game.lime_taken = true
+		Save.save_progress()
 		Sfx.play("learn", -6.0)
 		var hud = get_tree().get_first_node_in_group("hud")
 		if hud:
@@ -1470,6 +1471,7 @@ func _harold_try_slot() -> void:
 		return
 	Inventory.remove_res(want, 1)
 	Game.lime_wall_open = true
+	Save.save_progress()   # survives ANY exit from this exact second
 	Sfx.play("rumble", -6.0)
 	Sfx.play("learn", -8.0)
 	if _hwall != null and is_instance_valid(_hwall):
