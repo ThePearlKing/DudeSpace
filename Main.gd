@@ -318,6 +318,8 @@ func _boot() -> void:
 		_throat_shot()
 	if OS.get_environment("CTD_TEST") == "33":
 		_harold_test()
+	if OS.get_environment("CTD_TEST") == "34":
+		_riddle_shot()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -1505,6 +1507,33 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=34: camera in the riddle room, looking at the far wall --
+## the riddle must be READABLE in the frame
+func _riddle_shot() -> void:
+	await get_tree().create_timer(4.0).timeout
+	var hh := House.new()
+	hh.kind = "small"
+	hh.harolds = true
+	hh.slot = -99
+	add_child(hh)
+	hh.global_position = Vector3(300, 40, 300)
+	await get_tree().create_timer(2.0).timeout
+	var c := hh.room_center()
+	var sz := hh.room_size()
+	var fy := c.y - sz.y * 0.5
+	var rc := c + Vector3(-sz.x * 0.5 - 6.6, fy - c.y - 11.0 - 1.6, -2.0) \
+		+ Vector3(0, 0, -5.6)
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.global_position = rc + Vector3(0, 0.2, 3.6)
+	cam.look_at(rc + Vector3(0, 0.2, -4.0), Vector3.UP)
+	cam.current = true
+	await get_tree().create_timer(1.0).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("RIDDLESHOT saved")
+	get_tree().quit()
+
 ## CTD_TEST=33: headless probe of Harold's secret. Build the house,
 ## open the shelf, ray the shaft, solve the riddle, take the prize.
 func _harold_test() -> void:
@@ -1569,6 +1598,12 @@ func _harold_test() -> void:
 			print("HAROLD riddle label: off=", ch3.global_position
 				- (hh.room_center() + Vector3(0, 0, 0)), " rot=",
 				ch3.rotation_degrees)
+	var rc9 := Vector3(c.x - hx - 6.6, fy - 11.0 - 1.6, c.z - 2.0 - 5.6)
+	var dwalk: float = cast.call(
+		Vector3(rc9.x + 1.5, rc9.y - 0.9, rc9.z + 5.6),
+		Vector3(rc9.x + 1.5, rc9.y - 0.9, rc9.z - 6.5))
+	print("HAROLD walk path: hit %.1f (expect 9.0-10.4 = far wall) %s" % [
+		dwalk, "PASS" if dwalk > 8.9 and dwalk < 10.5 else "FAIL"])
 	var bkc := 0
 	for ch2 in hh._hshelf.get_children():
 		if ch2 is MeshInstance3D:

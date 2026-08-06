@@ -1190,15 +1190,19 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	var shc := c + Vector3(-hx - 6.6, 0, -2.0)   # shaft center (top)
 	var sdepth := 11.0
 	var stone := Color("#6a6258")
-	for sw in [[Vector3(1, sz.y + sdepth + 4.0, 5.6), Vector3(-2.8, -sdepth * 0.5, 0)],
-			[Vector3(5.6, sz.y + sdepth + 4.0, 1), Vector3(0, -sdepth * 0.5, -2.8)],
-			[Vector3(5.6, sz.y + sdepth + 4.0, 1), Vector3(0, -sdepth * 0.5, 2.8)]]:
+	# the shaft walls STOP at the riddle room's ceiling: full-depth
+	# slabs used to knife straight through the room's north end and
+	# stand between the doorway and the riddle
+	var swh := 14.3   # fy+4.0 down to the room ceiling top
+	for sw in [[Vector3(1, swh, 5.6), Vector3(-2.8, 4.0 - swh * 0.5, 0)],
+			[Vector3(5.6, swh, 1), Vector3(0, 4.0 - swh * 0.5, -2.8)],
+			[Vector3(5.6, swh, 1), Vector3(0, 4.0 - swh * 0.5, 2.8)]]:
 		_solid(shc + Vector3(0, fy - c.y, 0) + (sw[1] as Vector3), sw[0] as Vector3,
 			stone, 0.02)
-	# +X face: solid below the corridor mouth, header above it, side
-	# strips beside it -- the way in stays open
-	_solid(shc + Vector3(2.8, fy - c.y - (sdepth + 5.0) * 0.5, 0),
-		Vector3(1, sdepth + 5.0, 5.6), stone, 0.02)
+	# +X face: solid below the corridor mouth (down to the same ceiling
+	# line), header above it, side strips beside it
+	_solid(shc + Vector3(2.8, fy - c.y - 5.15, 0),
+		Vector3(1, 10.3, 5.6), stone, 0.02)
 	_solid(shc + Vector3(2.8, fy - c.y + 3.4, 0), Vector3(1, 1.2, 5.6), stone, 0.02)
 	for zs in [-2.1, 2.1]:
 		_solid(shc + Vector3(2.8, fy - c.y + 1.45, zs), Vector3(1, 3.0, 1.4),
@@ -1243,6 +1247,14 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	_solid(rc + Vector3(3.35, 0, 4.5), Vector3(2.3, 3.6, 1), Color("#5c554c"), 0.03)
 	_solid(rc + Vector3(0, 1.35, 4.5), Vector3(4.4, 0.9, 1), Color("#5c554c"), 0.03)
 	_solid(Vector3(shc.x, rc.y - 1.8, shc.z), Vector3(5.6, 1, 5.6),
+		Color("#5c554c"), 0.03)
+	# the BOTTOM CHAMBER: its own walls from ceiling to floor around
+	# the landing, open only through the doorway into the room
+	for cw in [[Vector3(1, 3.6, 4.8), Vector3(shc.x - 2.8, rc.y, shc.z + 1.1)],
+			[Vector3(1, 3.6, 4.8), Vector3(shc.x + 2.8, rc.y, shc.z + 1.1)],
+			[Vector3(5.6, 3.6, 1), Vector3(shc.x, rc.y, shc.z + 2.8)]]:
+		_solid(cw[1] as Vector3, cw[0] as Vector3, Color("#5c554c"), 0.03)
+	_solid(Vector3(shc.x, rc.y + 1.8, shc.z + 1.1), Vector3(6.6, 1, 5.0),
 		Color("#5c554c"), 0.03)
 	# candles never burned down. nobody asks why
 	for cd in [Vector3(-3.6, -1.4, 3.6), Vector3(3.6, -1.4, 3.6)]:
