@@ -373,6 +373,7 @@ func _boot() -> void:
 			# the TRAJECTORY survives the rejoin: same velocity, same
 			# orbit, same arc you logged out on
 			rk.vel = Save.rocket_vel()
+			rk.hyper_charge = Save.hyper_charge()
 
 ## Headless: park a Human in front of the player's face and press F.
 func _talk_test() -> void:
@@ -2071,7 +2072,8 @@ func _process(delta: float) -> void:
 				and is_instance_valid(_rocket):
 			rvel = _rocket.vel
 		Save.set_player_pos(pos, Game.mode == Game.Mode.IN_ROCKET, hyper, mk2,
-			rvel)
+			rvel, _rocket.hyper_charge if _rocket != null
+			and is_instance_valid(_rocket) else 4.0)
 		Save.save_progress()
 
 	# --- time-rift snapshots: one per minute, keep the last 6 ---
@@ -2373,7 +2375,8 @@ func _notification(what: int) -> void:
 				and is_instance_valid(_rocket):
 			rvel2 = _rocket.vel
 		Save.set_player_pos(_active_pos(), Game.mode == Game.Mode.IN_ROCKET,
-			hyper, mk2, rvel2)
+			hyper, mk2, rvel2, _rocket.hyper_charge if _rocket != null
+			and is_instance_valid(_rocket) else 4.0)
 		Save.save_progress()
 
 func _active_node() -> Node:

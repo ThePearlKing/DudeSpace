@@ -396,6 +396,7 @@ func save_progress() -> void:
 		"in_rocket_hyper": _last_hyper,
 		"in_rocket_mk2": _last_mk2,
 		"rocket_vel": [_last_vel.x, _last_vel.y, _last_vel.z],
+		"hyper_charge": _last_hyperq,
 		"pet": _last_pet,
 	}
 	_write(current_slot, _progress)
@@ -403,6 +404,10 @@ func save_progress() -> void:
 var _last_pos: Array = []
 var _last_in_rocket: bool = false
 var _last_vel: Vector3 = Vector3.ZERO
+var _last_hyperq: float = 4.0
+
+func hyper_charge() -> float:
+	return float(_progress.get("hyper_charge", 4.0))
 
 func rocket_vel() -> Vector3:
 	var a = _progress.get("rocket_vel", [0.0, 0.0, 0.0])
@@ -430,12 +435,14 @@ func had_pet() -> bool:
 	return bool(_progress.get("pet", false))
 
 func set_player_pos(p: Vector3, in_rocket: bool = false, hyper: bool = false,
-		mk2: bool = false, vel: Vector3 = Vector3.ZERO) -> void:
+		mk2: bool = false, vel: Vector3 = Vector3.ZERO,
+		hyperq: float = 4.0) -> void:
 	_last_pos = [p.x, p.y, p.z]
 	_last_in_rocket = in_rocket
 	_last_hyper = hyper
 	_last_mk2 = mk2
 	_last_vel = vel
+	_last_hyperq = hyperq
 
 func was_hyper() -> bool:
 	return bool(_progress.get("in_rocket_hyper", false))

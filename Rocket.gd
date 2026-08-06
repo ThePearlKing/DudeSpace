@@ -18,6 +18,12 @@ var piloted: bool = false
 var landed: bool = false
 var arcade: bool = false      # alien starship mode: unrealistic + angers gods
 var hyperdrive: bool = false  # installed on THIS ship (right-click the item nearby)
+# the hyperdrive drinks ULTIMA, not rocket fuel: a shipboard charge
+# measured in crystals. Empty tank = the drive is a paperweight until
+# you feed it (holding H auto-loads crystals from your inventory).
+const HYPER_MAX := 8.0
+var hyper_charge: float = 4.0   # crafted ships ship HALF full
+var _hyper_warn_t := 0.0
 var mk2: bool = false         # Rocket 2.0: double tank, sips fuel, seats a friend
 
 var _player: Player
@@ -323,17 +329,34 @@ func _physics_process(delta: float) -> void:
 
 	# --- main engine: Space (Mk2 upgrade = +60% thrust) ---
 	var thrust := MAIN_THRUST * (1.6 if Inventory.engine_mk2 else 1.0)
-	var burn_eff := 0.6 if mk2 else 1.0   # 2.0 sips where the 1.0 gulps
+	var burn_eff := 0.5 if mk2 else 1.0   # 2.0 sips where the 1.0 gulps
 	if not ui and Input.is_key_pressed(KEY_SPACE) and Inventory.fuel > 0.0:
 		vel += fwd * thrust * delta
 		Inventory.fuel = maxf(0.0, Inventory.fuel - MAIN_BURN * burn_eff * delta)
 		_engine_on = true
 
-	# --- hyperdrive: hold H, screams toward the nose. Ship-mounted. ---
-	if hyperdrive and not ui and Input.is_key_pressed(Settings.key("hyper")) and Inventory.fuel > 0.5:
-		vel = vel.lerp(fwd * 900.0, delta * 1.2)
-		Inventory.fuel = maxf(0.0, Inventory.fuel - 10.0 * burn_eff * delta)
-		_engine_on = true
+	# --- hyperdrive: hold H, screams toward the nose. Ship-mounted,
+	# ULTIMA-fueled: ~14 seconds a crystal, auto-loading from your
+	# inventory as the charge runs dry. Faster and far thriftier on
+	# rocket fuel than it used to be.
+	_hyper_warn_t = maxf(0.0, _hyper_warn_t - delta)
+	if hyperdrive and not ui and Input.is_key_pressed(Settings.key("hyper")) \
+			and Inventory.fuel > 0.5:
+		if hyper_charge <= 0.0 and Inventory.res_count("ultima") > 0:
+			Inventory.remove_res("ultima", 1)
+			hyper_charge += 1.0
+			Sfx.play("smelt", -14.0)
+		if hyper_charge > 0.0:
+			hyper_charge = maxf(0.0, hyper_charge - delta / 14.0)
+			vel = vel.lerp(fwd * 1400.0, delta * 1.6)
+			Inventory.fuel = maxf(0.0, Inventory.fuel - 4.0 * burn_eff * delta)
+			_engine_on = true
+		elif _hyper_warn_t <= 0.0:
+			_hyper_warn_t = 2.5
+			Sfx.play("denied", -16.0)
+			var hudh = get_tree().get_first_node_in_group("hud")
+			if hudh:
+				hudh.flash("HYPERDRIVE INACTIVE -- no ultima aboard")
 
 	# --- RCS translation (standard): arrows + Shift/Ctrl fore/aft ---
 	if not ui and Inventory.fuel > 0.0:

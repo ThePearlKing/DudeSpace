@@ -609,7 +609,8 @@ func _quit_title() -> void:
 		Save.set_player_pos(n.global_position, Game.mode == Game.Mode.IN_ROCKET,
 			n.hyperdrive if n is Rocket else false,
 			n.mk2 if n is Rocket else false,
-			n.vel if n is Rocket else Vector3.ZERO)
+			n.vel if n is Rocket else Vector3.ZERO,
+			n.hyper_charge if n is Rocket else 4.0)
 	var cs := get_tree().current_scene
 	if cs and cs.has_method("collect_world") and cs.get("_world_load_ok"):
 		Save.set_world(cs.collect_world())

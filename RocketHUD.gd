@@ -91,6 +91,11 @@ class _NavView extends Control:
 			"FUEL %6.1f / %.0f" % [Inventory.fuel, cap],
 			"RCS  ON",
 		]
+		if rocket.hyperdrive:
+			lines.append("HYPR %5.1f / %.0f ultima" % [rocket.hyper_charge,
+				rocket.HYPER_MAX] if rocket.hyper_charge > 0.0
+				or Inventory.res_count("ultima") > 0
+				else "HYPR INACTIVE -- no ultima")
 		var y := c.y - rn - 10.0
 		for i in lines.size():
 			draw_string(font, Vector2(c.x + rn + 24, y + float(i) * 22.0), lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
