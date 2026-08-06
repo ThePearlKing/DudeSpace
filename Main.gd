@@ -2136,6 +2136,98 @@ void fragment(){
 			var ftw := pivot.create_tween().set_loops()
 			ftw.tween_property(pivot, "rotation:y", TAU,
 				frng.randf_range(70.0, 220.0) / fsc).as_relative()
+	if b.kind == "ocean":
+		# MEGAFAUNA: three big things share the deep with the fishies
+		var mrng := RandomNumberGenerator.new()
+		mrng.seed = 777
+		# 1. THE WHALE: twenty meters of slow blue patience
+		var wpiv := Node3D.new()
+		p.add_child(wpiv)
+		wpiv.rotation = Vector3(0.4, 1.1, 0.2)
+		var whale9 := Node3D.new()
+		wpiv.add_child(whale9)
+		whale9.position = Vector3(b.radius * 0.8, 0, 0)
+		whale9.rotation_degrees = Vector3(0, 180, 0)
+		var wb9 := MeshInstance3D.new()
+		var wcm9 := CapsuleMesh.new()
+		wcm9.radius = 3.4
+		wcm9.height = 20.0
+		wb9.mesh = wcm9
+		wb9.rotation_degrees = Vector3(0, 0, 90)
+		wb9.scale = Vector3(1.0, 0.7, 1.0)
+		wb9.material_override = Destructible.make_material(Color("#3a6fae"), 0.8)
+		whale9.add_child(wb9)
+		var wbe9 := MeshInstance3D.new()
+		var wbc9 := CapsuleMesh.new()
+		wbc9.radius = 2.2
+		wbc9.height = 14.0
+		wbe9.mesh = wbc9
+		wbe9.rotation_degrees = Vector3(0, 0, 90)
+		wbe9.position = Vector3(0.8, -1.6, 0)
+		wbe9.material_override = Destructible.make_material(Color("#cfd8e2"), 0.6)
+		whale9.add_child(wbe9)
+		var wt9 := MeshInstance3D.new()
+		var wtm9 := BoxMesh.new()
+		wtm9.size = Vector3(0.5, 0.6, 6.4)
+		wt9.mesh = wtm9
+		wt9.position = Vector3(11.6, 0, 0)
+		wt9.material_override = Destructible.make_material(Color("#2a5288"), 0.7)
+		whale9.add_child(wt9)
+		var wtw9 := wpiv.create_tween().set_loops()
+		wtw9.tween_property(wpiv, "rotation:y", TAU, 420.0).as_relative()
+		# 2. THE SERPENT: a fourteen-segment arc snaking its own ring
+		var spiv := Node3D.new()
+		p.add_child(spiv)
+		spiv.rotation = Vector3(1.9, 0.3, 0.8)
+		for si9 in 14:
+			var sseg := MeshInstance3D.new()
+			var scm9 := CapsuleMesh.new()
+			scm9.radius = 1.5 - 0.08 * float(si9)
+			scm9.height = 4.6
+			sseg.mesh = scm9
+			sseg.material_override = Destructible.make_material(
+				Color("#3a8f5a") if si9 % 2 == 0 else Color("#2a6f42"), 0.8)
+			spiv.add_child(sseg)
+			var sang := float(si9) * (4.2 / (b.radius * 0.74))
+			var srad := b.radius * 0.74 + sin(float(si9) * 0.8) * 1.6
+			sseg.position = Vector3(cos(sang) * srad, sin(float(si9) * 0.6) * 2.2,
+				sin(sang) * srad)
+			sseg.rotation.y = -sang + PI * 0.5
+			sseg.rotation_degrees.x = 90.0
+		var stw9 := spiv.create_tween().set_loops()
+		stw9.tween_property(spiv, "rotation:y", -TAU, 240.0).as_relative()
+		# 3. THE CROWN JELLY: a six-meter bell drifting the shallows
+		var jpiv := Node3D.new()
+		p.add_child(jpiv)
+		jpiv.rotation = Vector3(2.6, 0.9, 1.4)
+		var jelly9 := Node3D.new()
+		jpiv.add_child(jelly9)
+		jelly9.position = Vector3(b.radius * 0.9, 0, 0)
+		var jb9 := MeshInstance3D.new()
+		var jbm9 := SphereMesh.new()
+		jbm9.radius = 3.0
+		jbm9.height = 4.0
+		jbm9.is_hemisphere = true
+		jb9.mesh = jbm9
+		var jmat9 := StandardMaterial3D.new()
+		jmat9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		jmat9.albedo_color = Color(1.0, 0.5, 0.85, 0.4)
+		jmat9.emission_enabled = true
+		jmat9.emission = Color(1.0, 0.4, 0.8) * 0.5
+		jb9.material_override = jmat9
+		jelly9.add_child(jb9)
+		for jt9 in 8:
+			var tent9 := MeshInstance3D.new()
+			var jtm9 := BoxMesh.new()
+			jtm9.size = Vector3(0.16, 5.0, 0.16)
+			tent9.mesh = jtm9
+			tent9.position = Vector3(cos(TAU * float(jt9) / 8.0) * 1.7, -2.6,
+				sin(TAU * float(jt9) / 8.0) * 1.7)
+			tent9.material_override = Destructible.make_material(
+				Color("#ff9ad9"), 0.7)
+			jelly9.add_child(tent9)
+		var jtw9 := jpiv.create_tween().set_loops()
+		jtw9.tween_property(jpiv, "rotation:y", TAU, 520.0).as_relative()
 	if b.kind != "gas":
 		p.add_child(col)   # gas giants have NO surface. you fall in.
 	else:
