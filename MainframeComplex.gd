@@ -4351,8 +4351,8 @@ class Airlock extends StaticBody3D:
 		await tw.finished
 		_busy = false
 		if _open:
-			# airlocks SEAL THEMSELVES. always.
-			await get_tree().create_timer(6.0).timeout
+			# airlocks SEAL THEMSELVES. always. quickly.
+			await get_tree().create_timer(3.0).timeout
 			if _open and not _busy:
 				use()
 
