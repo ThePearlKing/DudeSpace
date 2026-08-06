@@ -384,10 +384,93 @@ func _open_cheats() -> void:
 		if cs and cs.has_method("summon_ufo"):
 			cs.summon_ufo()))
 	col.add_child(_btn("Teleport to planet…", _open_tp))
+	col.add_child(_btn("Monolith cheats…  ⚠ SPOILERS", _open_mono))
 	col.add_child(_btn("Back", func() -> void:
 		_cheats.visible = false
 		_panel.visible = true))
 	_panel.visible = false
+
+var _mono: PanelContainer
+
+func _open_mono() -> void:
+	_cheats.visible = false
+	if _mono:
+		_mono.visible = true
+		return
+	_mono = PanelContainer.new()
+	_mono.set_anchors_preset(Control.PRESET_CENTER)
+	_mono.position = Vector2(-190, -200)
+	OptionsPanel._glow(_mono)
+	add_child(_mono)
+	var pad := MarginContainer.new()
+	pad.add_theme_constant_override("margin_left", 24)
+	pad.add_theme_constant_override("margin_right", 24)
+	pad.add_theme_constant_override("margin_top", 18)
+	pad.add_theme_constant_override("margin_bottom", 18)
+	_mono.add_child(pad)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 10)
+	pad.add_child(col)
+	var title := Label.new()
+	title.text = "MONOLITH CHEATS"
+	title.add_theme_font_size_override("font_size", 24)
+	col.add_child(title)
+	var warn := Label.new()
+	warn.text = "⚠ SPOILERS AHEAD. these touch the chain,\nthe sky, and the edge of the universe."
+	warn.add_theme_font_size_override("font_size", 13)
+	warn.modulate = Color("#ff5a5a")
+	col.add_child(warn)
+	var msync := func() -> void:
+		var cs := get_tree().current_scene
+		if cs and cs.has_method("_on_monolith_advanced"):
+			cs._on_monolith_advanced()
+		if cs and cs.has_method("_monolith_snap"):
+			cs._monolith_snap()
+	col.add_child(_btn("Activate every built monolith", func() -> void:
+		Game.cheated = true
+		Game.monolith_stage = 2
+		msync.call()
+		Sfx.play("learn")))
+	col.add_child(_btn("Reset ALL monolith progress", func() -> void:
+		Game.cheated = true
+		Game.monolith_stage = 0
+		msync.call()
+		Sfx.play("click")))
+	col.add_child(_btn("Clear sky effects", func() -> void:
+		Game.cheated = true
+		var cs := get_tree().current_scene
+		if cs and cs.has_method("mono_sky_clear"):
+			cs.mono_sky_clear()
+		Sfx.play("click")))
+	var sk := Label.new()
+	sk.text = "preview a sky (30s, at the nearest planet):"
+	sk.add_theme_font_size_override("font_size", 13)
+	col.add_child(sk)
+	var srow := HBoxContainer.new()
+	srow.add_theme_constant_override("separation", 6)
+	col.add_child(srow)
+	for si in 8:
+		var sb2 := Button.new()
+		sb2.text = str(si + 1)
+		sb2.custom_minimum_size = Vector2(38, 38)
+		sb2.modulate = Game.MONO_COLORS[si]
+		var idx := si
+		sb2.pressed.connect(func() -> void:
+			Game.cheated = true
+			var cs := get_tree().current_scene
+			if cs and cs.has_method("mono_sky_demo"):
+				cs.mono_sky_demo(idx)
+			Sfx.play("warp", -12.0))
+		srow.add_child(sb2)
+	col.add_child(_btn("Toggle universe boundary lattice", func() -> void:
+		Game.cheated = true
+		var cs := get_tree().current_scene
+		if cs and "_boundary_mesh" in cs and cs._boundary_mesh != null:
+			cs._boundary_mesh.visible = not cs._boundary_mesh.visible
+		Sfx.play("click")))
+	col.add_child(_btn("Back", func() -> void:
+		_mono.visible = false
+		_cheats.visible = true))
 
 var _tp: PanelContainer
 

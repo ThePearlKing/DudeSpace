@@ -898,6 +898,25 @@ void fragment(){
 		_uw_layer.queue_free()
 		_uw_layer = null
 
+## cheat helpers: demo a monolith sky at the nearest planet / clear it
+func mono_sky_clear() -> void:
+	for n in get_tree().get_nodes_in_group("mono_sky"):
+		if is_instance_valid(n):
+			n.queue_free()
+
+func mono_sky_demo(stage: int) -> void:
+	mono_sky_clear()
+	var b = Universe.nearest(_player.global_position if _player else Vector3.ZERO)
+	var col: Color = Game.MONO_COLORS[clampi(stage, 0, 7)]
+	var demo := Monolith.new()
+	demo.add_to_group("mono_sky")
+	add_child(demo)
+	demo.body = b
+	demo.dir = (( _player.global_position if _player else Vector3.UP)
+		- (b.center as Vector3)).normalized()
+	demo.stage = clampi(stage, 0, 7)
+	demo.sky_only(col)
+
 ## The EDGE OF THE UNIVERSE, visible when you get close: a red warning
 ## lattice that fades in over the last 2km before the god throws you
 ## back. Inward faces only.
@@ -5913,6 +5932,20 @@ var _boundary_mesh: MeshInstance3D = null
 ## instant (no animation) sync of everything monolith-stage-driven --
 ## used right after a save restores the stage
 func _monolith_snap() -> void:
+	if Game.monolith_stage == 0:
+		# fresh chain: Harold stands on the surface, Earth sleeps below
+		if _h_monolith != null and _h_monolith._root != null:
+			_h_monolith._root.visible = true
+			_h_monolith._root.global_position = \
+				(_h_monolith.body.center as Vector3) + _h_monolith.dir \
+				* float(_h_monolith.body.radius)
+			_h_monolith._busy = false
+		if _earth_monolith != null and _earth_monolith._root != null:
+			_earth_monolith.risen = false
+			_earth_monolith._root.global_position = \
+				(_earth_monolith.body.center as Vector3) \
+				+ _earth_monolith.dir \
+				* (float(_earth_monolith.body.radius) - Monolith.RISE_DEPTH)
 	if Game.monolith_stage >= 1:
 		if _h_monolith != null and _h_monolith._root != null:
 			_h_monolith._root.visible = false

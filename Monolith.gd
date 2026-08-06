@@ -21,6 +21,44 @@ const RISE_DEPTH := 14.0
 const ITEM_IDS := ["ytetra", "ltetra", "otetra", "btetra", "rtetra",
 	"ptetra", "ctetra", "wtetra"]
 
+static var _crack_sh: Shader = null
+static func _crack_shader() -> Shader:
+	if _crack_sh != null:
+		return _crack_sh
+	_crack_sh = Shader.new()
+	_crack_sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_front;
+uniform vec3 ccol = vec3(1.0, 0.82, 0.25);
+uniform float intensity = 0.3;
+uniform float fade = 0.0;
+vec2 h2(vec2 p){
+	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
+		dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+}
+void fragment(){
+	vec2 uv = UV * vec2(10.0, 5.0);
+	vec2 i = floor(uv);
+	vec2 f = fract(uv);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	for (int x = -1; x <= 1; x++) {
+		for (int y = -1; y <= 1; y++) {
+			vec2 g = vec2(float(x), float(y));
+			vec2 o = h2(i + g);
+			float d = length(g + o - f);
+			if (d < f1) { f2 = f1; f1 = d; }
+			else if (d < f2) { f2 = d; }
+		}
+	}
+	float edge = 1.0 - smoothstep(0.0, 0.09, f2 - f1);
+	ALBEDO = ccol;
+	EMISSION = ccol * edge * 2.2 * intensity * fade;
+	ALPHA = edge * intensity * fade * 0.9;
+}
+"""
+	return _crack_sh
+
 class MonoSocket extends StaticBody3D:
 	var host: Monolith = null
 	func use() -> void:
@@ -198,11 +236,13 @@ func activate() -> void:
 	sp.bus = "MonolithEcho"
 	sp.volume_db = -2.0
 	sp.max_distance = 400.0
+	sp.add_to_group("mono_sky")
 	add_child(sp)
 	sp.global_position = top + dir * 6.0
 	sp.play()
 	# 4. the SKY fills with turning triangles of the piece's color
 	var skyp := Node3D.new()
+	skyp.add_to_group("mono_sky")
 	add_child(skyp)
 	skyp.global_transform = Transform3D(bas, body.center as Vector3)
 	var tris: Array = []
@@ -274,44 +314,14 @@ func activate() -> void:
 	ckm.radial_segments = 32
 	ckm.rings = 16
 	crack.mesh = ckm
-	var cksh := Shader.new()
-	cksh.code = """
-shader_type spatial;
-render_mode unshaded, cull_front;
-uniform vec3 ccol = vec3(1.0, 0.82, 0.25);
-uniform float intensity = 0.3;
-uniform float fade = 0.0;
-vec2 h2(vec2 p){
-	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)),
-		dot(p, vec2(269.5, 183.3)))) * 43758.5453);
-}
-void fragment(){
-	vec2 uv = UV * vec2(10.0, 5.0);
-	vec2 i = floor(uv);
-	vec2 f = fract(uv);
-	float f1 = 8.0;
-	float f2 = 8.0;
-	for (int x = -1; x <= 1; x++) {
-		for (int y = -1; y <= 1; y++) {
-			vec2 g = vec2(float(x), float(y));
-			vec2 o = h2(i + g);
-			float d = length(g + o - f);
-			if (d < f1) { f2 = f1; f1 = d; }
-			else if (d < f2) { f2 = d; }
-		}
-	}
-	float edge = 1.0 - smoothstep(0.0, 0.09, f2 - f1);
-	ALBEDO = ccol;
-	EMISSION = ccol * edge * 2.2 * intensity * fade;
-	ALPHA = edge * intensity * fade * 0.9;
-}
-"""
+	var cksh := _crack_shader()
 	var ckmat := ShaderMaterial.new()
 	ckmat.shader = cksh
 	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
 	ckmat.set_shader_parameter("intensity",
 		0.25 + 0.75 * float(stage + 1) / 8.0)
 	crack.material_override = ckmat
+	crack.add_to_group("mono_sky")
 	add_child(crack)
 	crack.global_position = body.center as Vector3
 	var cktw := create_tween()
@@ -423,6 +433,63 @@ void fragment(){
 	if m9 != null and m9.has_method("_on_monolith_advanced"):
 		m9._on_monolith_advanced()
 	_busy = false
+
+## CHEAT/demo: only the sky show -- both triangle shells + the cracks,
+## thirty seconds, then gone (the node frees itself).
+func sky_only(col: Color) -> void:
+	var bas := _bup(dir)
+	var skyp := Node3D.new()
+	skyp.add_to_group("mono_sky")
+	add_child(skyp)
+	skyp.global_transform = Transform3D(bas, body.center as Vector3)
+	var tris: Array = []
+	for i in 36:
+		var t9 := MeshInstance3D.new()
+		t9.mesh = MainframeComplex._tetra_mesh(
+			14.0 + 10.0 * fmod(float(i) * 0.618, 1.0))
+		var tmat := StandardMaterial3D.new()
+		tmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		tmat.albedo_color = col
+		tmat.emission_enabled = true
+		tmat.emission = col
+		skyp.add_child(t9)
+		t9.material_override = tmat
+		var ph := TAU * float(i) / 36.0
+		var lat := -0.9 + 1.8 * fmod(float(i) * 0.382, 1.0)
+		t9.position = Vector3(cos(ph) * cos(lat), sin(lat),
+			sin(ph) * cos(lat)) * (float(body.radius) + 320.0)
+		tris.append(t9)
+	var skytw := create_tween().set_loops()
+	_show_tweens.append(skytw)
+	skytw.tween_property(skyp, "rotation:y", TAU, 40.0).from(0.0).as_relative()
+	for t9 in tris:
+		var st9 := create_tween().set_loops()
+		_show_tweens.append(st9)
+		st9.tween_property(t9, "rotation", Vector3(TAU, TAU * 0.7, 0), 9.0) \
+			.as_relative()
+	var crack := MeshInstance3D.new()
+	var ckm := SphereMesh.new()
+	ckm.radius = float(body.radius) + 600.0
+	ckm.height = ckm.radius * 2.0
+	ckm.radial_segments = 32
+	ckm.rings = 16
+	crack.mesh = ckm
+	var ckmat := ShaderMaterial.new()
+	ckmat.shader = _crack_shader()
+	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
+	ckmat.set_shader_parameter("intensity", 0.25 + 0.75 * float(stage + 1) / 8.0)
+	ckmat.set_shader_parameter("fade", 1.0)
+	crack.material_override = ckmat
+	crack.add_to_group("mono_sky")
+	add_child(crack)
+	crack.global_position = body.center as Vector3
+	var cleanup := create_tween()
+	cleanup.tween_interval(30.0)
+	cleanup.tween_callback(func() -> void:
+		for tw9 in _show_tweens:
+			if tw9 != null and (tw9 as Tween).is_valid():
+				(tw9 as Tween).kill()
+		queue_free())
 
 ## the flat 2D planet pictogram: outline ring, three latitude bands,
 ## an equator bar. Drawn in the XZ plane of its parent, engraved-bar
