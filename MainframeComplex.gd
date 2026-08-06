@@ -342,7 +342,7 @@ void fragment(){
 	# left section carries the ATRIUM AIRLOCK out into the hollow
 	_plate(Vector3(2.2, 7.0, 0.5), awxf, Vector3(-5.2, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(0.7, 7.0, 0.5), awxf, Vector3(-1.55, 0, -6.05), STEEL, 0.0)
-	_plate(Vector3(2.2, 3.95, 0.5), awxf, Vector3(-3.0, 1.275, -6.05), STEEL, 0.0)
+	_plate(Vector3(2.2, 4.2, 0.5), awxf, Vector3(-3.0, 1.4, -6.05), STEEL, 0.0)
 	_airlock(Transform3D(abas * Basis(Vector3(0, 1, 0), PI),
 		Transform3D(abas, _C + _u0 * _rF)
 		.translated_local(Vector3(-3.0, 0, -6.05)).origin))
@@ -4168,7 +4168,7 @@ func _lring_room(ac: float, sd: float, name: String) -> Dictionary:
 func _lower_ring() -> void:
 	# the hallway: full 360 in arc-strip segments, doors where rooms sit
 	var doors: Array = [[0.6, -1.0], [2.2, 1.0], [3.9, -1.0], [5.3, 1.0],
-		[2.9, -1.0]]
+		[TAU / 69.0 * 31.5, -1.0]]
 	var m := TAU * R_LOW
 	var n := int(ceil(m / 4.3))
 	var stp := TAU / float(n)
@@ -4198,10 +4198,17 @@ func _lower_ring() -> void:
 				Color("#f2ead8"), 2.2)
 	_sign("UNDERCROFT RING", _fr(0.25), _C + _pdir(0.25) * (R_LOW + 3.4),
 		Vector3.ZERO, 180.0)
-	# the LOWER AIRLOCK: out the ring's flank into the deep hollow
-	_airlock(Transform3D(_fr(2.9) * Basis(Vector3(0, 1, 0), -PI * 0.5),
-		Transform3D(_fr(2.9), _C + _pdir(2.9) * R_LOW)
+	# the LOWER AIRLOCK: centered EXACTLY in its wall gap, with filler
+	# plates sealing the bands the frame leaves beside and above it
+	var aA2 := TAU / 69.0 * 31.5   # the skipped wall segment's centre
+	var afb := _fr(aA2)
+	_airlock(Transform3D(afb * Basis(Vector3(0, 1, 0), -PI * 0.5),
+		Transform3D(afb, _C + _pdir(aA2) * R_LOW)
 		.translated_local(Vector3(-3.05, 0, 0)).origin))
+	var awx9 := Transform3D(afb, _C + _pdir(aA2) * (R_LOW + 2.25))
+	_plate(Vector3(0.5, 5.5, 1.0), awx9, Vector3(-3.05, 0, 1.95), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 1.0), awx9, Vector3(-3.05, 0, -1.95), STEEL, 0.0)
+	_plate(Vector3(0.5, 1.95, 3.1), awx9, Vector3(-3.05, 1.8, 0), STEEL, 0.0)
 	# ---- room 1: PUMP HALL (the old undercroft, now one of four) ----
 	var pr := _lring_room(0.6, -1.0, "PUMP HALL")
 	for pz in [-3.0, 0.0, 3.0]:
