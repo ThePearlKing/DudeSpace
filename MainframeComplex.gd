@@ -1321,7 +1321,7 @@ func _rings() -> void:
 	_hall(0, 1.621, 2.47, [[1.75, 1.0], [2.02, -1.0]])
 	var tr := _ring_room(0, 1.75, 1.0, "TAPE ARCHIVE", 2)
 	_dress_tape(tr)
-	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM", 2)
+	var nf := _ring_room(0, 2.02, -1.0, "NOODLE FARM", 1)
 	_dress_farm(nf)
 	_vp["tape"] = tr["vents"]
 	_vp["farm"] = nf["vents"]
@@ -1356,7 +1356,7 @@ func _rings() -> void:
 	_plate(Vector3(0.5, 5.5, 1.2), tawx, Vector3(3.05, 0, 1.9), STEEL, 0.0)
 	_plate(Vector3(0.5, 5.5, 1.2), tawx, Vector3(3.05, 0, -1.9), STEEL, 0.0)
 	_plate(Vector3(0.5, 1.95, 3.1), tawx, Vector3(3.05, 1.8, 0), STEEL, 0.0)
-	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE", 2)
+	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE", 1)
 	_dress_storage(st9)
 	var wk := _ring_room(0, 4.75, 1.0, "WORKSHOP", 2)
 	_dress_workshop(wk)
@@ -4737,18 +4737,33 @@ func _airlock(xf: Transform3D) -> void:
 	root.add_child(bcn)
 	bcn.position = Vector3(0, 3.55, 0.45)
 	_blinks.append({"mat": bmat, "phase": randf() * TAU})
-	var alb := Label3D.new()
-	alb.text = "AIRLOCK\nJETPACK REQUIRED"
-	alb.font_size = 24
-	alb.pixel_size = 0.007
-	alb.modulate = Color("#7df9ff")
-	alb.outline_size = 8
-	alb.outline_modulate = Color(0, 0, 0, 0.9)
-	root.add_child(alb)
-	alb.position = Vector3(0, 4.1, 0.45)
+	for als9 in [[Vector3(0, 4.1, 0.45), 0.0],
+			[Vector3(0, 4.1, -0.45), 180.0]]:
+		var alb := Label3D.new()
+		alb.text = "AIRLOCK\nJETPACK REQUIRED"
+		alb.font_size = 24
+		alb.pixel_size = 0.007
+		alb.modulate = Color("#7df9ff")
+		alb.outline_size = 8
+		alb.outline_modulate = Color(0, 0, 0, 0.9)
+		alb.rotation_degrees = Vector3(0, float(als9[1]), 0)
+		root.add_child(alb)
+		alb.position = als9[0] as Vector3
 	# outside landing RUNWAY with GLOWING guard rails down both sides --
 	# the far end stays open: that is the jump
 	mk.call(Vector3(3.4, 0.4, 7.5), Vector3(0, -0.2, 4.05), STEEL, 0.0)
+	# floor glow: a bright center line + edge strips down the whole
+	# runway -- spot it from across the hollow by its lit deck alone
+	for fg9 in [[Vector3(0.22, 0.05, 7.4), Vector3(0, 0.03, 4.05)],
+			[Vector3(0.1, 0.05, 7.4), Vector3(1.45, 0.03, 4.05)],
+			[Vector3(0.1, 0.05, 7.4), Vector3(-1.45, 0.03, 4.05)]]:
+		var fgm := MeshInstance3D.new()
+		var fgb := BoxMesh.new()
+		fgb.size = fg9[0]
+		fgm.mesh = fgb
+		fgm.material_override = Surfaces.cached_emissive(Color("#7df9ff"), 2.6)
+		root.add_child(fgm)
+		fgm.position = fg9[1]
 	for rs9 in [-1.0, 1.0]:
 		mk.call(Vector3(0.12, 1.1, 7.5), Vector3(rs9 * 1.64, 0.55, 4.05),
 			STEEL, 0.0)
@@ -4848,8 +4863,8 @@ func _networks() -> void:
 		["medbay", 1, "gym", 0, 58.8, true],
 		["gym", 1, "archive", 0, 58.8, false],
 		["archive", 1, "tape", 1, 58.8, false],
-		["tape", 0, "farm", 1, 58.8, true],
-		["workshop", 1, "storage", 1, 58.8, false],
+		["tape", 0, "farm", 0, 58.8, true],
+		["workshop", 1, "storage", 0, 58.8, false],
 		["kitchen", 1, "trophy", 0, 58.8, false],
 		["workshop", 0, "kitchen", 0, 58.8, true],
 	]
