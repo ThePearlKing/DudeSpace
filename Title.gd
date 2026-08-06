@@ -311,7 +311,7 @@ const TIPS := [
 	"tip: the Rocket 2.0's bubble seats a friend. press F on it while they fly.",
 	"tip: Sanus spits lava at visitors. the ultima is real though.",
 	"tip: gas giants eat rockets whole. parked, flying, doesn't matter.",
-	"tip: the eye in the sky is always watching. its color is its mood.",
+	"tip: the eye in the sky is always watching. its SIZE is its mood.",
 	"tip: spawn beacons place dormant. F claims one -- and un-claims all the others.",
 	"tip: Earth's humans look dumb. press F on one and reconsider.",
 	"tip: right-click the map in the teleport picker to warp straight there.",
