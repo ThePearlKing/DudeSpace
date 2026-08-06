@@ -159,6 +159,15 @@ var board_lock: float = 0.0  # playtime before which re-boarding is blocked
 
 # --- progression flags ---
 var door_open: bool = false   # euclid temple door (opens forever)
+# the monolith chain: how many monoliths have been fed their tetrahedron.
+# 0 = none. Order: Harold, Earth, Euclid, Big Water, Mars, Wobble,
+# Crystalia, Palewander.
+var monolith_stage: int = 0
+const MONO_COLORS: Array = [Color("#ffd23f"), Color("#7fff3a"),
+	Color("#ff8a2a"), Color("#2a6fff"), Color("#ff3a2a"), Color("#ff7ce9"),
+	Color("#7df9ff"), Color("#f2f2f2")]
+const MONO_PLANETS: Array = ["Harold", "Earth", "Euclid", "Big Water",
+	"Mars", "Wobble", "Crystalia", "Palewander"]
 var mind_core: bool = false   # unlocks the pyramid
 var playtime: float = 0.0     # for time-rift snapshots
 var cheated: bool = false     # any cheat = save branded illegitimate forever

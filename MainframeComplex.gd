@@ -99,27 +99,28 @@ func _rack(fbR: Basis, upR: Vector3, rbase: float, off: Vector3,
 		_deco_box(Vector3(0.06, 0.07, 0.8),
 			Transform3D(fbR, _C + upR * (rbase + 0.7 + 0.65 * float(sl))),
 			off + Vector3(-fs * 0.66, 0, 0), Color("#66ff99"), 1.8)
-	# FOUR fat status lights per rack, staggered phases, mixed colors --
-	# a server wall should look like it is THINKING
-	for db9 in 4:
+	# EIGHT square status lights per rack -- two columns of four, eight
+	# colors, staggered phases. A server wall THINKS out loud.
+	for db9 in 8:
 		var rdot := MeshInstance3D.new()
 		var rdm := BoxMesh.new()
-		rdm.size = Vector3(0.14, 0.14, 0.1)
+		rdm.size = Vector3(0.13, 0.13, 0.09)
 		rdot.mesh = rdm
 		var rdmat := StandardMaterial3D.new()
 		rdmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		var rdc: Color = [AMBER, Color("#66ff99"), Color("#ff4444"),
-			Color("#7df9ff")][db9]
+			Color("#7df9ff"), Color("#ff7ce9"), Color("#b388ff"),
+			Color("#ffe066"), Color("#7dff5a")][db9]
 		rdmat.albedo_color = rdc
 		rdmat.emission_enabled = true
 		rdmat.emission = rdc
 		rdot.material_override = rdmat
 		add_child(rdot)
 		rdot.global_transform = Transform3D(fbR,
-			_C + upR * (rbase + 2.75 + 0.35 * float(db9 % 2)))
+			_C + upR * (rbase + 2.62 + 0.24 * float(db9 % 4)))
 		rdot.translate_object_local(off + Vector3(-fs * 0.66, 0,
-			0.33 - 0.22 * float(db9)))
-		_blinks.append({"mat": rdmat, "phase": ph + float(db9) * 0.37})
+			0.3 - 0.6 * float(db9 / 4)))
+		_blinks.append({"mat": rdmat, "phase": ph + float(db9) * 0.29})
 
 ## spherical helpers: direction / frame at arc angle a, lateral angle b
 func _sdir(a: float, beta: float) -> Vector3:
@@ -210,10 +211,46 @@ func build(b, dir: Vector3) -> void:
 	crm.radial_segments = 48
 	crm.rings = 24
 	crust.mesh = crm
-	var crmat := StandardMaterial3D.new()
-	crmat.cull_mode = BaseMaterial3D.CULL_FRONT
-	crmat.albedo_color = Color("#0c1017")
-	crmat.roughness = 1.0
+	var crsh := Shader.new()
+	crsh.code = """
+shader_type spatial;
+render_mode cull_front;
+varying vec3 vn;
+void vertex(){ vn = normalize(VERTEX); }
+float h31(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float vno(vec3 p){
+	vec3 i = floor(p); vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = h31(i), b = h31(i + vec3(1,0,0)), c = h31(i + vec3(0,1,0));
+	float d = h31(i + vec3(1,1,0)), e = h31(i + vec3(0,0,1)), g = h31(i + vec3(1,0,1));
+	float hh = h31(i + vec3(0,1,1)), k = h31(i + vec3(1,1,1));
+	return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y),
+		mix(mix(e,g,f.x), mix(hh,k,f.x), f.y), f.z);
+}
+void fragment(){
+	vec3 n = normalize(vn);
+	// strata bands wrapping the shell + coarse rock grain
+	float strata = 0.5 + 0.5 * sin(n.y * 40.0 + vno(n * 6.0) * 6.0);
+	float grain = vno(n * 22.0);
+	vec3 rock = mix(vec3(0.045, 0.055, 0.075), vec3(0.10, 0.11, 0.13),
+		strata * 0.6 + grain * 0.4);
+	// the dudes WIRED their crust: faint amber conduit veins snaking
+	// through the rock, pulsing slow
+	vec3 cell = floor(n * 14.0);
+	float hv = h31(cell);
+	vec3 fp = fract(n * 14.0);
+	float vein = 0.0;
+	if (hv < 0.3) { vein = 1.0 - smoothstep(0.02, 0.07, abs(fp.y - 0.5)); }
+	else if (hv < 0.55) { vein = 1.0 - smoothstep(0.02, 0.07, abs(fp.x - 0.5)); }
+	float pulse = 0.55 + 0.45 * sin(TIME * 0.7 + hv * 20.0);
+	ALBEDO = rock;
+	EMISSION = vec3(1.0, 0.69, 0.0) * vein * 0.32 * pulse
+		+ vec3(0.2, 1.0, 0.4) * step(0.97, h31(cell + 7.0)) * 0.5 * pulse;
+	ROUGHNESS = 1.0;
+}
+"""
+	var crmat := ShaderMaterial.new()
+	crmat.shader = crsh
 	crust.material_override = crmat
 	add_child(crust)
 	crust.global_position = _C
@@ -362,6 +399,8 @@ func build(b, dir: Vector3) -> void:
 	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(-6.05, 0, 3.65), STEEL, 0.0)
 	_plate(Vector3(0.5, 7.0, 4.9), awxf, Vector3(-6.05, 0, -3.65), STEEL, 0.0)
 	_plate(Vector3(0.5, 2.15, 2.4), awxf, Vector3(-6.05, 2.42, 0), STEEL, 0.0)
+	_lobby_land = Transform3D(abas, _C + _u0 * (_rF + 1.2)) \
+		.translated_local(Vector3(-2.6, 0, -2.6)).origin
 	# surface gate, in the corner AWAY from both openings
 	var sg := Gate.new().configure({
 		"target": _C + _u0 * (R + 1.5) + _e1 * 7.0, "zone": "",
@@ -1682,6 +1721,20 @@ func _dress_ai() -> void:
 	add_child(_ai_sp)
 	_ai_sp.global_transform = Transform3D(fb9, _C + fup * (_rF + 3.4))
 	_ai_sp.translate_object_local(Vector3(-6.5, 0, 0))
+	# SUBTITLES: the line prints under the face while it speaks
+	_ai_lbl = Label3D.new()
+	_ai_lbl.text = ""
+	_ai_lbl.font_size = 30
+	_ai_lbl.pixel_size = 0.008
+	_ai_lbl.modulate = Color("#66ff99")
+	_ai_lbl.outline_size = 10
+	_ai_lbl.outline_modulate = Color(0, 0, 0, 0.9)
+	_ai_lbl.width = 900
+	_ai_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	add_child(_ai_lbl)
+	_ai_lbl.global_transform = Transform3D(fb9 * Basis(Vector3(0, 1, 0), PI * 0.5),
+		Transform3D(fb9, _C + fup * (_rF + 0.9))
+		.translated_local(Vector3(-6.3, 0, 0)).origin)
 	# cable conduits converging on the face along the floor
 	for cv in 5:
 		var cz: float = -5.6 + 2.8 * float(cv)
@@ -1707,6 +1760,7 @@ func _dress_ai() -> void:
 	_chatter(Transform3D(_fr(aA), _C + _pdir(aA) * (_rF + 1.4)).origin, 191, -8.0)
 
 var _ai_sp: AudioStreamPlayer3D = null
+var _ai_lbl: Label3D = null
 var _ai_line := 0
 var _ai_mat: ShaderMaterial = null
 const AI_LINES := [
@@ -1727,6 +1781,8 @@ func _ai_speak() -> void:
 	if _ai_sp == null or _ai_sp.playing:
 		return
 	var w = HumanVoice.render(AI_LINES[_ai_line], RadioLib.ALIEN_HOSTS[1])
+	if _ai_lbl != null:
+		_ai_lbl.text = AI_LINES[_ai_line]
 	_ai_line = (_ai_line + 1) % AI_LINES.size()
 	_ai_sp.stream = w
 	_ai_sp.play()
@@ -3648,8 +3704,20 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 	cl.material_override = Destructible.make_material(Color("#f2ead8"), 2.0)
 	root.add_child(cl)
 	cl.position = Vector3(0, 2.62, 0)
+	# it LOOKS like an elevator now: glowing amber door frame + a lit
+	# ELEVATOR sign over the opening
+	for dfr in [[Vector3(0.16, 2.9, 0.16), Vector3(1.42, 1.35, 1.52)],
+			[Vector3(0.16, 2.9, 0.16), Vector3(-1.42, 1.35, 1.52)],
+			[Vector3(3.0, 0.16, 0.16), Vector3(0, 2.72, 1.52)]]:
+		var fmi := MeshInstance3D.new()
+		var fbm := BoxMesh.new()
+		fbm.size = dfr[0]
+		fmi.mesh = fbm
+		fmi.material_override = Destructible.make_material(AMBER, 1.7)
+		root.add_child(fmi)
+		fmi.position = dfr[1]
 	var sgn := Label3D.new()
-	sgn.text = label
+	sgn.text = "ELEVATOR" if label == "ELEVATOR" else "ELEVATOR // " + label
 	sgn.font_size = 26
 	sgn.pixel_size = 0.007
 	sgn.modulate = AMBER
@@ -3657,7 +3725,8 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 	sgn.outline_modulate = Color(0, 0, 0, 0.9)
 	root.add_child(sgn)
 	sgn.position = Vector3(0, 3.35, 1.6)
-	# one button per destination, labeled
+	# one button per destination on the BACK wall, facing the door --
+	# you see every floor the moment you step in
 	var bi := 0
 	for sti in names.size():
 		if sti == stop:
@@ -3668,27 +3737,26 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 		btn.stop = sti
 		var bmi := MeshInstance3D.new()
 		var bbm := BoxMesh.new()
-		bbm.size = Vector3(0.1, 0.22, 0.22)
+		bbm.size = Vector3(0.3, 0.3, 0.1)
 		bmi.mesh = bbm
 		bmi.material_override = Destructible.make_material(AMBER, 1.9)
 		btn.add_child(bmi)
 		var bcs := CollisionShape3D.new()
 		var bbs := BoxShape3D.new()
-		bbs.size = Vector3(0.14, 0.26, 0.26)
+		bbs.size = Vector3(0.36, 0.36, 0.16)
 		bcs.shape = bbs
 		btn.add_child(bcs)
 		root.add_child(btn)
-		btn.position = Vector3(1.26, 1.15 + 0.42 * float(bi), 0.55)
+		btn.position = Vector3(-0.9 + 0.9 * float(bi), 1.25, -1.24)
 		var bl := Label3D.new()
 		bl.text = str(names[sti])
-		bl.font_size = 16
-		bl.pixel_size = 0.004
+		bl.font_size = 15
+		bl.pixel_size = 0.0042
 		bl.modulate = Color("#f2ead8")
 		bl.outline_size = 6
 		bl.outline_modulate = Color(0, 0, 0, 0.9)
-		bl.rotation_degrees = Vector3(0, -90, 0)
 		root.add_child(bl)
-		bl.position = Vector3(1.24, 1.15 + 0.42 * float(bi), 0.13)
+		bl.position = Vector3(-0.9 + 0.9 * float(bi), 1.62, -1.24)
 		bi += 1
 	(_lifts[lift] as Array).append({"root": root, "doors": doors,
 		"pos": xf.origin + xf.basis.y * 1.0, "up": xf.basis.y})
@@ -3791,7 +3859,7 @@ func _lower_floors() -> void:
 	bpipe.rotate_object_local(Vector3(0, 1, 0), 0.35)
 	_chatter(vxf.translated_local(Vector3(0, 1.4, 0)).origin, 240, -8.0)
 	_net_probes.append(vxf.origin)
-	_lift_cabin(0, 1, Transform3D(vb * Basis(Vector3(0, 1, 0), PI * 0.75),
+	_lift_cabin(0, 1, Transform3D(vb * Basis(Vector3(0, 1, 0), PI * 1.25),
 		vxf.translated_local(Vector3(4.35, 0, 4.35)).origin), "ELEVATOR", mains)
 	# stop 2: the UNDERCROFT -- not a room, a whole LOWER LEVEL: a full
 	# 360-degree service ring at radius 47, twelve meters under the main
@@ -3850,8 +3918,6 @@ func _lower_floors() -> void:
 	var cvb := Basis(_e2, _u0, _e1).orthonormalized()
 	_lift_cabin(0, 3, Transform3D(cvb, _C + _u0 * rr9), "CORE VIEW", mains)
 	_sign("CORE VIEW", cvb, _C + _u0 * (rr9 + 3.6), Vector3(0, 0, 2.2), 180.0)
-	_escape_gate(Transform3D(_bup(_pdir(PI)), _C + _pdir(PI) * rr9),
-		Vector3(0, 1.3, 0))
 	_net_probes.append(_C + _pdir(1.5) * rr9)
 
 class MapBtn extends StaticBody3D:
@@ -4127,13 +4193,56 @@ func _lower_ring() -> void:
 		Transform3D(cb0, _C + _pdir(0.32) * R_LOW).origin), "ELEVATOR",
 		["ATRIUM", "DATA VAULT", "UNDERCROFT", "CORE VIEW"])
 
-## an EXIT gate: teleports to the DATA VAULT (pipe included), where the
-## elevator waits. The only surface portal in the facility is the
-## atrium's -- everything else routes through here.
+class SurfBtn extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._surf_bail()
+
+func _surf_bail() -> void:
+	var pl = get_tree().get_first_node_in_group("player")
+	if pl != null:
+		pl.respawn_at(_lobby_land + (_lobby_land - _C).normalized() * 0.4,
+			(_lobby_land - _C).normalized())
+		Sfx.play("warp", -10.0)
+
+## a BAIL button beside a tunnel entrance: F sends you to the lobby
+func _surface_btn(pt: Vector3) -> void:
+	var up9 := (pt - _C).normalized()
+	var bb := _bup(up9)
+	var btn := SurfBtn.new()
+	btn.host = self
+	var bmi := MeshInstance3D.new()
+	var bbm := BoxMesh.new()
+	bbm.size = Vector3(0.34, 0.34, 0.18)
+	bmi.mesh = bbm
+	bmi.material_override = Destructible.make_material(Color("#66ff99"), 1.9)
+	btn.add_child(bmi)
+	var bcs := CollisionShape3D.new()
+	var bbs := BoxShape3D.new()
+	bbs.size = Vector3(0.4, 0.4, 0.3)
+	bcs.shape = bbs
+	btn.add_child(bcs)
+	add_child(btn)
+	btn.global_transform = Transform3D(bb, pt + up9 * 1.5)
+	var bl := Label3D.new()
+	bl.text = "LOBBY [F]"
+	bl.font_size = 18
+	bl.pixel_size = 0.005
+	bl.modulate = Color("#66ff99")
+	bl.outline_size = 8
+	bl.outline_modulate = Color(0, 0, 0, 0.9)
+	bl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(bl)
+	bl.global_position = pt + up9 * 2.1
+
+## an EXIT gate: teleports to the LOBBY (atrium floor), where the
+## surface gate and the elevator both live. One hub, no maze re-runs.
+var _lobby_land: Vector3
 var _vault_land: Vector3
 func _escape_gate(xf: Transform3D, off: Vector3) -> void:
 	var ep := Gate.new().configure({
-		"target": _vault_land, "zone": "",
+		"target": _lobby_land, "zone": "",
 		"label": "EXIT", "color": Color("#ff8a2a"), "cube": true})
 	add_child(ep)
 	ep.global_transform = xf
@@ -4144,20 +4253,19 @@ func _networks() -> void:
 	# three radius bands (58 / 54.5 / 51.5) so no vent ever crosses
 	# another, with bulkhead collars sealing every kink ----
 	var vpairs: Array = [
-		["medbay", 0, "gym", 0, 58.0, true],
-		["gym", 1, "archive", 0, 55.5, false],
-		["archive", 1, "tape", 0, 53.0, false],
-		["tape", 1, "farm", 0, 58.0, true],
-		["farm", 1, "workshop", 0, 53.0, false],
-		["workshop", 1, "storage", 0, 55.5, false],
-		["storage", 1, "kitchen", 0, 58.0, true],
-		["kitchen", 1, "trophy", 0, 55.5, false],
+		["medbay", 1, "gym", 0, 58.8, true],
+		["gym", 1, "archive", 0, 58.8, false],
+		["archive", 1, "tape", 1, 58.8, false],
+		["tape", 0, "farm", 1, 58.8, true],
+		["workshop", 1, "storage", 1, 58.8, false],
+		["kitchen", 1, "trophy", 0, 58.8, false],
+		["workshop", 0, "kitchen", 0, 58.8, true],
 	]
 	for vp9 in vpairs:
 		_vent_run((_vp[vp9[0]] as Array)[int(vp9[1])],
 			(_vp[vp9[2]] as Array)[int(vp9[3])], float(vp9[4]), bool(vp9[5]))
 	_vent_run({"p": _duct_end, "o": _duct_out, "b": _duct_bas},
-		(_vp["medbay"] as Array)[1], 53.0, false)
+		(_vp["medbay"] as Array)[0], 58.8, false)
 	# ---- THE COMPUTER TUNNELS: six hub junction boxes deep in the
 	# hollow (all below radius 49 -- verified clear of every room and
 	# every vent), wired as a branching web. The ONLY ways down are the
@@ -4206,6 +4314,12 @@ func _networks() -> void:
 		plan.append([ha, face_pick.call(ha, pb9), hbb, face_pick.call(hbb, pa9)])
 	var ndir := (-_u0 - _e1 * 0.6 + _e2 * 0.6).normalized()
 	var nface: int = face_pick.call(5, _C + ndir * 40.0)
+	var exs: Array = [
+		["srv", 0], ["cargo", 0], ["gold", 3], ["ai", 2]]
+	var eplan: Array = []
+	for ex in exs:
+		eplan.append([str(ex[0]), int(ex[1]),
+			int(face_pick.call(int(ex[1]), _e_pts[ex[0]]))])
 	var chk: Array = []
 	for hi9 in [1, 3, 4]:
 		for f9 in 4:
@@ -4233,26 +4347,13 @@ func _networks() -> void:
 			Vector3(0, 0, 1), Vector3(0, 0, -1)][f] as Vector3)
 		_checkpoint((fpts[hi] as Array)[f], wnorm, ci)
 		ci += 1
-	# ---- the four entry ELEVATORS: cabin behind each hidden breach,
-	# cabin inside the destination hub. Doors close, you drop. ----
-	var exs: Array = [
-		["srv", 0, "SERVER HALL"], ["cargo", 0, "CARGO BAY"],
-		["gold", 3, "SPECIAL DUDES"], ["ai", 2, "DUDE A.I."]]
-	var lift_id := 1
-	for ex in exs:
-		var hi2: int = ex[1]
-		var hd2: Vector3 = (hubs[hi2] as Array)[0]
-		var hr2: float = float((hubs[hi2] as Array)[1])
-		var names: Array = [str(ex[2]), "TUNNELS"]
-		_lift_cabin(lift_id, 0, _entry_cab_xf(str(ex[0])), str(ex[2]), names)
-		var corner := Vector3(2.35, 0, 2.35) if lift_id % 2 == 0 \
-			else Vector3(-2.35, 0, 2.35)
-		var hxf := Transform3D(_bup(hd2), _C + hd2 * hr2)
-		var yaw := PI * 0.75 if lift_id % 2 == 1 else -PI * 0.75
-		_lift_cabin(lift_id, 1, Transform3D(_bup(hd2)
-			* Basis(Vector3(0, 1, 0), PI + yaw),
-			hxf.translated_local(corner).origin), "TUNNELS", names)
-		lift_id += 1
+	# ---- the four entrances: STEEP OPEN CORRIDORS (no cabins to get
+	# stuck behind), each with a LOBBY bail button just inside the
+	# breach so you can always back out before committing to the deep
+	for ep9 in eplan:
+		_gc_tunnel(_e_pts[ep9[0]], (fpts[int(ep9[1])] as Array)[int(ep9[2])],
+			3.0, 2.9, 1)
+		_surface_btn(_e_pts[ep9[0]])
 	set_meta("net_probes", _net_probes)
 
 ## cabin frame behind each hidden breach
@@ -4356,6 +4457,8 @@ func _process(delta: float) -> void:
 	_lift_busy = maxf(0.0, _lift_busy - delta)
 	if _ai_mat != null and _ai_sp != null and not _ai_sp.playing:
 		_ai_mat.set_shader_parameter("talking", 0.0)
+		if _ai_lbl != null and _ai_lbl.text != "":
+			_ai_lbl.text = ""
 	if _map_holo_t > 0.0:
 		_map_holo_t -= delta
 		if _map_holo_t <= 0.0:

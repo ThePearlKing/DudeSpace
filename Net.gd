@@ -242,6 +242,18 @@ func can_break(owner: String) -> bool:
 		return true
 	return bool(host_settings.get("break_others", true))
 
+func broadcast_monolith(stage: int) -> void:
+	if active and not applying_remote:
+		_ev_monolith.rpc(stage)
+
+@rpc("any_peer", "reliable")
+func _ev_monolith(stage: int) -> void:
+	# the chain advances for EVERYBODY, tracker triangles included
+	Game.monolith_stage = maxi(Game.monolith_stage, stage)
+	var m = get_tree().current_scene
+	if m and m.has_method("_on_monolith_advanced"):
+		m._on_monolith_advanced()
+
 func broadcast_place(pid: String, pos: Vector3, up: Vector3) -> void:
 	if active and not applying_remote:
 		_ev_place.rpc(pid, pos, up)

@@ -73,7 +73,52 @@ var _palette := [
 	Color("#4cc9f0"), Color("#b388ff"), Color("#ff8c42"),
 ]
 
+var _load_bar: ProgressBar = null
+var _load_lbl: Label = null
+var _load_layer: CanvasLayer = null
+
+func _load_set(f: float, txt: String) -> void:
+	if _load_bar != null:
+		_load_bar.value = f * 100.0
+		_load_lbl.text = txt
+	await get_tree().process_frame
+	await get_tree().process_frame
+
 func _ready() -> void:
+	# LOADING SCREEN first: the world build is heavy and the bar below
+	# is real -- each phase reports as it finishes
+	_load_layer = CanvasLayer.new()
+	_load_layer.layer = 99
+	add_child(_load_layer)
+	var ldim := ColorRect.new()
+	ldim.color = Color("#05070c")
+	ldim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_load_layer.add_child(ldim)
+	var lbox := VBoxContainer.new()
+	lbox.set_anchors_preset(Control.PRESET_CENTER)
+	lbox.custom_minimum_size = Vector2(480, 120)
+	lbox.position = Vector2(-240, -60)
+	lbox.add_theme_constant_override("separation", 14)
+	_load_layer.add_child(lbox)
+	var lt := Label.new()
+	lt.text = "LOADING WORLD"
+	lt.add_theme_font_size_override("font_size", 30)
+	lt.modulate = Color("#ffb000")
+	lt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbox.add_child(lt)
+	_load_bar = ProgressBar.new()
+	_load_bar.custom_minimum_size = Vector2(480, 26)
+	_load_bar.show_percentage = false
+	lbox.add_child(_load_bar)
+	_load_lbl = Label.new()
+	_load_lbl.text = ""
+	_load_lbl.add_theme_font_size_override("font_size", 15)
+	_load_lbl.modulate = Color(1, 1, 1, 0.65)
+	_load_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbox.add_child(_load_lbl)
+	_boot()
+
+func _boot() -> void:
 	randomize()
 	Engine.time_scale = 1.0
 	get_window().grab_focus()
@@ -85,11 +130,19 @@ func _ready() -> void:
 	# opt-in loot/object density that keeps up with giant worlds
 	if bool(Save.character.get("bscale", false)):
 		_dens = Universe.world_scale
+	await _load_set(0.02, "environment")
 	_setup_environment()
 	_setup_light()
 	_crater_spots.clear()
+	var bnum := 0
 	for b in Universe.bodies:
 		_build_body(b)
+		bnum += 1
+		if bnum % 4 == 0:
+			await _load_set(0.02 + 0.42 * float(bnum)
+				/ float(Universe.bodies.size()),
+				"planets: %s" % str(b.name))
+	await _load_set(0.46, "life support")
 	if not Game.tutorial_session:
 		_spawn_invaders()
 	_spawn_player_and_rocket()
@@ -103,6 +156,7 @@ func _ready() -> void:
 		add_child(_c4)
 		_c4.global_position = C4_POS
 
+	await _load_set(0.52, "temples and anomalies")
 	if not Game.tutorial_session:
 		add_child(NoodleWatcher.new())   # the god is ALWAYS watching
 	add_child(DatamoshStudio.new())  # the DATAMOSH station: hole, mast, studio
@@ -111,6 +165,8 @@ func _ready() -> void:
 		for cname in COLONY_DIRS:
 			var cb = Universe.body_named(str(cname))
 			if cb != null:
+				await _load_set(0.56 + 0.05 * float(["Wireframe", "Datamosh",
+					"Pixel"].find(str(cname))), "colony: %s" % str(cname))
 				var col9 := IcosaColony.new()
 				add_child(col9)
 				col9.build(cb, COLONY_DIRS[cname],
@@ -118,9 +174,19 @@ func _ready() -> void:
 		# the Mainframe facility: dude-built, automated, nobody home
 		var mfb = Universe.body_named("Big Computer")
 		if mfb != null:
+			await _load_set(0.72, "BIG COMPUTER facility")
 			var mfc := MainframeComplex.new()
 			add_child(mfc)
 			mfc.build(mfb, MAINFRAME_DIR)
+	# the EARTH monolith: link 1. Buried until Harold's stone is fed;
+	# already risen on saves past that point.
+	var eb9 = Universe.body_named("Earth")
+	if eb9 != null and not Game.tutorial_session:
+		_earth_monolith = Monolith.new()
+		add_child(_earth_monolith)
+		_earth_monolith.risen = Game.monolith_stage >= 1
+		_earth_monolith.build_stele(eb9,
+			Vector3(0.3, 0.8, -0.52).normalized())
 	# TIN 618 hums across space: you hear it long before you see it,
 	# and well past Harold's orbit distance
 	var bhb2 = Universe.body_named("TIN 618")
@@ -144,6 +210,7 @@ func _ready() -> void:
 		add_child(_bgm)
 		_bgm_gap = randf_range(20.0, 60.0)   # the FIRST song finds you quickly
 
+	await _load_set(0.9, "interface")
 	_hud = HUD.new()
 	add_child(_hud)
 	add_child(InventoryUI.new())
@@ -176,6 +243,7 @@ func _ready() -> void:
 	add_child(_rocket_hud)
 	_rocket_hud.set_rocket(_rocket)
 
+	await _load_set(0.95, "restoring your world")
 	Game.reset()
 	Save.apply_progress()   # restore this slot's run (no-op on a fresh slot)
 	# deterministic world-gen: same save, same Earth, every single time
@@ -257,6 +325,12 @@ func _ready() -> void:
 	if Game.door_open:
 		open_temple_door()   # temple stays open across sessions
 	restore_world()          # your machines, chests, wires: still there
+	await _load_set(1.0, "done")
+	if _load_layer != null:
+		_load_layer.queue_free()
+		_load_layer = null
+		_load_bar = null
+		_load_lbl = null
 	if Save.had_pet() and _player:
 		# your buddy waited for you -- the SAME buddy (genome restored)
 		var pet := Animal.new()
@@ -1806,7 +1880,9 @@ func _build_body(b) -> void:
 		mi.mesh = _mesh_from_faces(kept)   # visual hole matches
 	else:
 		var cs := SphereShape3D.new()
-		cs.radius = b.radius
+		# ocean worlds: the WATER has no collider -- you sink through the
+		# whole sea until the sand floor catches you
+		cs.radius = b.radius * 0.62 if b.kind == "ocean" else b.radius
 		col.shape = cs
 	if b.kind != "gas":
 		p.add_child(col)   # gas giants have NO surface. you fall in.
@@ -2246,6 +2322,39 @@ void fragment(){
 			# big planet, small grain: 6x tighter noise so the rock still
 			# reads as rock with your face against it
 			return _rocky_material(color, 0.0, 6.0)
+		"ocean":
+			# open water all the way around: rolling swell, banded depth
+			# color, foam sparkle. There is no land. Keep swimming down.
+			var osh := Shader.new()
+			osh.code = preload("res://Title.gd")._TP_NOISE + """
+uniform vec3 base : source_color;
+varying vec3 wn;
+void vertex(){ wn = normalize(VERTEX); }
+void fragment(){
+	vec3 n = normalize(wn);
+	float sw = fbm(n * 6.0 + vec3(TIME * 0.05, 0.0, TIME * 0.03));
+	float sw2 = fbm(n * 17.0 - vec3(0.0, TIME * 0.08, 0.0));
+	vec3 deep = base * 0.45;
+	vec3 col = mix(deep, base * 1.25, sw * 0.7 + sw2 * 0.3);
+	float foam = smoothstep(0.72, 0.82, sw2);
+	col = mix(col, vec3(0.85, 0.95, 1.0), foam * 0.35);
+	ALBEDO = col;
+	ROUGHNESS = 0.12;
+	SPECULAR = 0.7;
+	EMISSION = base * 0.06;
+}
+"""
+			osh.code = "shader_type spatial;\n" + osh.code
+			var om9 := ShaderMaterial.new()
+			om9.shader = osh
+			om9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))
+			return om9
+		"rogue":
+			# the pale wanderer: bleached bone-grey stone, no sun to warm it
+			var rg9 := _rocky_material(color, 0.0, 4.0)
+			if rg9 is StandardMaterial3D:
+				rg9.roughness = 0.9
+			return rg9
 		"ice":
 			# glacial: saturated blue with a frosty sheen
 			var im2 := _rocky_material(Color("#5ab4f2"))
@@ -5360,12 +5469,36 @@ func _h_spike(b, cd: Vector3, alt: float, hrng: RandomNumberGenerator) -> void:
 ## custom mesh with the triangular mouth cut through it, three planar
 ## walls sinking to a black apex. Six pictograms ring the mouth.
 ## It does nothing. Yet.
+var _h_monolith: Monolith = null
+var _earth_monolith: Monolith = null
+
+## a monolith was fed (locally or by a peer): raise the next stele,
+## refresh every tracker strip
+func _on_monolith_advanced() -> void:
+	if Game.monolith_stage >= 1 and _earth_monolith != null \
+			and not _earth_monolith.risen:
+		_earth_monolith.rise()
+	for tr9 in get_tree().get_nodes_in_group("mono_tracker"):
+		if tr9.has_method("refresh"):
+			tr9.refresh()
+
 func _h_monument(b, hrng: RandomNumberGenerator) -> void:
 	var dir := _h_dir(hrng)
 	var bas := _basis_from_up(dir)
 	var root := Node3D.new()
 	add_child(root)
 	root.global_transform = Transform3D(bas, b.center + dir * b.radius)
+	# the YELLOW monolith: link 0 of the chain. Feeding it SPECIMEN 4
+	# starts everything. Already fed on an older save? It sits sunk.
+	_h_monolith = Monolith.new()
+	add_child(_h_monolith)
+	_h_monolith.body = b
+	_h_monolith.dir = dir
+	_h_monolith.stage = 0
+	_h_monolith._root = root
+	if Game.monolith_stage > 0:
+		root.visible = false
+		root.global_position = b.center + dir * (b.radius - Monolith.RISE_DEPTH)
 	var stone := Surfaces.stone(Color("#8a7f70"))
 	var dark := Surfaces.stone(Color("#6b6154"))
 	# tiers: [size, position, yaw_degrees] -- diamonds break the cubic
@@ -5511,7 +5644,8 @@ void fragment() {
 	plate.material_override = pmat
 	# solid hitbox over the whole carved front -- you don't fit in the
 	# mouth anyway, so the collider ignores the carving
-	var pbody := StaticBody3D.new()
+	var pbody := Monolith.MonoSocket.new()
+	pbody.host = _h_monolith
 	var pcs := CollisionShape3D.new()
 	var pbs := BoxShape3D.new()
 	pbs.size = Vector3(hx * 2.0, hy * 2.0, zf - zback)

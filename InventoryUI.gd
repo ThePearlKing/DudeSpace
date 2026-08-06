@@ -94,6 +94,17 @@ func _ready() -> void:
 	help.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(help)
 
+	# --- the MONOLITH TRACKER: its own little plaque floating above the
+	# menu's top-left corner. Eight triangle slots, dark until their
+	# monolith drinks its tetrahedron. Ocarina rules.
+	var mono := HBoxContainer.new()
+	mono.add_theme_constant_override("separation", 6)
+	mono.add_to_group("mono_tracker")
+	mono.set_script(preload("res://MonoTracker.gd"))
+	panel.add_child(mono)
+	mono.position = Vector2(4, -42)
+	(mono as Node).call("refresh")
+
 	# --- tab row (scrolls sideways once there are too many tabs) ---
 	var tabscroll := ScrollContainer.new()
 	tabscroll.custom_minimum_size = Vector2(876, 48)
