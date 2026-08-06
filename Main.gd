@@ -1794,6 +1794,8 @@ func _build_body(b) -> void:
 		col.shape = cs
 	if b.kind != "gas":
 		p.add_child(col)   # gas giants have NO surface. you fall in.
+	else:
+		col.free()   # orphaned colliders leak Jolt RIDs at exit
 	p.set_meta("body_name", b.name)   # the apple cinematic needs to find these
 	add_child(p)
 	p.global_position = b.center

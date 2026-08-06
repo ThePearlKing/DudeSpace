@@ -21,6 +21,13 @@ static func _host(tree: SceneTree) -> Node:
 		h = Node.new()
 		h.name = "IconHost"
 		root.add_child(h)
+		# whatever way the game exits (menu quit, window X, --quit-after),
+		# the icon viewports die BEFORE the renderer -- no leaked RIDs
+		tree.root.tree_exiting.connect(func() -> void:
+			_pool.clear()
+			var hh := tree.root.get_node_or_null("IconHost")
+			if hh != null:
+				hh.free())
 	return h
 
 ## The one true model pipeline: real world object > the player's own
