@@ -95,7 +95,7 @@ func _ready() -> void:
 	# --- the rogue: alone in the high dark, farther from everything
 	# than anything -- and furthest of all from the black hole. On no
 	# map, on no locator. The white monolith waits there. ---
-	var rog := _def_ret("Hush", Vector3(-30000, 42000, 52000), 64.0, 7.0,
+	var rog := _def_ret("Requiem", Vector3(-30000, 42000, 52000), 64.0, 7.0,
 		"rogue", Color("#d8d4cc"))
 	rog.hidden = true
 

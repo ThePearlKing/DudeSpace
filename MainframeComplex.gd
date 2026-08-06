@@ -1150,21 +1150,21 @@ void fragment(){
 		"FUEL TAP BREAKER")
 	# the SERVICES: what the facility is FOR
 	_svc_node(Transform3D(_abas9(1, 0.75), _C + _aup9(1, 0.75) * _rF),
-		Vector3(-8.3, 0, 3.4), "heal", "MEDBAY: FULL HEAL", Color("#66ff99"))
+		Vector3(-8.3, 0, 3.4), "heal", "MEDBAY: FULL HEAL. 30 POWER", Color("#66ff99"))
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
-		Vector3(-9.6, 0, 0), "fuel", "REACTOR TAP: FREE FUEL", AMBER)
+		Vector3(-9.6, 0, 0), "fuel", "REACTOR TAP: FILL TANKS. 25 POWER", AMBER)
 	_svc_node(Transform3D(_fr(1.3708 - 12.6 / _rF),
 		_C + _pdir(1.3708 - 12.6 / _rF) * _rF),
 		Vector3(-9.6, 0, 3.2), "feed",
 		"FEED REACTOR: COAL +90 / URANIUM +300 POWER",
 		Color("#ff6a4a"))
 	_svc_node(Transform3D(_abas9(1, 4.0), _C + _aup9(1, 4.0) * _rF),
-		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER -> 1 NOODLE",
+		Vector3(8.3, 0, -3.6), "noodle", "NOODLE POT: 2 FIBER + 10 POWER -> 1 NOODLE",
 		Color("#ffcf40"))
 	_svc_node(Transform3D(_sbas(_a0 + _step * 9.0, 12.0 / _rF),
 		_C + _sdir(_a0 + _step * 9.0, 12.0 / _rF) * _rF),
-		Vector3(0, 0, -3.4), "charts", "STAR CHARTS: THE HIDDEN WORLDS",
+		Vector3(0, 0, -3.4), "charts", "STAR CHARTS: THE HIDDEN WORLDS. 50 POWER",
 		Color("#7df9ff"))
 	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
 		Vector3(-4.4, 0, 3.2), "sync", "A.I. SYNC: 150 POWER. +10% SELL FOREVER",
@@ -1570,7 +1570,7 @@ func _rings() -> void:
 	var ai := _big_room(0, 2.685, 13.3, 7.0, 7.0, "DUDE A.I.", [[5, -1.0]])
 	_svc_node(Transform3D(_fr(2.685), _C + _pdir(2.685) * _rF),
 		Vector3(3.4, 0, 3.4), "bounty",
-		"A.I. CONTRACTS: HAUL FOR COINS", Color("#66ff99"))
+		"A.I. CONTRACTS: BIG HAULS, BIG COIN. 80 POWER", Color("#66ff99"))
 	set_meta("ai_room_a", 2.685)
 	_dress_ai()
 	_e_pts["ai"] = Transform3D(_fr(2.8033), _C + _pdir(2.8033) * (_rF - 0.25))\
@@ -5123,8 +5123,9 @@ var _bounty_res := ""
 var _bounty_n := 0
 var _bounty_pay := 0
 var _bounty_i := -1
-const _BOUNTIES: Array = [["coal", 12, 90], ["wire", 8, 130],
-	["plantfiber", 10, 100], ["uranium", 3, 300], ["irid", 2, 380]]
+const _BOUNTIES: Array = [["uranium", 10, 1350], ["sulfur", 20, 700],
+	["irid", 8, 700], ["ultima", 3, 1000], ["prism", 4, 800],
+	["meat", 25, 400]]
 
 ## drop every service pedestal onto the surface it actually stands on --
 ## laid out by arithmetic, verified by raycast
@@ -5147,6 +5148,16 @@ func _snap_services() -> void:
 			(sv as Node3D).global_position = hit9["position"] as Vector3
 			if (sv as RoomService).lbl != null:
 				(sv as RoomService).lbl.global_position += dely
+
+## every act of service pulls a real slug from the reactor
+func _draw_power(cost: float) -> bool:
+	if Game.facility_power < cost + 10.0:
+		_hud_flash("not enough power (%d needed). feed the reactor"
+			% int(cost))
+		Sfx.play("denied", -14.0)
+		return false
+	Game.facility_power -= cost
+	return true
 
 func _service(kind: String) -> void:
 	var now := Game.playtime
@@ -5183,6 +5194,8 @@ func _service(kind: String) -> void:
 					(float(_svc_cd["heal"]) - now))
 				Sfx.play("denied", -16.0)
 				return
+			if not _draw_power(30.0):
+				return
 			_svc_cd["heal"] = now + 60.0
 			Game.heal(999.0)
 			Sfx.play("learn", -8.0)
@@ -5197,6 +5210,8 @@ func _service(kind: String) -> void:
 					(float(_svc_cd["fuel"]) - now))
 				Sfx.play("denied", -16.0)
 				return
+			if not _draw_power(25.0):
+				return
 			_svc_cd["fuel"] = now + 120.0
 			Inventory.fuel = Inventory.fuel_max
 			Inventory.jet_fuel = Inventory.jet_max
@@ -5208,6 +5223,8 @@ func _service(kind: String) -> void:
 				_hud_flash("the pot wants 2 plant fiber per noodle")
 				Sfx.play("denied", -16.0)
 				return
+			if not _draw_power(10.0):
+				return
 			Inventory.remove_res("plantfiber", 2)
 			Inventory.add_res("noodle", 1)
 			Sfx.play("eat", -8.0)
@@ -5216,6 +5233,8 @@ func _service(kind: String) -> void:
 			if Game.charts_unlocked:
 				_hud_flash("the charts are already yours")
 				Sfx.play("denied", -18.0)
+				return
+			if not _draw_power(50.0):
 				return
 			Game.charts_unlocked = true
 			Sfx.play("learn", -6.0)
@@ -5226,11 +5245,8 @@ func _service(kind: String) -> void:
 					(float(_svc_cd["print"]) - now))
 				Sfx.play("denied", -18.0)
 				return
-			if Game.facility_power < 70.0:
-				_hud_flash("a print run eats 60 power. feed the reactor")
-				Sfx.play("denied", -14.0)
+			if not _draw_power(60.0):
 				return
-			Game.facility_power -= 60.0
 			_svc_cd["print"] = now + 240.0
 			_print_n += 1
 			var pool: Array = [["wire", 5], ["coal", 4], ["irid", 1],
@@ -5246,11 +5262,8 @@ func _service(kind: String) -> void:
 					% (Game.suit_boost_until - Game.playtime))
 				Sfx.play("denied", -18.0)
 				return
-			if Game.facility_power < 50.0:
-				_hud_flash("an overclock eats 40 power. feed the reactor")
-				Sfx.play("denied", -14.0)
+			if not _draw_power(40.0):
 				return
-			Game.facility_power -= 40.0
 			Game.suit_boost_until = Game.playtime + 300.0
 			Sfx.play("learn", -8.0)
 			_hud_flash("SUIT OVERCLOCKED: fast legs for five minutes (-40 power)")
@@ -5276,6 +5289,8 @@ func _service(kind: String) -> void:
 					Inventory.res_count(_bounty_res)])
 				Sfx.play("denied", -18.0)
 				return
+			if not _draw_power(80.0):
+				return
 			Inventory.remove_res(_bounty_res, _bounty_n)
 			Inventory.add_coins(_bounty_pay)
 			Sfx.play("coin", -8.0)
@@ -5288,11 +5303,8 @@ func _service(kind: String) -> void:
 				_hud_flash("already synced. the A.I. remembers you")
 				Sfx.play("denied", -18.0)
 				return
-			if Game.facility_power < 160.0:
-				_hud_flash("a full sync eats 150 power. feed the reactor first")
-				Sfx.play("denied", -14.0)
+			if not _draw_power(150.0):
 				return
-			Game.facility_power -= 150.0
 			Game.ai_blessed = true
 			Sfx.play("learn", -6.0)
 			_hud_flash("SYNCED: the A.I. routes 10% extra to every sale. forever")
@@ -5625,7 +5637,7 @@ func _process(delta: float) -> void:
 	# systems away
 	var pl0 = get_tree().get_first_node_in_group("player")
 	var on_site: bool = pl0 != null and is_instance_valid(pl0) \
-		and pl0.global_position.distance_to(_C) < float(_b.radius) + 60.0
+		and pl0.global_position.distance_to(_C) < float(_b.radius) - 2.0
 	if on_site:
 		Game.facility_power = maxf(0.0, Game.facility_power - delta)
 	if Game.facility_power <= 0.0 and _powered:
