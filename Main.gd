@@ -2857,7 +2857,7 @@ func _set_out_ambience() -> void:
 		if not _dark_amb.playing:
 			_dark_amb.play()
 		var dt := create_tween()
-		dt.tween_property(_dark_amb, "volume_db", -8.0, 4.0)
+		dt.tween_property(_dark_amb, "volume_db", -5.0, 4.0)
 	elif _dark_amb != null and _dark_amb.playing:
 		var dt2 := create_tween()
 		dt2.tween_property(_dark_amb, "volume_db", -60.0, 2.5)
@@ -3036,14 +3036,17 @@ func _dark_ambience() -> AudioStreamWAV:
 	for i in n:
 		var ts := float(i) / float(rate)
 		var v := 0.0
-		# deep drone pair, barely detuned (both integer cycles per loop)
-		v += 0.16 * sin(TAU * (588.0 / secs) * ts) \
+		# deep drone pair, barely detuned -- an octave up from where it
+		# was: 37Hz was felt, not heard. 74Hz is a voice.
+		v += 0.16 * sin(TAU * (1176.0 / secs) * ts) \
 			* (0.6 + 0.4 * sin(TAU * ts / 16.0))
-		v += 0.14 * sin(TAU * (592.0 / secs) * ts)
+		v += 0.14 * sin(TAU * (1184.0 / secs) * ts)
+		v += 0.08 * sin(TAU * (2352.0 / secs) * ts) \
+			* (0.6 + 0.4 * sin(TAU * ts / 16.0 + 1.3))
 		# a soft open fifth far above: vast, calm, empty -- not evil
-		v += 0.04 * sin(TAU * (880.0 / secs) * ts) \
+		v += 0.05 * sin(TAU * (3520.0 / secs) * ts) \
 			* (0.5 + 0.5 * sin(TAU * ts / 8.0))
-		v += 0.03 * sin(TAU * (1320.0 / secs) * ts) \
+		v += 0.04 * sin(TAU * (5280.0 / secs) * ts) \
 			* (0.5 + 0.5 * sin(TAU * ts / 8.0 + 2.1))
 		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
 		data[i * 2] = s9 & 0xFF
