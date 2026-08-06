@@ -849,6 +849,40 @@ func _mainframe_test() -> void:
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
 ## straight down -- checks the mesh-cut opening actually clears the
+var _uw_layer: CanvasLayer = null
+
+## fullscreen ocean effect: screen-space wave distortion + blue fog,
+## the aquarium treatment applied to your whole eyeball
+func _set_underwater(on: bool) -> void:
+	if on and _uw_layer == null:
+		_uw_layer = CanvasLayer.new()
+		_uw_layer.layer = 20
+		add_child(_uw_layer)
+		var rect := ColorRect.new()
+		rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sh9 := Shader.new()
+		sh9.code = """
+shader_type canvas_item;
+uniform sampler2D scr : hint_screen_texture, filter_linear_mipmap;
+void fragment(){
+	float t = TIME;
+	vec2 w = vec2(sin(t * 1.3 + SCREEN_UV.y * 26.0 + SCREEN_UV.x * 9.0),
+		cos(t * 1.0 + SCREEN_UV.x * 22.0)) * 0.008;
+	vec3 bg = texture(scr, clamp(SCREEN_UV + w, vec2(0.001), vec2(0.999))).rgb;
+	vec3 fogc = vec3(0.07, 0.28, 0.52);
+	float shimmer = 0.04 * sin(t * 2.0 + SCREEN_UV.y * 50.0);
+	COLOR = vec4(mix(bg, fogc, 0.38) + shimmer * fogc, 1.0);
+}
+"""
+		var mt9 := ShaderMaterial.new()
+		mt9.shader = sh9
+		rect.material = mt9
+		_uw_layer.add_child(rect)
+	elif not on and _uw_layer != null:
+		_uw_layer.queue_free()
+		_uw_layer = null
+
 ## The EDGE OF THE UNIVERSE, visible when you get close: a red warning
 ## lattice that fades in over the last 2km before the god throws you
 ## back. Inward faces only.
@@ -1726,6 +1760,17 @@ func _process(delta: float) -> void:
 	# --- universe edge: the god throws you back in (an unholy act) ---
 	# pocket dimensions live OUTSIDE the map on purpose -- the god only
 	# polices real space, not the sponge/temples
+	# UNDERWATER: inside an ocean world's water shell the whole screen
+	# wobbles and drowns in blue fog, aquarium-style
+	var wet := false
+	if Game.zone == "":
+		for ob9 in Universe.bodies:
+			if ob9.kind == "ocean":
+				var od9 := pos.distance_to(ob9.center)
+				if od9 < ob9.radius - 0.5 and od9 > ob9.radius * 0.625:
+					wet = true
+	_set_underwater(wet)
+
 	# the edge RESISTS first: over the last 1200m the boundary shoves
 	# you back toward the center, harder the closer you get. Integrated,
 	# the field stops anything slower than ~140 m/s -- come in hot
@@ -2005,6 +2050,41 @@ func _build_body(b) -> void:
 		# whole sea until the sand floor catches you
 		cs.radius = b.radius * 0.62 if b.kind == "ocean" else b.radius
 		col.shape = cs
+	if b.kind == "ocean":
+		# the SAND FLOOR: a real opaque seabed where the collider lives
+		var sand := MeshInstance3D.new()
+		var sam := SphereMesh.new()
+		sam.radius = b.radius * 0.625
+		sam.height = sam.radius * 2.0
+		sam.radial_segments = 48
+		sam.rings = 24
+		sand.mesh = sam
+		sand.material_override = _rocky_material(Color("#cbb475"), 0.0, 5.0)
+		p.add_child(sand)
+		# CLOUDS: a thin drifting shell over the water
+		var cl9 := MeshInstance3D.new()
+		var clm9 := SphereMesh.new()
+		clm9.radius = b.radius * 1.045
+		clm9.height = clm9.radius * 2.0
+		clm9.radial_segments = 48
+		clm9.rings = 24
+		cl9.mesh = clm9
+		var csh9 := Shader.new()
+		csh9.code = "shader_type spatial;\nrender_mode cull_disabled;\n" \
+			+ preload("res://Title.gd")._TP_NOISE + """
+void fragment(){
+	vec3 n = normalize(vn);
+	float cv = fbm(n * 5.0 + vec3(TIME * 0.012, 0.0, TIME * 0.007));
+	float cl = smoothstep(0.52, 0.72, cv);
+	ALBEDO = vec3(0.96, 0.98, 1.0);
+	ALPHA = cl * 0.75;
+	ROUGHNESS = 1.0;
+}
+"""
+		var cmt9 := ShaderMaterial.new()
+		cmt9.shader = csh9
+		cl9.material_override = cmt9
+		p.add_child(cl9)
 	if b.kind != "gas":
 		p.add_child(col)   # gas giants have NO surface. you fall in.
 	else:
@@ -2462,8 +2542,8 @@ void fragment(){
 			# reads as rock with your face against it
 			return _rocky_material(color, 0.0, 6.0)
 		"ocean":
-			# open water all the way around: rolling swell, banded depth
-			# color, foam sparkle. There is no land. Keep swimming down.
+			# open water all the way around: rolling swell, TRANSPARENT --
+			# you can see the deep from orbit. There is no land up here.
 			var osh := Shader.new()
 			osh.code = preload("res://Title.gd")._TP_NOISE + """
 uniform vec3 base : source_color;
@@ -2476,12 +2556,13 @@ void fragment(){
 	float foam = smoothstep(0.72, 0.82, sw2);
 	col = mix(col, vec3(0.85, 0.95, 1.0), foam * 0.35);
 	ALBEDO = col;
+	ALPHA = 0.62;
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
 	EMISSION = base * 0.06;
 }
 """
-			osh.code = "shader_type spatial;\n" + osh.code
+			osh.code = "shader_type spatial;\nrender_mode cull_disabled;\n" + osh.code
 			var om9 := ShaderMaterial.new()
 			om9.shader = osh
 			om9.set_shader_parameter("base", Vector3(color.r, color.g, color.b))

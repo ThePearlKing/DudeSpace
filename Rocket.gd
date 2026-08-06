@@ -367,8 +367,12 @@ func _physics_process(delta: float) -> void:
 		Sfx.engine(_engine_on)
 
 	# --- surface collision / landing (spheres AND the torus) ---
+	# the rocket collides with what COLLIDES: an ocean's water has no
+	# collider, so the ship sinks through and lands on the sand floor
 	var body := Universe.nearest(global_position)
 	var alt := Universe.altitude(body, global_position)
+	if body.kind == "ocean":
+		alt = global_position.distance_to(body.center) - body.radius * 0.625
 	if alt < 1.0:
 		var up := Universe.surface_up(body, global_position)
 		global_position += up * (1.0 - alt)
