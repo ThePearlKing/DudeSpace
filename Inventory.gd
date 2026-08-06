@@ -119,6 +119,7 @@ var items: Dictionary = {
 	"coaldrill":  {"name": "Coal Drill",       "color": Color("#2a2a30")},
 	"bioreactor": {"name": "Bioreactor",       "color": Color("#2a5a30")},
 	"rtg":        {"name": "RTG",              "color": Color("#1a4a4a")},
+	"creativegen": {"name": "Creative Generator", "color": Color("#ff5aff")},
 	"capacitor":  {"name": "Capacitor",        "color": Color("#44446a")},
 	"ultracap":   {"name": "Ultra Capacitor",  "color": Color("#6a5aff")},
 	"elight":     {"name": "Electric Light",   "color": Color("#fff2c8")},
@@ -168,7 +169,7 @@ var items: Dictionary = {
 	"ultima_boots":{"name": "Ultima Boots",    "color": Color("#7df9ff")},
 }
 var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier", "autominer",
-	"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "capacitor", "efurnace", "eseller",
+	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
 	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender"]
 
 var hotbar: Array = []

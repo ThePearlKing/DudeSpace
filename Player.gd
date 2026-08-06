@@ -1351,7 +1351,7 @@ func _hm_cyl(r: float, h: float, pos: Vector3, col: Color, emit: float = 0.4, to
 ## shrunk to hand size, turned so its face points screen-left. No more
 ## mystery cubes that look nothing like what you're about to place.
 const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
-	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "prisreactor",
+	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
 	"nreactor", "waypoint"]
@@ -1880,7 +1880,7 @@ func _use_selected() -> void:
 			place = global_position - global_transform.basis.z * 3.0
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
-		"generator", "coaldrill", "bioreactor", "rtg", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
+		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", \
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
 			if Universe.inside_body(global_position):
 				Sfx.play("denied")
@@ -1902,6 +1902,7 @@ func _use_selected() -> void:
 				"coaldrill": n = EMachines.CoalDrill.new()
 				"bioreactor": n = EMachines.Bioreactor.new()
 				"rtg": n = EMachines.RTG.new()
+				"creativegen": n = EMachines.CreativeGen.new()
 				"prisreactor": n = EMachines.PrismReactor.new()
 				"nreactor": n = EMachines.NuclearReactor.new()
 				"capacitor": n = EMachines.Capacitor.new()

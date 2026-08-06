@@ -475,6 +475,52 @@ class Capacitor extends Machine:
 		return "energy: %.0f / %.0f EU
 net: %+.1f EU/s" % [buf, buf_cap, _rate]
 
+## CREATIVE GENERATOR: 999 EU/s out of pure nothing, silky smooth --
+## per-frame trickle, no delay-burst-delay. Creative inventory only.
+class CreativeGen extends Machine:
+	var _halo: MeshInstance3D
+	func _init() -> void:
+		title = "CREATIVE GENERATOR"
+		box_color = Color("#3a1a4a")
+		refund_id = "creativegen"
+		shows_in = false
+		shows_out = false
+		buf_cap = 9999.0
+		gen_rate = 999.0   # gen_rate is applied per-frame: continuous
+	func _ready() -> void:
+		super._ready()
+		dress_industrial(Color("#2a1236"))
+		_halo = MeshInstance3D.new()
+		var tm := TorusMesh.new()
+		tm.inner_radius = 0.4
+		tm.outer_radius = 0.62
+		_halo.mesh = tm
+		_halo.material_override = Destructible.make_material(Color("#ff5aff"), 4.0)
+		_halo.position = Vector3(0, box_size.y + 0.55, 0)
+		add_child(_halo)
+		var bolt := BoxMesh.new()
+		bolt.size = Vector3(0.1, 0.5, 0.1)
+		part(bolt, Vector3(0, box_size.y + 0.55, 0), Color("#fff2cf"), 3.0,
+			Vector3(0, 0, 20))
+	func _process(delta: float) -> void:
+		super._process(delta)
+		if _halo:
+			_halo.rotate_y(delta * 3.0)
+		# extra push passes: wires drink at full 999/s, not WIRE_RATE
+		for _pass in 24:
+			for w in wires_out:
+				if is_instance_valid(w) and "buf_cap" in w and w.buf_cap > 0.0 \
+						and buf > 0.0:
+					var t: float = minf(minf(WIRE_RATE * delta, buf),
+						w.buf_cap - w.buf)
+					if t > 0.0:
+						buf -= t
+						w.buf += t
+	func work(_d: float) -> void:
+		pass
+	func info_text() -> String:
+		return "energy: %.0f / %.0f EU\n+999 EU/s, continuous, from nowhere" % [buf, buf_cap]
+
 ## ULTRA capacitor: 10x the storage, feeds wires faster. Late game.
 class UltraCapacitor extends Machine:
 	var _fill: MeshInstance3D
