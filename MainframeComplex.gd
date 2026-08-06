@@ -3725,8 +3725,8 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 	sgn.outline_modulate = Color(0, 0, 0, 0.9)
 	root.add_child(sgn)
 	sgn.position = Vector3(0, 3.35, 1.6)
-	# one button per destination on the BACK wall, facing the door --
-	# you see every floor the moment you step in
+	# buttons on the SIDE wall by the door, stacked tight like a real
+	# elevator panel
 	var bi := 0
 	for sti in names.size():
 		if sti == stop:
@@ -3737,26 +3737,27 @@ func _lift_cabin(lift: int, stop: int, xf: Transform3D, label: String,
 		btn.stop = sti
 		var bmi := MeshInstance3D.new()
 		var bbm := BoxMesh.new()
-		bbm.size = Vector3(0.3, 0.3, 0.1)
+		bbm.size = Vector3(0.1, 0.24, 0.24)
 		bmi.mesh = bbm
 		bmi.material_override = Destructible.make_material(AMBER, 1.9)
 		btn.add_child(bmi)
 		var bcs := CollisionShape3D.new()
 		var bbs := BoxShape3D.new()
-		bbs.size = Vector3(0.36, 0.36, 0.16)
+		bbs.size = Vector3(0.16, 0.28, 0.28)
 		bcs.shape = bbs
 		btn.add_child(bcs)
 		root.add_child(btn)
-		btn.position = Vector3(-0.9 + 0.9 * float(bi), 1.25, -1.24)
+		btn.position = Vector3(1.26, 1.05 + 0.34 * float(bi), 0.85)
 		var bl := Label3D.new()
 		bl.text = str(names[sti])
-		bl.font_size = 15
-		bl.pixel_size = 0.0042
+		bl.font_size = 14
+		bl.pixel_size = 0.0038
 		bl.modulate = Color("#f2ead8")
 		bl.outline_size = 6
 		bl.outline_modulate = Color(0, 0, 0, 0.9)
+		bl.rotation_degrees = Vector3(0, -90, 0)
 		root.add_child(bl)
-		bl.position = Vector3(-0.9 + 0.9 * float(bi), 1.62, -1.24)
+		bl.position = Vector3(1.24, 1.05 + 0.34 * float(bi), 0.42)
 		bi += 1
 	(_lifts[lift] as Array).append({"root": root, "doors": doors,
 		"pos": xf.origin + xf.basis.y * 1.0, "up": xf.basis.y})
