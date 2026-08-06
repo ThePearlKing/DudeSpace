@@ -1679,17 +1679,20 @@ func _make_held_model(id: String) -> void:
 				_hm_cyl(0.03, 0.07, rd, Color("#2a2a30"), 0.6, 0.05).rotation_degrees = \
 					Vector3(0, 0, 90) if absf(rd.x) > 0.0 else Vector3.ZERO
 		"ultima":
-			# THE crystal: a cyan cluster burning with its own light
+			# THE crystal, wearing THE ultima effect: the same boiling
+			# portal material as every ultima vein in every mine
 			for cs9 in [[0.05, 0.3, Vector3.ZERO, 0.0],
 					[0.035, 0.2, Vector3(0.07, -0.02, 0.02), 24.0],
 					[0.03, 0.16, Vector3(-0.06, -0.03, -0.02), -20.0]]:
 				var uc := _hm_cyl(float(cs9[0]), float(cs9[1]),
 					cs9[2] as Vector3, Color("#7df9ff"), 2.2, 0.005)
+				uc.material_override = Surfaces.portal(Color("#7df9ff"))
 				uc.rotation_degrees = Vector3(0, 0, float(cs9[3]))
 		"prism":
-			# the prism shard splits its own light: white spike, three
-			# colored facets riding it
+			# the prism shard wears THE prism effect -- same material as
+			# the prism deposits -- with three colored facets riding it
 			var pc := _hm_cyl(0.05, 0.3, Vector3.ZERO, Color("#ffffff"), 1.4, 0.005)
+			pc.material_override = Human._prism_material()
 			pc.rotation_degrees = Vector3(0, 0, 8.0)
 			_hm_box(Vector3(0.02, 0.16, 0.02), Vector3(0.05, 0.0, 0.0),
 				Color("#ff5566"), 2.0)
