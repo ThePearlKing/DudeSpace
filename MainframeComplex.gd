@@ -5377,13 +5377,20 @@ func _deco_box(size: Vector3, xf: Transform3D, off: Vector3,
 	mi.translate_object_local(off)
 
 func _process(delta: float) -> void:
-	# the facility BURNS fuel while the world runs. Empty = blackout.
-	Game.facility_power = maxf(0.0, Game.facility_power - delta)
+	# the facility burns fuel only while SOMEBODY IS HERE -- it idles
+	# when you leave, so no phantom drain and no warnings from three
+	# systems away
+	var pl0 = get_tree().get_first_node_in_group("player")
+	var on_site: bool = pl0 != null and is_instance_valid(pl0) \
+		and pl0.global_position.distance_to(_C) < float(_b.radius) + 60.0
+	if on_site:
+		Game.facility_power = maxf(0.0, Game.facility_power - delta)
 	if Game.facility_power <= 0.0 and _powered:
 		_set_power(false)
 	elif Game.facility_power > 0.0 and not _powered:
 		_set_power(true)
-	if Game.facility_power < 180.0 and _powered and not _pwr_warned:
+	if Game.facility_power < 180.0 and _powered and not _pwr_warned \
+			and on_site:
 		_pwr_warned = true
 		_hud_flash("BIG COMPUTER: reserves under 10 percent")
 		Sfx.play("denied", -14.0)
