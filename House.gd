@@ -95,6 +95,7 @@ const SLOT_SPACING := 800.0
 var kind: String = "small"
 var slot: int = -1              # which pocket lot this house owns
 var human_home: bool = false    # town house: humans only, no dudes
+var harolds: bool = false       # THE house: old, worn, and hiding something
 var owner_uid: int = 0          # claiming human's id (human homes)
 var owner_name: String = ""     # claiming human's NAME (for the sign)
 var roommate_name: String = ""  # a friend who moved in. rent is emotional
@@ -123,6 +124,8 @@ var _tag: Label3D
 
 ## What this home is called, on the sign and on every portal.
 func display_name() -> String:
+	if harolds:
+		return "Harold's house"
 	if human_home:
 		if owner_name == "":
 			return "Nobody's house"
@@ -767,10 +770,13 @@ func _build_interior() -> void:
 	var c := room_center()
 	var sz := room_size()
 	var warm := Color("#d8c8ae") if not (kind in ["factory", "box", "tower"]) else Color("#9aa0a8")
+	if harolds:
+		warm = Color("#8f8574")   # centuries of dust do this
 	_isurf = Surfaces.METAL if kind in ["factory", "box", "tower", "moonbase"] else Surfaces.PLASTER
 	# the basement supplies its own floor (the one with the HOLE in it)
 	_iroom(c, sz, warm, 0.12,
-		[0] if kind == "basement" else ([1] if kind == "moonbase" else []))
+		[0] if kind == "basement" else ([1] if kind == "moonbase" \
+		else ([2] if harolds else [])))
 	var fy := c.y - sz.y * 0.5
 	# every home: a visible ceiling light fixture and a wall trim band
 	# (moonbase hub is open dome overhead -- its lights hang in the wings)
@@ -998,6 +1004,346 @@ func _build_interior() -> void:
 	out.global_position = c + Vector3(0, fy - c.y + 1.0, sz.z * 0.5 - 1.4)
 	out.set_meta("house", self)
 	exit_pad = out.global_position   # humans walk HERE to leave
+	if harolds:
+		_build_harold_secret(c, sz, fy)
+
+## ---------------------------------------------------- HAROLD'S SECRET
+## The old man's house is a library with a lie in it. One book is not a
+## book. Behind the shelf: a doorway, a spiral stair, and at the bottom
+## a riddle asked by somebody who already knows you will get it wrong
+## the first four times. Solve it and the wall gives up the LIME
+## TETRAHEDRON -- his spare. He always kept a spare.
+
+const RIDDLE_ITEMS := ["ultima", "prism", "circle", "noodle", "uranium"]
+const RIDDLES := [
+	"I AM THE LAST THING THE MOUNTAIN SAYS\nBEFORE IT SAYS NOTHING.\nSHIPS DRINK MY LIGHT.\nBRING ME.",
+	"I TAKE ONE TRUTH\nAND TELL IT SEVEN WAYS.\nNONE OF THEM LIE.\nBRING ME.",
+	"I BEGIN NOWHERE. I END NOWHERE.\nI AM WORTH MORE THAN BOTH.\nBRING ME.",
+	"THE EYE ABOVE WOULD FORGIVE YOU\nANYTHING FOR ONE OF ME.\nCOOK ME FIRST.\nBRING ME.",
+	"I AM PATIENT. I GLOW\nWITHOUT ASKING A FIRE.\nCOUNT YOUR FINGERS AFTER.\nBRING ME.",
+]
+
+class SecretBook extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._harold_open_shelf()
+
+class RiddleSlot extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host._harold_try_slot()
+
+class LimeTetra extends StaticBody3D:
+	func use() -> void:
+		Inventory.add_res("ltetra", 1)
+		Game.lime_taken = true
+		Sfx.play("learn", -6.0)
+		var hud = get_tree().get_first_node_in_group("hud")
+		if hud:
+			hud.flash("the LIME TETRAHEDRON. his spare. he always kept a spare")
+		queue_free()
+
+var _hshelf: StaticBody3D = null
+var _hshelf_open := false
+var _hwall: StaticBody3D = null
+
+func _hbook_row(parent: Node3D, at: Vector3, w: float, rng: RandomNumberGenerator) -> void:
+	var x9 := -w * 0.5
+	while x9 < w * 0.5 - 0.06:
+		var bw := rng.randf_range(0.05, 0.1)
+		var bh := rng.randf_range(0.28, 0.42)
+		var bk := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(bw, bh, 0.24)
+		bk.mesh = bm
+		bk.material_override = _wallmat(Color.from_hsv(rng.randf(),
+			rng.randf_range(0.25, 0.5), rng.randf_range(0.25, 0.55)), 0.02)
+		parent.add_child(bk)
+		bk.position = at + Vector3(x9 + bw * 0.5, bh * 0.5, 0)
+		x9 += bw + rng.randf_range(0.005, 0.03)
+
+func _hshelf_unit(at: Vector3, rng: RandomNumberGenerator) -> StaticBody3D:
+	# a full bookcase: frame, four shelves, books crammed in
+	var un := StaticBody3D.new()
+	var wood := Color("#4a3b28")
+	for fr in [[Vector3(2.4, 0.1, 0.5), Vector3(0, 0.05, 0)],
+			[Vector3(2.4, 0.1, 0.5), Vector3(0, 3.15, 0)],
+			[Vector3(0.1, 3.2, 0.5), Vector3(-1.15, 1.6, 0)],
+			[Vector3(0.1, 3.2, 0.5), Vector3(1.15, 1.6, 0)],
+			[Vector3(2.4, 3.2, 0.08), Vector3(0, 1.6, 0.24)]]:
+		var fmi := MeshInstance3D.new()
+		var fbm := BoxMesh.new()
+		fbm.size = fr[0] as Vector3
+		fmi.mesh = fbm
+		fmi.material_override = _wallmat(wood, 0.03)
+		un.add_child(fmi)
+		fmi.position = fr[1] as Vector3
+	for sh in 3:
+		var sm9 := MeshInstance3D.new()
+		var sbm := BoxMesh.new()
+		sbm.size = Vector3(2.2, 0.07, 0.44)
+		sm9.mesh = sbm
+		sm9.material_override = _wallmat(wood.lightened(0.12), 0.03)
+		un.add_child(sm9)
+		sm9.position = Vector3(0, 0.85 + 0.75 * float(sh), 0)
+		_hbook_row(un, Vector3(0, 0.9 + 0.75 * float(sh), 0.02), 2.15, rng)
+	_hbook_row(un, Vector3(0, 0.14, 0.02), 2.15, rng)
+	var cs9 := CollisionShape3D.new()
+	var cb9 := BoxShape3D.new()
+	cb9.size = Vector3(2.4, 3.2, 0.55)
+	cs9.shape = cb9
+	cs9.position = Vector3(0, 1.6, 0)
+	un.add_child(cs9)
+	_iroot.add_child(un)
+	un.global_position = at
+	return un
+
+func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
+	var hx := sz.x * 0.5
+	var hz := sz.z * 0.5
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var worn := Color("#8f8574")
+	var wood := Color("#4a3b28")
+	# the -X wall, rebuilt by hand with a 2.3-wide doorway at z = -2.0
+	# (the room skipped that face for us)
+	var dz0 := -3.15
+	var dz1 := -0.85
+	_solid(c + Vector3(-hx, 0, (dz0 - hz) * 0.5),
+		Vector3(1, sz.y, hz + dz0), worn)
+	_solid(c + Vector3(-hx, 0, (dz1 + hz) * 0.5),
+		Vector3(1, sz.y, hz - dz1), worn)
+	var hdh := sz.y - 2.9   # header: doorway top to ceiling
+	_solid(c + Vector3(-hx, sz.y * 0.5 - hdh * 0.5, (dz0 + dz1) * 0.5),
+		Vector3(1, hdh, dz1 - dz0), worn)
+	# age: dust patches on the walls, a cracked plank leaning by the door
+	for dp in 5:
+		_deco(c + Vector3(rng.randf_range(-hx + 1.5, hx - 1.5),
+			rng.randf_range(fy - c.y + 0.4, sz.y * 0.4),
+			hz - 0.55), Vector3(rng.randf_range(0.8, 1.7), rng.randf_range(0.5, 1.1), 0.06),
+			Color("#5c5449"), 0.0)
+	_deco(c + Vector3(hx - 1.1, fy - c.y + 1.15, hz - 0.9),
+		Vector3(0.28, 2.3, 0.1), wood.darkened(0.2), 0.0)
+	# THE LIBRARY: two honest bookcases, and the one that lies
+	_hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, 2.2), rng) \
+		.rotation_degrees.y = 90.0
+	_hshelf_unit(c + Vector3(2.2, fy - c.y, -hz + 0.85), rng)
+	_hshelf = _hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, -2.0), rng)
+	_hshelf.rotation_degrees.y = 90.0
+	# the book that is not a book: bound in red, sitting too proud
+	var bk := SecretBook.new()
+	bk.host = self
+	var bmi := MeshInstance3D.new()
+	var bbm := BoxMesh.new()
+	bbm.size = Vector3(0.09, 0.36, 0.3)
+	bmi.mesh = bbm
+	bmi.material_override = _wallmat(Color("#7a1f1f"), 0.12)
+	bk.add_child(bmi)
+	var bcs := CollisionShape3D.new()
+	var bcb := BoxShape3D.new()
+	bcb.size = Vector3(0.14, 0.42, 0.4)
+	bcs.shape = bcb
+	bk.add_child(bcs)
+	_hshelf.add_child(bk)
+	bk.position = Vector3(0.62, 1.62, 0.12)
+	# THE PASSAGE: corridor west, then the shaft
+	var cx := c + Vector3(-hx - 2.2, 0, -2.0)   # corridor center
+	_solid(cx + Vector3(0, fy - c.y - 0.5, 0), Vector3(4.4, 1, 2.3), worn)
+	_solid(cx + Vector3(0, fy - c.y + 3.4, 0), Vector3(4.4, 1, 2.3), worn)
+	_solid(cx + Vector3(0, fy - c.y + 1.45, -1.65), Vector3(4.4, 4.9, 1), worn)
+	_solid(cx + Vector3(0, fy - c.y + 1.45, 1.65), Vector3(4.4, 4.9, 1), worn)
+	# the SPIRAL: a stone shaft, a center pole, steps winding down 10m
+	var shc := c + Vector3(-hx - 6.6, 0, -2.0)   # shaft center (top)
+	var sdepth := 11.0
+	var stone := Color("#6a6258")
+	for sw in [[Vector3(1, sz.y + sdepth + 4.0, 5.6), Vector3(-2.8, -sdepth * 0.5, 0)],
+			[Vector3(5.6, sz.y + sdepth + 4.0, 1), Vector3(0, -sdepth * 0.5, -2.8)],
+			[Vector3(5.6, sz.y + sdepth + 4.0, 1), Vector3(0, -sdepth * 0.5, 2.8)]]:
+		_solid(shc + Vector3(0, fy - c.y, 0) + (sw[1] as Vector3), sw[0] as Vector3,
+			stone, 0.02)
+	# +X face: solid below the corridor mouth, header above it, side
+	# strips beside it -- the way in stays open
+	_solid(shc + Vector3(2.8, fy - c.y - (sdepth + 5.0) * 0.5, 0),
+		Vector3(1, sdepth + 5.0, 5.6), stone, 0.02)
+	_solid(shc + Vector3(2.8, fy - c.y + 3.4, 0), Vector3(1, 1.2, 5.6), stone, 0.02)
+	for zs in [-2.1, 2.1]:
+		_solid(shc + Vector3(2.8, fy - c.y + 1.45, zs), Vector3(1, 3.0, 1.4),
+			stone, 0.02)
+	# shaft cap + entry landing + FLOOR at the bottom of the fall
+	_solid(shc + Vector3(0, fy - c.y + 3.9, 0), Vector3(6.6, 1, 6.6), worn)
+	_solid(shc + Vector3(1.5, fy - c.y - 0.1, 0), Vector3(2.6, 0.2, 2.3),
+		stone, 0.02)
+	var pole := MeshInstance3D.new()
+	var pcm := CylinderMesh.new()
+	pcm.top_radius = 0.3
+	pcm.bottom_radius = 0.3
+	pcm.height = sdepth + 4.0
+	pole.mesh = pcm
+	pole.material_override = _wallmat(Color("#57504a"), 0.02)
+	_iroot.add_child(pole)
+	pole.global_position = shc + Vector3(0, fy - c.y - sdepth * 0.5 + 1.6, 0)
+	var nst := 22
+	for st in nst:
+		var sa := TAU * float(st) / 10.0 + PI * 0.5
+		var sy := fy - c.y - (sdepth / float(nst)) * float(st)
+		var stp := StaticBody3D.new()
+		var smi := MeshInstance3D.new()
+		var sbm2 := BoxMesh.new()
+		sbm2.size = Vector3(1.9, 0.16, 0.85)
+		smi.mesh = sbm2
+		smi.material_override = _wallmat(Color("#7d756a"), 0.02)
+		stp.add_child(smi)
+		var scs := CollisionShape3D.new()
+		var scb := BoxShape3D.new()
+		scb.size = Vector3(1.9, 0.16, 0.85)
+		scs.shape = scb
+		stp.add_child(scs)
+		_iroot.add_child(stp)
+		stp.global_position = shc + Vector3(cos(sa) * 1.25, sy, sin(sa) * 1.25)
+		stp.rotation.y = -sa + PI * 0.5
+	# THE RIDDLE ROOM, at the bottom of everything
+	var rc := shc + Vector3(0, fy - c.y - sdepth - 1.6, -5.6)
+	_iroom(rc, Vector3(9.0, 3.6, 9.0), Color("#5c554c"), 0.03, [5])
+	# the +Z face carries the way in from the shaft: a doorway, not a wall
+	_solid(rc + Vector3(-3.35, 0, 4.5), Vector3(2.3, 3.6, 1), Color("#5c554c"), 0.03)
+	_solid(rc + Vector3(3.35, 0, 4.5), Vector3(2.3, 3.6, 1), Color("#5c554c"), 0.03)
+	_solid(rc + Vector3(0, 1.35, 4.5), Vector3(4.4, 0.9, 1), Color("#5c554c"), 0.03)
+	_solid(Vector3(shc.x, rc.y - 1.8, shc.z), Vector3(5.6, 1, 5.6),
+		Color("#5c554c"), 0.03)
+	# candles never burned down. nobody asks why
+	for cd in [Vector3(-3.6, -1.4, 3.6), Vector3(3.6, -1.4, 3.6)]:
+		_deco(rc + cd, Vector3(0.12, 0.5, 0.12), Color("#d8c8ae"), 0.1)
+		_deco(rc + cd + Vector3(0, 0.32, 0), Vector3(0.06, 0.14, 0.06),
+			Color("#ffb84d"), 2.2)
+	var ridx := int(absi(Game.world_seed)) % 5
+	var rl := Label3D.new()
+	rl.text = RIDDLES[ridx]
+	rl.font_size = 40
+	rl.pixel_size = 0.008
+	rl.modulate = Color("#c8ffB0")
+	rl.outline_size = 10
+	rl.outline_modulate = Color(0, 0, 0, 0.9)
+	_iroot.add_child(rl)
+	rl.global_position = rc + Vector3(0, 0.4, 4.35)
+	rl.rotation_degrees.y = 180.0
+	# the slot: a stone plinth with a hungry square
+	var slot9 := RiddleSlot.new()
+	slot9.host = self
+	var pmi := MeshInstance3D.new()
+	var pbm := BoxMesh.new()
+	pbm.size = Vector3(1.0, 1.2, 1.0)
+	pmi.mesh = pbm
+	pmi.material_override = _wallmat(Color("#57504a"), 0.02)
+	slot9.add_child(pmi)
+	pmi.position = Vector3(0, 0.6, 0)
+	var hmi := MeshInstance3D.new()
+	var hbm := BoxMesh.new()
+	hbm.size = Vector3(0.42, 0.1, 0.42)
+	hmi.mesh = hbm
+	hmi.material_override = _wallmat(Color("#c8ffb0"), 1.2)
+	slot9.add_child(hmi)
+	hmi.position = Vector3(0, 1.22, 0)
+	var pcs := CollisionShape3D.new()
+	var pcb := BoxShape3D.new()
+	pcb.size = Vector3(1.2, 1.6, 1.2)
+	pcs.shape = pcb
+	pcs.position = Vector3(0, 0.8, 0)
+	slot9.add_child(pcs)
+	_iroot.add_child(slot9)
+	slot9.global_position = rc + Vector3(0, -1.8, 2.0)
+	# THE WALL that knows the answer (east face), and what waits behind
+	_hwall = StaticBody3D.new()
+	var wmi := MeshInstance3D.new()
+	var wbm := BoxMesh.new()
+	wbm.size = Vector3(1, 3.4, 4.0)
+	wmi.mesh = wbm
+	wmi.material_override = _wallmat(Color("#655d52"), 0.02)
+	_hwall.add_child(wmi)
+	var wcs := CollisionShape3D.new()
+	var wcb := BoxShape3D.new()
+	wcb.size = Vector3(1, 3.4, 4.0)
+	wcs.shape = wcb
+	_hwall.add_child(wcs)
+	_iroot.add_child(_hwall)
+	_hwall.global_position = rc + Vector3(4.0, 0, 0)
+	# the alcove beyond it
+	var ac9 := rc + Vector3(6.4, 0, 0)
+	for aw in [[Vector3(3.8, 1, 4.4), Vector3(0, -1.8, 0)],
+			[Vector3(3.8, 1, 4.4), Vector3(0, 1.8, 0)],
+			[Vector3(3.8, 3.6, 1), Vector3(0, 0, -2.2)],
+			[Vector3(3.8, 3.6, 1), Vector3(0, 0, 2.2)],
+			[Vector3(1, 3.6, 4.4), Vector3(1.9, 0, 0)]]:
+		_solid(ac9 + (aw[1] as Vector3), aw[0] as Vector3, Color("#5c554c"), 0.02)
+	if Game.lime_wall_open:
+		_hwall.position += Vector3(0, -3.3, 0)
+	if not Game.lime_taken:
+		var lt := LimeTetra.new()
+		var lmi := MeshInstance3D.new()
+		lmi.mesh = MainframeComplex._tetra_mesh(0.5)
+		lmi.material_override = Destructible.make_material(Color("#b6ff3f"), 1.8)
+		lt.add_child(lmi)
+		lmi.position = Vector3(0, 1.5, 0)
+		var lcs := CollisionShape3D.new()
+		var lcb := BoxShape3D.new()
+		lcb.size = Vector3(1.2, 1.6, 1.2)
+		lcs.shape = lcb
+		lcs.position = Vector3(0, 1.2, 0)
+		lt.add_child(lcs)
+		var lped := MeshInstance3D.new()
+		var lpm := CylinderMesh.new()
+		lpm.top_radius = 0.4
+		lpm.bottom_radius = 0.5
+		lpm.height = 1.0
+		lped.mesh = lpm
+		lped.material_override = _wallmat(Color("#57504a"), 0.02)
+		lt.add_child(lped)
+		lped.position = Vector3(0, 0.5, 0)
+		_iroot.add_child(lt)
+		lt.global_position = ac9 + Vector3(0, -1.8, 0)
+		var ltw := lt.create_tween().set_loops()
+		ltw.tween_property(lmi, "rotation:y", TAU, 9.0).as_relative()
+
+func _harold_open_shelf() -> void:
+	if _hshelf_open or _hshelf == null:
+		return
+	_hshelf_open = true
+	Sfx.play("click", -8.0)
+	Sfx.play("rumble", -10.0)
+	var tw := create_tween()
+	tw.tween_property(_hshelf, "position",
+		_hshelf.position + Vector3(0, 0, 2.7), 2.2) \
+		.set_trans(Tween.TRANS_SINE)
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud:
+		hud.flash("the shelf was a door")
+
+func _harold_try_slot() -> void:
+	if Game.lime_wall_open:
+		var hud0 = get_tree().get_first_node_in_group("hud")
+		if hud0:
+			hud0.flash("the wall already gave its answer")
+		return
+	var ridx := int(absi(Game.world_seed)) % 5
+	var want: String = RIDDLE_ITEMS[ridx]
+	var hud = get_tree().get_first_node_in_group("hud")
+	if Inventory.res_count(want) <= 0:
+		Sfx.play("denied", -14.0)
+		if hud:
+			hud.flash("the slot stays hungry. read the wall again")
+		return
+	Inventory.remove_res(want, 1)
+	Game.lime_wall_open = true
+	Sfx.play("rumble", -6.0)
+	Sfx.play("learn", -8.0)
+	if _hwall != null and is_instance_valid(_hwall):
+		var tw := create_tween()
+		tw.tween_property(_hwall, "position",
+			_hwall.position + Vector3(0, -3.3, 0), 3.0) \
+			.set_trans(Tween.TRANS_SINE)
+	if hud:
+		hud.flash("the answer was accepted. the wall remembers how to move")
 
 ## A wood floor: warm overlay plus darker plank seams. Rooms stop
 ## looking like the inside of a shipping box.

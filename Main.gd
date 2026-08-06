@@ -316,6 +316,8 @@ func _boot() -> void:
 		_edge_shots()
 	if OS.get_environment("CTD_TEST") == "32":
 		_throat_shot()
+	if OS.get_environment("CTD_TEST") == "33":
+		_harold_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -1364,6 +1366,71 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=33: headless probe of Harold's secret. Build the house,
+## open the shelf, ray the shaft, solve the riddle, take the prize.
+func _harold_test() -> void:
+	await get_tree().create_timer(3.0).timeout
+	var hh := House.new()
+	hh.kind = "small"
+	hh.harolds = true
+	hh.slot = -99
+	add_child(hh)
+	hh.global_position = Vector3(300, 40, 300)
+	await get_tree().create_timer(2.0).timeout
+	var c := hh.room_center()
+	var sz := hh.room_size()
+	var fy := c.y - sz.y * 0.5
+	var hx := sz.x * 0.5
+	var sp9 := get_viewport().get_world_3d().direct_space_state
+	var cast := func(a: Vector3, b: Vector3) -> float:
+		var q := PhysicsRayQueryParameters3D.create(a, b)
+		var hit := sp9.intersect_ray(q)
+		return a.distance_to(hit["position"]) if hit.size() > 0 else -1.0
+	# 1. shelf closed: ray from room center toward the -X doorway hits
+	# the BOOKSHELF (something within 0.8m of the wall plane)
+	var d1: float = cast.call(Vector3(c.x, fy + 1.4, c.z - 2.0),
+		Vector3(c.x - hx - 1.5, fy + 1.4, c.z - 2.0))
+	print("HAROLD shelf blocks doorway: hit %.2f (< %.2f) %s" % [
+		d1, hx + 0.6, "PASS" if d1 >= 0.0 and d1 < hx + 0.6 else "FAIL"])
+	hh._harold_open_shelf()
+	await get_tree().create_timer(3.0).timeout
+	# 2. shelf open: the same ray now reaches into the corridor
+	var d2: float = cast.call(Vector3(c.x, fy + 1.4, c.z - 2.0),
+		Vector3(c.x - hx - 3.5, fy + 1.4, c.z - 2.0))
+	print("HAROLD doorway opens: hit %.2f (miss or > %.2f) %s" % [
+		d2, hx + 0.5, "PASS" if d2 < 0.0 or d2 > hx + 0.5 else "FAIL"])
+	# 3. the shaft has a floor: drop a ray from the shaft top
+	var shx := c.x - hx - 6.6
+	var d3: float = cast.call(Vector3(shx, fy + 1.0, c.z - 2.0),
+		Vector3(shx, fy - 40.0, c.z - 2.0))
+	print("HAROLD shaft floored: hit %.2f (must hit) %s" % [
+		d3, "PASS" if d3 >= 0.0 else "FAIL"])
+	# 4. riddle room floor exists
+	var rcy := fy - 11.0 - 1.6
+	var d4: float = cast.call(Vector3(shx, rcy, c.z - 7.6),
+		Vector3(shx, rcy - 20.0, c.z - 7.6))
+	print("HAROLD riddle room floored: hit %.2f (must hit) %s" % [
+		d4, "PASS" if d4 >= 0.0 else "FAIL"])
+	# 5. the riddle accepts its answer and the wall opens
+	var want: String = House.RIDDLE_ITEMS[int(absi(Game.world_seed)) % 5]
+	Inventory.add_res(want, 1)
+	hh._harold_try_slot()
+	print("HAROLD riddle solved with %s: wall_open=%s %s" % [
+		want, str(Game.lime_wall_open),
+		"PASS" if Game.lime_wall_open else "FAIL"])
+	# 6. the prize is real and taking it works
+	var lt9: Node = null
+	for ch in hh._iroot.get_children():
+		if ch is House.LimeTetra:
+			lt9 = ch
+	if lt9 != null:
+		lt9.use()
+	print("HAROLD lime tetra: found=%s count=%d %s" % [
+		str(lt9 != null), Inventory.res_count("ltetra"),
+		"PASS" if lt9 != null and Inventory.res_count("ltetra") == 1
+		else "FAIL"])
+	get_tree().quit()
+
 ## CTD_TEST=32: stand on the Big Computer atrium floor, look UP the
 ## shaft -- the way out must read OPEN (crust cut + sky at the top)
 func _throat_shot() -> void:
@@ -4089,6 +4156,11 @@ func _populate(b) -> void:
 					var hh2 := House.new()
 					hh2.kind = "small"
 					hh2.human_home = true
+					if ti == 0 and hi == 0:
+						# the first house of the first town has been
+						# here longer than the town has. Harold's.
+						hh2.harolds = true
+						hh2.human_home = false
 					# town houses live in a NEGATIVE pocket-lot band so
 					# they can never share an interior with a restored
 					# player house carrying the same saved slot number
@@ -6989,11 +7061,12 @@ void fragment() {
 	for g in 6:
 		var ga := TAU * float(g) / 6.0 + 0.26
 		_h_glyph(root, g, Vector3(cos(ga) * 1.5, cy + 0.2 + sin(ga) * 1.5, 1.84))
-	# and up TOP, alone on the big crown tier: the circle with weird
-	# lines. NOBODY carved these -- the stele reflects what it points
-	# at; the glyphs are a magical relation to the location of each
-	# piece. This one faces the machine planet.
-	_h_glyph(root, 6, Vector3(0, 9.9, 1.55))
+	# and up TOP, alone on the big crown tier. NOBODY carved these --
+	# the stele reflects what it points at; the glyphs are a magical
+	# relation to the location of each piece. Harold's faces the
+	# machine planet; Earth's shows a little house, because the lime
+	# piece waits under a roof on Earth.
+	_h_glyph(root, 7 if mono.stage == 1 else 6, Vector3(0, 9.9, 1.55))
 
 ## One carved pictogram, flat on the monument face, drawn with thin
 ## engraved bars. 0: the stalker-thulhus (tentacles going down). 1: the
@@ -7124,6 +7197,17 @@ func _h_glyph(root: Node3D, kind: int, at: Vector3) -> void:
 			bar.call(Vector2(0.045, 0.045), Vector2(0.02, 0.26), 0.0)
 			for pi3 in 3:
 				bar.call(Vector2(0.05, 0.24), Vector2(-0.14 + 0.14 * float(pi3), 0.16), 0.0)
+		7:
+			# HAROLD'S HOUSE: the lime piece hides under a roof. Ground
+			# line, two walls, a gable, a door, and the crooked chimney
+			# he never fixed.
+			bar.call(Vector2(0.4, 0.035), Vector2(0, -0.3), 0.0)
+			bar.call(Vector2(0.035, 0.3), Vector2(-0.17, -0.14), 0.0)
+			bar.call(Vector2(0.035, 0.3), Vector2(0.17, -0.14), 0.0)
+			bar.call(Vector2(0.27, 0.035), Vector2(-0.085, 0.12), 50.0)
+			bar.call(Vector2(0.27, 0.035), Vector2(0.085, 0.12), -50.0)
+			bar.call(Vector2(0.035, 0.14), Vector2(0.06, -0.24), 0.0)
+			bar.call(Vector2(0.045, 0.12), Vector2(-0.11, 0.17), 8.0)
 
 ## Varnisol fauna is WEIRD: the gentle planet grows strange meat.
 ## Every animal wears something the rest of the universe doesn't --
