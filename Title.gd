@@ -298,7 +298,6 @@ const TIPS := [
 	"tip: wire a computer output to a Light Box: instant status lamp.",
 	"tip: hold TAB for the player list -- every username, and how far away they are.",
 	"tip: double-tap 0 in a rocket for a ten-second 20x overdrive. ninety second cooldown.",
-	"tip: the stele on Harold accepts exactly one shape. the lab on Big Computer keeps one.",
 	"tip: Big Computer's atrium has a map dispenser. the map dies if it leaves the planet.",
 	"tip: glowing seams on crates mean OPENABLE. the facility pays explorers.",
 	"tip: airlocks glow blue from the void side. jetpack required, honesty included.",
