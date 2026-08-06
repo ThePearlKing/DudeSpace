@@ -562,14 +562,15 @@ class NetworkAnalyser extends Machine:
 		var all9: Array = get_tree().get_nodes_in_group("machine")
 		while not frontier.is_empty():
 			var m = frontier.pop_back()
-			if not is_instance_valid(m):
-				continue
+			if not is_instance_valid(m) or not ("wires_out" in m):
+				continue   # coil nodes live in the machine group wireless
 			_net.append(m)
 			var links: Array = []
 			for w in m.wires_out:
 				links.append(w)
 			for o in all9:
-				if is_instance_valid(o) and o.wires_out.has(m):
+				if is_instance_valid(o) and ("wires_out" in o) \
+						and o.wires_out.has(m):
 					links.append(o)
 			for l in links:
 				if is_instance_valid(l) and not seen.has(l):
