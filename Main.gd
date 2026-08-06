@@ -1051,9 +1051,9 @@ void fragment(){
 	float alive = step(0.18, h21(cid + 9.1) + 0.6 * sin(TIME * 0.07 + hp * 6.28));
 	float d = bradius - length(wpos);
 	float near = 1.0 - smoothstep(400.0, 6000.0, abs(d));
-	ALPHA = wire * alive * (0.08 + 0.22 * near) + 0.008;
+	ALPHA = wire * alive * (0.035 + 0.10 * near) + 0.004;
 	ALBEDO = blue;
-	EMISSION = blue * wire * alive * (0.35 + 0.8 * near);
+	EMISSION = blue * wire * alive * (0.18 + 0.4 * near);
 }
 """
 	var bmesh := SphereMesh.new()
