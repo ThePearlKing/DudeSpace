@@ -4301,20 +4301,25 @@ func _r_spike(b, cd: Vector3, hrng: RandomNumberGenerator) -> void:
 
 func _populate(b) -> void:
 	if str(b.name) == "Requiem":
-		# THE NEEDLE GRAVEYARD: Harold's silhouette taken too far --
-		# clusters of tall pale spikes over the whole face. The crown
-		# (28 degrees around +Y) stays CLEAR: something will stand
-		# there one day and it will not share the ground.
+		# THE GRAVEYARD PROPER: not just needles. Spike clusters, yes --
+		# but between them leaning gravestone slabs, bone-rib cages
+		# arcing out of the ground, pale boulder gardens, and rings of
+		# small shards like something burst upward. The crown (28
+		# degrees around +Y) stays CLEAR for what will stand there.
 		var qrng := RandomNumberGenerator.new()
 		qrng.seed = 8008
 		var qcap := cos(deg_to_rad(28.0))
+		var qdir := func() -> Vector3:
+			while true:
+				var d9 := Vector3(qrng.randf_range(-1, 1),
+					qrng.randf_range(-1, 1),
+					qrng.randf_range(-1, 1)).normalized()
+				if d9.y <= qcap:
+					return d9
+			return Vector3.DOWN
 		var placed := 0
-		while placed < 210:
-			var cd9 := Vector3(qrng.randf_range(-1, 1),
-				qrng.randf_range(-1, 1),
-				qrng.randf_range(-1, 1)).normalized()
-			if cd9.y > qcap:
-				continue
+		while placed < 120:
+			var cd9: Vector3 = qdir.call()
 			var cluster := 3 + qrng.randi() % 4
 			for ci9 in cluster:
 				var cdir9 := (cd9 + Vector3(qrng.randf_range(-0.06, 0.06),
@@ -4324,6 +4329,101 @@ func _populate(b) -> void:
 					continue
 				_r_spike(b, cdir9, qrng)
 				placed += 1
+		# GRAVESTONES: tall thin slabs, each leaning its own way
+		for gi9 in 36:
+			var gd9: Vector3 = qdir.call()
+			var gb9 := _basis_from_up(gd9)
+			var slab := MeshInstance3D.new()
+			var sbm9 := BoxMesh.new()
+			sbm9.size = Vector3(qrng.randf_range(1.6, 3.0),
+				qrng.randf_range(4.0, 9.0), qrng.randf_range(0.6, 1.1))
+			slab.mesh = sbm9
+			slab.material_override = Surfaces.stone(Color("#7d7568")
+				.darkened(qrng.randf_range(0.0, 0.25)))
+			var sshp := BoxShape3D.new()
+			sshp.size = sbm9.size
+			_rockify(slab, sshp)
+			add_child(slab)
+			slab.global_transform = Transform3D(gb9,
+				b.center + gd9 * (float(b.radius) + sbm9.size.y * 0.32))
+			slab.rotate_object_local(Vector3.UP, qrng.randf() * TAU)
+			slab.rotate_object_local(Vector3(1, 0, 0),
+				qrng.randf_range(-0.35, 0.35))
+			slab.rotate_object_local(Vector3(0, 0, 1),
+				qrng.randf_range(-0.3, 0.3))
+		# RIB CAGES: rows of paired bone arcs leaning toward each other
+		for ri9 in 12:
+			var rd9: Vector3 = qdir.call()
+			var rb9 := _basis_from_up(rd9)
+			var nrib := 4 + qrng.randi() % 3
+			for k9 in nrib:
+				for sgn9 in [-1.0, 1.0]:
+					var rib := MeshInstance3D.new()
+					var rcm9 := CylinderMesh.new()
+					rcm9.bottom_radius = 0.45
+					rcm9.top_radius = 0.12
+					rcm9.height = qrng.randf_range(5.0, 8.0)
+					rcm9.radial_segments = 6
+					rib.mesh = rcm9
+					rib.material_override = Surfaces.stone(Color("#a29a8c"))
+					var rshp := CylinderShape3D.new()
+					rshp.radius = 0.35
+					rshp.height = rcm9.height
+					_rockify(rib, rshp)
+					add_child(rib)
+					rib.global_transform = Transform3D(rb9,
+						b.center + rd9 * (float(b.radius)
+						+ rcm9.height * 0.3))
+					rib.translate_object_local(Vector3(sgn9 * 2.6, 0,
+						float(k9) * 2.2 - float(nrib) * 1.1))
+					rib.rotate_object_local(Vector3(0, 0, 1),
+						sgn9 * qrng.randf_range(0.5, 0.75))
+		# BOULDER GARDENS: pale rounded stones leaning together
+		for bi9 in 22:
+			var bd9: Vector3 = qdir.call()
+			var bb9 := _basis_from_up(bd9)
+			for bj9 in 3 + qrng.randi() % 3:
+				var bo9 := MeshInstance3D.new()
+				var bom9 := SphereMesh.new()
+				var br9 := qrng.randf_range(1.2, 3.4)
+				bom9.radius = br9
+				bom9.height = br9 * qrng.randf_range(1.3, 1.8)
+				bo9.mesh = bom9
+				bo9.material_override = Surfaces.stone(Color("#8d867c")
+					.darkened(qrng.randf_range(0.0, 0.2)))
+				var bshp9 := SphereShape3D.new()
+				bshp9.radius = br9 * 0.9
+				_rockify(bo9, bshp9)
+				add_child(bo9)
+				bo9.global_transform = Transform3D(bb9,
+					b.center + bd9 * (float(b.radius) + br9 * 0.3))
+				bo9.translate_object_local(Vector3(
+					qrng.randf_range(-4.0, 4.0), 0,
+					qrng.randf_range(-4.0, 4.0)))
+				bo9.rotate_object_local(Vector3(1, 0, 0),
+					qrng.randf_range(-0.4, 0.4))
+		# SHARD RINGS: circles of small teeth, like something got out
+		for si9 in 10:
+			var sd9: Vector3 = qdir.call()
+			var sb9 := _basis_from_up(sd9)
+			var nsh9 := 7 + qrng.randi() % 4
+			for k9 in nsh9:
+				var sa9 := TAU * float(k9) / float(nsh9)
+				var th9 := MeshInstance3D.new()
+				var thm9 := CylinderMesh.new()
+				thm9.bottom_radius = 0.5
+				thm9.top_radius = 0.04
+				thm9.height = qrng.randf_range(1.6, 3.2)
+				thm9.radial_segments = 5
+				th9.mesh = thm9
+				th9.material_override = Surfaces.stone(Color("#97907f"))
+				add_child(th9)
+				th9.global_transform = Transform3D(sb9,
+					b.center + sd9 * (float(b.radius) + thm9.height * 0.3))
+				th9.translate_object_local(Vector3(cos(sa9) * 5.0, 0,
+					sin(sa9) * 5.0))
+				th9.rotate_object_local(Vector3(-sin(sa9), 0, cos(sa9)),
+					-0.35)
 	# Coin value per crate rises far from Home, so late-game gear forces
 	# you out to the dangerous planets. (value, target crate count)
 	match b.kind:
