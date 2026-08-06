@@ -4427,14 +4427,14 @@ func _airlock(xf: Transform3D) -> void:
 	alb.outline_modulate = Color(0, 0, 0, 0.9)
 	root.add_child(alb)
 	alb.position = Vector3(0, 4.1, 0.45)
-	# outside landing ledge with GLOWING guard rails down both sides --
+	# outside landing RUNWAY with GLOWING guard rails down both sides --
 	# the far end stays open: that is the jump
-	mk.call(Vector3(3.4, 0.4, 2.6), Vector3(0, -0.2, 1.6), STEEL, 0.0)
+	mk.call(Vector3(3.4, 0.4, 7.5), Vector3(0, -0.2, 4.05), STEEL, 0.0)
 	for rs9 in [-1.0, 1.0]:
-		mk.call(Vector3(0.12, 1.1, 2.6), Vector3(rs9 * 1.64, 0.55, 1.6),
+		mk.call(Vector3(0.12, 1.1, 7.5), Vector3(rs9 * 1.64, 0.55, 4.05),
 			STEEL, 0.0)
-		for rg9 in [[Vector3(0.14, 0.1, 2.6), Vector3(rs9 * 1.64, 1.12, 1.6)],
-				[Vector3(0.14, 0.08, 2.6), Vector3(rs9 * 1.64, 0.55, 1.6)]]:
+		for rg9 in [[Vector3(0.14, 0.1, 7.5), Vector3(rs9 * 1.64, 1.12, 4.05)],
+				[Vector3(0.14, 0.08, 7.5), Vector3(rs9 * 1.64, 0.55, 4.05)]]:
 			var rgm9 := MeshInstance3D.new()
 			var rgb9 := BoxMesh.new()
 			rgb9.size = rg9[0]
