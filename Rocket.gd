@@ -231,9 +231,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()   # or the player re-boards SAME press
 			return
 		# time warp: 1-9 = 1x-9x, 0 = 10x. NEVER while the engine burns.
-		# DOUBLE-TAP 0: a 20x OVERDRIVE burst for 8s, then back to 10x.
+		# DOUBLE-TAP 0: a 20x OVERDRIVE burst for 10s, then back to 10x.
 		# Any warp key still works during the burst (including stopping).
-		# 30s cooldown between bursts.
+		# 90s cooldown between bursts, interrupted or not.
 		if event.keycode >= KEY_0 and event.keycode <= KEY_9:
 			if _engine_on:
 				Sfx.play("denied")
@@ -241,8 +241,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			var n: int = event.keycode - KEY_0
 			if n == 0 and Game.playtime - _warp_tap_t < 0.4:
 				if Game.playtime >= _overdrive_cd:
-					_overdrive_until = Game.playtime + 8.0
-					_overdrive_cd = Game.playtime + 38.0
+					_overdrive_until = Game.playtime + 10.0
+					_overdrive_cd = Game.playtime + 90.0
 					Game.timewarp = 20.0
 					Sfx.play("warp", -10.0)
 				else:
