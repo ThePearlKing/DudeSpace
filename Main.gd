@@ -313,6 +313,8 @@ func _boot() -> void:
 		_readme_shots()
 	if OS.get_environment("CTD_TEST") == "29":
 		_hole_shot()
+	if OS.get_environment("CTD_TEST") == "30":
+		_edge_shots()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -1230,6 +1232,33 @@ void fragment(){
 	starball.extra_cull_margin = 999999.0
 	add_child(starball)
 	starball.global_position = Vector3.ZERO
+
+## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
+## + star disc + planets in front), and inside looking out with the
+## sky broken (lattice + cracks).
+func _edge_shots() -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	await get_tree().create_timer(1.0).timeout
+	Game.monolith_stage = 8
+	_on_monolith_advanced()
+	if _boundary_mat != null:
+		_boundary_mat.set_shader_parameter("reveal", 1.0)
+	var cam := Camera3D.new()
+	cam.far = 420000.0
+	add_child(cam)
+	cam.current = true
+	var B := Universe.BOUNDARY
+	cam.global_position = Vector3(B * 1.12, B * 0.05, 0)
+	cam.look_at(Vector3.ZERO, Vector3.UP)
+	await get_tree().create_timer(0.5).timeout
+	get_viewport().get_texture().get_image().save_png("res://docs/shots/edge_outside.png")
+	cam.global_position = Vector3(B * 0.965, 0, 0)
+	cam.look_at(Vector3(B * 2.0, 0, 0), Vector3.UP)
+	await get_tree().create_timer(0.5).timeout
+	get_viewport().get_texture().get_image().save_png("res://docs/shots/edge_inside.png")
+	print("EDGESHOT done")
+	get_tree().quit()
 
 ## CTD_TEST=29: stand INSIDE the Pixel mouth, look outward + inward.
 func _hole_shot() -> void:
