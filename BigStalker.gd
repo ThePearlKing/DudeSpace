@@ -129,7 +129,7 @@ func take_damage(d: float, _from: Vector3) -> void:
 	if _dead:
 		return
 	hp -= d
-	Sfx.play("hurt", -10.0)
+	Sfx.play("hurt", -14.0)
 	_lunge = maxf(_lunge, 0.25)   # flinch
 	if hp <= 0.0:
 		_dead = true
@@ -168,7 +168,7 @@ func _process(delta: float) -> void:
 		_strike_cd = 3.5
 		_lunge = 0.6
 		Game.hurt(7.0)
-		Sfx.play("hurt", -6.0)
+		Sfx.play("hurt", -13.0)
 	if _lunge > 0.0:
 		global_position -= out * delta * 14.0 * _lunge
 	# face the dude, feet toward their down

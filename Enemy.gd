@@ -305,7 +305,7 @@ class Bolt extends Node3D:
 		var p := get_tree().get_first_node_in_group("player")
 		if p and Game.mode == Game.Mode.ON_FOOT and not Game.dead 				and global_position.distance_to(p.global_position) < 1.5:
 			Game.hurt(dmg)
-			Sfx.play("hurt", -10.0)
+			Sfx.play("hurt", -14.0)
 			queue_free()
 
 func take_damage(d: float, _from: Vector3) -> void:

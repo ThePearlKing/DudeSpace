@@ -2188,8 +2188,8 @@ void fragment(){
 			sseg.material_override = Destructible.make_material(
 				Color("#3a8f5a") if si9 % 2 == 0 else Color("#2a6f42"), 0.8)
 			spiv.add_child(sseg)
-			var sang := float(si9) * (4.2 / (b.radius * 0.74))
-			var srad := b.radius * 0.74 + sin(float(si9) * 0.8) * 1.6
+			var sang: float = float(si9) * (4.2 / (b.radius * 0.74))
+			var srad: float = b.radius * 0.74 + sin(float(si9) * 0.8) * 1.6
 			sseg.position = Vector3(cos(sang) * srad, sin(float(si9) * 0.6) * 2.2,
 				sin(sang) * srad)
 			sseg.rotation.y = -sang + PI * 0.5
