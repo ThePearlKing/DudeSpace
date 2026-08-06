@@ -230,12 +230,19 @@ func _process(delta: float) -> void:
 			Inventory.select_slot(randi() % 5)
 		3:
 			# THE SMACK: a tendril reaches all the way down and swats you
+			# -- SUPER-angry privileges only (a small eye just zaps)
+			if Game.wrath < 70.0:
+				return
 			var smack := _SmackFx.new()
 			smack.target = p
 			get_tree().current_scene.add_child(smack)
 			smack.global_position = p.global_position
 		4:
 			# THE GRAB: it takes you. it considers you. it discards you.
+			# The full clutch-and-hurl is reserved for a god at 70+ wrath
+			# -- when the eye is SMALL, you are not worth lifting.
+			if Game.wrath < 70.0:
+				return
 			var grab := _GrabFx.new()
 			grab.target = p
 			get_tree().current_scene.add_child(grab)
