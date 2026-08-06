@@ -689,6 +689,32 @@ func _mainframe_test() -> void:
 	var g2r: float = (g2 - C).length() - d5
 	print("MFTEST surface gate target: ground %.1f (~%.1f) %s" % [g2r, R,
 		"PASS" if absf(g2r - R) < 1.2 else "FAIL"])
+	# 5. the wings: a floor probe in every new space
+	var floor_checks: Array = [
+		["vent tube", (u0 * cos(0.263) - e1 * sin(0.263)).normalized(), rF, 1.5],
+		["bunk hall", (u0 * cos(0.263) - e2 * sin(0.263)).normalized(), rF, 1.5],
+		["VIP deck", (u0 * cos(0.412) - e2 * sin(0.412)).normalized(), rF - 7.0, 1.8],
+		["assembly", (u0 * cos(0.722) - e1 * sin(0.722)).normalized(), rF, 3.0],
+		["generator", (u0 * cos(0.978) - e1 * sin(0.978)).normalized(), rF, 3.0],
+		["maze row5", (u0 * cos(1.126) + e1 * sin(1.126)).normalized(), r2, 1.4],
+		["noodle rm", (u0 * cos(1.625) + e1 * sin(1.625)).normalized(), r2, 1.6],
+	]
+	for fc in floor_checks:
+		var pd9: Vector3 = fc[1]
+		var expr: float = float(fc[2])
+		var from9: Vector3 = C + pd9 * (expr + float(fc[3]))
+		var dd: float = cast.call(from9, from9 - pd9 * 6.0)
+		var got: float = (expr + float(fc[3])) - dd
+		print("MFTEST %s: floor %.1f (~%.1f) %s" % [str(fc[0]), got, expr,
+			"PASS" if dd >= 0.0 and absf(got - expr) < 0.9 else "FAIL"])
+	# 6. the old escape hole over the core doorway is SEALED
+	var a13 := 0.115 + (4.6 / rF) * 13.0
+	var pd13 := (u0 * cos(a13) + e1 * sin(a13)).normalized()
+	var t13 := (-u0 * sin(a13) + e1 * cos(a13)).normalized()
+	var dseal: float = cast.call(C + pd13 * (rF + 6.6),
+		C + pd13 * (rF + 6.6) + t13 * 12.0)
+	print("MFTEST core doorway band: hit at %.1fm (must hit) %s" % [dseal,
+		"PASS" if dseal >= 0.0 else "FAIL"])
 	print("MFTEST done")
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
@@ -2124,6 +2150,7 @@ func _planet_material(kind: String, color: Color) -> Material:
 			# copper traces cell by cell, glowing pads, pulsing
 			var dsh := Shader.new()
 			dsh.code = "shader_type spatial;\nuniform vec3 base : source_color;\n" \
+				+ "uniform float clk = 1.0;\n" \
 				+ preload("res://Title.gd")._TP_NOISE + """
 void fragment(){
 	vec3 n = normalize(vn);
@@ -2139,7 +2166,7 @@ void fragment(){
 	vec3 board = base * (0.5 + 0.25 * fbm(n * 7.0));
 	vec3 copper = vec3(0.85, 0.55, 0.2);
 	vec3 col = mix(board, copper, clamp(tr, 0.0, 1.0) * 0.9);
-	float pulse = 0.5 + 0.5 * sin(TIME * 2.0 + h * 12.0);
+	float pulse = 0.5 + 0.5 * sin(TIME * 2.0 * clk + h * 12.0);
 	ALBEDO = col;
 	EMISSION = vec3(0.3, 1.0, 0.5) * pad * (0.5 + pulse) + copper * tr * 0.15;
 	METALLIC = tr * 0.7;
