@@ -1678,6 +1678,76 @@ func _make_held_model(id: String) -> void:
 			for rd in [Vector3(0.12, 0, 0), Vector3(-0.12, 0, 0), Vector3(0, 0.12, 0), Vector3(0, -0.12, 0)]:
 				_hm_cyl(0.03, 0.07, rd, Color("#2a2a30"), 0.6, 0.05).rotation_degrees = \
 					Vector3(0, 0, 90) if absf(rd.x) > 0.0 else Vector3.ZERO
+		"ultima":
+			# THE crystal: a cyan cluster burning with its own light
+			for cs9 in [[0.05, 0.3, Vector3.ZERO, 0.0],
+					[0.035, 0.2, Vector3(0.07, -0.02, 0.02), 24.0],
+					[0.03, 0.16, Vector3(-0.06, -0.03, -0.02), -20.0]]:
+				var uc := _hm_cyl(float(cs9[0]), float(cs9[1]),
+					cs9[2] as Vector3, Color("#7df9ff"), 2.2, 0.005)
+				uc.rotation_degrees = Vector3(0, 0, float(cs9[3]))
+		"prism":
+			# the prism shard splits its own light: white spike, three
+			# colored facets riding it
+			var pc := _hm_cyl(0.05, 0.3, Vector3.ZERO, Color("#ffffff"), 1.4, 0.005)
+			pc.rotation_degrees = Vector3(0, 0, 8.0)
+			_hm_box(Vector3(0.02, 0.16, 0.02), Vector3(0.05, 0.0, 0.0),
+				Color("#ff5566"), 2.0)
+			_hm_box(Vector3(0.02, 0.14, 0.02), Vector3(-0.04, -0.02, 0.03),
+				Color("#66ff99"), 2.0)
+			_hm_box(Vector3(0.02, 0.12, 0.02), Vector3(0.0, -0.04, -0.05),
+				Color("#7cc8ff"), 2.0)
+		"uranium":
+			# dull rock, wrong green light leaking from the cracks
+			_hm_box(Vector3(0.16, 0.13, 0.14), Vector3.ZERO, Color("#3a3f38"), 0.1)
+			_hm_box(Vector3(0.17, 0.02, 0.02), Vector3(0, 0.02, 0.0),
+				Color("#5aff3a"), 2.4)
+			_hm_box(Vector3(0.02, 0.12, 0.02), Vector3(0.04, 0, 0.055),
+				Color("#5aff3a"), 2.4)
+		"sulfur":
+			for sy9 in [[Vector3(0.12, 0.1, 0.12), Vector3.ZERO],
+					[Vector3(0.08, 0.07, 0.08), Vector3(0.06, 0.07, 0.02)],
+					[Vector3(0.06, 0.05, 0.06), Vector3(-0.06, 0.06, -0.03)]]:
+				_hm_box(sy9[0] as Vector3, sy9[1] as Vector3,
+					Color("#e8d44f"), 0.5)
+		"ingot":
+			_hm_box(Vector3(0.2, 0.07, 0.09), Vector3.ZERO, Color("#b8bcc8"), 0.3)
+			_hm_box(Vector3(0.16, 0.02, 0.07), Vector3(0, 0.045, 0),
+				Color("#d5d9e2"), 0.5)
+		"irid":
+			_hm_box(Vector3(0.2, 0.07, 0.09), Vector3.ZERO, Color("#8a6cff"), 0.7)
+			_hm_box(Vector3(0.16, 0.02, 0.07), Vector3(0, 0.045, 0),
+				Color("#b09aff"), 1.1)
+		"raw_ingot":
+			_hm_box(Vector3(0.15, 0.12, 0.13), Vector3.ZERO, Color("#6f6a63"), 0.1)
+			_hm_box(Vector3(0.05, 0.04, 0.05), Vector3(0.04, 0.05, 0.03),
+				Color("#b8bcc8"), 0.6)
+			_hm_box(Vector3(0.04, 0.03, 0.04), Vector3(-0.05, 0.02, -0.04),
+				Color("#b8bcc8"), 0.6)
+		"raw_irid":
+			_hm_box(Vector3(0.15, 0.12, 0.13), Vector3.ZERO, Color("#57505e"), 0.1)
+			_hm_box(Vector3(0.05, 0.04, 0.05), Vector3(0.04, 0.05, 0.03),
+				Color("#8a6cff"), 1.0)
+			_hm_box(Vector3(0.04, 0.03, 0.04), Vector3(-0.05, 0.02, -0.04),
+				Color("#8a6cff"), 1.0)
+		"semicircle":
+			var scm := MeshInstance3D.new()
+			var scmesh := TorusMesh.new()
+			scmesh.inner_radius = 0.1
+			scmesh.outer_radius = 0.16
+			scm.mesh = scmesh
+			scm.material_override = Destructible.make_material(Color("#ffd166"), 0.8)
+			scm.rotation_degrees = Vector3(0, 0, 90)
+			scm.scale = Vector3(1, 1, 0.5)   # half a ring, honestly cut
+			_held.add_child(scm)
+		"meat":
+			_hm_box(Vector3(0.16, 0.09, 0.11), Vector3.ZERO, Color("#c04a4a"), 0.2)
+			_hm_box(Vector3(0.05, 0.1, 0.12), Vector3(0.09, 0, 0),
+				Color("#e8dcd0"), 0.2)
+		"waypoint":
+			_hm_cyl(0.015, 0.3, Vector3(0, 0.05, 0), Color("#b8bcc8"), 0.3)
+			_hm_box(Vector3(0.1, 0.06, 0.01), Vector3(0.05, 0.16, 0),
+				Color("#ffd166"), 1.4)
 		"plantfiber":
 			for fx2 in [-0.04, 0.0, 0.04]:
 				_hm_cyl(0.012, 0.3, Vector3(fx2, 0, fx2), Color("#4caf50"), 0.5).rotation_degrees = Vector3(0, 0, fx2 * 200.0)

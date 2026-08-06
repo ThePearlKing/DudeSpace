@@ -431,6 +431,11 @@ func _open_mono() -> void:
 		Game.monolith_stage = 2
 		msync.call()
 		Sfx.play("learn")))
+	col.add_child(_btn("Reset Harold's riddle (wall + prize)", func() -> void:
+		Game.cheated = true
+		Game.lime_wall_open = false
+		Game.lime_taken = false
+		Sfx.play("click")))
 	col.add_child(_btn("Reset ALL monolith progress", func() -> void:
 		Game.cheated = true
 		Game.monolith_stage = 0
