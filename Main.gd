@@ -2560,10 +2560,19 @@ void fragment(){
 	vec3 watercol = mix(deep, base * 1.25, sw * 0.7 + sw2 * 0.3);
 	float foam = smoothstep(0.72, 0.82, sw2);
 	watercol = mix(watercol, vec3(0.85, 0.95, 1.0), foam * 0.35);
-	ALBEDO = mix(bg, watercol, 0.42);
+	if (FRONT_FACING) {
+		ALBEDO = mix(bg, watercol, 0.42);
+	} else {
+		// from UNDERNEATH the surface is a rolling MIRROR: mostly the
+		// wobbled scene thrown back silver, swell highlights racing it
+		vec3 mirror9 = mix(bg, vec3(0.78, 0.88, 0.97), 0.55)
+			* (0.85 + 0.5 * sw2);
+		ALBEDO = mix(mirror9, watercol, 0.18);
+		EMISSION = vec3(0.10, 0.16, 0.22) * (0.5 + sw * 0.8);
+	}
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
-	EMISSION = base * 0.05;
+	EMISSION += base * 0.05;
 }
 """
 			osh.code = "shader_type spatial;\nrender_mode cull_disabled, unshaded;\n" \
