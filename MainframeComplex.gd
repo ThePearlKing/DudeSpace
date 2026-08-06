@@ -343,7 +343,13 @@ void fragment(){
 	var awxf := Transform3D(abas, _C + _u0 * (_rF + 3.25))
 	# -Z wall: a PROPER 2.4x3.0 doorway to the service hallway, plus a
 	# little grated wall vent with a fan turning in the duct behind it
-	_plate(Vector3(5.1, 7.0, 0.5), awxf, Vector3(-3.75, 0, -6.05), STEEL, 0.0)
+	# left section carries the ATRIUM AIRLOCK out into the hollow
+	_plate(Vector3(2.2, 7.0, 0.5), awxf, Vector3(-5.2, 0, -6.05), STEEL, 0.0)
+	_plate(Vector3(0.7, 7.0, 0.5), awxf, Vector3(-1.55, 0, -6.05), STEEL, 0.0)
+	_plate(Vector3(2.2, 3.95, 0.5), awxf, Vector3(-3.0, 1.275, -6.05), STEEL, 0.0)
+	_airlock(Transform3D(abas * Basis(Vector3(0, 1, 0), PI),
+		Transform3D(abas, _C + _u0 * _rF)
+		.translated_local(Vector3(-3.0, 0, -6.05)).origin))
 	_plate(Vector3(2.4, 4.0, 0.5), awxf, Vector3(0, 1.75, -6.05), STEEL, 0.0)
 	_plate(Vector3(2.15, 7.0, 0.5), awxf, Vector3(2.275, 0, -6.05), STEEL, 0.0)
 	_plate(Vector3(1.3, 4.1, 0.5), awxf, Vector3(3.9, 1.45, -6.05), STEEL, 0.0)
@@ -4149,7 +4155,8 @@ func _lring_room(ac: float, sd: float, name: String) -> Dictionary:
 
 func _lower_ring() -> void:
 	# the hallway: full 360 in arc-strip segments, doors where rooms sit
-	var doors: Array = [[0.6, -1.0], [2.2, 1.0], [3.9, -1.0], [5.3, 1.0]]
+	var doors: Array = [[0.6, -1.0], [2.2, 1.0], [3.9, -1.0], [5.3, 1.0],
+		[2.9, -1.0]]
 	var m := TAU * R_LOW
 	var n := int(ceil(m / 4.3))
 	var stp := TAU / float(n)
@@ -4179,6 +4186,10 @@ func _lower_ring() -> void:
 				Color("#f2ead8"), 2.2)
 	_sign("UNDERCROFT RING", _fr(0.25), _C + _pdir(0.25) * (R_LOW + 3.4),
 		Vector3.ZERO, 180.0)
+	# the LOWER AIRLOCK: out the ring's flank into the deep hollow
+	_airlock(Transform3D(_fr(2.9) * Basis(Vector3(0, 1, 0), -PI * 0.5),
+		Transform3D(_fr(2.9), _C + _pdir(2.9) * R_LOW)
+		.translated_local(Vector3(-3.05, 0, 0)).origin))
 	# ---- room 1: PUMP HALL (the old undercroft, now one of four) ----
 	var pr := _lring_room(0.6, -1.0, "PUMP HALL")
 	for pz in [-3.0, 0.0, 3.0]:
@@ -4301,6 +4312,113 @@ func _lower_ring() -> void:
 	_lift_cabin(0, 2, Transform3D(cb0 * Basis(Vector3(0, 1, 0), PI),
 		Transform3D(cb0, _C + _pdir(0.32) * R_LOW).origin), "ELEVATOR",
 		["ATRIUM", "DATA VAULT", "UNDERCROFT", "CORE VIEW"])
+
+## An AIRLOCK: a sliding door between the facility and the hollow void
+## of the planet. F opens it from EITHER side; it slides, waits, and
+## seals itself again. The outside face burns bright so a dude lost in
+## the dark of the hollow can find the way back in.
+class Airlock extends StaticBody3D:
+	var _open := false
+	var _busy := false
+	func use() -> void:
+		if _busy:
+			return
+		_busy = true
+		_open = not _open
+		Sfx.play("click", -10.0)
+		var tw := create_tween()
+		tw.tween_property(self, "position:x", 2.35 if _open else 0.0, 1.1) \
+			.set_trans(Tween.TRANS_SINE)
+		await tw.finished
+		_busy = false
+		if _open:
+			# airlocks SEAL THEMSELVES. always.
+			await get_tree().create_timer(6.0).timeout
+			if _open and not _busy:
+				use()
+
+func _airlock(xf: Transform3D) -> void:
+	var root := Node3D.new()
+	add_child(root)
+	root.global_transform = xf
+	var mk := func(size: Vector3, pos: Vector3, col: Color, emit: float) -> void:
+		var sb := StaticBody3D.new()
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = size
+		mi.mesh = bm
+		mi.material_override = Surfaces.metal(col) if emit <= 0.3 \
+			else Destructible.make_material(col, emit)
+		sb.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = size
+		cs.shape = bs
+		sb.add_child(cs)
+		root.add_child(sb)
+		sb.position = pos
+	# frame posts + header, glowing hard on the OUTSIDE (+Z) edge
+	mk.call(Vector3(0.4, 3.2, 0.7), Vector3(-1.3, 1.4, 0), STEEL, 0.0)
+	mk.call(Vector3(0.4, 3.2, 0.7), Vector3(1.3, 1.4, 0), STEEL, 0.0)
+	mk.call(Vector3(3.0, 0.4, 0.7), Vector3(0, 3.0, 0), STEEL, 0.0)
+	for gspec in [[Vector3(0.12, 3.3, 0.12), Vector3(-1.35, 1.4, 0.4)],
+			[Vector3(0.12, 3.3, 0.12), Vector3(1.35, 1.4, 0.4)],
+			[Vector3(2.9, 0.12, 0.12), Vector3(0, 3.12, 0.4)]]:
+		var gd := MeshInstance3D.new()
+		var gb := BoxMesh.new()
+		gb.size = gspec[0]
+		gd.mesh = gb
+		gd.material_override = Destructible.make_material(Color("#7df9ff"), 2.6)
+		root.add_child(gd)
+		gd.position = gspec[1]
+	# the beacon over the outside face -- visible across the hollow
+	var bcn := MeshInstance3D.new()
+	var bcm := SphereMesh.new()
+	bcm.radius = 0.22
+	bcm.height = 0.44
+	bcn.mesh = bcm
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.albedo_color = Color("#7df9ff")
+	bmat.emission_enabled = true
+	bmat.emission = Color("#7df9ff")
+	bcn.material_override = bmat
+	root.add_child(bcn)
+	bcn.position = Vector3(0, 3.55, 0.45)
+	_blinks.append({"mat": bmat, "phase": randf() * TAU})
+	var alb := Label3D.new()
+	alb.text = "AIRLOCK\nJETPACK REQUIRED"
+	alb.font_size = 24
+	alb.pixel_size = 0.007
+	alb.modulate = Color("#7df9ff")
+	alb.outline_size = 8
+	alb.outline_modulate = Color(0, 0, 0, 0.9)
+	root.add_child(alb)
+	alb.position = Vector3(0, 4.1, 0.45)
+	# outside landing ledge
+	mk.call(Vector3(3.4, 0.4, 2.6), Vector3(0, -0.2, 1.6), STEEL, 0.0)
+	# THE DOOR: slides right into the wall pocket. F from either side.
+	var door := Airlock.new()
+	var dmi := MeshInstance3D.new()
+	var dbm := BoxMesh.new()
+	dbm.size = Vector3(2.25, 2.85, 0.3)
+	dmi.mesh = dbm
+	dmi.material_override = Destructible.make_material(Color("#31384a"), 0.5)
+	door.add_child(dmi)
+	var dstripe := MeshInstance3D.new()
+	var dsm := BoxMesh.new()
+	dsm.size = Vector3(1.7, 0.14, 0.34)
+	dstripe.mesh = dsm
+	dstripe.material_override = Destructible.make_material(AMBER, 1.8)
+	door.add_child(dstripe)
+	dstripe.position = Vector3(0, 0.6, 0)
+	var dcs := CollisionShape3D.new()
+	var dbs := BoxShape3D.new()
+	dbs.size = dbm.size
+	dcs.shape = dbs
+	door.add_child(dcs)
+	root.add_child(door)
+	door.position = Vector3(0, 1.4, 0)
 
 class SurfBtn extends StaticBody3D:
 	var host = null
