@@ -1255,8 +1255,9 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	rl.outline_size = 10
 	rl.outline_modulate = Color(0, 0, 0, 0.9)
 	_iroot.add_child(rl)
-	rl.global_position = rc + Vector3(0, 0.4, 4.35)
-	rl.rotation_degrees.y = 180.0
+	# CARVED INTO the far wall, facing the door: flush against the -Z
+	# face, right way round, first thing you see walking in
+	rl.global_position = rc + Vector3(0, 0.4, -3.96)
 	# the slot: a stone plinth with a hungry square
 	var slot9 := RiddleSlot.new()
 	slot9.host = self
