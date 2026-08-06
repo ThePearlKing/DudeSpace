@@ -926,6 +926,7 @@ void fragment(){
 	# ---- LAST, once every room exists: the secret networks, laid
 	# through the space that provably nobody else is using ----
 	_networks()
+	_stashes()
 	# ---- four GIANT antennas on different sides of the planet ----
 	for an9 in 4:
 		var aang := TAU * float(an9) / 4.0 + 0.5
@@ -1029,16 +1030,7 @@ func _bunk_wing() -> void:
 		var fb := _fx(b)
 		var up := _pdx(b)
 		var flxf := Transform3D(fb, _C + up * (_rF - 0.25))
-		if i == 4:
-			# end segment: 2.6m hatch down to the special-dudes deck
-			_plate(Vector3(1.0, 0.5, 3.8), flxf, Vector3(-2.0, 0, 0), DARK, 0.0)
-			_plate(Vector3(1.0, 0.5, 3.8), flxf, Vector3(2.0, 0, 0), DARK, 0.0)
-			_plate(Vector3(3.0, 0.5, 0.5), flxf, Vector3(0, 0, 1.65), DARK, 0.0)
-			_plate(Vector3(3.0, 0.5, 0.5), flxf, Vector3(0, 0, -1.65), DARK, 0.0)
-			_sign("SPECIAL BUNKS BELOW", fb, _C + up * (_rF + 2.5),
-				Vector3(-1.8, 0, 0), 90.0)
-		else:
-			_plate(Vector3(5.0, 0.5, 3.8), flxf, Vector3.ZERO, DARK, 0.0)
+		_plate(Vector3(5.0, 0.5, 3.8), flxf, Vector3.ZERO, DARK, 0.0)
 		_plate(Vector3(5.0, 0.5, 3.8),
 			Transform3D(fb, _C + up * (_rF + 3.45)), Vector3.ZERO, DARK, 0.0)
 		var wxf := Transform3D(fb, _C + up * (_rF + 1.6))
@@ -1105,98 +1097,10 @@ func _bunk_wing() -> void:
 	_plate(Vector3(0.4, 1.6, 6.4), cxf9, Vector3(-2.65, 2.75, 0), STEEL, 0.0)
 	_plate(Vector3(0.4, 5.5, 1.2), cxf9, Vector3(-2.65, 0.65, 2.55), STEEL, 0.0)
 	_plate(Vector3(0.4, 5.5, 1.2), cxf9, Vector3(-2.65, 0.65, -2.55), STEEL, 0.0)
-	# chute + the SPECIAL DUDES deck
-	var b4 := -(_a0 + _step * 4.0)
-	var fb4 := _fx(b4)
-	var up4 := _pdx(b4)
-	var chln := _rF - (rV + 4.2)
-	var chxf := Transform3D(fb4, _C + up4 * ((_rF + rV + 4.2) * 0.5))
-	for chs in [[Vector3(0.5, chln, 2.8), Vector3(1.55, 0, 0)],
-			[Vector3(0.5, chln, 2.8), Vector3(-1.55, 0, 0)],
-			[Vector3(2.8, chln, 0.5), Vector3(0, 0, 1.55)],
-			[Vector3(2.8, chln, 0.5), Vector3(0, 0, -1.55)]]:
-		_plate(chs[0], chxf, chs[1], DARK, 0.0)
-	_plate(Vector3(11.6, 0.5, 11.6),
-		Transform3D(fb4, _C + up4 * (rV - 0.25)), Vector3.ZERO, DARK, 0.0)
-	var vcxf := Transform3D(fb4, _C + up4 * (rV + 4.2))
-	_plate(Vector3(11.6, 0.5, 4.15), vcxf, Vector3(0, 0, 3.725), DARK, 0.0)
-	_plate(Vector3(11.6, 0.5, 4.15), vcxf, Vector3(0, 0, -3.725), DARK, 0.0)
-	_plate(Vector3(4.15, 0.5, 3.3), vcxf, Vector3(3.725, 0, 0), DARK, 0.0)
-	_plate(Vector3(4.15, 0.5, 3.3), vcxf, Vector3(-3.725, 0, 0), DARK, 0.0)
-	var vwxf := Transform3D(fb4, _C + up4 * (rV + 2.1))
-	_plate(Vector3(0.5, 5.2, 1.5), vwxf, Vector3(5.8, 0, -5.05), STEEL, 0.0)
-	_plate(Vector3(0.5, 5.2, 7.7), vwxf, Vector3(5.8, 0, 1.95), STEEL, 0.0)
-	_plate(Vector3(0.5, 2.35, 2.4), vwxf, Vector3(5.8, 1.425, -3.1), STEEL, 0.0)
-	_e_pts["gold"] = Transform3D(fb4, _C + up4 * (rV - 0.25)) \
-		.translated_local(Vector3(7.0, 0, -3.1)).origin
-	_plate(Vector3(0.5, 5.2, 11.6), vwxf, Vector3(-5.8, 0, 0), STEEL, 0.0)
-	_plate(Vector3(11.6, 5.2, 0.5), vwxf, Vector3(0, 0, 5.8), STEEL, 0.0)
-	_plate(Vector3(11.6, 5.2, 0.5), vwxf, Vector3(0, 0, -5.8), STEEL, 0.0)
-	var GOLD := Color("#ffd700")
-	for gw in [[Vector3(11.0, 0.12, 0.12), Vector3(0, 0, 5.45)],
-			[Vector3(11.0, 0.12, 0.12), Vector3(0, 0, -5.45)],
-			[Vector3(0.12, 0.12, 11.0), Vector3(5.45, 0, 0)],
-			[Vector3(0.12, 0.12, 11.0), Vector3(-5.45, 0, 0)]]:
-		_deco_box(gw[0], Transform3D(fb4, _C + up4 * (rV + 1.2)), gw[1], GOLD, 1.6)
-	for vb in [[-3.4, 3.4], [3.4, 3.4], [-3.4, -3.4], [3.4, -3.4]]:
-		var gr2 := MeshInstance3D.new()
-		var gr2m := TorusMesh.new()
-		gr2m.inner_radius = 0.7
-		gr2m.outer_radius = 1.15
-		gr2.mesh = gr2m
-		gr2.material_override = Surfaces.cached_emissive(GOLD, 1.8)
-		add_child(gr2)
-		gr2.global_transform = Transform3D(fb4, _C + up4 * (rV + 0.14))
-		gr2.translate_object_local(Vector3(vb[0], 0, vb[1]))
-		var vbk := MeshInstance3D.new()
-		vbk.mesh = IcosaColony._cham_mesh(3.2, 0.4, 1.8, 0.35)
-		vbk.material_override = Surfaces.cached_emissive(Color("#3a2436"), 0.3)
-		add_child(vbk)
-		vbk.global_transform = Transform3D(fb4, _C + up4 * (rV + 0.7))
-		vbk.translate_object_local(Vector3(vb[0], 0, vb[1]))
-		var plw := MeshInstance3D.new()
-		var plwm := SphereMesh.new()
-		plwm.radius = 0.34
-		plwm.height = 0.4
-		plw.mesh = plwm
-		plw.material_override = Surfaces.cached_emissive(GOLD.lightened(0.3), 0.6)
-		add_child(plw)
-		plw.global_transform = Transform3D(fb4, _C + up4 * (rV + 1.0))
-		plw.translate_object_local(Vector3(vb[0] + 1.1, 0, vb[1]))
-	var rug := MeshInstance3D.new()
-	var rugm := CylinderMesh.new()
-	rugm.top_radius = 2.2
-	rugm.bottom_radius = 2.2
-	rugm.height = 0.06
-	rug.mesh = rugm
-	rug.material_override = Surfaces.cached_emissive(Color("#4a1a2e"), 0.2)
-	add_child(rug)
-	rug.global_transform = Transform3D(fb4, _C + up4 * (rV + 0.03))
-	var rugr := MeshInstance3D.new()
-	var rugrm := TorusMesh.new()
-	rugrm.inner_radius = 2.14
-	rugrm.outer_radius = 2.26
-	rugr.mesh = rugrm
-	rugr.material_override = Surfaces.cached_emissive(GOLD, 1.4)
-	add_child(rugr)
-	rugr.global_transform = Transform3D(fb4, _C + up4 * (rV + 0.06))
-	var vl := MeshInstance3D.new()
-	var vlm := CylinderMesh.new()
-	vlm.top_radius = 1.0
-	vlm.bottom_radius = 1.0
-	vlm.height = 0.08
-	vl.mesh = vlm
-	vl.material_override = Surfaces.cached_emissive(Color("#fff3d0"), 2.0)
-	add_child(vl)
-	vl.global_transform = Transform3D(fb4, _C + up4 * (rV + 3.9))
-	_sign("SPECIAL DUDES ONLY", fb4, _C + up4 * (rV + 3.0),
-		Vector3(0, 0, -5.4), 0.0)
-	var bg := Gate.new().configure({
-		"target": _C + up4 * (_rF + 0.45) - _fx(b4).x * 3.4, "zone": "",
-		"label": "BUNK HALL", "color": GOLD, "cube": true})
-	add_child(bg)
-	bg.global_transform = Transform3D(fb4, _C + up4 * (rV + 1.3))
-	bg.translate_object_local(Vector3(0, 0, 4.6))
+	# (the SPECIAL DUDES deck moved DOWN into the undercroft ring -- see
+	# _gold_suite. The chute is sealed; special dudes ride the elevator
+	# like everyone else, they just step out into gold.)
+	_gold_suite()
 
 ## ==================== THE RINGS: planet-wide hallways ====================
 ## Two great-circle hallway rings cross at the atrium and at the antipode
@@ -1460,7 +1364,21 @@ func _rings() -> void:
 	_vp["workshop"] = wk["vents"]
 	# --- ring A northwest: assembly -> atrium (the old crawl tube is
 	# now a real hallway; ventilation becomes a secret system) ---
-	_hall(0, 5.682, 6.185, [])
+	# aN: segment-4 centre -- the LOBBY's airlock, twenty meters from
+	# the atrium's back door, +side facing true void
+	var aN := 5.682 + 2.3 / _rF + (((6.185 - 5.682) * _rF - 4.6) / 7.0) \
+		/ _rF * 4.0
+	_hall(0, 5.682, 6.185, [[aN, 1.0]])
+	var nfb := _fr(aN)
+	_airlock(Transform3D(nfb * Basis(Vector3(0, 1, 0), PI * 0.5),
+		Transform3D(nfb, _C + _pdir(aN) * _rF)
+		.translated_local(Vector3(3.05, 0, 0)).origin))
+	var nawx := Transform3D(nfb, _C + _pdir(aN) * (_rF + 2.25))
+	_plate(Vector3(0.5, 5.5, 1.2), nawx, Vector3(3.05, 0, 1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 1.2), nawx, Vector3(3.05, 0, -1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 1.95, 3.1), nawx, Vector3(3.05, 1.8, 0), STEEL, 0.0)
+	_sign("AIRLOCK", nfb, _C + _pdir(aN) * (_rF + 3.6),
+		Vector3(2.5, 0, 0), -90.0)
 	# --- ring B east: atrium +X -> medbay/gym/archive -> cockpit ---
 	# aE: exact centre of ring B east segment 15 -- the FIRST top-floor
 	# airlock lives here, facing real void (its old atrium spot opened
@@ -3421,6 +3339,206 @@ func _console(fb: Basis, up: Vector3, s: float) -> void:
 		pan.add_child(dot)
 		_blinks.append({"mat": dmat, "phase": randf() * TAU})
 
+## ==================== THE HOLLOW: things worth flying to ============
+## The void between the facility and the crust is a place now: salvage
+## pods with one-time loot, crust taps that drip uranium, a derelict
+## freighter, and a shrine that knows about the monoliths. Every POI
+## carries a blinking beacon so a jetpack can hunt them by light.
+
+class VoidCache extends StaticBody3D:
+	var host = null
+	var key: String = ""
+	var loot: Dictionary = {}
+	var line: String = ""
+	func use() -> void:
+		if host != null:
+			host._cache_open(self)
+
+func _cache_open(c: VoidCache) -> void:
+	if Game.void_loot.has(c.key):
+		_hud_flash("already emptied")
+		Sfx.play("denied", -16.0)
+		return
+	Game.void_loot[c.key] = true
+	for id in c.loot:
+		if id == "coins":
+			Inventory.coins += int(c.loot[id])
+		else:
+			Inventory.add_res(str(id), int(c.loot[id]))
+	Sfx.play("coin", -6.0)
+	_hud_flash(c.line if c.line != "" else "salvage claimed")
+
+func _poi_beacon(pos: Vector3, col: Color, phase: float) -> void:
+	var b9 := MeshInstance3D.new()
+	var bm9 := SphereMesh.new()
+	bm9.radius = 0.3
+	bm9.height = 0.6
+	b9.mesh = bm9
+	var bmat := StandardMaterial3D.new()
+	bmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bmat.albedo_color = col
+	bmat.emission_enabled = true
+	bmat.emission = col
+	b9.material_override = bmat
+	add_child(b9)
+	b9.global_position = pos
+	_blinks.append({"mat": bmat, "phase": phase})
+
+func _void_pois() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1717
+	var rdir := _pdir(1.3708)   # keep everything off the reactor's back
+	# --- four SALVAGE PODS: cracked supply drums the dudes never caught
+	var pi9 := 0
+	while pi9 < 4:
+		var d9 := (_u0 * rng.randf_range(-1.0, 1.0)
+			+ _e1 * rng.randf_range(-1.0, 1.0)
+			+ _e2 * rng.randf_range(-1.0, 1.0)).normalized()
+		if absf(d9.dot(rdir)) > 0.86:
+			continue
+		var pr := 70.5 + 2.0 * float(pi9 % 2)
+		var pb := _bup(d9)
+		var pxf := Transform3D(pb, _C + d9 * pr)
+		var drum := MeshInstance3D.new()
+		var dm9 := CylinderMesh.new()
+		dm9.top_radius = 1.1
+		dm9.bottom_radius = 1.1
+		dm9.height = 2.6
+		drum.mesh = dm9
+		drum.material_override = Surfaces.metal(Color("#3d4456"))
+		add_child(drum)
+		drum.global_transform = pxf
+		drum.rotate_object_local(Vector3(0, 0, 1),
+			0.5 + 0.4 * float(pi9))
+		var crack := MeshInstance3D.new()
+		var ckm := BoxMesh.new()
+		ckm.size = Vector3(0.12, 2.2, 0.5)
+		crack.mesh = ckm
+		crack.material_override = Surfaces.cached_emissive(AMBER, 1.6)
+		add_child(crack)
+		crack.global_transform = pxf.translated_local(Vector3(1.0, 0.2, 0))
+		var vc := VoidCache.new()
+		vc.host = self
+		vc.key = "pod%d" % pi9
+		vc.loot = [{"coins": 220}, {"ingot": 6}, {"ultima": 2},
+			{"coins": 140, "wire": 4}][pi9]
+		vc.line = "salvage pod cracked open"
+		var vcs := CollisionShape3D.new()
+		var vbs := BoxShape3D.new()
+		vbs.size = Vector3(2.4, 2.8, 2.4)
+		vcs.shape = vbs
+		vc.add_child(vcs)
+		add_child(vc)
+		vc.global_transform = pxf
+		_poi_beacon(pxf.origin + d9 * 2.2, AMBER, float(pi9) * 0.9)
+		_net_probes.append(pxf.origin)
+		pi9 += 1
+	# --- four CRUST TAPS at the antenna roots: the veins drip fuel
+	for an9 in 4:
+		var aang := TAU * float(an9) / 4.0 + 0.5
+		var adir := (_u0 * cos(1.15)
+			+ (_e1 * cos(aang) + _e2 * sin(aang)) * sin(1.15)).normalized()
+		var ar9: float = float(_b.radius) - 3.4
+		var ab9 := _bup(adir)
+		var axf := Transform3D(ab9, _C + adir * ar9)
+		_plate(Vector3(3.0, 0.4, 3.0), axf, Vector3(0, -1.0, 0), STEEL, 0.0)
+		var root9 := MeshInstance3D.new()
+		var rm9 := CylinderMesh.new()
+		rm9.top_radius = 0.7
+		rm9.bottom_radius = 0.5
+		rm9.height = 2.6
+		root9.mesh = rm9
+		root9.material_override = Surfaces.metal(Color("#31384a"))
+		add_child(root9)
+		root9.global_transform = axf.translated_local(Vector3(0, 0.6, 0))
+		var vein := MeshInstance3D.new()
+		var vm9 := SphereMesh.new()
+		vm9.radius = 0.4
+		vm9.height = 0.8
+		vein.mesh = vm9
+		vein.material_override = Surfaces.cached_emissive(Color("#7dff5a"), 2.2)
+		add_child(vein)
+		vein.global_transform = axf.translated_local(Vector3(0.9, 0.1, 0))
+		var tap := VoidCache.new()
+		tap.host = self
+		tap.key = "tap%d" % an9
+		tap.loot = {"uranium": 2, "wire": 2}
+		tap.line = "crust tap bled dry -- uranium and wire"
+		var tcs := CollisionShape3D.new()
+		var tbs := BoxShape3D.new()
+		tbs.size = Vector3(2.2, 2.2, 2.2)
+		tcs.shape = tbs
+		tap.add_child(tcs)
+		add_child(tap)
+		tap.global_transform = axf
+		_poi_beacon(axf.origin - adir * 2.0, Color("#7dff5a"),
+			float(an9) * 1.3)
+	# --- the DERELICT FREIGHTER: a dead hauler adrift since the dudes
+	# went up. Walk its hold, take what is left.
+	var fd := (_u0 * -0.3 + _e1 * 0.75 - _e2 * 0.6).normalized()
+	if absf(fd.dot(rdir)) < 0.86:
+		var fxf := Transform3D(_bup(fd), _C + fd * 72.0)
+		_plate(Vector3(4.0, 3.2, 9.0), fxf, Vector3(0, 4.6, 0), Color("#2c3242"), 0.0)
+		_plate(Vector3(3.4, 0.4, 8.4), fxf, Vector3(0, -0.2, 0), Color("#2c3242"), 0.0)
+		_plate(Vector3(0.4, 2.8, 8.4), fxf, Vector3(1.7, 1.4, 0), Color("#2c3242"), 0.0)
+		_plate(Vector3(0.4, 2.8, 8.4), fxf, Vector3(-1.7, 1.4, 0), Color("#2c3242"), 0.0)
+		_plate(Vector3(3.4, 2.8, 0.4), fxf, Vector3(0, 1.4, 4.2), Color("#2c3242"), 0.0)
+		var eng := MeshInstance3D.new()
+		var em9 := CylinderMesh.new()
+		em9.top_radius = 1.2
+		em9.bottom_radius = 0.8
+		em9.height = 1.8
+		eng.mesh = em9
+		eng.material_override = Surfaces.metal(Color("#1c2026"))
+		add_child(eng)
+		eng.global_transform = fxf.translated_local(Vector3(0, 1.4, -5.1))
+		eng.rotate_object_local(Vector3(1, 0, 0), PI * 0.5)
+		for cx9 in [[-0.9, -2.0, 1], [0.8, 0.4, 2], [-0.6, 2.2, 1]]:
+			for lv9 in int(cx9[2]):
+				_plate(Vector3(1.3, 1.3, 1.3), fxf,
+					Vector3(float(cx9[0]), 0.65 + 1.32 * float(lv9),
+					float(cx9[1])), Color("#242a32"), 0.0)
+		var fvc := VoidCache.new()
+		fvc.host = self
+		fvc.key = "freighter"
+		fvc.loot = {"coins": 400, "irid": 4, "ultima": 3}
+		fvc.line = "the hauler's manifest closes at last"
+		var fcs := CollisionShape3D.new()
+		var fbs := BoxShape3D.new()
+		fbs.size = Vector3(1.5, 1.5, 1.5)
+		fcs.shape = fbs
+		fvc.add_child(fcs)
+		add_child(fvc)
+		fvc.global_transform = fxf.translated_local(Vector3(0.8, 0.7, 0.4))
+		_sign("HAULER 7 // 400 YEARS ADRIFT", _bup(fd),
+			fxf.origin + fd * 5.4, Vector3.ZERO, 0.0)
+		_poi_beacon(fxf.origin + fd * 6.2, Color("#ff6a6a"), 0.4)
+		_net_probes.append(fxf.translated_local(Vector3(0, 0.5, 0)).origin)
+	# --- the VOID SHRINE: a floating tetrahedron that remembers
+	var sd := (-_u0 * 0.55 - _e1 * 0.5 + _e2 * 0.68).normalized()
+	var sxf := Transform3D(_bup(sd), _C + sd * 71.0)
+	_plate(Vector3(2.6, 0.4, 2.6), sxf, Vector3(0, -0.2, 0), Color("#12161c"), 0.0)
+	var st9 := MeshInstance3D.new()
+	st9.mesh = _tetra_mesh(0.6)
+	st9.material_override = Surfaces.cached_emissive(Color("#ffd23f"), 2.0)
+	add_child(st9)
+	st9.global_transform = sxf.translated_local(Vector3(0, 1.6, 0))
+	_spins.append({"node": st9, "rate": 0.5})
+	var shr := VoidCache.new()
+	shr.host = self
+	shr.key = "voidshrine"
+	shr.loot = {"ultima": 1}
+	shr.line = "the shrine hums: FEED THE STONE ON HAROLD"
+	var scs9 := CollisionShape3D.new()
+	var sbs9 := BoxShape3D.new()
+	sbs9.size = Vector3(2.0, 2.6, 2.0)
+	scs9.shape = sbs9
+	shr.add_child(scs9)
+	add_child(shr)
+	shr.global_transform = sxf
+	_poi_beacon(sxf.origin + sd * 2.4, Color("#ffd23f"), 1.7)
+	_net_probes.append(sxf.origin)
+
 ## ==================== THE SECRET NETWORKS ====================
 ## Built LAST, through space nothing else occupies. Vents: steel crawl
 ## tunnels linking room wall-grilles, dipping under the floors. Data
@@ -4150,6 +4268,201 @@ func map_use() -> void:
 		mk.global_position = _C + dd * lerpf(r1, r2c, t)
 		_map_holo.append(mk)
 
+## ==================== STASHES: the complex PAYS now ====================
+## One-time loot caches and per-session harvests scattered through the
+## rooms -- reasons to actually walk the whole facility mid-late game.
+
+class Stash extends StaticBody3D:
+	var host = null
+	var key: String = ""          # "" = per-session (resets every boot)
+	var loot: Dictionary = {}
+	var line: String = ""
+	var _used := false
+	func use() -> void:
+		if host != null:
+			host._stash_open(self)
+
+func _stash_open(c: Stash) -> void:
+	if (c.key != "" and Game.void_loot.has(c.key)) or c._used:
+		_hud_flash("empty")
+		Sfx.play("denied", -16.0)
+		return
+	c._used = true
+	if c.key != "":
+		Game.void_loot[c.key] = true
+	for id in c.loot:
+		if id == "coins":
+			Inventory.coins += int(c.loot[id])
+		else:
+			Inventory.add_res(str(id), int(c.loot[id]))
+	Sfx.play("coin", -6.0)
+	_hud_flash(c.line if c.line != "" else "claimed")
+
+## a lootable box: glowing seam so it reads as OPENABLE
+func _stash(xf: Transform3D, off: Vector3, key: String, loot: Dictionary,
+		line: String, col: Color = Color("#ffd166")) -> void:
+	var st9 := Stash.new()
+	st9.host = self
+	st9.key = key
+	st9.loot = loot
+	st9.line = line
+	var bmi := MeshInstance3D.new()
+	bmi.mesh = Surfaces.box_mesh(Vector3(1.1, 0.9, 0.8))
+	bmi.material_override = Surfaces.metal(Color("#2c3242"))
+	st9.add_child(bmi)
+	var seam := MeshInstance3D.new()
+	seam.mesh = Surfaces.box_mesh(Vector3(1.14, 0.08, 0.84))
+	seam.material_override = Surfaces.cached_emissive(col, 1.8)
+	seam.position = Vector3(0, 0.2, 0)
+	st9.add_child(seam)
+	var cs := CollisionShape3D.new()
+	cs.shape = Surfaces.box_shape(Vector3(1.2, 1.0, 0.9))
+	st9.add_child(cs)
+	add_child(st9)
+	st9.global_transform = xf
+	st9.translate_object_local(off)
+
+## every room earns its keep
+func _stashes() -> void:
+	var f0 := func(a: float, lat: float, h: float) -> Transform3D:
+		return Transform3D(_sbas(a, lat / _rF), _C + _sdir(a, lat / _rF) * (_rF + h))
+	# deck side rooms
+	_stash(f0.call(_a0 + _step * 11.0, -9.6 * 1.0, 0.45), Vector3(2.6, 0, 3.4),
+		"cargo_stash", {"coins": 260, "ingot": 5}, "a crate nobody inventoried")
+	_stash(f0.call(_a0 + _step * 3.0, -18.9, 0.45), Vector3(0, 0, 3.6),
+		"lab_stash", {"ultima": 1, "prism": 2}, "sample case: contents remember")
+	# ring A rooms
+	var r0 := func(fam: int, ac: float, sd: float) -> Transform3D:
+		return Transform3D(_abas9(fam, ac), _C + _aup9(fam, ac) * (_rF + 0.45))
+	_stash(r0.call(0, 1.75, 1.0), Vector3(8.3, 0, -3.6),
+		"tape_stash", {"coins": 180}, "one reel was still readable")
+	_stash(r0.call(0, 2.02, -1.0), Vector3(-8.3, 0, 0), "",
+		{"noodle": 3}, "noodle harvest -- the farm regrows")
+	_stash(r0.call(0, 4.35, -1.0), Vector3(-8.3, 0, -3.4),
+		"storage_stash", {"wire": 8, "coal": 6}, "spare spool and fuel")
+	_stash(r0.call(0, 4.75, 1.0), Vector3(8.3, 0, 3.6),
+		"workshop_stash", {"ingot": 4, "wire": 4}, "the toolbox forgives")
+	# ring B rooms
+	_stash(r0.call(1, 0.75, -1.0), Vector3(-8.3, 0, -3.6), "",
+		{"cooked_meat": 3}, "medbay rations -- restocked daily")
+	_stash(r0.call(1, 1.5, 1.0), Vector3(8.3, 0, -3.6),
+		"gym_stash", {"coins": 120}, "locker room coins. do not ask")
+	_stash(r0.call(1, 2.3, -1.0), Vector3(-8.3, 0, 0),
+		"archive_stash", {"coins": 200}, "a first edition, sold to nobody")
+	_stash(r0.call(1, 4.0, 1.0), Vector3(8.3, 0, -3.4), "",
+		{"noodle": 2}, "the pot never quite empties")
+	# big rooms + below
+	_stash(Transform3D(_fr(3.775), _C + _pdir(3.775) * (_rF + 0.45)),
+		Vector3(7.0, 0, 6.0), "srv2_stash", {"wire": 10, "irid": 2},
+		"maintenance box behind the racks")
+	_stash(Transform3D(_fr(2.685), _C + _pdir(2.685) * (_rF + 0.45)),
+		Vector3(5.5, 0, -9.0), "ai_stash", {"ultima": 2},
+		"the A.I. kept these safe. for you, apparently")
+	var vb9 := _bup(_sdir(-0.35, 0.0))
+	_stash(Transform3D(vb9, _C + _sdir(-0.35, 0.0) * 52.45),
+		Vector3(-4.6, 0, -4.6), "vault_stash", {"ultima": 3},
+		"vault dividend")
+	_stash(Transform3D(_fr(0.6), _C + _pdir(0.6) * (R_LOW + 0.45)),
+		Vector3(-7.9, 0, 3.4), "pump_stash", {"irid": 3},
+		"pump spares, iridium grade")
+	_stash(Transform3D(_fr(5.3), _C + _pdir(5.3) * (R_LOW + 0.45)),
+		Vector3(7.9, 0, -3.4), "sump_stash", {"coins": 320},
+		"dredged from the sump. still sticky")
+	# comms + booth
+	var gam2 := 22.05 / _rF
+	var cb9 := _fr(1.3708).rotated((_fr(1.3708) * Vector3(0, 0, 1)).normalized(), -gam2)
+	var cup9 := (cb9 * Vector3(0, 1, 0)).normalized()
+	_stash(Transform3D(cb9, _C + cup9 * (_rF + 0.45)), Vector3(-4.0, 0, 4.0),
+		"comms_stash", {"wire": 5}, "spare tuner parts")
+
+## ==================== THE GOLD SUITE (undercroft) ====================
+## SPECIAL DUDES ONLY -- relocated from under the bunks, and BIGGER:
+## a 15x13 gold hall off the undercroft ring with four oversized bunks.
+func _gold_suite() -> void:
+	var GOLD := Color("#ffd700")
+	var ac := 4.6
+	var fb := _fr(ac)
+	var up := _pdir(ac)
+	var xf0 := Transform3D(fb, _C + up * R_LOW)
+	_plate(Vector3(15.4, 0.5, 13.2), xf0, Vector3(-10.2, -0.25, 0), DARK, 0.0)
+	_plate(Vector3(15.4, 0.5, 13.2), xf0, Vector3(-10.2, 5.75, 0), DARK, 0.0)
+	var wxf := Transform3D(fb, _C + up * (R_LOW + 2.75))
+	_plate(Vector3(0.5, 6.5, 5.4), wxf, Vector3(-3.15, 0, 3.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 6.5, 5.4), wxf, Vector3(-3.15, 0, -3.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 2.5, 2.4), wxf, Vector3(-3.15, 2.0, 0), STEEL, 0.0)
+	_plate(Vector3(0.5, 6.5, 4.6), wxf, Vector3(-17.65, 0, 4.3), STEEL, 0.0)
+	_plate(Vector3(0.5, 6.5, 4.6), wxf, Vector3(-17.65, 0, -4.3), STEEL, 0.0)
+	_plate(Vector3(0.5, 3.9, 4.0), wxf, Vector3(-17.65, 1.3, 0), STEEL, 0.0)
+	_plate(Vector3(15.0, 6.5, 0.5), wxf, Vector3(-10.2, 0, 6.35), STEEL, 0.0)
+	_plate(Vector3(15.0, 6.5, 0.5), wxf, Vector3(-10.2, 0, -6.35), STEEL, 0.0)
+	# gold trim + chandelier ring + rug
+	for gw in [[Vector3(14.4, 0.14, 0.14), Vector3(-10.2, -1.3, 6.0)],
+			[Vector3(14.4, 0.14, 0.14), Vector3(-10.2, -1.3, -6.0)],
+			[Vector3(0.14, 0.14, 12.6), Vector3(-17.3, -1.3, 0)]]:
+		_deco_box(gw[0], wxf, gw[1], GOLD, 1.7)
+	var chand := MeshInstance3D.new()
+	var chm := TorusMesh.new()
+	chm.inner_radius = 2.0
+	chm.outer_radius = 2.25
+	chand.mesh = chm
+	chand.material_override = Surfaces.cached_emissive(GOLD, 2.0)
+	add_child(chand)
+	chand.global_transform = xf0.translated_local(Vector3(-10.2, 4.8, 0))
+	_spins.append({"node": chand, "rate": 0.3})
+	var rug := MeshInstance3D.new()
+	var rugm := CylinderMesh.new()
+	rugm.top_radius = 3.2
+	rugm.bottom_radius = 3.2
+	rugm.height = 0.06
+	rug.mesh = rugm
+	rug.material_override = Surfaces.cached_emissive(Color("#4a1a2e"), 0.2)
+	add_child(rug)
+	rug.global_transform = xf0.translated_local(Vector3(-10.2, 0.03, 0))
+	# FOUR oversized gold bunks with grav rings and reading pearls
+	for vb in [[-14.2, 3.6], [-14.2, -3.6], [-6.2, 3.6], [-6.2, -3.6]]:
+		var gr2 := MeshInstance3D.new()
+		var gr2m := TorusMesh.new()
+		gr2m.inner_radius = 1.1
+		gr2m.outer_radius = 1.7
+		gr2.mesh = gr2m
+		gr2.material_override = Surfaces.cached_emissive(GOLD, 1.8)
+		add_child(gr2)
+		gr2.global_transform = xf0.translated_local(
+			Vector3(float(vb[0]), 0.14, float(vb[1])))
+		var vbk := MeshInstance3D.new()
+		vbk.mesh = IcosaColony._cham_mesh(4.6, 0.55, 2.6, 0.45)
+		vbk.material_override = Surfaces.cached_emissive(Color("#3a2436"), 0.3)
+		add_child(vbk)
+		vbk.global_transform = xf0.translated_local(
+			Vector3(float(vb[0]), 0.95, float(vb[1])))
+		var plw := MeshInstance3D.new()
+		var plwm := SphereMesh.new()
+		plwm.radius = 0.45
+		plwm.height = 0.55
+		plw.mesh = plwm
+		plw.material_override = Surfaces.cached_emissive(GOLD.lightened(0.3), 0.7)
+		add_child(plw)
+		plw.global_transform = xf0.translated_local(
+			Vector3(float(vb[0]) + 1.6, 1.4, float(vb[1])))
+	var vl := MeshInstance3D.new()
+	var vlm := CylinderMesh.new()
+	vlm.top_radius = 1.2
+	vlm.bottom_radius = 1.2
+	vlm.height = 0.08
+	vl.mesh = vlm
+	vl.material_override = Surfaces.cached_emissive(Color("#fff3d0"), 2.0)
+	add_child(vl)
+	vl.global_transform = xf0.translated_local(Vector3(-10.2, 5.4, 0))
+	_sign("SPECIAL DUDES ONLY", fb, _C + up * (R_LOW + 3.6),
+		Vector3(-2.6, 0, 0), 90.0)
+	# the gold-panel breach lives HERE now: a missing wall panel behind
+	# the far-left bunk drops into the computer tunnels
+	_e_pts["gold"] = xf0.translated_local(Vector3(-18.6, 1.0, 0)).origin
+	_stash(xf0, Vector3(-10.2, 0.45, 4.8), "gold_stash",
+		{"coins": 500, "ultima": 2}, "the special dudes tipped well",
+		Color("#ffd700"))
+	_net_probes.append(xf0.translated_local(Vector3(-10.2, 1.0, 0)).origin)
+
 ## ==================== THE LOWER RING (r=47) ====================
 ## A second full circle of facility below everything walkable above:
 ## service hallway wrapping the whole planet + four rooms. Elevator
@@ -4187,7 +4500,7 @@ func _lring_room(ac: float, sd: float, name: String) -> Dictionary:
 func _lower_ring() -> void:
 	# the hallway: full 360 in arc-strip segments, doors where rooms sit
 	var doors: Array = [[0.6, -1.0], [2.2, 1.0], [3.9, -1.0], [5.3, 1.0],
-		[TAU / 69.0 * 31.5, -1.0]]
+		[TAU / 69.0 * 31.5, -1.0], [4.6, -1.0]]
 	var m := TAU * R_LOW
 	var n := int(ceil(m / 4.3))
 	var stp := TAU / float(n)

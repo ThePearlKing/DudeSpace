@@ -163,6 +163,7 @@ var door_open: bool = false   # euclid temple door (opens forever)
 # 0 = none. Order: Harold, Earth, Euclid, Big Water, Mars, Wobble,
 # Crystalia, Palewander.
 var monolith_stage: int = 0
+var void_loot: Dictionary = {}   # hollow-POI caches already claimed
 const MONO_COLORS: Array = [Color("#ffd23f"), Color("#7fff3a"),
 	Color("#ff8a2a"), Color("#2a6fff"), Color("#ff3a2a"), Color("#ff7ce9"),
 	Color("#7df9ff"), Color("#f2f2f2")]

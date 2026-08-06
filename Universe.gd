@@ -81,15 +81,17 @@ func _ready() -> void:
 	# --- the Tris system: a pale-blue giant on the FAR side of everything ---
 	var TC := Vector3(52000, -2500, -15000)
 	_def("Tris",     TC,                             460.0, 27.0, "sun",      Color("#9fd8ff"))
-	_def("Sanus",    TC + Vector3(-1050, 80, 260),    70.0, 9.5,  "lava",     Color("#8a1f10"))
-	_def("Extroma",  TC + Vector3(1900, -240, -700),  85.0, 9.0,  "volcanic", Color("#c8a83a"))
-	_def("Varnisol", TC + Vector3(-3400, 420, 1500), 100.0, 9.0,  "varnisol", Color("#3f8f3a"))
+	# scattered for real: every orbit on its own tilt, nobody sharing a
+	# plane, nobody lining up from any angle
+	_def("Sanus",    TC + Vector3(-820, 640, 460),    70.0, 9.5,  "lava",     Color("#8a1f10"))
+	_def("Extroma",  TC + Vector3(1700, -980, -1150), 85.0, 9.0,  "volcanic", Color("#c8a83a"))
+	_def("Varnisol", TC + Vector3(-3050, 1350, 1750), 100.0, 9.0, "varnisol", Color("#3f8f3a"))
 	# --- Xero: Varnisol's ice moon. Light blue, cold, quietly beautiful. ---
-	_def("Xero",     TC + Vector3(-3400, 540, 2150), 60.0, 5.0,  "ice",      Color("#6ec2ff"))
+	_def("Xero",     TC + Vector3(-3050, 1500, 2390), 60.0, 5.0,  "ice",      Color("#6ec2ff"))
 	# --- Big Water: the Tris system's ocean world, out past Varnisol.
 	# ALL water, no land -- you sink through the whole ocean until the
 	# sand floor catches you. The blue monolith waits down there. ---
-	_def("Big Water", TC + Vector3(-5200, 700, 2600), 110.0, 8.5, "ocean", Color("#1a5fae"))
+	_def("Big Water", TC + Vector3(-4900, -1750, 3050), 110.0, 8.5, "ocean", Color("#1a5fae"))
 	# --- the rogue: a pale wanderer between the systems. On no map, on
 	# no locator. The white monolith's planet. ---
 	var rog := _def_ret("Palewander", Vector3(21000, 14500, 30500), 64.0, 7.0,

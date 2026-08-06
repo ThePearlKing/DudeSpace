@@ -142,35 +142,31 @@ func activate() -> void:
 	var top: Vector3 = (body.center as Vector3) + dir * float(body.radius)
 	var sock_pos: Vector3 = _root.global_transform \
 		.translated_local(Vector3(0, 5.4, 0.9)).origin if _root != null else top
-	# 1. the tetrahedron flies in and seats itself
+	# 1. the tetrahedron flies to the FRONT of the socket, then slides
+	# INTO the mouth -- a real insertion, not a teleport
+	var mbas: Basis = _root.global_transform.basis if _root != null else bas
+	var mouth_out := mbas * Vector3(0, 0, 1)
 	var tet := MeshInstance3D.new()
 	tet.mesh = MainframeComplex._tetra_mesh(0.42)
 	tet.material_override = Destructible.make_material(col.lightened(0.2), 2.0)
 	add_child(tet)
-	tet.global_position = sock_pos + (bas * Vector3(0, 0, 1)) * 4.0
+	tet.global_position = sock_pos + mouth_out * 5.0 + (mbas * Vector3(0, 1, 0)) * 1.2
 	var tw0 := create_tween()
-	tw0.tween_property(tet, "global_position", sock_pos, 2.2) \
+	tw0.tween_property(tet, "global_position", sock_pos + mouth_out * 1.6, 2.0) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	Sfx.play("learn", -8.0)
 	await tw0.finished
+	# the slide IN: slow, deliberate, past the lip into the cavity
+	var tw1 := create_tween()
+	tw1.tween_property(tet, "global_position", sock_pos - mouth_out * 0.35, 1.8) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw1.parallel().tween_property(tet, "rotation", tet.rotation
+		+ mbas * Vector3(0, 0, 1) * 0.0 + Vector3(0.4, 0.9, 0.2), 1.8)
+	await tw1.finished
 	_socket_tet = tet
-	# 2. ULTIMA glow: the seated piece goes fluid, bloom cranks hard
+	# 2. seated: the piece ITSELF goes molten with the ultima fluid
+	# treatment as the sound begins -- no stand-in glow ball
 	tet.material_override = DatamoshStudio._fluid_material(col)
-	var glow := MeshInstance3D.new()
-	var gm2 := SphereMesh.new()
-	gm2.radius = 1.1
-	gm2.height = 2.2
-	glow.mesh = gm2
-	var gmat := StandardMaterial3D.new()
-	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	gmat.albedo_color = Color(col.r, col.g, col.b, 0.35)
-	gmat.emission_enabled = true
-	gmat.emission = col
-	gmat.emission_energy_multiplier = 3.0
-	glow.material_override = gmat
-	add_child(glow)
-	glow.global_position = sock_pos
 	var env := _env()
 	var old_glow := 0.8
 	if env != null:
@@ -242,42 +238,60 @@ func activate() -> void:
 		twt.tween_property(tet, "global_position",
 			sock_pos - dir * RISE_DEPTH, 14.0) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		var twg2 := create_tween()
-		twg2.tween_property(glow, "global_position",
-			sock_pos - dir * RISE_DEPTH, 14.0) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		await twl.finished
 		_root.visible = false
 		tet.visible = false
-		glow.visible = false
-	# 6. hologram of the NEXT planet, then the floor pictogram
+	# 6. hologram: a PROJECTOR PUCK left in the ground beams up a flat
+	# 2D pictogram of the next planet -- ring, latitude bands, a bar --
+	# in the piece's color, with a visible cone of light from the
+	# emitter. Fades, then burns the same pictogram into the floor.
 	var nxt: String = Game.MONO_PLANETS[stage + 1] if stage + 1 < 8 else ""
 	if nxt != "":
-		var nb = Universe.body_named(nxt)
-		var holo := MeshInstance3D.new()
-		var hm := SphereMesh.new()
-		hm.radius = 5.0
-		hm.height = 10.0
-		holo.mesh = hm
+		var puck := MeshInstance3D.new()
+		var pkm := CylinderMesh.new()
+		pkm.top_radius = 0.5
+		pkm.bottom_radius = 0.7
+		pkm.height = 0.4
+		puck.mesh = pkm
+		puck.material_override = Surfaces.metal(Color("#12161c"))
+		add_child(puck)
+		puck.global_transform = Transform3D(bas, top + dir * 0.2)
+		var cone := MeshInstance3D.new()
+		var cnm := CylinderMesh.new()
+		cnm.top_radius = 3.6
+		cnm.bottom_radius = 0.3
+		cnm.height = 7.0
+		cone.mesh = cnm
+		var cmat := StandardMaterial3D.new()
+		cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		cmat.albedo_color = Color(col.r, col.g, col.b, 0.10)
+		cmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		cone.material_override = cmat
+		add_child(cone)
+		cone.global_transform = Transform3D(bas, top + dir * 3.9)
+		var holo := Node3D.new()
+		add_child(holo)
+		holo.global_transform = Transform3D(bas, top + dir * 7.6)
 		var hmat := StandardMaterial3D.new()
 		hmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		hmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		hmat.albedo_color = Color(col.r, col.g, col.b, 0.5)
+		hmat.albedo_color = Color(col.r, col.g, col.b, 0.75)
 		hmat.emission_enabled = true
 		hmat.emission = col
-		holo.material_override = hmat
-		add_child(holo)
-		holo.global_position = top + dir * 8.0
+		_planet_pictogram(holo, hmat)
 		var htw := create_tween()
 		htw.tween_property(holo, "rotation:y", TAU * 2.0, 6.0).as_relative()
 		Sfx.play("warp", -8.0)
 		await get_tree().create_timer(4.5).timeout
 		var ftw := create_tween()
 		ftw.tween_property(hmat, "albedo_color:a", 0.0, 2.0)
+		ftw.parallel().tween_property(cmat, "albedo_color:a", 0.0, 2.0)
 		await ftw.finished
 		holo.queue_free()
+		cone.queue_free()
 		_floor_glyph(top, bas, col)
-	# 7. wind down: sky fades, bloom eases back
+		# 7. wind down: sky fades, bloom eases back
 	await get_tree().create_timer(3.0).timeout
 	for t9 in tris:
 		var ftw2 := create_tween()
@@ -298,34 +312,46 @@ func activate() -> void:
 		m9._on_monolith_advanced()
 	_busy = false
 
-## the permanent scar: a no-collide pictogram of the next planet, flat
-## in the ground where the monolith stood
+## the flat 2D planet pictogram: outline ring, three latitude bands,
+## an equator bar. Drawn in the XZ plane of its parent, engraved-bar
+## style like the Harold glyphs.
+func _planet_pictogram(parent: Node3D, mat: Material) -> void:
+	var ring := MeshInstance3D.new()
+	var rm := TorusMesh.new()
+	rm.inner_radius = 3.3
+	rm.outer_radius = 3.6
+	ring.mesh = rm
+	ring.material_override = mat
+	parent.add_child(ring)
+	for i in 3:
+		var band := MeshInstance3D.new()
+		var bm2 := BoxMesh.new()
+		var half := sqrt(maxf(0.1, 3.3 * 3.3 - pow(1.1 * float(i + 1), 2.0)))
+		bm2.size = Vector3(half * 2.0, 0.06, 0.22)
+		band.mesh = bm2
+		band.material_override = mat
+		band.position = Vector3(0, 0, -1.1 * float(i + 1))
+		parent.add_child(band)
+		if i > 0:
+			var band2 := MeshInstance3D.new()
+			band2.mesh = bm2
+			band2.material_override = mat
+			band2.position = Vector3(0, 0, 1.1 * float(i))
+			parent.add_child(band2)
+	var bar := MeshInstance3D.new()
+	var bbm := BoxMesh.new()
+	bbm.size = Vector3(6.6, 0.06, 0.26)
+	bar.mesh = bbm
+	bar.material_override = mat
+	parent.add_child(bar)
+
+## the permanent scar: the same pictogram, burned flat into the ground
+## where the monolith stood
 func _floor_glyph(top: Vector3, bas: Basis, col: Color) -> void:
 	var g := Node3D.new()
 	add_child(g)
 	g.global_transform = Transform3D(bas, top + dir * 0.06)
-	var ring := MeshInstance3D.new()
-	var rm := TorusMesh.new()
-	rm.inner_radius = 3.4
-	rm.outer_radius = 3.8
-	ring.mesh = rm
-	ring.material_override = Destructible.make_material(col, 1.4)
-	g.add_child(ring)
-	# lat/long etch: reads as "a planet", whatever the planet
-	for i in 3:
-		var band := MeshInstance3D.new()
-		var bm2 := TorusMesh.new()
-		bm2.inner_radius = 3.4 - 1.0 * float(i + 1) * 0.8
-		bm2.outer_radius = bm2.inner_radius + 0.18
-		band.mesh = bm2
-		band.material_override = Destructible.make_material(col.darkened(0.2), 1.0)
-		g.add_child(band)
-	var bar := MeshInstance3D.new()
-	var bbm := BoxMesh.new()
-	bbm.size = Vector3(6.8, 0.06, 0.2)
-	bar.mesh = bbm
-	bar.material_override = Destructible.make_material(col.darkened(0.1), 1.1)
-	g.add_child(bar)
+	_planet_pictogram(g, Destructible.make_material(col, 1.4))
 
 func _env() -> Environment:
 	for c in get_tree().current_scene.get_children():

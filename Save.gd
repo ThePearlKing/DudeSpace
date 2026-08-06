@@ -285,6 +285,7 @@ func apply_progress() -> void:
 	Game.wrath = float(_progress.get("wrath", 0.0))
 	Game.door_open = bool(_progress.get("door_open", false))
 	Game.monolith_stage = int(_progress.get("monolith_stage", 0))
+	Game.void_loot = _progress.get("void_loot", {})
 	Game.mind_core = bool(_progress.get("mind_core", false))
 	Game.cheated = bool(_progress.get("cheated", false))
 	Game.godmode = bool(_progress.get("c_god", false))
@@ -368,6 +369,7 @@ func save_progress() -> void:
 		"wrath": Game.wrath,
 		"door_open": Game.door_open,
 		"monolith_stage": Game.monolith_stage,
+		"void_loot": Game.void_loot,
 		"mind_core": Game.mind_core,
 		"cheated": Game.cheated,
 		"c_god": Game.godmode,

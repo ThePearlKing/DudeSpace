@@ -1395,6 +1395,14 @@ func _make_held_model(id: String) -> void:
 		return
 	var col := _held_color(id)
 	var dark := Color("#2a2a30")
+	if id == "ytetra":
+		# SPECIMEN 4 in your hand: the exact tetrahedron, glowing amber
+		var tmi := MeshInstance3D.new()
+		tmi.mesh = MainframeComplex._tetra_mesh(0.2)
+		tmi.material_override = Destructible.make_material(
+			Color("#ffd23f"), 1.8)
+		_held.add_child(tmi)
+		return
 	if Inventory.weapons.has(id):
 		match id:
 			"ak47":

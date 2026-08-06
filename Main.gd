@@ -142,6 +142,7 @@ func _boot() -> void:
 			await _load_set(0.02 + 0.42 * float(bnum)
 				/ float(Universe.bodies.size()),
 				"planets: %s" % str(b.name))
+	_build_boundary()
 	await _load_set(0.46, "life support")
 	if not Game.tutorial_session:
 		_spawn_invaders()
@@ -771,7 +772,8 @@ func _mainframe_test() -> void:
 	var floor_checks: Array = [
 		["vent tube", (u0 * cos(0.263) - e1 * sin(0.263)).normalized(), rF, 1.5],
 		["bunk hall", (u0 * cos(0.263) - e2 * sin(0.263)).normalized(), rF, 1.5],
-		["VIP deck", (u0 * cos(0.412) - e2 * sin(0.412)).normalized(), rF - 7.0, 1.8],
+		["gold suite", ((u0 * cos(4.6) + e1 * sin(4.6)) * 47.0
+			- e2 * 10.2).normalized(), 48.09, 1.5],
 		["assembly", (u0 * cos(0.722) - e1 * sin(0.722)).normalized(), rF, 3.0],
 		["generator", (u0 * cos(0.978) - e1 * sin(0.978)).normalized(), rF, 3.0],
 		["ringA east", (u0 * cos(2.0) + e1 * sin(2.0)).normalized(), rF, 2.5],
@@ -847,6 +849,44 @@ func _mainframe_test() -> void:
 
 ## Windowed: hover a camera over the Pixel colony mouth and screenshot
 ## straight down -- checks the mesh-cut opening actually clears the
+## The EDGE OF THE UNIVERSE, visible when you get close: a red warning
+## lattice that fades in over the last 2km before the god throws you
+## back. Inward faces only.
+func _build_boundary() -> void:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_front;
+uniform float bradius = 95000.0;
+varying vec3 wpos;
+void vertex(){ wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment(){
+	float d = bradius - length(wpos - vec3(0.0));
+	float near = 1.0 - smoothstep(120.0, 2000.0, abs(d));
+	vec2 g = fract(wpos.xy * 0.002) - 0.5;
+	vec2 g2 = fract(wpos.zy * 0.002) - 0.5;
+	float lat = max(step(abs(g.x), 0.03) + step(abs(g.y), 0.03),
+		step(abs(g2.x), 0.03));
+	ALPHA = near * (0.10 + 0.55 * min(lat, 1.0));
+	ALBEDO = vec3(1.0, 0.15, 0.1);
+	EMISSION = vec3(1.0, 0.15, 0.1) * near * 1.6;
+}
+"""
+	var bmesh := SphereMesh.new()
+	bmesh.radius = Universe.BOUNDARY
+	bmesh.height = Universe.BOUNDARY * 2.0
+	bmesh.radial_segments = 64
+	bmesh.rings = 32
+	var bmat := ShaderMaterial.new()
+	bmat.shader = sh
+	bmat.set_shader_parameter("bradius", Universe.BOUNDARY)
+	var bmi := MeshInstance3D.new()
+	bmi.mesh = bmesh
+	bmi.material_override = bmat
+	bmi.extra_cull_margin = 16384.0
+	add_child(bmi)
+	bmi.global_position = Vector3.ZERO
+
 ## CTD_TEST=28: the README tour. Flies a camera to every showpiece and
 ## saves docs/shots/*.png.
 func _readme_shots() -> void:
