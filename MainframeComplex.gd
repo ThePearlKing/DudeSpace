@@ -1446,7 +1446,18 @@ func _rings() -> void:
 		211, -6.0)
 	_chatter(Transform3D(_fr(3.72), _C + _pdir(3.72) * (_rF + 2.0)) \
 		.translated_local(Vector3(5.0, 0, 0)).origin, 212, -7.0)
-	_hall(0, 3.92, 5.172, [[4.35, -1.0], [4.75, 1.0]])
+	# aT: exact centre of hall segment 1 -- the second top-floor airlock
+	# sits here, opposite side of the planet from the atrium's
+	var aT := 3.92 + 2.3 / _rF + (((5.172 - 3.92) * _rF - 4.6) / 17.0) / _rF
+	_hall(0, 3.92, 5.172, [[4.35, -1.0], [4.75, 1.0], [aT, 1.0]])
+	var tfb := _fr(aT)
+	_airlock(Transform3D(tfb * Basis(Vector3(0, 1, 0), PI * 0.5),
+		Transform3D(tfb, _C + _pdir(aT) * _rF)
+		.translated_local(Vector3(3.05, 0, 0)).origin))
+	var tawx := Transform3D(tfb, _C + _pdir(aT) * (_rF + 2.25))
+	_plate(Vector3(0.5, 5.5, 1.2), tawx, Vector3(3.05, 0, 1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 5.5, 1.2), tawx, Vector3(3.05, 0, -1.9), STEEL, 0.0)
+	_plate(Vector3(0.5, 1.95, 3.1), tawx, Vector3(3.05, 1.8, 0), STEEL, 0.0)
 	var st9 := _ring_room(0, 4.35, -1.0, "STORAGE", 2)
 	_dress_storage(st9)
 	var wk := _ring_room(0, 4.75, 1.0, "WORKSHOP", 2)
