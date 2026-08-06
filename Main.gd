@@ -4490,9 +4490,10 @@ func _populate(b) -> void:
 					var hh2 := House.new()
 					hh2.kind = "small"
 					hh2.human_home = true
-					if ti == 0 and hi == 0:
-						# the first house of the first town has been
-						# here longer than the town has. Harold's.
+					# Harold's house hides in ONE seeded spot among all
+					# twelve town houses -- a different town and door
+					# every world, never just "the first one you check"
+					if ti * 3 + hi == int(absi(Game.world_seed * 13 + 5)) % 12:
 						hh2.harolds = true
 						hh2.human_home = false
 					# town houses live in a NEGATIVE pocket-lot band so
