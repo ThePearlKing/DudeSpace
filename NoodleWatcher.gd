@@ -137,8 +137,10 @@ func _process(delta: float) -> void:
 	# beyond the edge the god cannot reach you; past the eighth monolith
 	# he has nothing left to police. Either way: he WATCHES -- and with
 	# the sky broken he watches FURIOUS -- but he does not act.
-	var untouchable: bool = Game.zone == "" \
-		and p.global_position.length() > Universe.BOUNDARY
+	# INDOORS IS SANCTUARY: inside any pocket interior (a house, a
+	# temple) the god cannot reach through the roof. He waits.
+	var untouchable: bool = Game.zone != "" \
+		or p.global_position.length() > Universe.BOUNDARY
 	var sky_broken: bool = Game.monolith_stage >= 8
 	if sky_broken:
 		w = maxf(w, 0.85)   # the stare of a god who lost

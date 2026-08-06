@@ -118,7 +118,13 @@ func _process(delta: float) -> void:
 		var want: Vector3 = p.global_position + out * 17.0 \
 			+ Vector3(sin(_t * 0.37 + _phase), sin(_t * 0.51 + _phase * 2.0) * 0.7,
 				cos(_t * 0.33 + _phase)) * 3.0
-		global_position = global_position.lerp(want, minf(1.0, delta * 0.7))
+		# approach SPEED-CAPPED: it walks its way to the ring (8 m/s),
+		# no more teleport-lunging across half the field
+		var stepv := want - global_position
+		var maxstep := 8.0 * delta
+		if stepv.length() > maxstep:
+			stepv = stepv.normalized() * maxstep
+		global_position += stepv
 		# stared at head-on? it eases back. politely. wrongly.
 		var cam: Camera3D = get_viewport().get_camera_3d()
 		if cam != null and d > 0.5:

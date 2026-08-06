@@ -1544,6 +1544,12 @@ func _harold_test() -> void:
 			lt9 = ch
 	if lt9 != null:
 		lt9.use()
+	var bkc := 0
+	for ch2 in hh._hshelf.get_children():
+		if ch2 is MeshInstance3D:
+			bkc += 1
+	print("HAROLD shelf meshes: %d (expect 70+) %s" % [bkc,
+		"PASS" if bkc > 40 else "FAIL"])
 	print("HAROLD lime tetra: found=%s count=%d %s" % [
 		str(lt9 != null), Inventory.res_count("ltetra"),
 		"PASS" if lt9 != null and Inventory.res_count("ltetra") == 1
@@ -5915,7 +5921,8 @@ func _update_stalkers(delta: float) -> void:
 	for st in get_tree().get_nodes_in_group("stalker"):
 		if is_instance_valid(st):
 			live.append(st)
-	var no_stalk: bool = Game.monolith_stage >= 8 or (_player != null
+	var no_stalk: bool = Game.monolith_stage >= 8 or Game.zone != "" \
+		or (_player != null
 		and Game.zone == ""
 		and _player.global_position.length() > Universe.BOUNDARY)
 	if no_stalk:

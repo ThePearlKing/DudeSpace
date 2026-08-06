@@ -1127,11 +1127,14 @@ func _build_harold_secret(c: Vector3, sz: Vector3, fy: float) -> void:
 	_deco(c + Vector3(hx - 1.1, fy - c.y + 1.15, hz - 0.9),
 		Vector3(0.28, 2.3, 0.1), wood.darkened(0.2), 0.0)
 	# THE LIBRARY: two honest bookcases, and the one that lies
+	# backs to the WALL, books to the ROOM (they shipped reversed: 98
+	# books all politely facing the plaster)
 	_hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, 2.2), rng) \
-		.rotation_degrees.y = 90.0
-	_hshelf_unit(c + Vector3(2.2, fy - c.y, -hz + 0.85), rng)
+		.rotation_degrees.y = -90.0
+	_hshelf_unit(c + Vector3(2.2, fy - c.y, -hz + 0.85), rng) \
+		.rotation_degrees.y = 180.0
 	_hshelf = _hshelf_unit(c + Vector3(-hx + 0.85, fy - c.y, -2.0), rng)
-	_hshelf.rotation_degrees.y = 90.0
+	_hshelf.rotation_degrees.y = -90.0
 	# the book that is not a book: bound in red, sitting too proud
 	var bk := SecretBook.new()
 	bk.host = self

@@ -165,7 +165,12 @@ func _process(delta: float) -> void:
 	var want: Vector3 = p.global_position + out * 70.0 \
 		+ Vector3(sin(_t * 0.31 + _phase), sin(_t * 0.44 + _phase * 2.0) * 0.6,
 			cos(_t * 0.28 + _phase)) * 8.0
-	global_position = global_position.lerp(want, minf(1.0, delta * 0.7))
+	# the BIG one is slow the way weather is slow: capped at 14 m/s
+	var stepv := want - global_position
+	var maxstep := 14.0 * delta
+	if stepv.length() > maxstep:
+		stepv = stepv.normalized() * maxstep
+	global_position += stepv
 	# STRIKE: inside 90m a tendril reaches you every few seconds
 	if d < 90.0 and _strike_cd <= 0.0 and not Game.dead:
 		_strike_cd = 3.5
