@@ -255,7 +255,8 @@ var wrath_event: bool = false   # the noodle god is currently descending
 ## with full geometric ceremony first.
 func wrath_event_over(caught: bool) -> void:
 	wrath_event = false
-	if not caught:
+	if not caught or godmode:
+		# god mode: the sentence cannot be carried out. The god lets go.
 		return
 	if hardcore:
 		permadeath()
