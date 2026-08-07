@@ -22,6 +22,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
 		_on = not _on
 		visible = _on
+		Game.hitbox_debug = _on
+		var cs9 := get_tree().current_scene
+		if cs9 and cs9.has_method("set_hitbox_debug"):
+			cs9.set_hitbox_debug(_on)
 
 func _process(_delta: float) -> void:
 	if not _on:

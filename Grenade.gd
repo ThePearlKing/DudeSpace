@@ -7,9 +7,9 @@ extends Node3D
 ## animal in range learns about shrapnel.
 
 const FUSE := 2.2
-const KILL_R := 6.0      # machines inside this: instant scrap
-const DENT_R := 14.0     # machines inside this: +1 damage (3 = dead)
-const HURT_R := 16.0     # creatures inside this: scaled damage
+const KILL_R := 10.0     # machines inside this: instant scrap
+const DENT_R := 24.0     # machines inside this: +1 damage (3 = dead)
+const HURT_R := 28.0     # creatures inside this: scaled damage
 
 var vel: Vector3 = Vector3.ZERO
 var _t: float = 0.0
@@ -47,6 +47,26 @@ func _physics_process(delta: float) -> void:
 func _boom() -> void:
 	var pos := global_position
 	# machines: scrap the close ones, dent the near ones
+	if Game.hitbox_debug:
+		for rr9 in [[KILL_R, Color(1.0, 0.4, 0.1, 0.3)],
+				[HURT_R, Color(1.0, 0.1, 0.1, 0.12)]]:
+			var dbg := MeshInstance3D.new()
+			var dsm := SphereMesh.new()
+			dsm.radius = rr9[0]
+			dsm.height = float(rr9[0]) * 2.0
+			dbg.mesh = dsm
+			var dmat := StandardMaterial3D.new()
+			dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			dmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			dmat.albedo_color = rr9[1]
+			dmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+			dbg.material_override = dmat
+			get_parent().add_child(dbg)
+			dbg.global_position = pos
+			var dtw := dbg.create_tween()
+			dtw.tween_interval(1.1)
+			dtw.tween_property(dmat, "albedo_color:a", 0.0, 0.4)
+			dtw.tween_callback(dbg.queue_free)
 	for grp in ["machine", "chest", "autominer", "bench", "nterm"]:
 		for n in get_tree().get_nodes_in_group(grp):
 			if not (n is Node3D) or not is_instance_valid(n):
@@ -76,9 +96,9 @@ func _boom() -> void:
 				continue
 			# gentle falloff: even the EDGE of the blast means it --
 			# never below 30% (a nearby grenade used to tickle)
-			var fall := maxf(0.3, 1.0 - (dc / HURT_R) * 0.7)
+			var fall := maxf(0.4, 1.0 - (dc / HURT_R) * 0.6)
 			if c.has_method("take_damage"):
-				c.take_damage(80.0 * fall, (c.global_position - pos).normalized())
+				c.take_damage(110.0 * fall, (c.global_position - pos).normalized())
 	# the thrower is not exempt. physics has no favorites.
 	var p = get_tree().get_first_node_in_group("player")
 	if p != null:

@@ -620,6 +620,19 @@ class _EquipSlot extends Panel:
 
 class _ItemCell extends Panel:
 	var id: String = ""
+	var mult := 1
+	var _mlbl: Label = null
+
+	func _set_mult(v: int) -> void:
+		mult = clampi(v, 1, 99)
+		if _mlbl == null:
+			_mlbl = Label.new()
+			_mlbl.add_theme_font_size_override("font_size", 18)
+			_mlbl.modulate = Color("#ffe066")
+			_mlbl.position = Vector2(6, 4)
+			_mlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_mlbl)
+		_mlbl.text = "×%d" % mult if mult > 1 else ""
 
 	func _ready() -> void:
 		# hover glow + click flash (locked tutorial items stay gray)
@@ -645,11 +658,27 @@ class _ItemCell extends Panel:
 			ui.try_buy(id)
 
 	func _gui_input(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if not (event is InputEventMouseButton and event.pressed):
+			return
+		# scroll on a stackable: pick HOW MANY to craft (resets on buy)
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP \
+				and Inventory.STACKABLE.has(id):
+			_set_mult(mult + 1)
+			return
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN \
+				and Inventory.STACKABLE.has(id):
+			_set_mult(mult - 1)
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT:
 			var ui := _find_ui()
 			if ui:
 				_flash_click()
-				ui.try_buy(id)
+				var n9 := mult
+				_set_mult(1)
+				for k9 in n9:
+					if not Game.creative and not Inventory.can_buy(id):
+						break
+					ui.try_buy(id)
 
 	func _find_ui() -> InventoryUI:
 		var n: Node = self

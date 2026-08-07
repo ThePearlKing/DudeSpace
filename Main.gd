@@ -4449,6 +4449,61 @@ class CactusPlant extends StaticBody3D:
 			global_transform.basis.y)
 		queue_free()
 
+## F3: dress every live hitbox in translucent green so collision truth
+## is visible (blast radii draw themselves at detonation)
+func set_hitbox_debug(on: bool) -> void:
+	for n9 in get_tree().get_nodes_in_group("hb_dbg"):
+		if is_instance_valid(n9):
+			n9.queue_free()
+	if not on:
+		return
+	var seen9 := {}
+	for g9 in ["enemy", "stalker", "big_stalker", "animal", "machine",
+			"player", "waypoint"]:
+		for b9 in get_tree().get_nodes_in_group(g9):
+			if seen9.has(b9):
+				continue
+			seen9[b9] = true
+			_hb_paint(b9)
+
+func _hb_paint(root: Node) -> void:
+	var stack9: Array = [root]
+	while not stack9.is_empty():
+		var n9: Node = stack9.pop_back()
+		for c9 in n9.get_children():
+			stack9.append(c9)
+		if n9 is CollisionShape3D and (n9 as CollisionShape3D).shape != null:
+			var sh9: Shape3D = (n9 as CollisionShape3D).shape
+			var mi9 := MeshInstance3D.new()
+			if sh9 is BoxShape3D:
+				mi9.mesh = Surfaces.box_mesh((sh9 as BoxShape3D).size)
+			elif sh9 is SphereShape3D:
+				var sm9 := SphereMesh.new()
+				sm9.radius = (sh9 as SphereShape3D).radius
+				sm9.height = sm9.radius * 2.0
+				mi9.mesh = sm9
+			elif sh9 is CapsuleShape3D:
+				var cm9 := CapsuleMesh.new()
+				cm9.radius = (sh9 as CapsuleShape3D).radius
+				cm9.height = (sh9 as CapsuleShape3D).height
+				mi9.mesh = cm9
+			elif sh9 is CylinderShape3D:
+				var cy9 := CylinderMesh.new()
+				cy9.top_radius = (sh9 as CylinderShape3D).radius
+				cy9.bottom_radius = cy9.top_radius
+				cy9.height = (sh9 as CylinderShape3D).height
+				mi9.mesh = cy9
+			else:
+				continue
+			var hm9 := StandardMaterial3D.new()
+			hm9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			hm9.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			hm9.albedo_color = Color(0.2, 1.0, 0.4, 0.22)
+			hm9.cull_mode = BaseMaterial3D.CULL_DISABLED
+			mi9.material_override = hm9
+			mi9.add_to_group("hb_dbg")
+			n9.add_child(mi9)
+
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
 		# EXOTIC FLORA, clustered: little stands of branching orange
