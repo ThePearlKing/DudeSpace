@@ -357,8 +357,7 @@ class _ForkStudio extends Node3D:
 				_leg_r.rotation.x = q * 1.1
 				_arm_l.rotation.z = 1.5
 				_arm_r.rotation.z = -1.5
-		# the pupil finds the camera and stays there. of course it does.
-		_pupil.position = Vector3(0, 0, 0.16)
+		# the pupil stays put; the build placed it proud of the white
 
 ## ---------------------------------------------------------- SPY CAM
 class SpyCam extends StaticBody3D:

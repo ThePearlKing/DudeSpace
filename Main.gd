@@ -342,6 +342,8 @@ func _boot() -> void:
 		_edge_shots()
 	if OS.get_environment("CTD_TEST") == "32":
 		_throat_shot()
+	if OS.get_environment("CTD_TEST") == "39":
+		_forktv_shot()
 	if OS.get_environment("CTD_TEST") == "36":
 		_skyshow_test()
 	if OS.get_environment("CTD_TEST") == "37":
@@ -1641,6 +1643,19 @@ func _shatter_test() -> void:
 	print("SHATTER t+20: leftover=%d lattice_visible=%s %s" % [cracks_end,
 		str(lat_end), "PASS" if cracks_mid > 0 and not lat_mid
 		and lat_end else "FAIL"])
+	get_tree().quit()
+
+## CTD_TEST=39: capture the FORK TV studio feed itself
+func _forktv_shot() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var vp := TVSet.channel_feed(get_tree(), 1)
+	TVSet.ping(1)
+	await get_tree().create_timer(2.0).timeout
+	TVSet.ping(1)
+	await get_tree().create_timer(0.5).timeout
+	var img := vp.get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("FORKSHOT saved")
 	get_tree().quit()
 
 ## CTD_TEST=36: fire the monolith sky show headless and prove it built
