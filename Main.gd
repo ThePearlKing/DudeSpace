@@ -5493,26 +5493,49 @@ func show_chat_bubble(pname: String, text: String) -> void:
 				break
 	if target == null or not is_instance_valid(target):
 		return
-	var old := target.get_node_or_null("chatbubble")
-	if old:
-		old.queue_free()
+	# older bubbles climb out of the way -- chat again and the new line
+	# slides in underneath instead of stacking on top of the old one
+	for c9 in target.get_children():
+		if c9 is Node3D and c9.has_meta("chat_bub"):
+			(c9 as Node3D).position.y += 0.62
+	var root9 := Node3D.new()
+	root9.set_meta("chat_bub", true)
+	target.add_child(root9)
+	root9.position = Vector3(0, 3.0, 0)
 	var lbl := Label3D.new()
-	lbl.name = "chatbubble"
 	lbl.text = text
-	lbl.font_size = 22
+	lbl.font_size = 30
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.no_depth_test = true
 	lbl.render_priority = 10
 	lbl.outline_size = 8
-	lbl.width = 420
+	lbl.width = 460
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = Vector3(0, 3.0, 0)
-	target.add_child(lbl)
-	var tw := lbl.create_tween()
-	tw.tween_interval(5.0)
+	root9.add_child(lbl)
+	# the CARD behind the words, human-bubble style
+	var bg9 := MeshInstance3D.new()
+	var bgm9 := QuadMesh.new()
+	var lines9 := 1 + int(text.length() / 34)
+	bgm9.size = Vector2(clampf(0.5 + float(text.length()) * 0.055, 0.9, 3.3),
+		0.26 + float(lines9) * 0.24)
+	bg9.mesh = bgm9
+	var bmat9 := ShaderMaterial.new()
+	var bsh9 := Shader.new()
+	bsh9.code = EarthHuman.BUBBLE_SHADER
+	bmat9.shader = bsh9
+	bmat9.set_shader_parameter("alpha", 0.85)
+	bmat9.render_priority = 9
+	bg9.material_override = bmat9
+	bg9.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bg9.extra_cull_margin = 6.0
+	root9.add_child(bg9)
+	var tw := root9.create_tween()
+	tw.tween_interval(6.0)
 	tw.tween_property(lbl, "modulate:a", 0.0, 0.8)
-	tw.tween_callback(lbl.queue_free)
+	tw.parallel().tween_method(func(v: float) -> void:
+		bmat9.set_shader_parameter("alpha", v), 0.85, 0.0, 0.8)
+	tw.tween_callback(root9.queue_free)
 
 ## WELCOME TO <city>: a roadside sign dressed like its city.
 func _city_sign(b, dir: Vector3, cname: String, arch: String,
