@@ -1144,9 +1144,9 @@ func _sky_detonate() -> void:
 		plate.add_child(pm9)
 		# each shard dies on its own clock, up to ~3s apart
 		var pfd := pm9.create_tween()
-		pfd.tween_interval(1.4 + brng.randf() * 3.0)
+		pfd.tween_interval(0.9 + brng.randf() * 1.2)
 		pfd.tween_property(pm9, "transparency", 1.0,
-			4.5 + brng.randf() * 2.0)
+			1.6 + brng.randf() * 1.6)
 		pfd.tween_callback(pm9.hide)
 		# the FALL: perfectly still for a breath, then off it goes
 		var dirn := cen.normalized()
@@ -1155,20 +1155,24 @@ func _sky_detonate() -> void:
 			txn = dirn.cross(Vector3(1, 0, 0))
 		txn = txn.normalized()
 		var tzn := txn.cross(dirn).normalized()
-		var away := (dirn * (0.8 if brng.randf() < 0.5 else -0.45)
-			+ txn * brng.randf_range(-0.6, 0.6)
-			+ tzn * brng.randf_range(-0.6, 0.6)).normalized()
+		var away := (dirn * (0.9 if brng.randf() < 0.5 else -0.55)
+			+ txn * brng.randf_range(-0.7, 0.7)
+			+ tzn * brng.randf_range(-0.7, 0.7)).normalized()
+		var hold9 := 0.5 + brng.randf_range(0.0, 0.5)
 		var sc9 := plate.create_tween()
-		sc9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
+		sc9.tween_interval(hold9)
 		sc9.tween_property(plate, "position",
-			away * Universe.BOUNDARY * brng.randf_range(0.2, 0.55),
-			brng.randf_range(5.0, 9.0)) \
+			away * Universe.BOUNDARY * brng.randf_range(0.5, 1.1),
+			brng.randf_range(1.2, 2.4)) \
 			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		sc9.parallel().tween_property(plate, "scale",
+			Vector3.ONE * brng.randf_range(2.0, 3.2),
+			brng.randf_range(1.2, 2.4))
 		var tb9 := plate.create_tween()
-		tb9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
+		tb9.tween_interval(hold9)
 		tb9.tween_property(plate, "rotation",
-			Vector3(brng.randf_range(-2.0, 2.0), brng.randf_range(-2.0, 2.0),
-				brng.randf_range(-1.0, 1.0)), 8.0).as_relative()
+			Vector3(brng.randf_range(-4.0, 4.0), brng.randf_range(-4.0, 4.0),
+				brng.randf_range(-2.0, 2.0)), 2.4).as_relative()
 	for f9 in ifc9:
 		var A9 := (iv9[(f9 as Array)[0]] as Vector3).normalized()
 		var B9 := (iv9[(f9 as Array)[1]] as Vector3).normalized()
@@ -1187,7 +1191,7 @@ func _sky_detonate() -> void:
 						pt.call(i9, j9 + 1))
 	var bf9 := create_tween()
 	_sky_tweens.append(bf9)
-	bf9.tween_interval(12.0)
+	bf9.tween_interval(7.0)
 	bf9.tween_callback(func() -> void:
 		if is_instance_valid(bshell):
 			bshell.queue_free())
