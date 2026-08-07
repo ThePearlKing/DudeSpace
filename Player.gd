@@ -1415,6 +1415,63 @@ func _make_held_model(id: String) -> void:
 		return
 	var col := _held_color(id)
 	var dark := Color("#2a2a30")
+	if Inventory.armors.has(id):
+		# ARMOR IN HAND: the piece itself, tinted its own color -- no
+		# item may remain a cube
+		var ac9: Color = Inventory.armors[id]["color"]
+		if id.ends_with("helmet"):
+			_hm_cyl(0.16, 0.13, Vector3(0, 0.03, 0), ac9, 0.5, 0.14)
+			_hm_cyl(0.18, 0.03, Vector3(0, -0.05, 0), ac9, 0.4, 0.18)
+		elif id.ends_with("chest"):
+			_hm_box(Vector3(0.3, 0.34, 0.08), Vector3(0, 0, 0.03), ac9, 0.5)
+			_hm_box(Vector3(0.3, 0.34, 0.08), Vector3(0, 0, -0.03), ac9, 0.4)
+			_hm_box(Vector3(0.1, 0.06, 0.16), Vector3(-0.16, 0.16, 0), ac9, 0.5)
+			_hm_box(Vector3(0.1, 0.06, 0.16), Vector3(0.16, 0.16, 0), ac9, 0.5)
+		elif id.ends_with("legs"):
+			_hm_box(Vector3(0.11, 0.34, 0.12), Vector3(-0.08, -0.05, 0), ac9, 0.5)
+			_hm_box(Vector3(0.11, 0.34, 0.12), Vector3(0.08, -0.05, 0), ac9, 0.5)
+			_hm_box(Vector3(0.28, 0.1, 0.13), Vector3(0, 0.15, 0), ac9, 0.4)
+		else:
+			_hm_box(Vector3(0.1, 0.12, 0.2), Vector3(-0.08, -0.06, 0), ac9, 0.5)
+			_hm_box(Vector3(0.1, 0.12, 0.2), Vector3(0.08, -0.06, 0), ac9, 0.5)
+		if int(Inventory.enchant.get(id, 0)) > 0:
+			_ench_shine(_held)
+		return
+	if id == "grenade":
+		var gb9 := MeshInstance3D.new()
+		var gs9 := SphereMesh.new()
+		gs9.radius = 0.11
+		gs9.height = 0.2
+		gb9.mesh = gs9
+		gb9.material_override = Destructible.make_material(Color("#3a4a3a"), 0.3)
+		_held.add_child(gb9)
+		_hm_box(Vector3(0.16, 0.03, 0.03), Vector3(0, 0.09, 0), Color("#2a2a30"), 0.4)
+		_hm_cyl(0.02, 0.05, Vector3(0.05, 0.13, 0), Color("#c8c8d0"), 0.5)
+		return
+	if id == "coil":
+		_hm_cyl(0.07, 0.2, Vector3.ZERO, Color("#8a5a2a"), 0.4)
+		for cr9 in 4:
+			var crr := MeshInstance3D.new()
+			var crt := TorusMesh.new()
+			crt.inner_radius = 0.075
+			crt.outer_radius = 0.095
+			crr.mesh = crt
+			crr.material_override = Destructible.make_material(Color("#e8a050"), 0.7)
+			crr.position = Vector3(0, -0.07 + float(cr9) * 0.05, 0)
+			_held.add_child(crr)
+		return
+	if id == "magnet":
+		_hm_box(Vector3(0.06, 0.2, 0.06), Vector3(-0.07, 0, 0), Color("#c03030"), 0.5)
+		_hm_box(Vector3(0.06, 0.2, 0.06), Vector3(0.07, 0, 0), Color("#3050c0"), 0.5)
+		_hm_box(Vector3(0.2, 0.06, 0.06), Vector3(0, -0.13, 0), Color("#8a8f98"), 0.4)
+		return
+	if id == "cage":
+		for cx9 in [-0.09, 0.0, 0.09]:
+			_hm_box(Vector3(0.02, 0.24, 0.02), Vector3(cx9, 0, 0.09), Color("#b8bcc8"), 0.4)
+			_hm_box(Vector3(0.02, 0.24, 0.02), Vector3(cx9, 0, -0.09), Color("#b8bcc8"), 0.4)
+		_hm_box(Vector3(0.22, 0.02, 0.22), Vector3(0, 0.12, 0), Color("#8a8f98"), 0.4)
+		_hm_box(Vector3(0.22, 0.02, 0.22), Vector3(0, -0.12, 0), Color("#8a8f98"), 0.4)
+		return
 	if id in Monolith.ITEM_IDS:
 		# a chain tetrahedron in your hand, glowing its own color
 		var tmi := MeshInstance3D.new()

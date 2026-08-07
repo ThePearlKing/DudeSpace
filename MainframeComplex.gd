@@ -626,6 +626,37 @@ void fragment(){
 		Vector3(-5.6, 0, 0), 90.0)
 	_sign("MEDBAY / GYM", abas, _C + _u0 * (_rF + 4.4),
 		Vector3(5.6, 0, 0), -90.0)
+	# the FACILITY MAP, right in the lobby where it can be found --
+	# the map room kept its copy, but this one greets you
+	var mpost := MapPost.new()
+	mpost.host = self
+	var mpm := MeshInstance3D.new()
+	mpm.mesh = Surfaces.box_mesh(Vector3(1.3, 1.7, 0.25))
+	mpm.material_override = _femissive(Color("#33ff99").darkened(0.55), 0.9)
+	mpost.add_child(mpm)
+	var mps := MeshInstance3D.new()
+	mps.mesh = Surfaces.box_mesh(Vector3(1.05, 1.1, 0.06))
+	mps.material_override = _femissive(Color("#33ff99"), 1.6)
+	mpost.add_child(mps)
+	mps.position = Vector3(0, 0.15, -0.14)
+	var mpc := CollisionShape3D.new()
+	mpc.shape = Surfaces.box_shape(Vector3(1.5, 1.9, 0.5))
+	mpost.add_child(mpc)
+	add_child(mpost)
+	mpost.global_transform = Transform3D(abas, _C + _u0 * (_rF + 1.6))
+	mpost.translate_object_local(Vector3(5.55, 0, 2.2))
+	mpost.rotate_object_local(Vector3.UP, PI * 0.5)
+	var mpl := Label3D.new()
+	mpl.text = "FACILITY MAP [F]"
+	mpl.font_size = 24
+	mpl.pixel_size = 0.007
+	mpl.modulate = Color("#33ff99")
+	mpl.outline_size = 8
+	mpl.outline_modulate = Color(0, 0, 0, 0.9)
+	mpl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(mpl)
+	mpl.global_transform = Transform3D(abas, _C + _u0 * (_rF + 2.9))
+	mpl.translate_object_local(Vector3(5.5, 0, 2.2))
 	_sign("ASSEMBLY / GENERATOR", abas, _C + _u0 * (_rF + 3.4),
 		Vector3(0, 0, -5.7), 0.0)
 	# MAP DISPENSER: a wall button that hands you the facility map
@@ -4538,6 +4569,7 @@ class MapBtn extends StaticBody3D:
 var _map_rooms: Array = []     # [name, world pos] in cycle order
 var _map_sel := -1
 var _map_holo: Array = []      # the current path markers
+var _map_ui: CanvasLayer = null
 var _map_holo_t := 0.0
 var _map_chk := 1.0
 
@@ -4572,8 +4604,58 @@ func map_use() -> void:
 			["KITCHEN", _C + _aup9(1, 4.0) * (_rF + 1.0)],
 			["MEDBAY", _C + _aup9(1, 0.75) * (_rF + 1.0)],
 		]
-	_map_sel = (_map_sel + 1) % _map_rooms.size()
-	var pick: Array = _map_rooms[_map_sel]
+	if _map_ui != null:
+		_map_close()
+		return
+	_map_ui = CanvasLayer.new()
+	_map_ui.layer = 44
+	add_child(_map_ui)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map_ui.add_child(dim)
+	var pc := PanelContainer.new()
+	pc.set_anchors_preset(Control.PRESET_CENTER)
+	_map_ui.add_child(pc)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	pc.add_child(vb)
+	var ttl := Label.new()
+	ttl.text = "FACILITY MAP — pick a destination"
+	ttl.add_theme_font_size_override("font_size", 20)
+	vb.add_child(ttl)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	vb.add_child(grid)
+	for ri9 in _map_rooms.size():
+		var btn := Button.new()
+		btn.text = str((_map_rooms[ri9] as Array)[0])
+		btn.custom_minimum_size = Vector2(240, 40)
+		var idx9 := ri9
+		btn.pressed.connect(func() -> void:
+			_map_route(idx9)
+			_map_close())
+		grid.add_child(btn)
+	var cls := Button.new()
+	cls.text = "close"
+	cls.pressed.connect(_map_close)
+	vb.add_child(cls)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _map_close() -> void:
+	if _map_ui != null and is_instance_valid(_map_ui):
+		_map_ui.queue_free()
+	_map_ui = null
+	if not Game.dead:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+## the route: a BEAM OF GREEN ARROWS from where YOU stand, running at
+## corridor height the whole way (no cutting through walls), then a
+## radial arrow chain down/up to the destination's level
+func _map_route(sel: int) -> void:
+	var pick: Array = _map_rooms[sel]
 	_hud_flash("MAP: -> %s" % str(pick[0]))
 	Sfx.play("click", -12.0)
 	for m in _map_holo:
@@ -4586,32 +4668,50 @@ func map_use() -> void:
 		return
 	var d1 := ((pl.global_position as Vector3) - _C).normalized()
 	var d2 := ((pick[1] as Vector3) - _C).normalized()
-	var r1 := ((pl.global_position as Vector3) - _C).length()
 	var r2c := ((pick[1] as Vector3) - _C).length()
+	var rcorr := _rF + 1.6
 	var ang := d1.angle_to(d2)
 	var nx := d1.cross(d2)
 	if nx.length() < 0.01:
 		nx = d1.cross(_e2)
 	nx = nx.normalized()
-	var n := maxi(3, int(ang * 60.0 / 2.2))
 	var hmat := StandardMaterial3D.new()
 	hmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	hmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	hmat.albedo_color = Color(0.4, 1.0, 0.7, 0.55)
+	hmat.albedo_color = Color(0.35, 1.0, 0.55, 0.7)
 	hmat.emission_enabled = true
-	hmat.emission = Color(0.4, 1.0, 0.7)
+	hmat.emission = Color(0.35, 1.0, 0.55)
+	hmat.emission_energy_multiplier = 1.4
+	var amesh := CylinderMesh.new()
+	amesh.top_radius = 0.0
+	amesh.bottom_radius = 0.17
+	amesh.height = 0.5
+	amesh.radial_segments = 6
+	var n := maxi(3, int(ang * rcorr / 2.2))
 	for i in n + 1:
 		var t := float(i) / float(n)
 		var dd := d1.rotated(nx, ang * t)
+		var dnext := d1.rotated(nx, ang * minf(1.0, t + 1.0 / float(n)))
+		var tangent := ((dnext - dd).normalized()
+			if i < n else (dnext - d1.rotated(nx, ang * (t - 1.0 / float(n)))).normalized())
 		var mk := MeshInstance3D.new()
-		var mm2 := SphereMesh.new()
-		mm2.radius = 0.14 if i < n else 0.34
-		mm2.height = mm2.radius * 2.0
-		mk.mesh = mm2
+		mk.mesh = amesh
 		mk.material_override = hmat
 		add_child(mk)
-		mk.global_position = _C + dd * lerpf(r1, r2c, t)
+		mk.global_transform = Transform3D(_bup(tangent), _C + dd * rcorr)
 		_map_holo.append(mk)
+	# the radial tail: arrows pointing at the destination's level
+	var steps9 := maxi(1, int(absf(r2c - rcorr) / 2.0))
+	var rdir9 := 1.0 if r2c > rcorr else -1.0
+	for k9 in steps9:
+		var rr9 := rcorr + (absf(r2c - rcorr) * float(k9 + 1)
+			/ float(steps9)) * rdir9
+		var mk2 := MeshInstance3D.new()
+		mk2.mesh = amesh
+		mk2.material_override = hmat
+		add_child(mk2)
+		mk2.global_transform = Transform3D(_bup(d2 * rdir9), _C + d2 * rr9)
+		_map_holo.append(mk2)
 
 ## ==================== STASHES: the complex PAYS now ====================
 ## One-time loot caches and per-session harvests scattered through the
@@ -5152,6 +5252,12 @@ func _airlock(xf: Transform3D) -> void:
 ## The facility WORKS for you now -- one unique service per room, the
 ## kind a run detours for: healing, free fuel, noodle cooking, a deep
 ## scan, and the A.I.'s permanent blessing.
+class MapPost extends StaticBody3D:
+	var host = null
+	func use() -> void:
+		if host != null:
+			host.map_use()
+
 class RoomService extends StaticBody3D:
 	var host = null
 	var kind: String = ""
