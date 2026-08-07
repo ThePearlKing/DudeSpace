@@ -458,6 +458,9 @@ func _refresh() -> void:
 	for i in _slots.size():
 		_slots[i].add_theme_stylebox_override("panel", _slot_style(i == Inventory.selected))
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
+		_slot_lbls[i].material = Inventory.ench_text_material() \
+			if int(Inventory.enchant.get(str(Inventory.hotbar[i]["id"]), 0)) > 0 \
+			else null
 
 func _on_killed() -> void:
 	_over.visible = true

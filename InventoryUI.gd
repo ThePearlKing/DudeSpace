@@ -315,6 +315,9 @@ func _refresh() -> void:
 	for i in _slot_panels.size():
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
 		_slot_panels[i].add_theme_stylebox_override("panel", _hot_style(i == Inventory.selected))
+		_slot_lbls[i].material = Inventory.ench_text_material() \
+			if int(Inventory.enchant.get(str(Inventory.hotbar[i]["id"]), 0)) > 0 \
+			else null
 	for ep in _equip_slots:
 		ep.refresh()
 	if _eq_lbl:

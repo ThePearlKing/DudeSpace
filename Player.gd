@@ -1270,6 +1270,8 @@ func _update_held() -> void:
 		return
 	_held.visible = true
 	_make_held_model(id)
+	if int(Inventory.enchant.get(id, 0)) > 0:
+		_ench_shine(_held)
 	# mirror the model into the third-person hand
 	if _body and is_instance_valid(_body):
 		_body.set_held(_held.duplicate(), Inventory.weapons.has(id))
@@ -1397,6 +1399,12 @@ func _strip_held(n: Node) -> void:
 		n.visible = false
 	for c in n.get_children():
 		_strip_held(c)
+
+func _ench_shine(n: Node) -> void:
+	if n is MeshInstance3D:
+		(n as MeshInstance3D).material_overlay = Inventory.ench_overlay()
+	for c9 in n.get_children():
+		_ench_shine(c9)
 
 func _make_held_model(id: String) -> void:
 	if _held_machine(id):

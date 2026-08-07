@@ -22,6 +22,48 @@ var jet_max: float = 100.0
 var jet_power: float = 1.0        # thrust multiplier (Jetpack 3.0 = 2x)
 var jet_on: bool = false          # was the jetpack toggled ON (persisted)
 var enchant: Dictionary = {}      # weapon id -> shrine enchant level
+
+# ---- the ENCHANTED look: orange, with a moving shine ----
+var _ench_txt: ShaderMaterial = null
+var _ench_ovl: ShaderMaterial = null
+
+## canvas shader for item-name labels: warm orange with a light band
+## sweeping across the text forever
+func ench_text_material() -> ShaderMaterial:
+	if _ench_txt != null:
+		return _ench_txt
+	var sh := Shader.new()
+	sh.code = """shader_type canvas_item;
+varying vec2 wp;
+void vertex(){ wp = VERTEX; }
+void fragment(){
+	vec4 c = texture(TEXTURE, UV);
+	float band = pow(0.5 + 0.5 * sin(TIME * 2.4 - (wp.x + wp.y) * 0.09), 8.0);
+	vec3 col = mix(vec3(1.0, 0.55, 0.12), vec3(1.0, 0.92, 0.6), band);
+	COLOR = vec4(col, c.a);
+}"""
+	_ench_txt = ShaderMaterial.new()
+	_ench_txt.shader = sh
+	return _ench_txt
+
+## mesh overlay for enchanted models: orange rim + the same traveling
+## shine, additive, riding material_overlay so shared mats stay clean
+func ench_overlay() -> ShaderMaterial:
+	if _ench_ovl != null:
+		return _ench_ovl
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+render_mode unshaded, blend_add, cull_back;
+varying vec3 lp;
+void vertex(){ lp = VERTEX; }
+void fragment(){
+	float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.2);
+	float band = pow(0.5 + 0.5 * sin(TIME * 2.6 - (lp.x + lp.y + lp.z) * 9.0), 8.0);
+	ALBEDO = vec3(1.0, 0.45, 0.1) * (fr * 0.4 + band * 0.85);
+}"""
+	_ench_ovl = ShaderMaterial.new()
+	_ench_ovl.shader = sh
+	return _ench_ovl
 var hyper_rockets: int = 0        # broken rockets that still hold a hyperdrive
 
 # --- armor & equipment ---

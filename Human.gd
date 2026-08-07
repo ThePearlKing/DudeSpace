@@ -127,6 +127,8 @@ func _bolt_on(parent: MeshInstance3D, size: Vector3, pos: Vector3, c: Color, id:
 		mi.material_override = Surfaces.portal(Color("#7df9ff"))
 	else:
 		mi.material_override = Destructible.make_material(c, 0.35)
+	if id != "" and int(Inventory.enchant.get(id, 0)) > 0:
+		mi.material_overlay = Inventory.ench_overlay()
 	parent.add_child(mi)
 	return mi
 
