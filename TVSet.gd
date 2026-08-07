@@ -119,19 +119,19 @@ class _ForkStudio extends Node3D:
 		_eye.position = Vector3(0, 0.15, 0.75)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
-		wm.radius = 0.34
-		wm.height = 0.68
+		wm.radius = 0.23
+		wm.height = 0.46
 		white.mesh = wm
 		white.material_override = Destructible.make_material(Color("#f2f2ee"), 0.9)
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.13
-		pm.height = 0.26
+		pm.radius = 0.09
+		pm.height = 0.18
 		_pupil.mesh = pm
 		_pupil.material_override = Destructible.make_material(Color("#1a1016"), 0.2)
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.24)
+		_pupil.position = Vector3(0, 0, 0.16)
 		# limbs: noodly boxes on pivot nodes
 		_arm_l = _limb(Vector3(-0.95, 0.35, 0), Color("#e8cf9a"))
 		_arm_r = _limb(Vector3(0.95, 0.35, 0), Color("#e8cf9a"))
@@ -283,7 +283,7 @@ class _ForkStudio extends Node3D:
 				_arm_l.rotation.z = 1.5
 				_arm_r.rotation.z = -1.5
 		# the pupil finds the camera and stays there. of course it does.
-		_pupil.position = Vector3(0, 0, 0.24)
+		_pupil.position = Vector3(0, 0, 0.16)
 
 ## ---------------------------------------------------------- SPY CAM
 class SpyCam extends StaticBody3D:
