@@ -40,7 +40,9 @@ func setup(lvl: int, home_body, pyr: bool = false, as_tank: bool = false) -> voi
 		flyer = true
 		shooter = true
 		burst = 3
-		speed *= 2.2   # airborne pursuit must out-run a jetpack
+		# fast enough to menace, slow enough that a dude sprinting on
+		# succulent fruit (11.25 m/s) can BARELY stay ahead
+		speed = minf(speed * 2.2, 10.8)
 		if tank:
 			# the green one: a wall with an eye. slow. barely killable.
 			hp *= 3.5
