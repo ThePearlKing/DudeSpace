@@ -344,6 +344,8 @@ func _boot() -> void:
 		_throat_shot()
 	if OS.get_environment("CTD_TEST") == "36":
 		_skyshow_test()
+	if OS.get_environment("CTD_TEST") == "37":
+		_shatter_test()
 	if OS.get_environment("CTD_TEST") == "33":
 		_harold_test()
 	if OS.get_environment("CTD_TEST") == "34":
@@ -1543,6 +1545,28 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=37: the full break-the-universe sequence, timed
+func _shatter_test() -> void:
+	await get_tree().create_timer(3.0).timeout
+	Game.monolith_stage = 8
+	_on_monolith_advanced()
+	sky_shatter()
+	await get_tree().create_timer(3.0).timeout
+	var cracks_mid := get_tree().get_nodes_in_group("mono_sky").size()
+	var lat_mid: bool = _boundary_mesh != null and _boundary_mesh.visible
+	print("SHATTER t+3: cracks=%d lattice_visible=%s (want cracks>0, lattice HIDDEN)"
+		% [cracks_mid, str(lat_mid)])
+	await get_tree().create_timer(17.0).timeout
+	var cracks_end := 0
+	for n9 in get_tree().get_nodes_in_group("mono_sky"):
+		if is_instance_valid(n9) and not n9.is_queued_for_deletion():
+			cracks_end += 1
+	var lat_end: bool = _boundary_mesh != null and _boundary_mesh.visible
+	print("SHATTER t+20: leftover=%d lattice_visible=%s %s" % [cracks_end,
+		str(lat_end), "PASS" if cracks_mid > 0 and not lat_mid
+		and lat_end else "FAIL"])
+	get_tree().quit()
+
 ## CTD_TEST=36: fire the monolith sky show headless and prove it built
 func _skyshow_test() -> void:
 	await get_tree().create_timer(3.0).timeout
