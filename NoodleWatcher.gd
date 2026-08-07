@@ -141,7 +141,7 @@ func _process(delta: float) -> void:
 	# temple) the god cannot reach through the roof. He waits.
 	var untouchable: bool = Game.zone != "" \
 		or p.global_position.length() > Universe.BOUNDARY \
-		or Game.playtime < Game.god_truce_until \
+		or Game.playtime < Game.god_restrained_until \
 		or Game.playtime < Game.god_pacified_until
 	var sky_broken: bool = Game.monolith_stage >= 8
 	if sky_broken and Game.playtime >= Game.god_pacified_until:

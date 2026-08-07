@@ -1024,7 +1024,7 @@ func sky_shatter() -> void:
 	det.tween_callback(_sky_detonate)
 
 func _sky_detonate() -> void:
-	Game.god_truce(40.0)
+	Game.god_restrain(40.0)
 	_shatter_seq = false
 	mono_sky_clear()
 	var flash := CanvasLayer.new()
@@ -1395,7 +1395,7 @@ func sky_show(col: Color, stage: int, linger: bool,
 	# not mercy, not approval -- the game simply holds the god off your
 	# back while the sky performs, because getting smacked mid-ceremony
 	# is bad theater. He is not glad. He is just not allowed.
-	Game.god_truce(400.0 if linger else 34.0)
+	Game.god_restrain(400.0 if linger else 34.0)
 	var cktw := create_tween()
 	_sky_tweens.append(cktw)
 	cktw.tween_method(func(v: float) -> void:
@@ -2808,7 +2808,7 @@ func _process(delta: float) -> void:
 			_threw_back = true
 			Game.anger(15.0)
 			if Game.wrath >= 70.0 and node != null \
-					and Game.playtime >= Game.god_truce_until:
+					and Game.playtime >= Game.god_restrained_until:
 				var gh := GodHand.new()
 				add_child(gh)
 				gh.begin(node, Vector3.ZERO)
@@ -6241,7 +6241,7 @@ func _update_stalkers(delta: float) -> void:
 		if is_instance_valid(st):
 			live.append(st)
 	var no_stalk: bool = Game.monolith_stage >= 8 or Game.zone != "" \
-		or Game.playtime < Game.god_truce_until \
+		or Game.playtime < Game.god_restrained_until \
 		or (_player != null
 		and Game.zone == ""
 		and _player.global_position.length() > Universe.BOUNDARY)

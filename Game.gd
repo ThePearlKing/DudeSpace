@@ -170,12 +170,12 @@ var charts_unlocked: bool = false  # map room star charts: hidden worlds shown
 var suit_boost_until: float = 0.0  # BIG COMPUTER overclock: fast legs until then
 var white_beaten: bool = false
 var suppress_hurt_until: float = 0.0  # god-grip window: hurt notes muted
-var god_truce_until: float = 0.0   # sky ceremonies: the god watches, only
+var god_restrained_until: float = 0.0   # sky ceremonies: the god watches, only
 
-## the game pulls the god off you for a ceremony: sets the window AND
-## cancels anything already mid-swing (smack arms, grabs, the hand)
-func god_truce(secs: float) -> void:
-	god_truce_until = maxf(god_truce_until, playtime + secs)
+## not a truce -- he agrees to nothing. The game RESTRAINS him for the
+## ceremony window and cancels anything already mid-swing
+func god_restrain(secs: float) -> void:
+	god_restrained_until = maxf(god_restrained_until, playtime + secs)
 	for fx in get_tree().get_nodes_in_group("god_fx"):
 		if is_instance_valid(fx):
 			fx.queue_free()
