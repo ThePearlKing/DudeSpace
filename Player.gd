@@ -698,10 +698,11 @@ func _start_ghost(cat: String, kind: String) -> void:
 	_ghost = MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	if cat == "tvish":
-		bm.size = Vector3(2.8, 2.1, 0.5) if kind == "tvbig" \
-			else (Vector3(1.35, 1.4, 0.5) if kind == "tv" \
-			else Vector3(0.45, 0.7, 0.55))
-	if cat == "house":
+		# TRUE dimensions: the ghost is the exact footprint
+		bm.size = Vector3(2.74, 2.0, 0.5) if kind == "tvbig" \
+			else (Vector3(1.3, 1.2, 0.45) if kind == "tv" \
+			else Vector3(0.44, 0.7, 0.55))
+	elif cat == "house":
 		var w := 5.0
 		var hh := 3.4
 		match kind:
@@ -719,7 +720,7 @@ func _start_ghost(cat: String, kind: String) -> void:
 				w = 3.4
 				hh = 3.0
 		bm.size = Vector3(w, hh, w)
-	else:
+	elif cat == "furn":
 		match kind:
 			"carpet":
 				bm.size = Vector3(4.4, 0.08, 3.2)
@@ -733,8 +734,10 @@ func _start_ghost(cat: String, kind: String) -> void:
 				bm.size = Vector3(5.4, 2.3, 2.0)
 			"moonbase":
 				bm.size = Vector3(7.0, 3.5, 7.0)
+			"table":
+				bm.size = Vector3(1.6, 0.95, 1.0)
 			"doorframe":
-				bm.size = Vector3(2.1, 2.8, 0.4)
+				bm.size = Vector3(2.1, 2.9, 0.25)
 			_:
 				bm.size = Vector3(0.7, 1.1, 0.7)
 	_ghost.mesh = bm
@@ -846,7 +849,7 @@ func _update_ghost() -> void:
 			if hit2:
 				hit.position = hit2.position
 		_ghost.global_transform = Transform3D(_basis_from_up(up2),
-			hit.position + up2 * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4))
+			hit.position + up2 * (_ghost.mesh.size.y * 0.5))
 		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
 		_ghost.visible = true
 	else:
@@ -856,7 +859,7 @@ func _confirm_ghost() -> void:
 	if _ghost == null or not _ghost.visible:
 		return
 	var tf := _ghost.global_transform
-	var base_pos: Vector3 = tf.origin - tf.basis.y * (_ghost.mesh.size.y * 0.5 if _ghost_cat == "house" else 0.4)
+	var base_pos: Vector3 = tf.origin - tf.basis.y * (_ghost.mesh.size.y * 0.5)
 	if _ghost_cat == "house" and _ghost_kind == "station":
 		# SPACE ONLY, and stations SNAP to each other edge-to-edge
 		var hudn = get_tree().get_first_node_in_group("hud")
@@ -904,6 +907,11 @@ func _confirm_ghost() -> void:
 		tn.set_meta("placed_id", _ghost_kind)
 		tn.set_meta("owner", Net.my_name())
 		tn.global_transform = Transform3D(tf.basis, base_pos)
+		# screen turns to greet its owner
+		var flat9 := (global_position - tn.global_position) \
+			- tf.basis.y * (global_position - tn.global_position).dot(tf.basis.y)
+		if flat9.length() > 0.1:
+			tn.look_at(tn.global_position - flat9, tf.basis.y)
 		if not Game.creative:
 			Inventory.remove_res(_ghost_kind, 1)
 		Sfx.play("place")
