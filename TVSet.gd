@@ -183,8 +183,8 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.17
-		pm.height = 0.34
+		pm.radius = 0.16
+		pm.height = 0.32
 		_pupil.mesh = pm
 		var pmat := StandardMaterial3D.new()
 		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -195,14 +195,14 @@ class _ForkStudio extends Node3D:
 		# w~0.45 = 0.84 of base) and FLATTENED to 45% depth -- a disc
 		# riding the eyeball, not a full ball
 		_pupil.scale = Vector3(1, 1, 0.45)
-		_pupil.position = Vector3(0, 0, 0.36)
+		_pupil.position = Vector3(0, 0, 0.35)
 		var iris := MeshInstance3D.new()
 		var im := TorusMesh.new()
-		im.inner_radius = 0.2
-		im.outer_radius = 0.26
+		im.inner_radius = 0.19
+		im.outer_radius = 0.24
 		iris.mesh = im
 		iris.rotation_degrees = Vector3(90, 0, 0)
-		iris.position = Vector3(0, 0, 0.33)
+		iris.position = Vector3(0, 0, 0.34)
 		var imat := StandardMaterial3D.new()
 		imat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		imat.albedo_color = Color("#c89020")
