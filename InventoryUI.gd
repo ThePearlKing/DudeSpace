@@ -509,7 +509,13 @@ class _EquipSlot extends Panel:
 		elif Inventory.armors.has(id):
 			nm = "%s  -%d%%" % [Inventory.armors[id]["name"], int(Inventory.armors[id]["def"])]
 		_lbl.text = slot_name.to_upper() + "\n" + (nm if nm != "" else "—")
-		_lbl.modulate = Color("#9adf9a") if nm != "" else Color(1, 1, 1, 0.5)
+		if int(Inventory.enchant.get(id, 0)) > 0:
+			# enchanted: orange with the moving shine, right in the slot
+			_lbl.material = Inventory.ench_text_material()
+			_lbl.modulate = Color(1, 1, 1)
+		else:
+			_lbl.material = null
+			_lbl.modulate = Color("#9adf9a") if nm != "" else Color(1, 1, 1, 0.5)
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

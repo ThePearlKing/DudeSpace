@@ -124,7 +124,10 @@ func _bolt_on(parent: MeshInstance3D, size: Vector3, pos: Vector3, c: Color, id:
 	if id.begins_with("prism_"):
 		mi.material_override = _prism_material()
 	elif id.begins_with("ultima_"):
-		mi.material_override = Surfaces.portal(Color("#7df9ff"))
+		# enchanted ultima runs HOT: the portal effect itself turns
+		# orange instead of cyan
+		mi.material_override = Surfaces.portal(Color("#ff8c2a")
+			if int(Inventory.enchant.get(id, 0)) > 0 else Color("#7df9ff"))
 	else:
 		mi.material_override = Destructible.make_material(c, 0.35)
 	if id != "" and int(Inventory.enchant.get(id, 0)) > 0:
