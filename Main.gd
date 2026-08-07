@@ -4438,6 +4438,12 @@ class CactusPlant extends StaticBody3D:
 		get_parent().add_child(drop)
 		drop.global_position = global_position \
 			+ global_transform.basis.y * 1.2
+		# HARVESTED means harvested: the plant comes apart
+		Destructible.spawn_debris(get_parent(), global_position
+			+ global_transform.basis.y * 0.8,
+			Vector3(1.2, 1.8, 1.2), Color("#e8702a"), 
+			global_transform.basis.y)
+		queue_free()
 
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
@@ -4583,53 +4589,81 @@ func _populate(b) -> void:
 				ct1 = cd9.cross(Vector3.RIGHT)
 			ct1 = ct1.normalized()
 			var ct2 := cd9.cross(ct1).normalized()
-			for si9 in 4 + srng9.randi() % 5:
+			for si9 in 3 + srng9.randi() % 3:
 				var sd9 := (cd9 + (ct1 * srng9.randf_range(-1.4, 1.4)
 					+ ct2 * srng9.randf_range(-1.4, 1.4))
-					* (6.0 / float(b.radius))).normalized()
+					* (14.0 / float(b.radius))).normalized()
 				var sb9 := _basis_from_up(sd9)
 				var sroot := CactusPlant.new()
+				var ch9 := srng9.randf_range(1.6, 3.4)
+				if srng9.randf() < 0.15:
+					ch9 = srng9.randf_range(4.2, 5.6)   # the tall ones
+				var cr9 := srng9.randf_range(0.3, 0.5)
 				var scs9 := CollisionShape3D.new()
 				var scap9 := CapsuleShape3D.new()
-				scap9.radius = 0.5
-				scap9.height = 1.6
+				scap9.radius = cr9 + 0.1
+				scap9.height = ch9
 				scs9.shape = scap9
-				scs9.position = Vector3(0, 0.7, 0)
+				scs9.position = Vector3(0, ch9 * 0.5, 0)
 				sroot.add_child(scs9)
 				add_child(sroot)
 				sroot.global_transform = Transform3D(sb9,
 					b.center + sd9 * float(b.radius))
 				sroot.rotate_object_local(Vector3.UP, srng9.randf() * TAU)
-				var lobes := 2 + srng9.randi() % 3
-				var ly9 := 0.0
-				var lr9 := srng9.randf_range(0.28, 0.45)
-				for lk9 in lobes:
-					var lobe := MeshInstance3D.new()
-					var lm9 := SphereMesh.new()
-					var r9 := lr9 * (1.0 - float(lk9) * 0.22)
-					lm9.radius = r9
-					lm9.height = r9 * srng9.randf_range(2.0, 2.8)
-					lm9.radial_segments = 8
-					lm9.rings = 6
-					lobe.mesh = lm9
-					lobe.material_override = Destructible.make_material(
-						Color("#e8702a").darkened(srng9.randf_range(0.0, 0.15)),
-						0.35)
-					sroot.add_child(lobe)
-					ly9 += lm9.height * 0.36
-					lobe.position = Vector3(srng9.randf_range(-0.04, 0.04),
-						ly9, srng9.randf_range(-0.04, 0.04))
-					ly9 += lm9.height * 0.3
-				if srng9.randf() < 0.25:
+				var ccol := Color("#e8702a").darkened(
+					srng9.randf_range(0.0, 0.18))
+				var col9 := MeshInstance3D.new()
+				var cap9 := CapsuleMesh.new()
+				cap9.radius = cr9
+				cap9.height = ch9
+				cap9.radial_segments = 10
+				col9.mesh = cap9
+				col9.material_override = Destructible.make_material(ccol, 0.3)
+				sroot.add_child(col9)
+				col9.position = Vector3(0, ch9 * 0.5, 0)
+				# arms: the classic cactus silhouette, zero to two
+				for ak9 in srng9.randi() % 3:
+					var aa9 := srng9.randf() * TAU
+					var arm := MeshInstance3D.new()
+					var am9 := CapsuleMesh.new()
+					am9.radius = cr9 * 0.55
+					am9.height = srng9.randf_range(0.8, 1.5)
+					am9.radial_segments = 8
+					arm.mesh = am9
+					arm.material_override = Destructible.make_material(ccol, 0.3)
+					sroot.add_child(arm)
+					arm.position = Vector3(cos(aa9) * (cr9 + 0.15),
+						ch9 * srng9.randf_range(0.4, 0.7),
+						sin(aa9) * (cr9 + 0.15))
+					arm.rotation = Vector3(sin(aa9) * 0.6, 0, -cos(aa9) * 0.6)
+				# GREEN PRICKS: thin spines bristling off the column
+				for pk9 in 10 + srng9.randi() % 7:
+					var pa9 := srng9.randf() * TAU
+					var ph9 := srng9.randf_range(0.2, ch9 - 0.2)
+					var prick := MeshInstance3D.new()
+					var prm9 := CylinderMesh.new()
+					prm9.bottom_radius = 0.015
+					prm9.top_radius = 0.002
+					prm9.height = srng9.randf_range(0.18, 0.3)
+					prm9.radial_segments = 3
+					prick.mesh = prm9
+					prick.material_override = Destructible.make_material(
+						Color("#3fae4a"), 0.7)
+					sroot.add_child(prick)
+					prick.position = Vector3(cos(pa9) * cr9, ph9,
+						sin(pa9) * cr9)
+					prick.rotation = Vector3(sin(pa9) * 1.45, 0,
+						-cos(pa9) * 1.45)
+				if srng9.randf() < 0.3:
 					var nub := MeshInstance3D.new()
 					var nm9 := SphereMesh.new()
-					nm9.radius = 0.09
-					nm9.height = 0.14
+					nm9.radius = 0.11
+					nm9.height = 0.17
 					nub.mesh = nm9
 					nub.material_override = Destructible.make_material(
 						Color("#ffd23f"), 1.4)
 					sroot.add_child(nub)
-					nub.position = Vector3(0, ly9 + 0.06, 0)
+					nub.position = Vector3(0, ch9 + 0.06, 0)
 	if str(b.name) == "Requiem":
 		# THE GRAVEYARD PROPER: not just needles. Spike clusters, yes --
 		# but between them leaning gravestone slabs, bone-rib cages

@@ -1139,7 +1139,7 @@ func _physics_process(delta: float) -> void:
 	if Game.zone == "zero":
 		# ZERO-G: drift. Jetpack is your only authority.
 		if jet_ok:
-			var jp := JET_THRUST * Inventory.jet_power
+			var jp := JET_THRUST * Inventory.jet_power * _buff_mult()
 			var thrust := wish * jp
 			if Input.is_key_pressed(KEY_SPACE): thrust += up * jp
 			if Input.is_key_pressed(Settings.key("jet_down")): thrust -= up * jp
@@ -1153,9 +1153,7 @@ func _physics_process(delta: float) -> void:
 		if can_input and Input.is_key_pressed(KEY_SPACE):
 			v_up = JUMP_VEL              # fixed launch -> low gravity jumps higher
 		v_up -= _g * delta
-		var spd9 := WALK_SPEED \
-			* (1.35 if Game.playtime < Game.suit_boost_until else 1.0) \
-			* (1.25 if Game.playtime < Game.sugar_rush_until else 1.0)
+		var spd9 := WALK_SPEED * _buff_mult()
 		velocity = wish * spd9 + up * v_up
 	elif Game.underwater:
 		# SWIMMING: the water carries you. Heavy drag, a slow sink,
@@ -1915,6 +1913,15 @@ func _tracer(a: Vector3, b: Vector3, color: Color) -> void:
 	get_parent().add_child(mi)
 	# method callable on mi: auto-disconnects if the scene frees it first
 	get_tree().create_timer(0.05).timeout.connect(mi.queue_free)
+
+## every leg/thruster buff in one place -- walking AND jetpack
+func _buff_mult() -> float:
+	var m := 1.0
+	if Game.playtime < Game.suit_boost_until:
+		m *= 1.35
+	if Game.playtime < Game.sugar_rush_until:
+		m *= 1.25
+	return m
 
 func _update_shake(delta: float) -> void:
 	if _shake > 0.0:
