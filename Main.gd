@@ -1243,7 +1243,13 @@ func _sky_plates(skyp: Node3D, col: Color, stage: int) -> void:
 		return
 	var rngs := RandomNumberGenerator.new()
 	rngs.seed = 991 + stage * 31
+	# the late links FILL the sky: by cyan the universe is nearly done
+	# and it shows -- shards everywhere
 	var nplates := 84 + 14 * stage
+	if stage == 5:
+		nplates = 260
+	elif stage >= 6:
+		nplates = 460
 	var srad := Universe.BOUNDARY - 3000.0
 	var side := Universe.BOUNDARY * 0.048
 	var rim_mat := StandardMaterial3D.new()

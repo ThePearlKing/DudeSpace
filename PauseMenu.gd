@@ -469,13 +469,18 @@ func _open_mono() -> void:
 			# these SET progress now: button N = N links done. 1 raises
 			# the Earth stele and nothing else; 8 is the real end.
 			Game.monolith_stage = idx + 1
-			msync.call()
 			var cs := get_tree().current_scene
 			if idx == 7:
+				# shatter FIRST (it hides the lattice for the build-up),
+				# THEN sync -- the old order flashed the lattice on for
+				# a beat before the sequence even started
 				if cs and cs.has_method("sky_shatter"):
 					cs.sky_shatter()
-			elif cs and cs.has_method("mono_sky_demo"):
-				cs.mono_sky_demo(idx)
+				msync.call()
+			else:
+				msync.call()
+				if cs and cs.has_method("mono_sky_demo"):
+					cs.mono_sky_demo(idx)
 			Sfx.play("warp", -12.0))
 		srow.add_child(sb2)
 	col.add_child(_btn("Toggle universe boundary lattice", func() -> void:
