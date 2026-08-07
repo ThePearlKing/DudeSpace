@@ -539,13 +539,15 @@ func use_item(slot: int) -> bool:
 			jet_power = 2.0
 		"ward": wrath_ward = true
 		"noodle":
-			# a brooding god will NOT be bribed -- the noodle stays yours
+			# tribute ALWAYS lands -- a brooding god just takes it with
+			# less grace (half value), never refuses it outright. And a
+			# god kept happy remembers: every minute of peace sweetens
+			# the next noodle, up to +18 wrath forgiven per bowl.
+			var pot := maxf(3.0, 12.0 - 2.0 * float(Game.god_cycles)) \
+				+ minf(18.0, Game.god_peace / 60.0)
 			if Game.playtime < Game.god_standby_until:
-				Sfx.play("denied")
-				return false
-			# and each brood it survives, tribute means less to it
-			Game.wrath = maxf(0.0, Game.wrath \
-				- maxf(3.0, 12.0 - 2.0 * float(Game.god_cycles)))
+				pot *= 0.5
+			Game.wrath = maxf(0.0, Game.wrath - pot)
 		"banana":
 			Game.heal(15.0)
 			Sfx.play("eat")

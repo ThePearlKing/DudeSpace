@@ -283,6 +283,7 @@ func apply_progress() -> void:
 	Inventory.selected = int(_progress.get("selected", 0))
 	Game.score = int(_progress.get("score", 0))
 	Game.wrath = float(_progress.get("wrath", 0.0))
+	Game.god_peace = float(_progress.get("god_peace", 0.0))
 	Game.door_open = bool(_progress.get("door_open", false))
 	Game.monolith_stage = int(_progress.get("monolith_stage", 0))
 	Game.void_loot = _progress.get("void_loot", {})
@@ -380,6 +381,7 @@ func save_progress() -> void:
 		"ai_blessed": Game.ai_blessed,
 		"charts_unlocked": Game.charts_unlocked,
 		"white_beaten": Game.white_beaten,
+		"god_peace": Game.god_peace,
 		"lime_taken": Game.lime_taken,
 		"lime_wall_open": Game.lime_wall_open,
 		"harold_shelf_open": Game.harold_shelf_open,

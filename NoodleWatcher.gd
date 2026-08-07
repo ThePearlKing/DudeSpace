@@ -140,10 +140,21 @@ func _process(delta: float) -> void:
 	# INDOORS IS SANCTUARY: inside any pocket interior (a house, a
 	# temple) the god cannot reach through the roof. He waits.
 	var untouchable: bool = Game.zone != "" \
-		or p.global_position.length() > Universe.BOUNDARY
+		or p.global_position.length() > Universe.BOUNDARY \
+		or Game.playtime < Game.god_truce_until \
+		or Game.playtime < Game.god_pacified_until
 	var sky_broken: bool = Game.monolith_stage >= 8
-	if sky_broken:
+	if sky_broken and Game.playtime >= Game.god_pacified_until:
 		w = maxf(w, 0.85)   # the stare of a god who lost
+	# PEACE LEDGER: time spent liked accrues; enough of it and the god
+	# forgives a whole brood cycle -- tribute starts meaning more again
+	if Game.wrath < 25.0:
+		Game.god_peace += delta
+		if Game.god_peace >= 600.0 and Game.god_cycles > 0:
+			Game.god_peace -= 600.0
+			Game.god_cycles -= 1
+	else:
+		Game.god_peace = maxf(0.0, Game.god_peace - delta * 0.5)
 	# after it kills you (or anything does), it BROODS: a few minutes of
 	# locked red silence. still watching. still angry. not acting.
 	var standby := Game.playtime < Game.god_standby_until

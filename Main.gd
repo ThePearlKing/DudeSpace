@@ -346,6 +346,8 @@ func _boot() -> void:
 		_skyshow_test()
 	if OS.get_environment("CTD_TEST") == "37":
 		_shatter_test()
+	if OS.get_environment("CTD_TEST") == "38":
+		_shatter_shot()
 	if OS.get_environment("CTD_TEST") == "33":
 		_harold_test()
 	if OS.get_environment("CTD_TEST") == "34":
@@ -1022,6 +1024,7 @@ func sky_shatter() -> void:
 	det.tween_callback(_sky_detonate)
 
 func _sky_detonate() -> void:
+	Game.god_truce_until = maxf(Game.god_truce_until, Game.playtime + 40.0)
 	_shatter_seq = false
 	mono_sky_clear()
 	var flash := CanvasLayer.new()
@@ -1382,6 +1385,8 @@ func sky_show(col: Color, stage: int, linger: bool,
 	crack.add_to_group("mono_sky")
 	add_child(crack)
 	crack.global_position = Vector3.ZERO
+	Game.god_truce_until = maxf(Game.god_truce_until,
+		Game.playtime + (400.0 if linger else 34.0))
 	var cktw := create_tween()
 	_sky_tweens.append(cktw)
 	cktw.tween_method(func(v: float) -> void:
@@ -1596,6 +1601,24 @@ void fragment(){
 ## CTD_TEST=30: the EDGE diagnostics. Outside looking back (white void
 ## + star disc + planets in front), and inside looking out with the
 ## sky broken (lattice + cracks).
+## CTD_TEST=38: detonate and LOOK -- the packed shell must be in frame
+func _shatter_shot() -> void:
+	await get_tree().create_timer(4.0).timeout
+	Game.monolith_stage = 8
+	_sky_detonate()
+	var cam := Camera3D.new()
+	cam.far = 1000000.0
+	add_child(cam)
+	var hb = Universe.body_named("Home")
+	cam.global_position = hb.center + Vector3.UP * (hb.radius + 30.0)
+	cam.look_at(cam.global_position + Vector3(0.3, 1, 0.2), Vector3.FORWARD)
+	cam.current = true
+	await get_tree().create_timer(2.5).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("CTD_SHOT"))
+	print("SHATTERSHOT saved")
+	get_tree().quit()
+
 ## CTD_TEST=37: the full break-the-universe sequence, timed
 func _shatter_test() -> void:
 	await get_tree().create_timer(3.0).timeout
@@ -6208,6 +6231,7 @@ func _update_stalkers(delta: float) -> void:
 		if is_instance_valid(st):
 			live.append(st)
 	var no_stalk: bool = Game.monolith_stage >= 8 or Game.zone != "" \
+		or Game.playtime < Game.god_truce_until \
 		or (_player != null
 		and Game.zone == ""
 		and _player.global_position.length() > Universe.BOUNDARY)

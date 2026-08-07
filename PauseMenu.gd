@@ -366,6 +366,10 @@ func _open_cheats() -> void:
 	calm.pressed.connect(func() -> void:
 		Game.cheated = true
 		Game.wrath = 0.0
+		# calm means CALM: clears the brood, quiets even a broken-sky
+		# stare for ten minutes, and ends any standby sulk
+		Game.god_standby_until = 0.0
+		Game.god_pacified_until = Game.playtime + 600.0
 		Game.changed.emit()
 		Sfx.play("click"))
 	grow.add_child(calm)
