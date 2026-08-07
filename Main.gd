@@ -982,11 +982,7 @@ func mono_sky_clear() -> void:
 	_skyfx.clear()
 
 func mono_sky_demo(stage: int) -> void:
-	# cracks first, a held beat -- THEN the pop: the whole triangle
-	# field and the falling glass arrive at once, like a detonation,
-	# never loitering in the background from second zero
-	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7),
-		false, 3.5)
+	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7), false)
 
 ## THE SHATTER: the boundary breaks. White flash, then the sky-shell
 ## bursts into giant glass shards that tumble inward and fade. The
@@ -1398,13 +1394,15 @@ func sky_show(col: Color, stage: int, linger: bool,
 	add_child(skyp)
 	skyp.global_position = Vector3.ZERO
 	_skyfx.append(skyp)
+	# NO boundary-glass triangles here: those are pieces of the actual
+	# barrier and only the EIGHTH breaks it -- if link one shed them,
+	# the lore would have the universe half-won at yellow. Links shed
+	# only their falling glass rain (pink plenty, cyan tons).
 	if burst_delay > 0.0:
 		var bdt := skyp.create_tween()
 		bdt.tween_interval(burst_delay)
-		bdt.tween_callback(_sky_plates.bind(skyp, col, stage))
 		bdt.tween_callback(_sky_fall.bind(skyp, col, stage))
 	else:
-		_sky_plates(skyp, col, stage)
 		_sky_fall(skyp, col, stage)
 	var wheel := skyp.create_tween().set_loops()
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
