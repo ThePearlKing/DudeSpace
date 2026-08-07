@@ -7,7 +7,7 @@ extends Node
 signal changed
 
 const STACKABLE := ["raw_ingot", "raw_irid", "ingot", "irid", "ultima", "prism", "uranium", "sulfur", "semicircle", "circle", "waypoint",
-	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire", "sucfruit", "noodle"]
+	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire", "sucfruit", "noodle", "grenade"]
 const STACK_MAX := 999
 
 var coins: int = 0            # carried coins (lose 50% on death)

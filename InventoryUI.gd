@@ -223,15 +223,20 @@ func _make_cell(item: Dictionary) -> Control:
 	txt.add_child(nm)
 	if Inventory.armors.has(str(item.id)):
 		var defl := Label.new()
-		defl.text = "blocks %d%% damage" % int(Inventory.armors[str(item.id)]["def"])
+		var alv9 := int(Inventory.enchant.get(str(item.id), 0))
+		defl.text = "blocks %d%% damage" % int(
+			float(Inventory.armors[str(item.id)]["def"])
+			* (1.0 + 0.15 * float(alv9)))
 		defl.add_theme_font_size_override("font_size", 12)
 		defl.modulate = Color("#9adf9a")
 		txt.add_child(defl)
 	if Inventory.weapons.has(str(item.id)):
 		var wd9: Dictionary = Inventory.weapons[str(item.id)]
-		var dps9 := float(wd9["dmg"]) / maxf(0.02, float(wd9["rate"]))
+		var wlv9 := int(Inventory.enchant.get(str(item.id), 0))
+		var wdm9 := float(wd9["dmg"]) * (1.0 + 0.25 * float(wlv9))
+		var dps9 := wdm9 / maxf(0.02, float(wd9["rate"]))
 		var wl9 := Label.new()
-		wl9.text = "%d damage · %d d/s" % [int(wd9["dmg"]), int(dps9)]
+		wl9.text = "%d damage · %d d/s" % [int(wdm9), int(dps9)]
 		wl9.add_theme_font_size_override("font_size", 12)
 		wl9.modulate = Color("#ffb347")
 		txt.add_child(wl9)
@@ -323,11 +328,22 @@ func _refresh() -> void:
 	for i in _slot_panels.size():
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
 		var sid9 := str(Inventory.hotbar[i]["id"])
+		var elv9 := int(Inventory.enchant.get(sid9, 0))
 		if Inventory.weapons.has(sid9):
 			var wd0: Dictionary = Inventory.weapons[sid9]
-			_slot_panels[i].tooltip_text = "%d damage · %d d/s" % [
-				int(wd0["dmg"]),
-				int(float(wd0["dmg"]) / maxf(0.02, float(wd0["rate"])))]
+			var edm9 := float(wd0["dmg"]) * (1.0 + 0.25 * float(elv9))
+			var tip9 := "%d damage · %d d/s" % [int(edm9),
+				int(edm9 / maxf(0.02, float(wd0["rate"])))]
+			if elv9 > 0:
+				tip9 += "  (enchant +%d)" % elv9
+			_slot_panels[i].tooltip_text = tip9
+		elif Inventory.armors.has(sid9):
+			var ad0 := float(Inventory.armors[sid9]["def"]) \
+				* (1.0 + 0.15 * float(elv9))
+			var atip9 := "blocks %d%% damage" % int(ad0)
+			if elv9 > 0:
+				atip9 += "  (enchant +%d)" % elv9
+			_slot_panels[i].tooltip_text = atip9
 		else:
 			_slot_panels[i].tooltip_text = ""
 		_slot_panels[i].add_theme_stylebox_override("panel", _hot_style(i == Inventory.selected))

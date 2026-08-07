@@ -155,8 +155,8 @@ static func temple_spawn() -> Vector3:
 static func build_pyramid_interior(root: Node3D, exit_target: Vector3) -> void:
 	pyramid_exit = exit_target
 	var p := PYRAMID_POS
-	var base := 96.0
-	var hgt := 58.0
+	var base := 64.0
+	var hgt := 40.0
 	var brick := Surfaces.stone(Color("#b5934f"))
 	# floor
 	var fl := StaticBody3D.new()
@@ -247,7 +247,7 @@ void fragment(){
 	var hl9 := OmniLight3D.new()
 	hl9.light_color = Color("#ffcf8a")
 	hl9.light_energy = 1.8
-	hl9.omni_range = 90.0
+	hl9.omni_range = 70.0
 	root.add_child(hl9)
 	hl9.global_position = p + Vector3(0, hgt * 0.6, 0)
 	# the hall's OWN air: a deep stone drone with a thin whistle far
@@ -292,7 +292,7 @@ static func _pyramid_air() -> AudioStreamWAV:
 	return wav
 
 static func pyramid_spawn() -> Vector3:
-	return PYRAMID_POS + Vector3(0, 2.0, PYRAMID_POS.length() * 0.0 + 34.0)
+	return PYRAMID_POS + Vector3(0, 2.0, 22.0)
 
 static func build_shadow_temple(root: Node3D, dummy_body) -> void:
 	var p := SHADOW_POS

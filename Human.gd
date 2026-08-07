@@ -319,13 +319,39 @@ func animate(speed: float, grounded: bool, delta: float, jetting: bool = false) 
 	if _arm_l == null:
 		return
 	_punch_t = maxf(0.0, _punch_t - delta * 4.0)
+	if grounded:
+		# the airborne splay and chin drain away on landing
+		_leg_l.rotation.z = lerpf(_leg_l.rotation.z, 0.0, delta * 8.0)
+		_leg_r.rotation.z = lerpf(_leg_r.rotation.z, 0.0, delta * 8.0)
+		_arm_l.rotation.z = lerpf(_arm_l.rotation.z, 0.0, delta * 6.0)
+		_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.0, delta * 6.0)
+		if _head_m:
+			_head_m.rotation.x = lerpf(_head_m.rotation.x, 0.0, delta * 6.0)
 	if not grounded:
-		# airborne / jetpack: legs tuck, arms out (or up when jetting)
-		var arm_target := -1.2 if jetting else -2.4
-		_leg_l.rotation.x = lerpf(_leg_l.rotation.x, 0.7, delta * 8.0)
-		_leg_r.rotation.x = lerpf(_leg_r.rotation.x, 0.5, delta * 8.0)
-		_arm_l.rotation.x = lerpf(_arm_l.rotation.x, arm_target, delta * 6.0)
-		_arm_r.rotation.x = lerpf(_arm_r.rotation.x, arm_target, delta * 6.0)
+		if jetting:
+			# JETPACK: upright rocket-man -- legs hanging near straight
+			# with a light splay, arms pressed down-and-out, chin up.
+			# (same function drives net avatars, so everyone sees it)
+			_leg_l.rotation.x = lerpf(_leg_l.rotation.x, -0.15, delta * 8.0)
+			_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -0.05, delta * 8.0)
+			_leg_l.rotation.z = lerpf(_leg_l.rotation.z, -0.12, delta * 8.0)
+			_leg_r.rotation.z = lerpf(_leg_r.rotation.z, 0.12, delta * 8.0)
+			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, 0.25, delta * 6.0)
+			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, 0.25, delta * 6.0)
+			_arm_l.rotation.z = lerpf(_arm_l.rotation.z, -0.55, delta * 6.0)
+			_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.55, delta * 6.0)
+			if _head_m:
+				_head_m.rotation.x = lerpf(_head_m.rotation.x, -0.2,
+					delta * 6.0)
+		else:
+			# FALLING: skydiver arch -- legs trail BACK behind the hips
+			# (knees no longer aimed at the ground), arms thrown wide
+			_leg_l.rotation.x = lerpf(_leg_l.rotation.x, -0.45, delta * 8.0)
+			_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -0.3, delta * 8.0)
+			_leg_l.rotation.z = lerpf(_leg_l.rotation.z, -0.08, delta * 8.0)
+			_leg_r.rotation.z = lerpf(_leg_r.rotation.z, 0.08, delta * 8.0)
+			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -2.4, delta * 6.0)
+			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -2.4, delta * 6.0)
 	elif speed > 0.5:
 		# walk/run cycle: opposite arm-leg swing, faster with speed
 		_cycle += delta * clampf(speed, 2.0, 14.0) * 1.1

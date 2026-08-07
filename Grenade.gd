@@ -7,9 +7,9 @@ extends Node3D
 ## animal in range learns about shrapnel.
 
 const FUSE := 2.2
-const KILL_R := 3.5      # machines inside this: instant scrap
-const DENT_R := 7.0      # machines inside this: +1 damage (3 = dead)
-const HURT_R := 8.0      # creatures inside this: scaled damage
+const KILL_R := 6.0      # machines inside this: instant scrap
+const DENT_R := 14.0     # machines inside this: +1 damage (3 = dead)
+const HURT_R := 16.0     # creatures inside this: scaled damage
 
 var vel: Vector3 = Vector3.ZERO
 var _t: float = 0.0
@@ -74,9 +74,11 @@ func _boom() -> void:
 			var dc: float = pos.distance_to(c.global_position)
 			if dc > HURT_R:
 				continue
-			var fall := 1.0 - dc / HURT_R
+			# gentle falloff: even the EDGE of the blast means it --
+			# never below 30% (a nearby grenade used to tickle)
+			var fall := maxf(0.3, 1.0 - (dc / HURT_R) * 0.7)
 			if c.has_method("take_damage"):
-				c.take_damage(34.0 * fall, (c.global_position - pos).normalized())
+				c.take_damage(80.0 * fall, (c.global_position - pos).normalized())
 	# the thrower is not exempt. physics has no favorites.
 	var p = get_tree().get_first_node_in_group("player")
 	if p != null:
