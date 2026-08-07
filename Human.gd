@@ -329,17 +329,17 @@ func animate(speed: float, grounded: bool, delta: float, jetting: bool = false) 
 			_head_m.rotation.x = lerpf(_head_m.rotation.x, 0.0, delta * 6.0)
 	if not grounded:
 		if jetting:
-			# JETPACK: upright rocket-man -- legs hanging near straight
-			# with a light splay, arms pressed down-and-out, chin up.
+			# JETPACK: superman -- both arms punched straight ahead
+			# with a light splay, legs hanging near straight, chin up.
 			# (same function drives net avatars, so everyone sees it)
 			_leg_l.rotation.x = lerpf(_leg_l.rotation.x, -0.15, delta * 8.0)
 			_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -0.05, delta * 8.0)
 			_leg_l.rotation.z = lerpf(_leg_l.rotation.z, -0.12, delta * 8.0)
 			_leg_r.rotation.z = lerpf(_leg_r.rotation.z, 0.12, delta * 8.0)
-			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, 0.25, delta * 6.0)
-			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, 0.25, delta * 6.0)
-			_arm_l.rotation.z = lerpf(_arm_l.rotation.z, -0.55, delta * 6.0)
-			_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.55, delta * 6.0)
+			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, 1.45, delta * 6.0)
+			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, 1.45, delta * 6.0)
+			_arm_l.rotation.z = lerpf(_arm_l.rotation.z, -0.22, delta * 6.0)
+			_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 0.22, delta * 6.0)
 			if _head_m:
 				_head_m.rotation.x = lerpf(_head_m.rotation.x, -0.2,
 					delta * 6.0)

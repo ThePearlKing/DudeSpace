@@ -407,6 +407,8 @@ class SpyCam extends StaticBody3D:
 		Game.cam_aiming = true
 		if _aimcam == null:
 			_aimcam = Camera3D.new()
+			# layer 9 is the first-person hand: cameras don't see it
+			_aimcam.cull_mask = 0xFFFFF & ~(1 << 9)
 			_head.add_child(_aimcam)
 			_aimcam.position = Vector3(0, 0.22, -0.4)
 		_aimcam.current = true
@@ -607,8 +609,25 @@ class TV extends StaticBody3D:
 	var _menu_lbl: Label3D
 	var _con_lbl: Label3D
 	var _tick := 0.0
+	var _hp := 3
 
 	func take_damage(_d: float, _from: Vector3) -> void:
+		_hp -= 1
+		if _hp > 0:
+			# a crack, not a death: sparks and a flicker, screen stays up
+			Destructible.spawn_debris(get_parent(), global_position
+				+ global_transform.basis.y * (_sh() * 0.5 + 0.3),
+				Vector3(_sw() * 0.4, _sh() * 0.4, 0.2), Color("#1c1e24"),
+				global_transform.basis.y)
+			Sfx.play("click", -6.0)
+			if _screen and _screen.material_override:
+				var m: Material = _screen.material_override
+				var tw := create_tween()
+				tw.tween_method(func(v: float) -> void:
+					if m is StandardMaterial3D:
+						(m as StandardMaterial3D).emission_energy_multiplier = v,
+					0.05, 1.0, 0.35)
+			return
 		Destructible.spawn_debris(get_parent(), global_position
 			+ global_transform.basis.y * (_sh() * 0.5 + 0.3),
 			Vector3(_sw(), _sh(), 0.4), Color("#1c1e24"),
@@ -723,6 +742,7 @@ class TV extends StaticBody3D:
 			"camera":
 				_ensure_vp()
 				_vcam = Camera3D.new()
+				_vcam.cull_mask = 0xFFFFF & ~(1 << 9)   # no floating hand on TV
 				_vp.add_child(_vcam)
 				_vcam.current = true
 				m.albedo_texture = _vp.get_texture()

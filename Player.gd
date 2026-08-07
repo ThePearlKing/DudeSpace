@@ -222,8 +222,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Game.mode != Game.Mode.ON_FOOT or Game.dead:
 		return
 	if _ghost != null and event is InputEventMouseButton and event.pressed:
-		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
-			_confirm_ghost()   # either button places. Esc cancels.
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			_confirm_ghost()   # RMB places. LMB or Esc cancels.
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			_cancel_ghost()
 		get_viewport().set_input_as_handled()
 		return
 	# door/DESTROY modes only bite while the Furniture Placer is in hand;
@@ -850,6 +852,14 @@ func _update_ghost() -> void:
 				hit.position = hit2.position
 		_ghost.global_transform = Transform3D(_basis_from_up(up2),
 			hit.position + up2 * (_ghost.mesh.size.y * 0.5))
+		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
+		_ghost.visible = true
+	elif _ghost_kind == "camtv":
+		# cameras are anti-grav: aim at open air and the ghost hangs
+		# right there, 4m out. Aim at a surface and it mounts instead.
+		var upA := global_transform.basis.y
+		_ghost.global_transform = Transform3D(_basis_from_up(upA),
+			f - _camera.global_transform.basis.z * 4.0)
 		_ghost.rotate_object_local(Vector3.UP, _ghost_yaw)
 		_ghost.visible = true
 	else:
