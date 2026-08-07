@@ -7,7 +7,7 @@ extends StaticBody3D
 ## Unlike the old god-event, this one is a creature: it hunts at deep
 ## wrath, it hurts, and enough firepower drops it.
 
-var hp := 4000.0
+var hp := 2000.0
 var _t := 0.0
 var _phase := 0.0
 var _tents: Array = []
@@ -162,7 +162,7 @@ func _process(delta: float) -> void:
 	var d := to_me.length()
 	var out: Vector3 = to_me / d if d > 0.5 else Vector3(1, 0, 0)
 	# it looms at ~70m, drifting like weather with intent
-	var want: Vector3 = p.global_position + out * 70.0 \
+	var want: Vector3 = p.global_position + out * 110.0 \
 		+ Vector3(sin(_t * 0.31 + _phase), sin(_t * 0.44 + _phase * 2.0) * 0.6,
 			cos(_t * 0.28 + _phase)) * 8.0
 	# the BIG one is slow the way weather is slow: capped at 14 m/s
@@ -172,7 +172,7 @@ func _process(delta: float) -> void:
 		stepv = stepv.normalized() * maxstep
 	global_position += stepv
 	# STRIKE: inside 90m a tendril reaches you every few seconds
-	if d < 90.0 and _strike_cd <= 0.0 and not Game.dead:
+	if d < 130.0 and _strike_cd <= 0.0 and not Game.dead:
 		_strike_cd = 3.5
 		_lunge = 0.6
 		Game.hurt(7.0)
