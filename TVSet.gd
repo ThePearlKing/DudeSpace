@@ -316,12 +316,26 @@ class _ForkStudio extends Node3D:
 ## ---------------------------------------------------------- SPY CAM
 class SpyCam extends StaticBody3D:
 	var cam_name := "camera"
+	var _vis: Node3D = null
+	var _ht := 0.0
+
+	func _process(delta: float) -> void:
+		# the HOUSING floats -- a gentle hover bob on the visuals only.
+		# The node (and the feed anchored to it) never moves: no wobble
+		# on any TV watching through this lens.
+		_ht += delta
+		if _vis != null:
+			_vis.position.y = sin(_ht * 1.3) * 0.05
+			_vis.rotation.z = sin(_ht * 0.9) * 0.03
+
 	func _ready() -> void:
 		add_to_group("spycam")
+		_vis = Node3D.new()
+		add_child(_vis)
 		var body := MeshInstance3D.new()
 		body.mesh = Surfaces.box_mesh(Vector3(0.3, 0.22, 0.44))
 		body.material_override = Destructible.make_material(Color("#2a2f38"), 0.4)
-		add_child(body)
+		_vis.add_child(body)
 		body.position = Vector3(0, 0.22, 0)
 		var lens := MeshInstance3D.new()
 		var lm := CylinderMesh.new()
@@ -330,7 +344,7 @@ class SpyCam extends StaticBody3D:
 		lm.height = 0.14
 		lens.mesh = lm
 		lens.material_override = Destructible.make_material(Color("#7df9ff"), 1.4)
-		add_child(lens)
+		_vis.add_child(lens)
 		lens.position = Vector3(0, 0.22, -0.26)
 		lens.rotation_degrees = Vector3(90, 0, 0)
 		var dot := MeshInstance3D.new()
@@ -339,7 +353,7 @@ class SpyCam extends StaticBody3D:
 		dm2.height = 0.06
 		dot.mesh = dm2
 		dot.material_override = Destructible.make_material(Color("#ff3030"), 2.2)
-		add_child(dot)
+		_vis.add_child(dot)
 		dot.position = Vector3(0.1, 0.34, 0)
 		var cs := CollisionShape3D.new()
 		cs.shape = Surfaces.box_shape(Vector3(0.4, 0.4, 0.5))
