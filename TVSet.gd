@@ -90,7 +90,11 @@ class _ForkStudio extends Node3D:
 		add_child(cam)
 		# ZOOMED: the host fills the frame, and the backdrop fills
 		# everything behind -- no void in shot
-		cam.position = Vector3(0, 2.3, 5.4)
+		if lock_channel == 0:
+			# THE DANCE airs in close-up
+			cam.position = Vector3(0, 2.25, 3.8)
+		else:
+			cam.position = Vector3(0, 2.3, 5.4)
 		cam.look_at(Vector3(0, 2.15, 0), Vector3.UP)
 		cam.current = true
 		_build_puppet()
@@ -308,16 +312,21 @@ class _ForkStudio extends Node3D:
 			(_tents[i] as Node3D).rotation.z = sin(_t * 2.0 + float(i)) * 0.25
 		match ch:
 			0:
-				# THE DANCE: the default dance, forever
-				var b := _t * 5.2
-				_body.position = Vector3(0, 2.2 + absf(sin(b)) * 0.18, 0)
-				_body.rotation.y = sin(b * 0.5) * 0.4
-				_arm_l.rotation.z = 1.1 + sin(b) * 0.9
-				_arm_r.rotation.z = -1.1 + sin(b) * 0.9
-				_arm_l.rotation.x = cos(b) * 0.7
-				_arm_r.rotation.x = -cos(b) * 0.7
-				_leg_l.rotation.x = sin(b) * 0.5
-				_leg_r.rotation.x = -sin(b) * 0.5
+				# THE ACTUAL DEFAULT DANCE: tight alternating arm pumps
+				# across the body with the hip twist and the bounce --
+				# not spaghetti flailing
+				var b := _t * 6.0
+				var ph := sin(b)
+				_body.position = Vector3(0, 2.2 + absf(ph) * 0.12, 0)
+				_body.rotation.y = ph * 0.28
+				# arms PUMP: one crosses low in front while the other
+				# cocks back, then they trade -- small, rhythmic
+				_arm_l.rotation.z = 2.35 - maxf(0.0, ph) * 0.9
+				_arm_r.rotation.z = -2.35 + maxf(0.0, -ph) * 0.9
+				_arm_l.rotation.x = maxf(0.0, ph) * 0.6
+				_arm_r.rotation.x = maxf(0.0, -ph) * 0.6
+				_leg_l.rotation.x = maxf(0.0, -ph) * 0.35
+				_leg_r.rotation.x = maxf(0.0, ph) * 0.35
 			1:
 				# desk show: leaning, gesturing at nothing
 				_body.position = Vector3(0, 2.2, -0.2)
