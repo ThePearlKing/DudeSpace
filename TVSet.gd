@@ -550,7 +550,7 @@ class TV extends StaticBody3D:
 		if opts.is_empty():
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud:
-				hud.flash("no cameras placed. place a Spy Camera and name it")
+				hud.flash("no cameras placed. place a Security Camera and name it")
 			return
 		var pui := PickUI.new().configure("CAMERAS", opts,
 			func(pick: String) -> void:
