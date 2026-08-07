@@ -4422,6 +4422,62 @@ func _r_spike(b, cd: Vector3, hrng: RandomNumberGenerator) -> void:
 		sh8 += nkm.height * 0.94
 
 func _populate(b) -> void:
+	if str(b.name) == "Euclid":
+		# SPARSE EXOTIC FLORA: thin orange stems, and at the top a
+		# yellow almost-flower -- a ring of petals mid-bloom around a
+		# bright heart. Rare enough that finding one feels like news.
+		var erng := RandomNumberGenerator.new()
+		erng.seed = 3141
+		for pi9 in 44:
+			var pd9 := Vector3(erng.randf_range(-1, 1),
+				erng.randf_range(-1, 1),
+				erng.randf_range(-1, 1)).normalized()
+			if absf(pd9.y) > 0.85:
+				continue   # poles belong to the temple and the pyramid
+			var pb9 := _basis_from_up(pd9)
+			var root9 := Node3D.new()
+			add_child(root9)
+			root9.global_transform = Transform3D(pb9,
+				b.center + pd9 * float(b.radius))
+			var sh9 := erng.randf_range(1.3, 2.4)
+			var stem := MeshInstance3D.new()
+			var stm := CylinderMesh.new()
+			stm.top_radius = 0.035
+			stm.bottom_radius = 0.06
+			stm.height = sh9
+			stm.radial_segments = 5
+			stem.mesh = stm
+			stem.material_override = Destructible.make_material(
+				Color("#ff7a2a"), 0.5)
+			root9.add_child(stem)
+			stem.position = Vector3(0, sh9 * 0.5, 0)
+			stem.rotation_degrees = Vector3(erng.randf_range(-8, 8), 0,
+				erng.randf_range(-8, 8))
+			var head9 := Node3D.new()
+			root9.add_child(head9)
+			head9.position = Vector3(0, sh9, 0)
+			var heart := MeshInstance3D.new()
+			var hm9 := SphereMesh.new()
+			hm9.radius = 0.11
+			hm9.height = 0.22
+			heart.mesh = hm9
+			heart.material_override = Destructible.make_material(
+				Color("#ffe066"), 1.6)
+			head9.add_child(heart)
+			var npet := 5 + erng.randi() % 3
+			var tilt9 := erng.randf_range(0.5, 1.0)   # how far it has bloomed
+			for pk9 in npet:
+				var pa9 := TAU * float(pk9) / float(npet)
+				var pet := MeshInstance3D.new()
+				var pm9 := SphereMesh.new()
+				pm9.radius = 0.16
+				pm9.height = 0.06
+				pet.mesh = pm9
+				pet.material_override = Destructible.make_material(
+					Color("#ffd23f"), 1.0)
+				head9.add_child(pet)
+				pet.position = Vector3(cos(pa9) * 0.22, 0.04, sin(pa9) * 0.22)
+				pet.rotation = Vector3(sin(pa9) * tilt9, 0, -cos(pa9) * tilt9)
 	if str(b.name) == "Requiem":
 		# THE GRAVEYARD PROPER: not just needles. Spike clusters, yes --
 		# but between them leaning gravestone slabs, bone-rib cages
