@@ -4423,61 +4423,131 @@ func _r_spike(b, cd: Vector3, hrng: RandomNumberGenerator) -> void:
 
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
-		# SPARSE EXOTIC FLORA: thin orange stems, and at the top a
-		# yellow almost-flower -- a ring of petals mid-bloom around a
-		# bright heart. Rare enough that finding one feels like news.
+		# EXOTIC FLORA, clustered: little stands of branching orange
+		# growths. Each plant forks into curving branches, and every
+		# branch ends in something FLOWERLIKE but wrong -- a whorl of
+		# thin curved spines around a glowing heart, filament stalks
+		# with bead tips leaning out of it. Some splayed wide, some
+		# still furled shut.
 		var erng := RandomNumberGenerator.new()
 		erng.seed = 3141
-		for pi9 in 44:
-			var pd9 := Vector3(erng.randf_range(-1, 1),
+		for ci9 in 26:
+			var cd9 := Vector3(erng.randf_range(-1, 1),
 				erng.randf_range(-1, 1),
 				erng.randf_range(-1, 1)).normalized()
-			if absf(pd9.y) > 0.85:
+			if absf(cd9.y) > 0.85:
 				continue   # poles belong to the temple and the pyramid
-			var pb9 := _basis_from_up(pd9)
-			var root9 := Node3D.new()
-			add_child(root9)
-			root9.global_transform = Transform3D(pb9,
-				b.center + pd9 * float(b.radius))
-			var sh9 := erng.randf_range(1.3, 2.4)
-			var stem := MeshInstance3D.new()
-			var stm := CylinderMesh.new()
-			stm.top_radius = 0.035
-			stm.bottom_radius = 0.06
-			stm.height = sh9
-			stm.radial_segments = 5
-			stem.mesh = stm
-			stem.material_override = Destructible.make_material(
-				Color("#ff7a2a"), 0.5)
-			root9.add_child(stem)
-			stem.position = Vector3(0, sh9 * 0.5, 0)
-			stem.rotation_degrees = Vector3(erng.randf_range(-8, 8), 0,
-				erng.randf_range(-8, 8))
-			var head9 := Node3D.new()
-			root9.add_child(head9)
-			head9.position = Vector3(0, sh9, 0)
-			var heart := MeshInstance3D.new()
-			var hm9 := SphereMesh.new()
-			hm9.radius = 0.11
-			hm9.height = 0.22
-			heart.mesh = hm9
-			heart.material_override = Destructible.make_material(
-				Color("#ffe066"), 1.6)
-			head9.add_child(heart)
-			var npet := 5 + erng.randi() % 3
-			var tilt9 := erng.randf_range(0.5, 1.0)   # how far it has bloomed
-			for pk9 in npet:
-				var pa9 := TAU * float(pk9) / float(npet)
-				var pet := MeshInstance3D.new()
-				var pm9 := SphereMesh.new()
-				pm9.radius = 0.16
-				pm9.height = 0.06
-				pet.mesh = pm9
-				pet.material_override = Destructible.make_material(
-					Color("#ffd23f"), 1.0)
-				head9.add_child(pet)
-				pet.position = Vector3(cos(pa9) * 0.22, 0.04, sin(pa9) * 0.22)
-				pet.rotation = Vector3(sin(pa9) * tilt9, 0, -cos(pa9) * tilt9)
+			var ct1 := cd9.cross(Vector3.UP)
+			if ct1.length() < 0.01:
+				ct1 = cd9.cross(Vector3.RIGHT)
+			ct1 = ct1.normalized()
+			var ct2 := cd9.cross(ct1).normalized()
+			for pi9 in 3 + erng.randi() % 3:
+				var pd9 := (cd9 + (ct1 * erng.randf_range(-1.0, 1.0)
+					+ ct2 * erng.randf_range(-1.0, 1.0))
+					* (4.5 / float(b.radius))).normalized()
+				var pb9 := _basis_from_up(pd9)
+				var root9 := Node3D.new()
+				add_child(root9)
+				root9.global_transform = Transform3D(pb9,
+					b.center + pd9 * float(b.radius))
+				root9.rotate_object_local(Vector3.UP, erng.randf() * TAU)
+				var sh9 := erng.randf_range(1.0, 2.3)
+				var stem := MeshInstance3D.new()
+				var stm := CylinderMesh.new()
+				stm.top_radius = 0.03
+				stm.bottom_radius = 0.06
+				stm.height = sh9
+				stm.radial_segments = 5
+				stem.mesh = stm
+				stem.material_override = Destructible.make_material(
+					Color("#ff7a2a"), 0.5)
+				root9.add_child(stem)
+				stem.position = Vector3(0, sh9 * 0.5, 0)
+				var nbr := 2 + erng.randi() % 3
+				for bk9 in nbr + 1:
+					# branch 0 is the crown; the rest fork off the stem
+					var bh9 := sh9 if bk9 == 0 \
+						else sh9 * erng.randf_range(0.45, 0.8)
+					var byaw := erng.randf() * TAU
+					var btilt := 0.0 if bk9 == 0 \
+						else erng.randf_range(0.5, 1.0)
+					var bnode := Node3D.new()
+					root9.add_child(bnode)
+					bnode.position = Vector3(0, bh9, 0)
+					bnode.rotation = Vector3(0, byaw, 0)
+					var blen := 0.0
+					if bk9 > 0:
+						blen = erng.randf_range(0.45, 0.9)
+						var br9 := MeshInstance3D.new()
+						var brm := CylinderMesh.new()
+						brm.top_radius = 0.02
+						brm.bottom_radius = 0.035
+						brm.height = blen
+						brm.radial_segments = 5
+						br9.mesh = brm
+						br9.material_override = Destructible.make_material(
+							Color("#ff8c3d"), 0.5)
+						bnode.add_child(br9)
+						br9.rotation = Vector3(0, 0, -btilt)
+						br9.position = Vector3(sin(btilt) * blen * 0.5,
+							cos(btilt) * blen * 0.5, 0)
+					var head9 := Node3D.new()
+					bnode.add_child(head9)
+					head9.position = Vector3(sin(btilt) * blen,
+						cos(btilt) * blen, 0)
+					# THE BLOOM: curved spine whorl + heart + filaments
+					var heart := MeshInstance3D.new()
+					var hm9 := SphereMesh.new()
+					hm9.radius = 0.08
+					hm9.height = 0.16
+					heart.mesh = hm9
+					heart.material_override = Destructible.make_material(
+						Color("#ffe066"), 2.0)
+					head9.add_child(heart)
+					var splay := erng.randf_range(0.25, 1.25)  # furled..wide
+					var nsp := 6 + erng.randi() % 4
+					for sk9 in nsp:
+						var sa9 := TAU * float(sk9) / float(nsp)
+						var sp9 := MeshInstance3D.new()
+						var spm := CylinderMesh.new()
+						spm.bottom_radius = 0.022
+						spm.top_radius = 0.003
+						spm.height = erng.randf_range(0.24, 0.4)
+						spm.radial_segments = 4
+						sp9.mesh = spm
+						sp9.material_override = Destructible.make_material(
+							Color("#ffd23f"), 1.3)
+						head9.add_child(sp9)
+						sp9.position = Vector3(cos(sa9) * 0.05, 0.03,
+							sin(sa9) * 0.05)
+						sp9.rotation = Vector3(sin(sa9) * splay, 0,
+							-cos(sa9) * splay)
+					for fk9 in 2 + erng.randi() % 2:
+						var fa9 := erng.randf() * TAU
+						var fil := MeshInstance3D.new()
+						var fim := CylinderMesh.new()
+						fim.top_radius = 0.006
+						fim.bottom_radius = 0.006
+						fim.height = 0.3
+						fim.radial_segments = 3
+						fil.mesh = fim
+						fil.material_override = Destructible.make_material(
+							Color("#ffb84d"), 0.9)
+						head9.add_child(fil)
+						fil.position = Vector3(cos(fa9) * 0.03, 0.16,
+							sin(fa9) * 0.03)
+						fil.rotation = Vector3(sin(fa9) * 0.35, 0,
+							-cos(fa9) * 0.35)
+						var bead := MeshInstance3D.new()
+						var bem := SphereMesh.new()
+						bem.radius = 0.03
+						bem.height = 0.06
+						bead.mesh = bem
+						bead.material_override = Destructible.make_material(
+							Color("#fff2a0"), 2.2)
+						fil.add_child(bead)
+						bead.position = Vector3(0, 0.16, 0)
 	if str(b.name) == "Requiem":
 		# THE GRAVEYARD PROPER: not just needles. Spike clusters, yes --
 		# but between them leaning gravestone slabs, bone-rib cages
