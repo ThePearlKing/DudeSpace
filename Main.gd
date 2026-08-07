@@ -6390,21 +6390,133 @@ func _euclid_landmarks(b) -> void:
 
 	# South pole: the sealed pyramid. Mind Core opens it. Zero-g inside.
 	var sp: Vector3 = b.center + Vector3.DOWN * b.radius
+	# the pyramid wears SANDSTONE BRICKS: staggered courses, mortar
+	# seams, sun-baked grain -- and its base runs deep into the planet
+	# so the curvature can never make it look like it is balancing
 	var pyr := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.0
-	cm.bottom_radius = 20.0
-	cm.height = 26.0
+	cm.bottom_radius = 22.0
+	cm.height = 36.0
 	cm.radial_segments = 4
 	pyr.mesh = cm
-	pyr.material_override = Destructible.make_material(Color("#b5934f"), 0.1)
+	var bsh := Shader.new()
+	bsh.code = """shader_type spatial;
+varying vec2 buv;
+void vertex(){ buv = UV; }
+float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment(){
+	vec2 uv = buv * vec2(28.0, 18.0);
+	float row = floor(uv.y);
+	uv.x += fract(row * 0.5);   // staggered courses
+	vec2 c = floor(uv);
+	vec2 f = fract(uv);
+	float mortar = smoothstep(0.0, 0.06, f.x) * smoothstep(1.0, 0.94, f.x)
+		* smoothstep(0.0, 0.09, f.y) * smoothstep(1.0, 0.91, f.y);
+	float tone = 0.82 + 0.18 * h2(c);
+	vec3 sand = vec3(0.71, 0.58, 0.33) * tone;
+	vec3 seam = vec3(0.45, 0.36, 0.22);
+	ALBEDO = mix(seam, sand, mortar);
+	ROUGHNESS = 0.95;
+}"""
+	var bmat9 := ShaderMaterial.new()
+	bmat9.shader = bsh
+	pyr.material_override = bmat9
 	add_child(pyr)
-	pyr.global_transform = Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 13.0)
+	pyr.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
+		sp + Vector3.DOWN * 10.0)
 	_pyramid_exit = sp + Vector3.DOWN * 2.0
+	# THE INTERIOR: a pyramid-shaped chamber -- the same four-sided
+	# form seen from within, brick-lined, with a real floor
+	var inner := MeshInstance3D.new()
+	var im9 := CylinderMesh.new()
+	im9.top_radius = 0.0
+	im9.bottom_radius = 17.0
+	im9.height = 24.0
+	im9.radial_segments = 4
+	inner.mesh = im9
+	inner.material_override = bmat9
+	add_child(inner)
+	inner.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
+		sp + Vector3.DOWN * 13.5)
+	inner.scale = Vector3(-1, 1, 1)   # inverted winding: visible INSIDE
+	var ifloor := StaticBody3D.new()
+	var ifm := MeshInstance3D.new()
+	var ifme := CylinderMesh.new()
+	ifme.top_radius = 15.0
+	ifme.bottom_radius = 15.0
+	ifme.height = 0.6
+	ifme.radial_segments = 4
+	ifm.mesh = ifme
+	ifm.material_override = Surfaces.stone(Color("#8a7443"))
+	ifloor.add_child(ifm)
+	var ifc9 := CollisionShape3D.new()
+	var ifcs := CylinderShape3D.new()
+	ifcs.radius = 15.0
+	ifcs.height = 0.6
+	ifc9.shape = ifcs
+	ifloor.add_child(ifc9)
+	add_child(ifloor)
+	ifloor.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
+		sp + Vector3.DOWN * 2.2)
+	# the SHRINE sits dressed at the chamber's heart: stepped plinth,
+	# corner columns with burning caps, a gold ring underfoot
+	var sxf := Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 2.5)
+	for ti9 in 3:
+		var tier := MeshInstance3D.new()
+		var tm9 := BoxMesh.new()
+		tm9.size = Vector3(7.0 - float(ti9) * 1.8, 0.5,
+			7.0 - float(ti9) * 1.8)
+		tier.mesh = tm9
+		tier.material_override = Surfaces.stone(Color("#a08040"))
+		add_child(tier)
+		tier.global_transform = sxf
+		tier.translate_object_local(Vector3(0, 0.55 + float(ti9) * 0.5, 0))
+	var gring := MeshInstance3D.new()
+	var grm := TorusMesh.new()
+	grm.inner_radius = 4.1
+	grm.outer_radius = 4.5
+	gring.mesh = grm
+	gring.material_override = Destructible.make_material(Color("#ffd166"), 1.1)
+	add_child(gring)
+	gring.global_transform = sxf
+	gring.translate_object_local(Vector3(0, 0.4, 0))
+	for ci9 in 4:
+		var ca9 := TAU * float(ci9) / 4.0 + PI / 4.0
+		var colm := MeshInstance3D.new()
+		var ccm := CylinderMesh.new()
+		ccm.top_radius = 0.5
+		ccm.bottom_radius = 0.65
+		ccm.height = 7.0
+		colm.mesh = ccm
+		colm.material_override = Surfaces.stone(Color("#96793e"))
+		add_child(colm)
+		colm.global_transform = sxf
+		colm.translate_object_local(Vector3(cos(ca9) * 9.0, 3.5,
+			sin(ca9) * 9.0))
+		var capf := MeshInstance3D.new()
+		var cfm := SphereMesh.new()
+		cfm.radius = 0.45
+		cfm.height = 0.7
+		capf.mesh = cfm
+		capf.material_override = Destructible.make_material(Color("#ff9a1a"), 2.4)
+		add_child(capf)
+		capf.global_transform = sxf
+		capf.translate_object_local(Vector3(cos(ca9) * 9.0, 7.3,
+			sin(ca9) * 9.0))
+		var tl9 := OmniLight3D.new()
+		tl9.light_color = Color("#ffb04a")
+		tl9.light_energy = 1.6
+		tl9.omni_range = 14.0
+		add_child(tl9)
+		tl9.global_transform = sxf
+		tl9.translate_object_local(Vector3(cos(ca9) * 9.0, 7.3,
+			sin(ca9) * 9.0))
 	# inside the pyramid: the MENGER SHRINE. F + prism shards = enchant.
 	var shrine := MengerShrine.new()
 	add_child(shrine)
-	shrine.global_transform = Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 10.0)
+	shrine.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
+		sp + Vector3.DOWN * 4.6)
 
 func _register_crates(b, count: int, value: int) -> void:
 	count = _n(count)
