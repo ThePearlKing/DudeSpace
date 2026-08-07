@@ -4433,11 +4433,12 @@ class CactusPlant extends StaticBody3D:
 		harvested = true
 		Sfx.play("eat", -10.0)
 		Inventory.add_coins(2 + randi() % 5)
-		var drop := ItemDrop.new()
-		drop.setup("sucfruit", 1 + randi() % 2)
-		get_parent().add_child(drop)
-		drop.global_position = global_position \
-			+ global_transform.basis.y * 1.2
+		if randi() % 5 < 3:   # 60%: ONE fruit. 40%: none. No fruit farms.
+			var drop := ItemDrop.new()
+			drop.setup("sucfruit", 1)
+			get_parent().add_child(drop)
+			drop.global_position = global_position \
+				+ global_transform.basis.y * 1.2
 		# HARVESTED means harvested: the plant comes apart
 		Destructible.spawn_debris(get_parent(), global_position
 			+ global_transform.basis.y * 0.8,
@@ -4620,7 +4621,9 @@ func _populate(b) -> void:
 				col9.mesh = cap9
 				col9.material_override = Destructible.make_material(ccol, 0.3)
 				sroot.add_child(col9)
-				col9.position = Vector3(0, ch9 * 0.5, 0)
+				# base SUNK: the rounded bottom hides in the ground, so
+				# no cactus balances on a curve like a circus act
+				col9.position = Vector3(0, ch9 * 0.5 - 0.4, 0)
 				# arms: the classic cactus silhouette, zero to two
 				for ak9 in srng9.randi() % 3:
 					var aa9 := srng9.randf() * TAU

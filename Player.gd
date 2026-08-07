@@ -1448,6 +1448,24 @@ func _make_held_model(id: String) -> void:
 			"voidhammer":
 				_hm_cyl(0.035, 0.6, Vector3(0, 0, 0.05), Color("#3a2a4a"), 0.2).rotation_degrees = Vector3(90, 0, 0)
 				_hm_box(Vector3(0.3, 0.2, 0.2), Vector3(0, 0, -0.32), col, 1.4)
+			"massdriver":
+				# THE ANSWER: twin heavy rails on a coil stack, orange
+				# core burning between them, stock built like furniture
+				_hm_box(Vector3(0.14, 0.16, 0.62), Vector3(0, -0.02, -0.1), Color("#23262c"), 0.6)
+				_hm_box(Vector3(0.05, 0.06, 0.7), Vector3(-0.07, 0.08, -0.16), Color("#3a3f48"), 0.4)
+				_hm_box(Vector3(0.05, 0.06, 0.7), Vector3(0.07, 0.08, -0.16), Color("#3a3f48"), 0.4)
+				_hm_box(Vector3(0.04, 0.04, 0.66), Vector3(0, 0.08, -0.16), Color("#ff3d00"), 2.4)
+				for rc9 in 3:
+					var ring9 := MeshInstance3D.new()
+					var rtm9 := TorusMesh.new()
+					rtm9.inner_radius = 0.075
+					rtm9.outer_radius = 0.105
+					ring9.mesh = rtm9
+					ring9.material_override = Destructible.make_material(Color("#ff8c42"), 1.2)
+					ring9.rotation_degrees = Vector3(90, 0, 0)
+					ring9.position = Vector3(0, 0.08, -0.34 + float(rc9) * 0.17)
+					_held.add_child(ring9)
+				_hm_box(Vector3(0.06, 0.14, 0.16), Vector3(0, -0.14, 0.14), Color("#2a2a30"), 0.3)
 			"rail":
 				_hm_box(Vector3(0.2, 0.22, 0.5), Vector3(0, 0, 0.1), dark, 0.2)
 				_hm_cyl(0.05, 0.8, Vector3(0, 0.02, -0.4), col, 1.0).rotation_degrees = Vector3(90, 0, 0)

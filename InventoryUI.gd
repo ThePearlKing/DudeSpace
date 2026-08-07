@@ -227,6 +227,14 @@ func _make_cell(item: Dictionary) -> Control:
 		defl.add_theme_font_size_override("font_size", 12)
 		defl.modulate = Color("#9adf9a")
 		txt.add_child(defl)
+	if Inventory.weapons.has(str(item.id)):
+		var wd9: Dictionary = Inventory.weapons[str(item.id)]
+		var dps9 := float(wd9["dmg"]) / maxf(0.02, float(wd9["rate"]))
+		var wl9 := Label.new()
+		wl9.text = "%d damage · %d/s held down" % [int(wd9["dmg"]), int(dps9)]
+		wl9.add_theme_font_size_override("font_size", 12)
+		wl9.modulate = Color("#ffb347")
+		txt.add_child(wl9)
 	var cost := Label.new()
 	cost.text = Inventory.cost_text(item.id)
 	cost.add_theme_font_size_override("font_size", 12)
@@ -321,7 +329,7 @@ func _refresh() -> void:
 	for ep in _equip_slots:
 		ep.refresh()
 	if _eq_lbl:
-		_eq_lbl.text = "EQUIPMENT — %d%% damage blocked (cap 60%%)   (drag or right-click armor to wear · click a slot to take off)" \
+		_eq_lbl.text = "EQUIPMENT — %d%% damage blocked (soft cap 60%%, hard 80%%)   (drag or right-click armor to wear · click a slot to take off)" \
 			% roundi(Inventory.armor_reduction() * 100.0)
 
 func _cell_style(owned: bool, afford: bool) -> StyleBoxFlat:
@@ -519,6 +527,31 @@ class _EquipSlot extends Panel:
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			# carrying a piece? clicking its slot WEARS it -- the drag
+			# everyone kept trying finally does the thing
+			var ui9: Node = self
+			while ui9 != null and not (ui9 is InventoryUI):
+				ui9 = ui9.get_parent()
+			if ui9 != null and str((ui9 as InventoryUI).held["id"]) != "":
+				var hid9 := str((ui9 as InventoryUI).held["id"])
+				var fits9: bool = (slot_name == "charm" and hid9 == "charm") \
+					or (Inventory.armors.has(hid9)
+					and str(Inventory.armors[hid9]["slot"]) == slot_name)
+				if not fits9:
+					Sfx.play("denied", -20.0)
+					return
+				var prev9 := str(Inventory.equip.get(slot_name, ""))
+				Inventory.equip[slot_name] = hid9
+				(ui9 as InventoryUI).held["n"] = \
+					int((ui9 as InventoryUI).held["n"]) - 1
+				if int((ui9 as InventoryUI).held["n"]) <= 0:
+					(ui9 as InventoryUI).held = Inventory.empty_slot()
+				if prev9 != "":
+					Inventory.give(prev9, 1)
+				Sfx.play("click", -8.0)
+				Inventory.changed.emit()
+				refresh()
+				return
 			var id := str(Inventory.equip.get(slot_name, ""))
 			if id == "":
 				Sfx.play("denied", -20.0)

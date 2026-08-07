@@ -92,7 +92,12 @@ func armor_reduction() -> float:
 		if armors.has(id):
 			total += float(armors[id]["def"]) \
 				* (1.0 + 0.15 * float(enchant.get(id, 0)))
-	return minf(0.6, total / 100.0)
+	# SOFT CAP: full value to 60%%; everything past that counts at a
+	# third of its worth, and nothing pierces the 80%% hard wall
+	var raw := total / 100.0
+	if raw <= 0.6:
+		return raw
+	return minf(0.8, 0.6 + (raw - 0.6) * 0.34)
 
 var has_rcs: bool = false
 var has_jetpack: bool = false
@@ -112,6 +117,7 @@ var weapons: Dictionary = {
 	"knife":     {"name": "Knife",       "dmg": 6.0,  "rate": 0.22, "range": 4.0,   "color": Color("#c8c8d0")},
 	"raygun":    {"name": "Ray Gun",     "dmg": 45.0, "rate": 0.14, "range": 220.0, "color": Color("#4dff9a")},
 	"rail":      {"name": "Rail Cannon", "dmg": 90.0, "rate": 0.70, "range": 400.0, "color": Color("#ff5964")},
+	"massdriver":{"name": "Mass Driver", "dmg": 400.0, "rate": 6.0, "range": 500.0, "color": Color("#ff3d00")},
 }
 
 # Non-weapon items (tools, placeables, and resources).
@@ -334,6 +340,7 @@ func _ready() -> void:
 		{"id": "eseller",   "tab": "Electric", "name": "Electric Seller","cost": {"ingot": 25, "irid": 15}, "desc": "Sells fast at 1.25x price, 2 EU per sale."},
 
 		{"id": "zapper",    "tab": "Weapons",  "name": "Zapper",         "cost": {"coins": 1600, "ingot": 4}, "desc": "Tiny zaps, torrent of them. 160 DPS hosepipe."},
+		{"id": "massdriver","tab": "Weapons",  "name": "Mass Driver",    "cost": {"coins": 20000, "irid": 50, "ultima": 30, "uranium": 60}, "desc": "One shot ends arguments. Six seconds to reload it. The cooldown shows on the slot."},
 		{"id": "plasma",    "tab": "Weapons",  "name": "Plasma Rifle",   "cost": {"coins": 15000, "irid": 30}, "desc": "Heavy energy damage. 250 DPS does not come cheap."},
 		{"id": "ak47",      "tab": "Weapons",  "name": "AK-47",          "cost": {"ingot": 20, "ultima": 6}, "desc": "CRAFT. Needs the recipe from the Shadow Temple.", "recipe": true},
 		{"id": "rail",      "tab": "Weapons",  "name": "Rail Cannon",    "cost": {"coins": 2800},"desc": "Huge single-shot damage, long range."},

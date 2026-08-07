@@ -458,6 +458,15 @@ func _refresh() -> void:
 	for i in _slots.size():
 		_slots[i].add_theme_stylebox_override("panel", _slot_style(i == Inventory.selected))
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
+		# heavy weapons wear their reload right on the slot
+		var wid9 := str(Inventory.hotbar[i]["id"])
+		if Inventory.weapons.has(wid9) \
+				and float(Inventory.weapons[wid9]["rate"]) >= 1.0 \
+				and i == Inventory.selected:
+			var pl9 = get_tree().get_first_node_in_group("player")
+			if pl9 != null and "_cooldown" in pl9 \
+					and float(pl9._cooldown) > 0.05:
+				_slot_lbls[i].text += "  RELOAD %.1f" % float(pl9._cooldown)
 		_slot_lbls[i].material = Inventory.ench_text_material() \
 			if int(Inventory.enchant.get(str(Inventory.hotbar[i]["id"]), 0)) > 0 \
 			else null
