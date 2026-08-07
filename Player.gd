@@ -982,7 +982,7 @@ func _physics_process(delta: float) -> void:
 				var ssens := MOUSE_SENS * Settings.mouse_sensitivity
 				_head.rotation.y = clampf(_head.rotation.y - _look.x * ssens,
 					-1.5, 1.5)
-				_pitch = clampf(_pitch - _look.y * ssens, -1.4, 1.4)
+				_pitch = clampf(_pitch - _look.y * ssens, -1.5707, 1.5707)
 				_head.rotation.x = _pitch
 			_look = Vector2.ZERO
 			return
@@ -1054,7 +1054,7 @@ func _physics_process(delta: float) -> void:
 			var sens := MOUSE_SENS * Settings.mouse_sensitivity
 			if _look.x != 0.0:
 				rotate_object_local(Vector3.UP, -_look.x * sens)
-			_pitch = clampf(_pitch - _look.y * sens, -1.4, 1.4)
+			_pitch = clampf(_pitch - _look.y * sens, -1.5707, 1.5707)
 			_head.rotation.x = _pitch
 		_look = Vector2.ZERO
 		if not _ui_open() and not Game.dead:
@@ -1100,7 +1100,7 @@ func _physics_process(delta: float) -> void:
 		if _look.x != 0.0:
 			global_transform.basis = Basis(up, -_look.x * sens) * global_transform.basis
 			global_transform.basis = global_transform.basis.orthonormalized()
-		_pitch = clampf(_pitch - _look.y * sens, -1.4, 1.4)
+		_pitch = clampf(_pitch - _look.y * sens, -1.5707, 1.5707)
 		_head.rotation.x = _pitch
 	_look = Vector2.ZERO
 
