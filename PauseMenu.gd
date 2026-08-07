@@ -471,11 +471,11 @@ func _open_mono() -> void:
 			Game.monolith_stage = idx + 1
 			var cs := get_tree().current_scene
 			if idx == 7:
-				# shatter FIRST (it hides the lattice for the build-up),
-				# THEN sync -- the old order flashed the lattice on for
-				# a beat before the sequence even started
-				if cs and cs.has_method("sky_shatter"):
-					cs.sky_shatter()
+				# the cheat does not tease: INSTANT detonation, the full
+				# icosphere burst, right now. The slow 17s build-up
+				# belongs to the real eighth feeding, not this button.
+				if cs and cs.has_method("_sky_detonate"):
+					cs._sky_detonate()
 				msync.call()
 			else:
 				msync.call()
