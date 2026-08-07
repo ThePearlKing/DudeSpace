@@ -132,9 +132,13 @@ class _ForkStudio extends Node3D:
 	var _wreath: Node3D
 
 	func _build_puppet() -> void:
+		_body = Node3D.new()
+		add_child(_body)
+		_body.position = Vector3(0, 2.2, 0)
+		# the wreath rides the BODY: it moves when he moves, and coils
+		# cross wherever they like -- exactly the sky tangle
 		_wreath = Node3D.new()
-		add_child(_wreath)
-		_wreath.position = Vector3(0, 2.2, 0)
+		_body.add_child(_wreath)
 		var wr := RandomNumberGenerator.new()
 		wr.seed = 40
 		for i in 12:
@@ -143,12 +147,12 @@ class _ForkStudio extends Node3D:
 			tm.inner_radius = wr.randf_range(0.52, 0.7)
 			tm.outer_radius = tm.inner_radius + wr.randf_range(0.09, 0.15)
 			coil.mesh = tm
-			# rings face the camera like the sky wreath -- tilted a
-			# little, pushed BEHIND the eye plane, never across it
-			coil.rotation_degrees = Vector3(90 + wr.randf_range(-22, 22),
-				wr.randf_range(-15, 15), wr.randf_range(0, 360))
-			coil.position = Vector3(wr.randf_range(-0.1, 0.1),
-				wr.randf_range(-0.1, 0.1), wr.randf_range(-0.5, -0.15))
+			# the sky god's own wreath: fully random tangle, front and
+			# back alike
+			coil.rotation_degrees = Vector3(wr.randf_range(0, 180),
+				wr.randf_range(0, 180), wr.randf_range(0, 180))
+			coil.position = Vector3(wr.randf_range(-0.08, 0.08),
+				wr.randf_range(-0.08, 0.08), wr.randf_range(-0.15, 0.15))
 			var cmat := StandardMaterial3D.new()
 			cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			cmat.albedo_color = Color("#e8b830")
@@ -157,9 +161,6 @@ class _ForkStudio extends Node3D:
 			cmat.emission_energy_multiplier = 0.25
 			coil.material_override = cmat
 			_wreath.add_child(coil)
-		_body = Node3D.new()
-		add_child(_body)
-		_body.position = Vector3(0, 2.2, 0)
 		# THE EYE, exactly like the sky: warm white ball, dark pupil,
 		# gold iris ring
 		_eye = Node3D.new()
