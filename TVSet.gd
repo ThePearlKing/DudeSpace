@@ -90,8 +90,8 @@ class _ForkStudio extends Node3D:
 		add_child(cam)
 		# ZOOMED: the host fills the frame, and the backdrop fills
 		# everything behind -- no void in shot
-		cam.position = Vector3(0, 2.3, 4.4)
-		cam.look_at(Vector3(0, 2.1, 0), Vector3.UP)
+		cam.position = Vector3(0, 2.3, 5.4)
+		cam.look_at(Vector3(0, 2.15, 0), Vector3.UP)
 		cam.current = true
 		_build_puppet()
 		_build_props()
@@ -136,15 +136,15 @@ class _ForkStudio extends Node3D:
 		for i in 12:
 			var coil := MeshInstance3D.new()
 			var tm := TorusMesh.new()
-			tm.inner_radius = wr.randf_range(0.5, 0.66)
-			tm.outer_radius = tm.inner_radius + wr.randf_range(0.09, 0.14)
+			tm.inner_radius = wr.randf_range(0.52, 0.7)
+			tm.outer_radius = tm.inner_radius + wr.randf_range(0.09, 0.15)
 			coil.mesh = tm
 			# rings face the camera like the sky wreath -- tilted a
 			# little, pushed BEHIND the eye plane, never across it
 			coil.rotation_degrees = Vector3(90 + wr.randf_range(-22, 22),
 				wr.randf_range(-15, 15), wr.randf_range(0, 360))
 			coil.position = Vector3(wr.randf_range(-0.1, 0.1),
-				wr.randf_range(-0.1, 0.1), wr.randf_range(-0.42, -0.08))
+				wr.randf_range(-0.1, 0.1), wr.randf_range(-0.5, -0.15))
 			var cmat := StandardMaterial3D.new()
 			cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 			cmat.albedo_color = Color("#e8b830")
@@ -163,8 +163,8 @@ class _ForkStudio extends Node3D:
 		_eye.position = Vector3(0, 0, 0.1)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
-		wm.radius = 0.34
-		wm.height = 0.68
+		wm.radius = 0.62
+		wm.height = 1.24
 		white.mesh = wm
 		var emat := StandardMaterial3D.new()
 		emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -176,22 +176,22 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.15
-		pm.height = 0.3
+		pm.radius = 0.3
+		pm.height = 0.6
 		_pupil.mesh = pm
 		var pmat := StandardMaterial3D.new()
 		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		pmat.albedo_color = Color("#0e0a04")
 		_pupil.material_override = pmat
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.27)
+		_pupil.position = Vector3(0, 0, 0.52)
 		var iris := MeshInstance3D.new()
 		var im := TorusMesh.new()
-		im.inner_radius = 0.15
-		im.outer_radius = 0.19
+		im.inner_radius = 0.3
+		im.outer_radius = 0.38
 		iris.mesh = im
 		iris.rotation_degrees = Vector3(90, 0, 0)
-		iris.position = Vector3(0, 0, 0.26)
+		iris.position = Vector3(0, 0, 0.5)
 		var imat := StandardMaterial3D.new()
 		imat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		imat.albedo_color = Color("#c89020")
@@ -202,10 +202,12 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(iris)
 		# LIMBS: the god's own tendrils. Two arms at the sides, two
 		# longer legs below.
-		_arm_l = _limb_root(Vector3(-0.55, 0.05, 0), 2.35, 0.85, 0.075)
-		_arm_r = _limb_root(Vector3(0.55, 0.05, 0), -2.35, 0.85, 0.075)
-		_leg_l = _limb_root(Vector3(-0.24, -0.45, 0), PI, 1.5, 0.095)
-		_leg_r = _limb_root(Vector3(0.24, -0.45, 0), PI, 1.5, 0.095)
+		# the SAME tendril the sky god wears -- fat (0.23 wide at this
+		# scale) and calm-length, not metre-long spaghetti
+		_arm_l = _limb_root(Vector3(-0.72, 0.05, -0.1), 2.35, 1.0, 0.23)
+		_arm_r = _limb_root(Vector3(0.72, 0.05, -0.1), -2.35, 1.0, 0.23)
+		_leg_l = _limb_root(Vector3(-0.3, -0.58, -0.1), PI, 1.5, 0.23)
+		_leg_r = _limb_root(Vector3(0.3, -0.58, -0.1), PI, 1.5, 0.23)
 
 	func _limb_root(at: Vector3, zrot: float, length: float,
 			width: float) -> Node3D:
