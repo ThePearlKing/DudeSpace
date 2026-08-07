@@ -67,6 +67,7 @@ func _phase_mat(c: Color) -> ShaderMaterial:
 	return m
 
 func begin(victim: Node3D, target: Vector3) -> void:
+	add_to_group("god_fx")
 	Game.suppress_hurt_until = Game.playtime + 6.0
 	Sfx.play("godgrip", -8.0)
 	_victim = victim

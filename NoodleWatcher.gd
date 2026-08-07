@@ -264,6 +264,7 @@ func _process(delta: float) -> void:
 		3:
 			# THE SMACK: a tendril reaches all the way down and swats you
 			var smack := _SmackFx.new()
+			smack.add_to_group("god_fx")
 			smack.target = p
 			get_tree().current_scene.add_child(smack)
 			smack.global_position = p.global_position
@@ -274,6 +275,7 @@ func _process(delta: float) -> void:
 			if Game.wrath < 70.0:
 				return
 			var grab := _GrabFx.new()
+			grab.add_to_group("god_fx")
 			grab.target = p
 			get_tree().current_scene.add_child(grab)
 			grab.global_position = p.global_position

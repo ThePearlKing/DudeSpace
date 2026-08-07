@@ -1024,7 +1024,7 @@ func sky_shatter() -> void:
 	det.tween_callback(_sky_detonate)
 
 func _sky_detonate() -> void:
-	Game.god_truce_until = maxf(Game.god_truce_until, Game.playtime + 40.0)
+	Game.god_truce(40.0)
 	_shatter_seq = false
 	mono_sky_clear()
 	var flash := CanvasLayer.new()
@@ -1144,9 +1144,9 @@ func _sky_detonate() -> void:
 		plate.add_child(pm9)
 		# each shard dies on its own clock, up to ~3s apart
 		var pfd := pm9.create_tween()
-		pfd.tween_interval(0.9 + brng.randf() * 1.2)
+		pfd.tween_interval(1.2 + brng.randf() * 1.5)
 		pfd.tween_property(pm9, "transparency", 1.0,
-			1.6 + brng.randf() * 1.6)
+			4.5 + brng.randf() * 2.5)
 		pfd.tween_callback(pm9.hide)
 		# the FALL: perfectly still for a breath, then off it goes
 		var dirn := cen.normalized()
@@ -1168,6 +1168,9 @@ func _sky_detonate() -> void:
 		sc9.parallel().tween_property(plate, "scale",
 			Vector3.ONE * brng.randf_range(2.0, 3.2),
 			brng.randf_range(1.2, 2.4))
+		sc9.tween_property(plate, "position",
+			away * Universe.BOUNDARY * brng.randf_range(0.25, 0.5),
+			brng.randf_range(4.0, 6.0)).as_relative()
 		var tb9 := plate.create_tween()
 		tb9.tween_interval(hold9)
 		tb9.tween_property(plate, "rotation",
@@ -1191,7 +1194,7 @@ func _sky_detonate() -> void:
 						pt.call(i9, j9 + 1))
 	var bf9 := create_tween()
 	_sky_tweens.append(bf9)
-	bf9.tween_interval(7.0)
+	bf9.tween_interval(11.0)
 	bf9.tween_callback(func() -> void:
 		if is_instance_valid(bshell):
 			bshell.queue_free())
@@ -1392,8 +1395,7 @@ func sky_show(col: Color, stage: int, linger: bool,
 	# not mercy, not approval -- the game simply holds the god off your
 	# back while the sky performs, because getting smacked mid-ceremony
 	# is bad theater. He is not glad. He is just not allowed.
-	Game.god_truce_until = maxf(Game.god_truce_until,
-		Game.playtime + (400.0 if linger else 34.0))
+	Game.god_truce(400.0 if linger else 34.0)
 	var cktw := create_tween()
 	_sky_tweens.append(cktw)
 	cktw.tween_method(func(v: float) -> void:
@@ -2805,7 +2807,8 @@ func _process(delta: float) -> void:
 		if not _threw_back:
 			_threw_back = true
 			Game.anger(15.0)
-			if Game.wrath >= 70.0 and node != null:
+			if Game.wrath >= 70.0 and node != null \
+					and Game.playtime >= Game.god_truce_until:
 				var gh := GodHand.new()
 				add_child(gh)
 				gh.begin(node, Vector3.ZERO)

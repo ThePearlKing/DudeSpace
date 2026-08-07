@@ -171,6 +171,14 @@ var suit_boost_until: float = 0.0  # BIG COMPUTER overclock: fast legs until the
 var white_beaten: bool = false
 var suppress_hurt_until: float = 0.0  # god-grip window: hurt notes muted
 var god_truce_until: float = 0.0   # sky ceremonies: the god watches, only
+
+## the game pulls the god off you for a ceremony: sets the window AND
+## cancels anything already mid-swing (smack arms, grabs, the hand)
+func god_truce(secs: float) -> void:
+	god_truce_until = maxf(god_truce_until, playtime + secs)
+	for fx in get_tree().get_nodes_in_group("god_fx"):
+		if is_instance_valid(fx):
+			fx.queue_free()
 var god_pacified_until: float = 0.0  # cheat calm: even a broken sky rests
 var god_peace: float = 0.0         # seconds spent liked: buys forgiveness  # somebody escaped the white zone once: it gave up
 var lime_taken: bool = false    # Harold's spare tetrahedron: claimed
