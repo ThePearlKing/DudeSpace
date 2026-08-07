@@ -6,6 +6,8 @@ extends RefCounted
 
 const CAVERN_POS := Vector3(0, -40000, -40000)
 const TEMPLE_POS := Vector3(40000, 12000, 40000)
+const PYRAMID_POS := Vector3(46000, 16500, 46000)
+static var pyramid_exit := Vector3.ZERO
 const SHADOW_POS := Vector3(-16000, -4000, -14000)   # exterior temple, in space
 
 static var temple_exit := Vector3.ZERO   # where the Euclid temple door is, outside
@@ -14,6 +16,8 @@ static var temple_exit := Vector3.ZERO   # where the Euclid temple door is, outs
 ## house interiors map to their house's exterior, the Euclid temple
 ## interior maps to the pyramid door. Everything else maps to itself.
 static func exterior_of(p: Vector3) -> Vector3:
+	if pyramid_exit != Vector3.ZERO and p.distance_to(PYRAMID_POS) < 2600.0:
+		return pyramid_exit
 	if temple_exit != Vector3.ZERO and p.distance_to(TEMPLE_POS) < 2600.0:
 		return temple_exit
 	var tree := Engine.get_main_loop() as SceneTree
@@ -144,6 +148,99 @@ static func temple_spawn() -> Vector3:
 	return TEMPLE_POS + Vector3(0, 2, 10)
 
 # --------------------------------------------------------- shadow temple
+
+## THE PYRAMID'S INSIDE: a pocket realm, Euclid-temple rules -- small
+## outside, cathedral inside, and the cathedral is ITSELF a pyramid:
+## four brick slopes meeting at an apex over the dressed Menger shrine.
+static func build_pyramid_interior(root: Node3D, exit_target: Vector3) -> void:
+	pyramid_exit = exit_target
+	var p := PYRAMID_POS
+	var base := 96.0
+	var hgt := 58.0
+	var brick := Surfaces.stone(Color("#b5934f"))
+	# floor
+	var fl := StaticBody3D.new()
+	var flm := MeshInstance3D.new()
+	flm.mesh = Surfaces.box_mesh(Vector3(base + 8.0, 1.0, base + 8.0))
+	flm.material_override = Surfaces.stone(Color("#8a7443"))
+	fl.add_child(flm)
+	var flc := CollisionShape3D.new()
+	flc.shape = Surfaces.box_shape(Vector3(base + 8.0, 1.0, base + 8.0))
+	fl.add_child(flc)
+	root.add_child(fl)
+	fl.global_position = p
+	# four sloped walls: each a plate leaning inward to the apex
+	var slope := atan2(base * 0.5, hgt)
+	var wlen := sqrt(pow(base * 0.5, 2.0) + pow(hgt, 2.0))
+	for wi9 in 4:
+		var wyaw := TAU * float(wi9) / 4.0
+		var wdir := Vector3(cos(wyaw), 0, sin(wyaw))
+		var wall := StaticBody3D.new()
+		var wm9 := MeshInstance3D.new()
+		wm9.mesh = Surfaces.box_mesh(Vector3(base + 2.0, wlen, 1.2))
+		wm9.material_override = brick
+		wall.add_child(wm9)
+		var wc9 := CollisionShape3D.new()
+		wc9.shape = Surfaces.box_shape(Vector3(base + 2.0, wlen, 1.2))
+		wall.add_child(wc9)
+		root.add_child(wall)
+		wall.global_position = p + wdir * (base * 0.25) \
+			+ Vector3(0, hgt * 0.5, 0)
+		wall.look_at(wall.global_position + wdir.cross(Vector3.UP), Vector3.UP)
+		wall.rotate_object_local(Vector3(1, 0, 0), 0.0)
+		wall.global_transform.basis = Basis(wdir.cross(Vector3.UP).normalized(),
+			Vector3.UP, wdir).orthonormalized()
+		wall.rotate_object_local(Vector3(1, 0, 0), -(PI * 0.5 - slope))
+	# cornice trim + corner pillars: no flat plastic down here
+	for ci9 in 4:
+		var ca9 := TAU * float(ci9) / 4.0 + PI / 4.0
+		var pil := MeshInstance3D.new()
+		var pm9 := CylinderMesh.new()
+		pm9.top_radius = 0.7
+		pm9.bottom_radius = 0.95
+		pm9.height = 10.0
+		pil.mesh = pm9
+		pil.material_override = Surfaces.stone(Color("#96793e"))
+		root.add_child(pil)
+		pil.global_position = p + Vector3(cos(ca9) * base * 0.32, 5.0,
+			sin(ca9) * base * 0.32)
+	# the DRESSED shrine: stepped tiers, gold ring, the shrine itself
+	for ti9 in 3:
+		var tier := MeshInstance3D.new()
+		tier.mesh = Surfaces.box_mesh(Vector3(9.0 - float(ti9) * 2.2, 0.6,
+			9.0 - float(ti9) * 2.2))
+		tier.material_override = Surfaces.stone(Color("#a08040"))
+		root.add_child(tier)
+		tier.global_position = p + Vector3(0, 0.8 + float(ti9) * 0.6, 0)
+	var gring := MeshInstance3D.new()
+	var grm := TorusMesh.new()
+	grm.inner_radius = 5.2
+	grm.outer_radius = 5.7
+	gring.mesh = grm
+	gring.material_override = Destructible.make_material(Color("#ffd166"), 1.1)
+	root.add_child(gring)
+	gring.global_position = p + Vector3(0, 0.7, 0)
+	var shrine := MengerShrine.new()
+	root.add_child(shrine)
+	# the sponge is centered on its origin (spans +-3.5): seat it ON
+	# the top tier, not waist-deep in the floor
+	shrine.global_position = p + Vector3(0, 6.1, 0)
+	# a warm hall light high under the apex
+	var hl9 := OmniLight3D.new()
+	hl9.light_color = Color("#ffcf8a")
+	hl9.light_energy = 1.8
+	hl9.omni_range = 90.0
+	root.add_child(hl9)
+	hl9.global_position = p + Vector3(0, hgt * 0.6, 0)
+	# exit back to the sand
+	var out := Gate.new().configure({
+		"target": exit_target, "zone": "", "label": "EXIT",
+		"color": Color("#ffe066")})
+	root.add_child(out)
+	out.global_position = p + Vector3(0, 0.5, base * 0.42)
+
+static func pyramid_spawn() -> Vector3:
+	return PYRAMID_POS + Vector3(0, 2.0, PYRAMID_POS.length() * 0.0 + 34.0)
 
 static func build_shadow_temple(root: Node3D, dummy_body) -> void:
 	var p := SHADOW_POS

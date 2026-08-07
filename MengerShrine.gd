@@ -45,6 +45,8 @@ func _ready() -> void:
 		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, xforms[i]))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
+	# the sponge wears the same orange moving shine it grants
+	mmi.material_overlay = Inventory.ench_overlay()
 	_spin.add_child(mmi)
 
 	var col := CollisionShape3D.new()

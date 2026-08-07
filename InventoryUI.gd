@@ -231,7 +231,7 @@ func _make_cell(item: Dictionary) -> Control:
 		var wd9: Dictionary = Inventory.weapons[str(item.id)]
 		var dps9 := float(wd9["dmg"]) / maxf(0.02, float(wd9["rate"]))
 		var wl9 := Label.new()
-		wl9.text = "%d damage · %d/s held down" % [int(wd9["dmg"]), int(dps9)]
+		wl9.text = "%d damage · %d d/s" % [int(wd9["dmg"]), int(dps9)]
 		wl9.add_theme_font_size_override("font_size", 12)
 		wl9.modulate = Color("#ffb347")
 		txt.add_child(wl9)
@@ -322,6 +322,14 @@ func _refresh() -> void:
 			_tab_btns[i].modulate = Color(0.5, 0.5, 0.5)
 	for i in _slot_panels.size():
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
+		var sid9 := str(Inventory.hotbar[i]["id"])
+		if Inventory.weapons.has(sid9):
+			var wd0: Dictionary = Inventory.weapons[sid9]
+			_slot_panels[i].tooltip_text = "%d damage · %d d/s" % [
+				int(wd0["dmg"]),
+				int(float(wd0["dmg"]) / maxf(0.02, float(wd0["rate"])))]
+		else:
+			_slot_panels[i].tooltip_text = ""
 		_slot_panels[i].add_theme_stylebox_override("panel", _hot_style(i == Inventory.selected))
 		_slot_lbls[i].material = Inventory.ench_text_material() \
 			if int(Inventory.enchant.get(str(Inventory.hotbar[i]["id"]), 0)) > 0 \

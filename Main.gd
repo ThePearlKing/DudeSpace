@@ -6449,64 +6449,6 @@ void fragment(){
 	pyr.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
 		sp + Vector3.DOWN * 9.0)
 	_pyramid_exit = sp + Vector3.DOWN * 2.0
-	# ONE pyramid, walls visible from BOTH sides (cull off): the same
-	# bricks serve as exterior hide and interior chamber -- no second
-	# shell ghosting at the base
-	var ifloor := StaticBody3D.new()
-	var ifm := MeshInstance3D.new()
-	var ifme := CylinderMesh.new()
-	ifme.top_radius = 15.0
-	ifme.bottom_radius = 15.0
-	ifme.height = 0.6
-	ifme.radial_segments = 4
-	ifm.mesh = ifme
-	ifm.material_override = Surfaces.stone(Color("#8a7443"))
-	ifloor.add_child(ifm)
-	var ifc9 := CollisionShape3D.new()
-	var ifcs := CylinderShape3D.new()
-	ifcs.radius = 15.0
-	ifcs.height = 0.6
-	ifc9.shape = ifcs
-	ifloor.add_child(ifc9)
-	add_child(ifloor)
-	ifloor.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
-		sp + Vector3.DOWN * 2.2)
-	# the SHRINE sits dressed at the chamber's heart: stepped plinth,
-	# corner columns with burning caps, a gold ring underfoot
-	var sxf := Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 2.5)
-	for ti9 in 3:
-		var tier := MeshInstance3D.new()
-		var tm9 := BoxMesh.new()
-		tm9.size = Vector3(7.0 - float(ti9) * 1.8, 0.5,
-			7.0 - float(ti9) * 1.8)
-		tier.mesh = tm9
-		tier.material_override = Surfaces.stone(Color("#a08040"))
-		add_child(tier)
-		tier.global_transform = sxf
-		tier.translate_object_local(Vector3(0, 0.55 + float(ti9) * 0.5, 0))
-	var gring := MeshInstance3D.new()
-	var grm := TorusMesh.new()
-	grm.inner_radius = 4.1
-	grm.outer_radius = 4.5
-	gring.mesh = grm
-	gring.material_override = Destructible.make_material(Color("#ffd166"), 1.1)
-	add_child(gring)
-	gring.global_transform = sxf
-	gring.translate_object_local(Vector3(0, 0.4, 0))
-	for ci9 in 4:
-		var ca9 := TAU * float(ci9) / 4.0 + PI / 4.0
-		var colm := MeshInstance3D.new()
-		var ccm := CylinderMesh.new()
-		ccm.top_radius = 0.5
-		ccm.bottom_radius = 0.65
-		ccm.height = 7.0
-		colm.mesh = ccm
-		colm.material_override = Surfaces.stone(Color("#96793e"))
-		add_child(colm)
-		colm.global_transform = sxf
-		colm.translate_object_local(Vector3(cos(ca9) * 9.0, 3.5,
-			sin(ca9) * 9.0))
-
 	# THE DOOR: one framed opening at the base. Sealed by a slab until
 	# the Mind Core has been activated; then F slides it into the sand.
 	var dxf := Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 2.0)
@@ -6537,6 +6479,19 @@ void fragment(){
 	pdoor.global_transform = dxf
 	pdoor.rotate_object_local(Vector3.UP, dyaw)
 	pdoor.translate_object_local(Vector3(0, 0, 14.0))
+	var pgate := Gate.new().configure({
+		"target": Zones.pyramid_spawn(), "zone": "flat", "zone_g": 9.0,
+		"label": "ENTER", "color": Color("#ffcf40")})
+	add_child(pgate)
+	pgate.global_transform = dxf
+	pgate.rotate_object_local(Vector3.UP, dyaw)
+	pgate.translate_object_local(Vector3(0, 0.5, 12.6))
+	# the interior is a POCKET REALM, Euclid-temple rules: the inside
+	# is bigger than the outside and shaped like the outside
+	Zones.build_pyramid_interior(self,
+		dxf.translated_local(Vector3(0, 0, 0)).origin
+		+ (dxf.basis * Basis(Vector3.UP, dyaw) * Vector3(0, 0, 1)) * 17.0
+		+ (dxf.basis * Vector3(0, 1, 0)) * 1.0)
 	var pdl := Label3D.new()
 	pdl.text = "PYRAMID DOOR [F]"
 	pdl.font_size = 26
