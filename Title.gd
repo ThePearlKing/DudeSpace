@@ -326,6 +326,7 @@ const TIPS := [
 	"tip: the universe has an edge. it pushes back. keep pushing anyway.",
 	"tip: the dotted circle on the map is where everything ends.",
 	"tip: how big the EYEBALL is -- the eyeball itself, not the god -- is its mood. small: safe. swollen: not.",
+	"tip: scroll on a shop card to craft a whole stack of it at once.",
 	"the fork is coming.",
 	"tip: gas giants have no ground. do not go looking for the ground.",
 	"tip: K opens the calendar. UFO trader Saturdays are predictable.",
