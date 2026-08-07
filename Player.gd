@@ -583,6 +583,16 @@ func _wreck_click() -> void:
 	var hud = get_tree().get_first_node_in_group("hud")
 	var f := _furn_under_crosshair()
 	if f == null:
+		# not furniture? maybe a TV or camera -- those break too
+		var space9 := get_world_3d().direct_space_state
+		var q9 := PhysicsRayQueryParameters3D.create(_camera.global_position,
+			_camera.global_position - _camera.global_transform.basis.z * 9.0)
+		q9.exclude = [get_rid()]
+		var hit9 := space9.intersect_ray(q9)
+		if hit9 and (hit9.collider is TVSet.TV or hit9.collider is TVSet.SpyCam):
+			hit9.collider.take_damage(999.0, Vector3.ZERO)
+			Sfx.play("explode", -16.0)
+			return
 		Sfx.play("denied", -18.0)
 		return
 	if not Net.can_break(str(f.get_meta("owner", ""))):
@@ -687,6 +697,10 @@ func _start_ghost(cat: String, kind: String) -> void:
 	_ghost_kind = kind
 	_ghost = MeshInstance3D.new()
 	var bm := BoxMesh.new()
+	if cat == "tvish":
+		bm.size = Vector3(2.8, 2.1, 0.5) if kind == "tvbig" \
+			else (Vector3(1.35, 1.4, 0.5) if kind == "tv" \
+			else Vector3(0.45, 0.7, 0.55))
 	if cat == "house":
 		var w := 5.0
 		var hh := 3.4
@@ -872,6 +886,26 @@ func _confirm_ghost() -> void:
 		sn.global_transform = Transform3D(sbasis, spos)
 		if not Game.creative:
 			Inventory.remove_res("housekit", 1)
+		Sfx.play("place")
+		_cancel_ghost()
+		return
+	if _ghost_cat == "tvish":
+		var tn: Node3D
+		match _ghost_kind:
+			"tv":
+				tn = TVSet.TV.new()
+			"tvbig":
+				var tb := TVSet.TV.new()
+				tb.big = true
+				tn = tb
+			_:
+				tn = TVSet.SpyCam.new()
+		get_parent().add_child(tn)
+		tn.set_meta("placed_id", _ghost_kind)
+		tn.set_meta("owner", Net.my_name())
+		tn.global_transform = Transform3D(tf.basis, base_pos)
+		if not Game.creative:
+			Inventory.remove_res(_ghost_kind, 1)
 		Sfx.play("place")
 		_cancel_ghost()
 		return
@@ -2090,10 +2124,12 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", "netanalyser", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio", \
 		"tv", "tvbig", "camtv":
-			if Universe.inside_body(global_position) \
-					and id not in ["tv", "tvbig", "camtv"]:
+			# PREVIEW FIRST: a ghost shows exactly where it lands
+			_start_ghost("tvish", id)
+			return
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
+			if Universe.inside_body(global_position):
 				Sfx.play("denied")
 				var hudi = get_tree().get_first_node_in_group("hud")
 				if hudi:

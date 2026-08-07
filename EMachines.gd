@@ -479,7 +479,7 @@ net: %+.1f EU/s" % [buf, buf_cap, _rate]
 ## per-frame trickle, no delay-burst-delay. Creative inventory only.
 class CreativeGen extends Machine:
 	var _halo: MeshInstance3D
-	var _dtv: MeshInstance3D = null
+	var _dtvs: Array = []
 	var _dtv_on := false
 	var _dtv_t := 0.0
 	func _init() -> void:
@@ -505,39 +505,52 @@ class CreativeGen extends Machine:
 		bolt.size = Vector3(0.1, 0.5, 0.1)
 		part(bolt, Vector3(0, box_size.y + 0.55, 0), Color("#fff2cf"), 3.0,
 			Vector3(0, 0, 20))
-		# the little TV: airs THE DANCE, but only while somebody is
-		# close -- far away it is an honest black rectangle
-		_dtv = MeshInstance3D.new()
-		var dq := QuadMesh.new()
-		dq.size = Vector2(0.62, 0.4)
-		_dtv.mesh = dq
-		var dbk := StandardMaterial3D.new()
-		dbk.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		dbk.albedo_color = Color(0.01, 0.01, 0.02)
-		_dtv.material_override = dbk
-		add_child(_dtv)
-		_dtv.position = Vector3(0, box_size.y * 0.55, box_size.z * 0.5 + 0.03)
+		# the little TVs: radio-style FRAMED screens on ALL FOUR sides,
+		# airing THE DANCE -- but only while somebody is close. Far away
+		# they are honest black rectangles.
+		for fy9 in 4:
+			var yaw9 := PI * 0.5 * float(fy9)
+			var fr9 := MeshInstance3D.new()
+			fr9.mesh = Surfaces.box_mesh(Vector3(0.78, 0.56, 0.06))
+			fr9.material_override = Destructible.make_material(
+				Color("#1c1e24"), 0.4)
+			add_child(fr9)
+			fr9.position = Vector3(0, box_size.y * 0.55, 0)
+			fr9.rotate_object_local(Vector3.UP, yaw9)
+			fr9.translate_object_local(Vector3(0, 0, box_size.z * 0.5 + 0.04))
+			var scr9 := MeshInstance3D.new()
+			var dq := QuadMesh.new()
+			dq.size = Vector2(0.62, 0.4)
+			scr9.mesh = dq
+			var dbk := StandardMaterial3D.new()
+			dbk.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			dbk.albedo_color = Color(0.01, 0.01, 0.02)
+			scr9.material_override = dbk
+			add_child(scr9)
+			scr9.position = Vector3(0, box_size.y * 0.55, 0)
+			scr9.rotate_object_local(Vector3.UP, yaw9)
+			scr9.translate_object_local(Vector3(0, 0, box_size.z * 0.5 + 0.08))
+			_dtvs.append(scr9)
 	func _process(delta: float) -> void:
 		_dtv_t += delta
-		if _dtv != null and _dtv_t > 0.5:
+		if not _dtvs.is_empty() and _dtv_t > 0.5:
 			_dtv_t = 0.0
 			var pl0 = get_tree().get_first_node_in_group("player")
 			var near9: bool = pl0 != null and is_instance_valid(pl0) \
 				and pl0.global_position.distance_to(global_position) < 40.0
 			if near9:
-				TVSet.dance_ping_ms = Time.get_ticks_msec()
-			if near9 and not _dtv_on:
-				_dtv_on = true
+				TVSet.ping(0)
+			if near9 != _dtv_on:
+				_dtv_on = near9
 				var dm9 := StandardMaterial3D.new()
 				dm9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-				dm9.albedo_texture = TVSet.dance_feed(get_tree()).get_texture()
-				_dtv.material_override = dm9
-			elif not near9 and _dtv_on:
-				_dtv_on = false
-				var bk9 := StandardMaterial3D.new()
-				bk9.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-				bk9.albedo_color = Color(0.01, 0.01, 0.02)
-				_dtv.material_override = bk9
+				if near9:
+					dm9.albedo_texture = TVSet.channel_feed(get_tree(), 0) \
+						.get_texture()
+				else:
+					dm9.albedo_color = Color(0.01, 0.01, 0.02)
+				for sc0 in _dtvs:
+					(sc0 as MeshInstance3D).material_override = dm9
 		super._process(delta)
 		if _halo:
 			_halo.rotate_y(delta * 3.0)

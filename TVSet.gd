@@ -5,47 +5,35 @@ extends Node
 ## nowhere else. One studio feeds every screen in the universe.
 
 static var cams: Dictionary = {}      # camera name -> SpyCam node
-static var fork_channel := 0
-static var _fork_vp: SubViewport = null
-static var _fork_drv: Node = null
-static var _dance_vp: SubViewport = null
-static var dance_ping_ms := 0
-static var fork_sub := ""             # current FORK TV subtitle line
+static var _ch_vps: Dictionary = {}   # channel -> SubViewport (own studio)
+static var ch_ping_ms: Dictionary = {} # channel -> last watch ping
+static var ch_subs: Dictionary = {}    # channel -> current subtitle
 
 const CHANNELS := ["THE DANCE", "NOODLE GOD TV", "MISSING DUDES",
 	"COOKING WITH NOODLE", "EXERCISE HOUR"]
 
 ## ---------------------------------------------------------- FORK TV
-## the studio lives inside its own SubViewport world: no pocket, no
-## collisions, unreachable by anything but a screen.
-## a small dedicated studio locked to THE DANCE, for machine screens.
-## Renders only while something nearby keeps pinging it.
-static func dance_feed(tree: SceneTree) -> SubViewport:
-	if _dance_vp != null and is_instance_valid(_dance_vp):
-		return _dance_vp
-	_dance_vp = SubViewport.new()
-	_dance_vp.size = Vector2i(200, 120)
-	_dance_vp.own_world_3d = true
-	_dance_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	tree.current_scene.add_child(_dance_vp)
+## every channel is its OWN studio inside its own SubViewport world --
+## different TVs on different channels show different scenes, TVs on
+## the same channel share a broadcast, and any studio nobody has
+## pinged for four seconds stops rendering entirely.
+static func channel_feed(tree: SceneTree, ch: int) -> SubViewport:
+	if _ch_vps.has(ch) and is_instance_valid(_ch_vps[ch]):
+		return _ch_vps[ch]
+	var vp := SubViewport.new()
+	vp.size = Vector2i(360, 220)
+	vp.own_world_3d = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	tree.current_scene.add_child(vp)
 	var drv := _ForkStudio.new()
-	drv.lock_channel = 0
+	drv.lock_channel = ch
 	drv.sleepy = true
-	_dance_vp.add_child(drv)
-	return _dance_vp
+	vp.add_child(drv)
+	_ch_vps[ch] = vp
+	return vp
 
-static func fork_feed(tree: SceneTree) -> SubViewport:
-	if _fork_vp != null and is_instance_valid(_fork_vp):
-		return _fork_vp
-	_fork_vp = SubViewport.new()
-	_fork_vp.size = Vector2i(360, 220)
-	_fork_vp.own_world_3d = true
-	_fork_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	tree.current_scene.add_child(_fork_vp)
-	var drv := _ForkStudio.new()
-	_fork_vp.add_child(drv)
-	_fork_drv = drv
-	return _fork_vp
+static func ping(ch: int) -> void:
+	ch_ping_ms[ch] = Time.get_ticks_msec()
 
 class _ForkStudio extends Node3D:
 	var lock_channel := -1     # >=0: this studio airs ONE channel forever
@@ -100,89 +88,133 @@ class _ForkStudio extends Node3D:
 		lt.position = Vector3(0, 6, 6)
 		var cam := Camera3D.new()
 		add_child(cam)
-		cam.position = Vector3(0, 2.6, 7.5)
-		cam.look_at(Vector3(0, 2.0, 0), Vector3.UP)
+		# ZOOMED: the host fills the frame, and the backdrop fills
+		# everything behind -- no void in shot
+		cam.position = Vector3(0, 2.3, 4.4)
+		cam.look_at(Vector3(0, 2.1, 0), Vector3.UP)
 		cam.current = true
 		_build_puppet()
 		_build_props()
-		set_channel(TVSet.fork_channel)
+		_build_backdrop()
+		set_channel(maxi(0, lock_channel))
 
-	## the FORK TV host: a mini noodle god with 4 small tentacles, two
-	## arms, two legs -- and the rings live BEHIND him, never crossing
-	## the eye
+	## every channel gets its OWN look behind the host -- a full wall,
+	## wider than the lens can see past
+	func _build_backdrop() -> void:
+		var looks := {
+			0: [Color("#3a1a4a"), Color("#ff5aff")],
+			1: [Color("#1a2a4a"), Color("#4d9dff")],
+			2: [Color("#2a2a2e"), Color("#c22222")],
+			3: [Color("#4a2c14"), Color("#ffb04a")],
+			4: [Color("#173a22"), Color("#5aff3a")]}
+		var lk: Array = looks.get(maxi(0, lock_channel), looks[0])
+		var wall := MeshInstance3D.new()
+		wall.mesh = Surfaces.box_mesh(Vector3(30, 18, 0.4))
+		wall.material_override = Destructible.make_material(lk[0] as Color, 0.25)
+		add_child(wall)
+		wall.position = Vector3(0, 5, -3.2)
+		for i in 5:
+			var strip := MeshInstance3D.new()
+			strip.mesh = Surfaces.box_mesh(Vector3(0.25, 18, 0.1))
+			strip.material_override = Destructible.make_material(
+				lk[1] as Color, 1.3)
+			add_child(strip)
+			strip.position = Vector3(-6.0 + float(i) * 3.0, 5, -2.95)
+
+	## the FORK TV host: the sky god himself, scaled for television --
+	## the same eye, iris, pupil, and gold coil wreath, except the
+	## tendrils are LIMBS: two at the sides as arms, two longer as legs.
+	## The wreath never spawns in front of the eye and never moves.
+	var _wreath: Node3D
+
 	func _build_puppet() -> void:
+		_wreath = Node3D.new()
+		add_child(_wreath)
+		_wreath.position = Vector3(0, 2.2, 0)
+		var wr := RandomNumberGenerator.new()
+		wr.seed = 40
+		for i in 12:
+			var coil := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = wr.randf_range(0.5, 0.66)
+			tm.outer_radius = tm.inner_radius + wr.randf_range(0.09, 0.14)
+			coil.mesh = tm
+			# rings face the camera like the sky wreath -- tilted a
+			# little, pushed BEHIND the eye plane, never across it
+			coil.rotation_degrees = Vector3(90 + wr.randf_range(-22, 22),
+				wr.randf_range(-15, 15), wr.randf_range(0, 360))
+			coil.position = Vector3(wr.randf_range(-0.1, 0.1),
+				wr.randf_range(-0.1, 0.1), wr.randf_range(-0.42, -0.08))
+			var cmat := StandardMaterial3D.new()
+			cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			cmat.albedo_color = Color("#e8b830")
+			cmat.emission_enabled = true
+			cmat.emission = Color("#ffcf40")
+			cmat.emission_energy_multiplier = 0.25
+			coil.material_override = cmat
+			_wreath.add_child(coil)
 		_body = Node3D.new()
 		add_child(_body)
 		_body.position = Vector3(0, 2.2, 0)
-		var core := MeshInstance3D.new()
-		var cm := SphereMesh.new()
-		cm.radius = 0.9
-		cm.height = 1.8
-		core.mesh = cm
-		core.material_override = Destructible.make_material(Color("#e8cf9a"), 0.6)
-		_body.add_child(core)
-		# rings BEHIND the body, tilted away -- the eye stays clear
-		for rr in [[1.3, -0.9], [1.6, -1.2]]:
-			var ring := MeshInstance3D.new()
-			var tm := TorusMesh.new()
-			tm.inner_radius = float(rr[0]) - 0.06
-			tm.outer_radius = float(rr[0])
-			ring.mesh = tm
-			ring.material_override = Destructible.make_material(
-				Color("#ffcf40"), 1.2)
-			_body.add_child(ring)
-			ring.position = Vector3(0, 0.2, rr[1])
-			ring.rotation_degrees = Vector3(70, 0, 0)
-		# THE EYE, front and center, unblocked forever
+		# THE EYE, exactly like the sky: warm white ball, dark pupil,
+		# gold iris ring
 		_eye = Node3D.new()
 		_body.add_child(_eye)
-		_eye.position = Vector3(0, 0.15, 0.75)
+		_eye.position = Vector3(0, 0, 0.1)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
-		wm.radius = 0.23
-		wm.height = 0.46
+		wm.radius = 0.34
+		wm.height = 0.68
 		white.mesh = wm
-		white.material_override = Destructible.make_material(Color("#f2f2ee"), 0.9)
+		var emat := StandardMaterial3D.new()
+		emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		emat.albedo_color = Color("#f5eee0")
+		emat.emission_enabled = true
+		emat.emission = Color("#ffcf40")
+		emat.emission_energy_multiplier = 0.4
+		white.material_override = emat
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.09
-		pm.height = 0.18
+		pm.radius = 0.15
+		pm.height = 0.3
 		_pupil.mesh = pm
-		_pupil.material_override = Destructible.make_material(Color("#1a1016"), 0.2)
+		var pmat := StandardMaterial3D.new()
+		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		pmat.albedo_color = Color("#0e0a04")
+		_pupil.material_override = pmat
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.16)
-		# limbs: noodly boxes on pivot nodes
-		_arm_l = _limb(Vector3(-0.95, 0.35, 0), Color("#e8cf9a"))
-		_arm_r = _limb(Vector3(0.95, 0.35, 0), Color("#e8cf9a"))
-		_leg_l = _limb(Vector3(-0.4, -0.85, 0), Color("#d8bf8a"))
-		_leg_r = _limb(Vector3(0.4, -0.85, 0), Color("#d8bf8a"))
-		# four SMALL tentacles fringing the underside
-		for i in 4:
-			var a := -0.9 + 0.6 * float(i)
-			var tp := Node3D.new()
-			_body.add_child(tp)
-			tp.position = Vector3(a * 0.55, -0.8, 0.25)
-			var tm2 := MeshInstance3D.new()
-			var tc := CylinderMesh.new()
-			tc.top_radius = 0.03
-			tc.bottom_radius = 0.09
-			tc.height = 0.6
-			tm2.mesh = tc
-			tm2.material_override = Destructible.make_material(Color("#e8cf9a"), 0.5)
-			tp.add_child(tm2)
-			tm2.position = Vector3(0, -0.3, 0)
-			_tents.append(tp)
+		_pupil.position = Vector3(0, 0, 0.27)
+		var iris := MeshInstance3D.new()
+		var im := TorusMesh.new()
+		im.inner_radius = 0.15
+		im.outer_radius = 0.19
+		iris.mesh = im
+		iris.rotation_degrees = Vector3(90, 0, 0)
+		iris.position = Vector3(0, 0, 0.26)
+		var imat := StandardMaterial3D.new()
+		imat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		imat.albedo_color = Color("#c89020")
+		imat.emission_enabled = true
+		imat.emission = Color("#ffcf40")
+		imat.emission_energy_multiplier = 0.8
+		iris.material_override = imat
+		_eye.add_child(iris)
+		# LIMBS: the god's own tendrils. Two arms at the sides, two
+		# longer legs below.
+		_arm_l = _limb_root(Vector3(-0.55, 0.05, 0), 2.35, 0.85, 0.075)
+		_arm_r = _limb_root(Vector3(0.55, 0.05, 0), -2.35, 0.85, 0.075)
+		_leg_l = _limb_root(Vector3(-0.24, -0.45, 0), PI, 1.5, 0.095)
+		_leg_r = _limb_root(Vector3(0.24, -0.45, 0), PI, 1.5, 0.095)
 
-	func _limb(at: Vector3, col: Color) -> Node3D:
+	func _limb_root(at: Vector3, zrot: float, length: float,
+			width: float) -> Node3D:
 		var piv := Node3D.new()
 		_body.add_child(piv)
 		piv.position = at
-		var m := MeshInstance3D.new()
-		m.mesh = Surfaces.box_mesh(Vector3(0.22, 0.85, 0.22))
-		m.material_override = Destructible.make_material(col, 0.5)
-		piv.add_child(m)
-		m.position = Vector3(0, -0.42, 0)
+		piv.rotation.z = zrot
+		var t := NoodleGod.make_tendril(length, width, randf() * TAU)
+		piv.add_child(t)
 		return piv
 
 	func _build_props() -> void:
@@ -246,28 +278,29 @@ class _ForkStudio extends Node3D:
 			(_props[k] as Node3D).visible = int(k) == ch
 		_sub_i = 0
 		_sub_t = 0.0
-		TVSet.fork_sub = "" if not SUBS.has(ch) else str(SUBS[ch][0])
+		TVSet.ch_subs[ch] = "" if not SUBS.has(ch) else str(SUBS[ch][0])
 
 	func _process(delta: float) -> void:
 		_t += delta
 		if sleepy:
-			# nobody near a screen? the studio stops rendering entirely
-			var idle: bool = Time.get_ticks_msec() - TVSet.dance_ping_ms > 4000
+			# nobody watching this channel? stop rendering entirely
+			var idle: bool = Time.get_ticks_msec() \
+				- int(TVSet.ch_ping_ms.get(lock_channel, 0)) > 4000
 			(get_parent() as SubViewport).render_target_update_mode = \
 				SubViewport.UPDATE_DISABLED if idle \
 				else SubViewport.UPDATE_ALWAYS
 			if idle:
 				return
-		var ch := lock_channel if lock_channel >= 0 else TVSet.fork_channel
+		var ch := lock_channel
 		# subtitles roll on every talking channel
 		if SUBS.has(ch):
 			_sub_t += delta
 			if _sub_t > 5.0:
 				_sub_t = 0.0
 				_sub_i = (_sub_i + 1) % (SUBS[ch] as Array).size()
-				TVSet.fork_sub = str((SUBS[ch] as Array)[_sub_i])
+			TVSet.ch_subs[ch] = str((SUBS[ch] as Array)[_sub_i])
 		else:
-			TVSet.fork_sub = ""
+			TVSet.ch_subs[ch] = ""
 		# tentacles always drift
 		for i in _tents.size():
 			(_tents[i] as Node3D).rotation.z = sin(_t * 2.0 + float(i)) * 0.25
@@ -316,6 +349,8 @@ class _ForkStudio extends Node3D:
 ## ---------------------------------------------------------- SPY CAM
 class SpyCam extends StaticBody3D:
 	var cam_name := "camera"
+	var shared := false        # other players' TVs may watch this lens
+	var owner_name := ""
 	var _vis: Node3D = null
 	var _head: Node3D = null      # the aimable part; the mount never moves
 	var _ht := 0.0
@@ -460,7 +495,7 @@ class SpyCam extends StaticBody3D:
 		add_child(cs)
 		var lbl := Label3D.new()
 		lbl.name = "tag"
-		lbl.text = cam_name + "  [F rename]"
+		lbl.text = cam_name + "  [F]"
 		lbl.font_size = 18
 		lbl.pixel_size = 0.005
 		lbl.modulate = Color("#7df9ff")
@@ -474,15 +509,35 @@ class SpyCam extends StaticBody3D:
 			if TVSet.cams.get(cam_name) == self:
 				TVSet.cams.erase(cam_name))
 
+	func take_damage(_d: float, _from: Vector3) -> void:
+		if _aiming:
+			aim_end()
+		Destructible.spawn_debris(get_parent(), global_position,
+			Vector3(0.4, 0.4, 0.5), Color("#2a2f38"), Vector3.UP)
+		var drop := ItemDrop.new()
+		drop.setup("camtv", 1)
+		get_parent().add_child(drop)
+		drop.global_position = global_position
+		Sfx.play("explode", -18.0)
+		queue_free()
+
 	func use() -> void:
 		var pui := PickUI.new().configure("SECURITY CAMERA", [
 			{"id": "aim", "label": "AIM CAMERA (see through it)"},
-			{"id": "rename", "label": "RENAME"}],
+			{"id": "rename", "label": "RENAME"},
+			{"id": "share", "label": "SHOW TO OTHER PLAYERS: "
+				+ ("YES" if shared else "NO")}],
 			func(pick: String) -> void:
 				if pick == "aim":
 					aim_begin()
 				elif pick == "rename":
-					_rename_box())
+					_rename_box()
+				elif pick == "share":
+					shared = not shared
+					if shared and owner_name == "":
+						owner_name = Net.my_name()
+					Sfx.play("click", -12.0)
+					use())
 		get_tree().current_scene.add_child(pui)
 
 	func _rename_box() -> void:
@@ -514,7 +569,7 @@ class SpyCam extends StaticBody3D:
 				TVSet.cams.erase(cam_name)
 				cam_name = nn
 				TVSet.cams[cam_name] = self
-				(get_node("tag") as Label3D).text = cam_name + "  [F rename]"
+				(get_node("tag") as Label3D).text = cam_name + "  [F]"
 			lay.queue_free()
 			Input.mouse_mode = was_mouse
 		ok.pressed.connect(done)
@@ -526,6 +581,7 @@ class TV extends StaticBody3D:
 	var wall := false
 	var mode := "menu"        # menu | camera | alien | fork | console
 	var cam_pick := ""
+	var fork_ch := 0          # THIS tv's channel: every set tunes free
 	var _screen: MeshInstance3D
 	var _stand: MeshInstance3D = null
 	var _sub: Label3D
@@ -534,6 +590,19 @@ class TV extends StaticBody3D:
 	var _menu_lbl: Label3D
 	var _con_lbl: Label3D
 	var _tick := 0.0
+
+	func take_damage(_d: float, _from: Vector3) -> void:
+		Destructible.spawn_debris(get_parent(), global_position
+			+ global_transform.basis.y * (_sh() * 0.5 + 0.3),
+			Vector3(_sw(), _sh(), 0.4), Color("#1c1e24"),
+			global_transform.basis.y)
+		var drop := ItemDrop.new()
+		drop.setup("tvbig" if big else "tv", 1)
+		get_parent().add_child(drop)
+		drop.global_position = global_position \
+			+ global_transform.basis.y * 0.6
+		Sfx.play("explode", -16.0)
+		queue_free()
 
 	func _sw() -> float:
 		return 2.6 if big else 1.15
@@ -643,15 +712,18 @@ class TV extends StaticBody3D:
 				m.albedo_color = Color.WHITE
 				_screen.material_override = m
 			"alien":
-				_ensure_vp()
-				_vcam = Camera3D.new()
-				_vp.add_child(_vcam)
-				_vcam.current = true
-				m.albedo_texture = _vp.get_texture()
-				m.albedo_color = Color.WHITE
+				# the EXACT colony-apartment feed: same viewport, same
+				# icosahedron hosts, same speaker-colored subtitles
+				var col9: Node = _find_colony()
+				if col9 != null:
+					col9._ensure_tv_feed()
+					m.albedo_texture = col9._tv_vp.get_texture()
+					m.albedo_color = Color.WHITE
+				else:
+					m.albedo_color = Color(0.05, 0.05, 0.1)
 				_screen.material_override = m
 			"fork":
-				var fvp := TVSet.fork_feed(get_tree())
+				var fvp := TVSet.channel_feed(get_tree(), fork_ch)
 				m.albedo_texture = fvp.get_texture()
 				m.albedo_color = Color.WHITE
 				_screen.material_override = m
@@ -662,6 +734,12 @@ class TV extends StaticBody3D:
 			_vp.size = Vector2i(400, 240)
 			_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 			add_child(_vp)
+
+	func _find_colony():
+		for c in get_tree().current_scene.get_children():
+			if c is IcosaColony:
+				return c
+		return null
 
 	func use() -> void:
 		var opts: Array = [
@@ -680,25 +758,37 @@ class TV extends StaticBody3D:
 				if pick == "off":
 					mode = "menu"
 					_apply_screen()
+					use()   # the menu STAYS open
 				elif pick == "alien":
 					mode = "alien"
 					_apply_screen()
 				elif pick == "fork":
 					mode = "fork"
 					_apply_screen()
+					use()   # straight into the channel list
 				elif pick.begins_with("ch"):
-					TVSet.fork_channel = int(pick.substr(2))
-					if TVSet._fork_drv != null \
-							and is_instance_valid(TVSet._fork_drv):
-						TVSet._fork_drv.set_channel(TVSet.fork_channel)
+					fork_ch = int(pick.substr(2))
+					_apply_screen()
+					use()   # keep flipping channels
 				elif pick == "cam":
 					_pick_camera())
 		get_tree().current_scene.add_child(pui)
 
 	func _pick_camera() -> void:
 		var opts: Array = []
+		var mine := str(get_meta("owner", Net.my_name()))
 		for nm in TVSet.cams.keys():
-			opts.append({"id": str(nm), "label": str(nm)})
+			var cnode = TVSet.cams[nm]
+			if cnode == null or not is_instance_valid(cnode):
+				continue
+			var own9 := str(cnode.owner_name)
+			# your own cameras always list; others' only when SHARED
+			if own9 != "" and own9 != mine and not cnode.shared:
+				continue
+			var lbl9 := str(nm)
+			if own9 != "" and own9 != mine:
+				lbl9 += "  (" + own9 + ")"
+			opts.append({"id": str(nm), "label": lbl9})
 		if opts.is_empty():
 			var hud = get_tree().get_first_node_in_group("hud")
 			if hud:
@@ -728,18 +818,21 @@ class TV extends StaticBody3D:
 					_vcam.global_transform = anchor.global_transform \
 						.translated_local(Vector3(0, 0.22, -0.3))
 			"alien":
-				var ds: DatamoshStudio = null
-				for c in get_tree().current_scene.get_children():
-					if c is DatamoshStudio:
-						ds = c
-						break
-				if ds != null and _vcam != null and ds._tv_cam != null \
-						and is_instance_valid(ds._tv_cam):
-					ds.remote_watch = 6.0
-					_vcam.global_transform = ds._tv_cam.global_transform
-					_sub.text = str(ds._cur_text)
+				var col0 = _find_colony()
+				if col0 != null:
+					for dsn in get_tree().current_scene.get_children():
+						if dsn is DatamoshStudio:
+							dsn.remote_watch = 6.0
+							break
+					if not (col0._tv_subs as Array).is_empty():
+						var src0: Label3D = col0._tv_subs[0]
+						if is_instance_valid(src0):
+							_sub.text = src0.text
+							_sub.modulate = src0.modulate
 			"fork":
-				_sub.text = TVSet.fork_sub
+				TVSet.ping(fork_ch)
+				_sub.modulate = Color.WHITE
+				_sub.text = str(TVSet.ch_subs.get(fork_ch, ""))
 			"menu":
 				for c3 in get_tree().get_nodes_in_group("machine"):
 					if "wires_out" in c3 and (c3.wires_out as Array).has(self):
