@@ -982,7 +982,11 @@ func mono_sky_clear() -> void:
 	_skyfx.clear()
 
 func mono_sky_demo(stage: int) -> void:
-	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7), false)
+	# cracks first, a held beat -- THEN the pop: the whole triangle
+	# field and the falling glass arrive at once, like a detonation,
+	# never loitering in the background from second zero
+	sky_show(Game.MONO_COLORS[clampi(stage, 0, 7)], clampi(stage, 0, 7),
+		false, 3.5)
 
 ## THE SHATTER: the boundary breaks. White flash, then the sky-shell
 ## bursts into giant glass shards that tumble inward and fade. The
