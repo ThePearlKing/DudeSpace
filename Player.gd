@@ -20,6 +20,7 @@ var _pitch: float = 0.0
 var _look: Vector2 = Vector2.ZERO
 var _cooldown: float = 0.0
 var _shake: float = 0.0
+var _cd_until: Dictionary = {}   # weapon id -> playtime it fires again
 var _jetting: bool = false
 var _g: float = 5.0
 var _hand: Node3D
@@ -1210,12 +1211,16 @@ func _physics_process(delta: float) -> void:
 				if not sspace.intersect_ray(clr):
 					global_position += up * (rise + 0.05) + fwd * 0.12
 
-	_cooldown -= delta
+	# cooldowns are PER WEAPON: swapping guns never inherits another
+	# gun's wait (the mass driver was locking the AK)
+	var wid0 := Inventory.slot_id(Inventory.selected)
+	_cooldown = maxf(0.0, float(_cd_until.get(wid0, 0.0)) - Game.playtime)
 	if not _ui_open() and not Game.dead and not _door_mode and not _wreck_mode \
 			and not _hwreck_mode \
 			and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _cooldown <= 0.0:
 		_fire()
-		_cooldown = float(Inventory.current_weapon()["rate"])
+		_cd_until[wid0] = Game.playtime \
+			+ float(Inventory.current_weapon()["rate"])
 	_update_shake(delta)
 	_update_hand(delta)
 	_update_hwreck_preview()

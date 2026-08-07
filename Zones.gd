@@ -6,7 +6,7 @@ extends RefCounted
 
 const CAVERN_POS := Vector3(0, -40000, -40000)
 const TEMPLE_POS := Vector3(40000, 12000, 40000)
-const PYRAMID_POS := Vector3(46000, 16500, 46000)
+const PYRAMID_POS := Vector3(85000, 52000, 85000)   # far from TIN 618's hum
 static var pyramid_exit := Vector3.ZERO
 const SHADOW_POS := Vector3(-16000, -4000, -14000)   # exterior temple, in space
 
@@ -169,28 +169,46 @@ static func build_pyramid_interior(root: Node3D, exit_target: Vector3) -> void:
 	fl.add_child(flc)
 	root.add_child(fl)
 	fl.global_position = p
-	# four sloped walls: each a plate leaning inward to the apex
-	var slope := atan2(base * 0.5, hgt)
-	var wlen := sqrt(pow(base * 0.5, 2.0) + pow(hgt, 2.0))
-	for wi9 in 4:
-		var wyaw := TAU * float(wi9) / 4.0
-		var wdir := Vector3(cos(wyaw), 0, sin(wyaw))
-		var wall := StaticBody3D.new()
-		var wm9 := MeshInstance3D.new()
-		wm9.mesh = Surfaces.box_mesh(Vector3(base + 2.0, wlen, 1.2))
-		wm9.material_override = brick
-		wall.add_child(wm9)
-		var wc9 := CollisionShape3D.new()
-		wc9.shape = Surfaces.box_shape(Vector3(base + 2.0, wlen, 1.2))
-		wall.add_child(wc9)
-		root.add_child(wall)
-		wall.global_position = p + wdir * (base * 0.25) \
-			+ Vector3(0, hgt * 0.5, 0)
-		wall.look_at(wall.global_position + wdir.cross(Vector3.UP), Vector3.UP)
-		wall.rotate_object_local(Vector3(1, 0, 0), 0.0)
-		wall.global_transform.basis = Basis(wdir.cross(Vector3.UP).normalized(),
-			Vector3.UP, wdir).orthonormalized()
-		wall.rotate_object_local(Vector3(1, 0, 0), -(PI * 0.5 - slope))
+	# the hall is ONE four-sided cone, seamless: same form as the
+	# pyramid outside, walls visible from within, collidable everywhere
+	var shell := StaticBody3D.new()
+	var shm := MeshInstance3D.new()
+	var scm9 := CylinderMesh.new()
+	scm9.top_radius = 0.0
+	scm9.bottom_radius = base * 0.62
+	scm9.height = hgt
+	scm9.radial_segments = 4
+	shm.mesh = scm9
+	var bsh9 := Shader.new()
+	bsh9.code = """shader_type spatial;
+render_mode cull_disabled;
+varying vec2 buv;
+void vertex(){ buv = UV; }
+float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment(){
+	vec2 uv = buv * vec2(36.0, 22.0);
+	float row = floor(uv.y);
+	uv.x += fract(row * 0.5);
+	vec2 c = floor(uv);
+	vec2 f = fract(uv);
+	float mortar = smoothstep(0.0, 0.06, f.x) * smoothstep(1.0, 0.94, f.x)
+		* smoothstep(0.0, 0.09, f.y) * smoothstep(1.0, 0.91, f.y);
+	vec3 sand = vec3(0.71, 0.58, 0.33) * (0.82 + 0.18 * h2(c));
+	ALBEDO = mix(vec3(0.45, 0.36, 0.22), sand, mortar);
+	ROUGHNESS = 0.95;
+}"""
+	var swall := ShaderMaterial.new()
+	swall.shader = bsh9
+	shm.material_override = swall
+	shell.add_child(shm)
+	var shc9 := CollisionShape3D.new()
+	var shcs := ConcavePolygonShape3D.new()
+	shcs.backface_collision = true
+	shcs.set_faces(scm9.get_faces())
+	shc9.shape = shcs
+	shell.add_child(shc9)
+	root.add_child(shell)
+	shell.global_position = p + Vector3(0, hgt * 0.5, 0)
 	# cornice trim + corner pillars: no flat plastic down here
 	for ci9 in 4:
 		var ca9 := TAU * float(ci9) / 4.0 + PI / 4.0
@@ -232,12 +250,46 @@ static func build_pyramid_interior(root: Node3D, exit_target: Vector3) -> void:
 	hl9.omni_range = 90.0
 	root.add_child(hl9)
 	hl9.global_position = p + Vector3(0, hgt * 0.6, 0)
+	# the hall's OWN air: a deep stone drone with a thin whistle far
+	# above -- positional, so it exists only in here
+	var amb := AudioStreamPlayer3D.new()
+	amb.stream = _pyramid_air()
+	amb.max_distance = 160.0
+	amb.volume_db = -10.0
+	amb.autoplay = true
+	root.add_child(amb)
+	amb.global_position = p + Vector3(0, 6.0, 0)
 	# exit back to the sand
 	var out := Gate.new().configure({
 		"target": exit_target, "zone": "", "label": "EXIT",
 		"color": Color("#ffe066")})
 	root.add_child(out)
 	out.global_position = p + Vector3(0, 0.5, base * 0.42)
+
+## seamless 12s loop: every partial an integer cycle count
+static func _pyramid_air() -> AudioStreamWAV:
+	var rate := 22050
+	var secs := 12.0
+	var n := int(rate * secs)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var ts := float(i) / float(rate)
+		var v := 0.12 * sin(TAU * (804.0 / secs) * ts) \
+			* (0.6 + 0.4 * sin(TAU * ts / 12.0))
+		v += 0.08 * sin(TAU * (1008.0 / secs) * ts)
+		v += 0.02 * sin(TAU * (10800.0 / secs) * ts) \
+			* (0.5 + 0.5 * sin(TAU * ts / 6.0 + 1.7))
+		var s9 := int(clampf(v, -1.0, 1.0) * 32000.0)
+		data[i * 2] = s9 & 0xFF
+		data[i * 2 + 1] = (s9 >> 8) & 0xFF
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.data = data
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_end = n
+	return wav
 
 static func pyramid_spawn() -> Vector3:
 	return PYRAMID_POS + Vector3(0, 2.0, PYRAMID_POS.length() * 0.0 + 34.0)

@@ -4449,25 +4449,6 @@ class CactusPlant extends StaticBody3D:
 			global_transform.basis.y)
 		queue_free()
 
-## the pyramid's slab: Mind Core is the key, F is the hand
-class PyramidDoor extends StaticBody3D:
-	var opened := false
-	func use() -> void:
-		if opened:
-			return
-		if not Game.mind_core:
-			Sfx.play("denied", -14.0)
-			var hud = get_tree().get_first_node_in_group("hud")
-			if hud:
-				hud.flash("SEALED -- activate the Mind Core in the Euclid Temple")
-			return
-		opened = true
-		Sfx.play("rumble", -8.0)
-		var tw := create_tween()
-		tw.tween_property(self, "position",
-			position - global_transform.basis.y * 4.5, 3.0) \
-			.set_trans(Tween.TRANS_SINE)
-
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
 		# EXOTIC FLORA, clustered: little stands of branching orange
@@ -6424,7 +6405,6 @@ func _euclid_landmarks(b) -> void:
 	pyr.mesh = cm
 	var bsh := Shader.new()
 	bsh.code = """shader_type spatial;
-render_mode cull_disabled;
 varying vec2 buv;
 void vertex(){ buv = UV; }
 float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -6465,27 +6445,14 @@ void fragment(){
 		fr9.rotate_object_local(Vector3.UP, dyaw)
 		fr9.translate_object_local(Vector3(0, 0, 14.0))
 		fr9.translate_object_local(fp9[1] as Vector3)
-	var pdoor := PyramidDoor.new()
-	var pdm := MeshInstance3D.new()
-	pdm.mesh = Surfaces.box_mesh(Vector3(3.8, 4.7, 0.5))
-	pdm.material_override = Surfaces.stone(Color("#a08040"))
-	pdoor.add_child(pdm)
-	pdm.position = Vector3(0, 2.35, 0)
-	var pdc := CollisionShape3D.new()
-	pdc.shape = Surfaces.box_shape(Vector3(3.8, 4.7, 0.5))
-	pdc.position = Vector3(0, 2.35, 0)
-	pdoor.add_child(pdc)
-	add_child(pdoor)
-	pdoor.global_transform = dxf
-	pdoor.rotate_object_local(Vector3.UP, dyaw)
-	pdoor.translate_object_local(Vector3(0, 0, 14.0))
 	var pgate := Gate.new().configure({
 		"target": Zones.pyramid_spawn(), "zone": "flat", "zone_g": 9.0,
-		"label": "ENTER", "color": Color("#ffcf40")})
+		"label": "ENTER", "color": Color("#ffcf40"),
+		"requires": "mindcore"})
 	add_child(pgate)
 	pgate.global_transform = dxf
 	pgate.rotate_object_local(Vector3.UP, dyaw)
-	pgate.translate_object_local(Vector3(0, 0.5, 12.6))
+	pgate.translate_object_local(Vector3(0, 0.5, 13.9))
 	# the interior is a POCKET REALM, Euclid-temple rules: the inside
 	# is bigger than the outside and shaped like the outside
 	Zones.build_pyramid_interior(self,
