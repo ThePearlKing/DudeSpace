@@ -486,10 +486,12 @@ func connect_wire(dst: Node3D, kind: String, port: int = 0) -> void:
 		cbody.collision_mask = 0
 		var ccol := CollisionShape3D.new()
 		var ccs := CapsuleShape3D.new()
-		ccs.radius = radius + 0.18
+		ccs.radius = radius + 0.3
 		ccs.height = pa2.distance_to(pb2) + 0.1
 		ccol.shape = ccs
-		ccol.rotation_degrees = Vector3(90, 0, 0)
+		# NO cross-rotation: the body's Y already runs along the cable,
+		# and the capsule's axis is Y -- the old 90-degree twist laid
+		# the hitbox ACROSS the wire, so only the arrow ever clicked
 		cbody.add_child(ccol)
 		parent.add_child(cbody)
 		cbody.global_position = (pa2 + pb2) * 0.5
