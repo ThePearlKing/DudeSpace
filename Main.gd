@@ -4548,6 +4548,63 @@ func _populate(b) -> void:
 							Color("#fff2a0"), 2.2)
 						fil.add_child(bead)
 						bead.position = Vector3(0, 0.16, 0)
+	if str(b.name) == "Euclid":
+		# CACTUS-LIKE SUCCULENTS around the flowering stands: fat
+		# orange lobed columns, mostly bare -- only the odd one carries
+		# a small yellow nub, so the flowers stay the rare thing
+		var srng9 := RandomNumberGenerator.new()
+		srng9.seed = 2718
+		for ci9 in 26:
+			var cd9 := Vector3(srng9.randf_range(-1, 1),
+				srng9.randf_range(-1, 1),
+				srng9.randf_range(-1, 1)).normalized()
+			if absf(cd9.y) > 0.85:
+				continue
+			var ct1 := cd9.cross(Vector3.UP)
+			if ct1.length() < 0.01:
+				ct1 = cd9.cross(Vector3.RIGHT)
+			ct1 = ct1.normalized()
+			var ct2 := cd9.cross(ct1).normalized()
+			for si9 in 4 + srng9.randi() % 5:
+				var sd9 := (cd9 + (ct1 * srng9.randf_range(-1.4, 1.4)
+					+ ct2 * srng9.randf_range(-1.4, 1.4))
+					* (6.0 / float(b.radius))).normalized()
+				var sb9 := _basis_from_up(sd9)
+				var sroot := Node3D.new()
+				add_child(sroot)
+				sroot.global_transform = Transform3D(sb9,
+					b.center + sd9 * float(b.radius))
+				sroot.rotate_object_local(Vector3.UP, srng9.randf() * TAU)
+				var lobes := 2 + srng9.randi() % 3
+				var ly9 := 0.0
+				var lr9 := srng9.randf_range(0.28, 0.45)
+				for lk9 in lobes:
+					var lobe := MeshInstance3D.new()
+					var lm9 := SphereMesh.new()
+					var r9 := lr9 * (1.0 - float(lk9) * 0.22)
+					lm9.radius = r9
+					lm9.height = r9 * srng9.randf_range(2.0, 2.8)
+					lm9.radial_segments = 8
+					lm9.rings = 6
+					lobe.mesh = lm9
+					lobe.material_override = Destructible.make_material(
+						Color("#e8702a").darkened(srng9.randf_range(0.0, 0.15)),
+						0.35)
+					sroot.add_child(lobe)
+					ly9 += lm9.height * 0.36
+					lobe.position = Vector3(srng9.randf_range(-0.04, 0.04),
+						ly9, srng9.randf_range(-0.04, 0.04))
+					ly9 += lm9.height * 0.3
+				if srng9.randf() < 0.25:
+					var nub := MeshInstance3D.new()
+					var nm9 := SphereMesh.new()
+					nm9.radius = 0.09
+					nm9.height = 0.14
+					nub.mesh = nm9
+					nub.material_override = Destructible.make_material(
+						Color("#ffd23f"), 1.4)
+					sroot.add_child(nub)
+					nub.position = Vector3(0, ly9 + 0.06, 0)
 	if str(b.name) == "Requiem":
 		# THE GRAVEYARD PROPER: not just needles. Spike clusters, yes --
 		# but between them leaning gravestone slabs, bone-rib cages
