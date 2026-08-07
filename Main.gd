@@ -1243,13 +1243,7 @@ func _sky_plates(skyp: Node3D, col: Color, stage: int) -> void:
 		return
 	var rngs := RandomNumberGenerator.new()
 	rngs.seed = 991 + stage * 31
-	# the late links FILL the sky: by cyan the universe is nearly done
-	# and it shows -- shards everywhere
 	var nplates := 84 + 14 * stage
-	if stage == 5:
-		nplates = 260
-	elif stage >= 6:
-		nplates = 460
 	var srad := Universe.BOUNDARY - 3000.0
 	var side := Universe.BOUNDARY * 0.048
 	var rim_mat := StandardMaterial3D.new()
@@ -1318,6 +1312,53 @@ func _sky_plates(skyp: Node3D, col: Color, stage: int) -> void:
 		if is_instance_valid(skyp):
 			skyp.queue_free())
 
+## FALLING GLASS: full transparent triangles raining out of the sky --
+## the pink link sheds plenty, the cyan link sheds TONS: the universe
+## is one feed away from done and it shows
+func _sky_fall(skyp: Node3D, col: Color, stage: int) -> void:
+	if not is_instance_valid(skyp):
+		return
+	var count := 0
+	if stage == 5:
+		count = 130
+	elif stage >= 6:
+		count = 300
+	if count == 0:
+		return
+	var rngf := RandomNumberGenerator.new()
+	rngf.seed = 5151 + stage
+	for i in count:
+		var d9 := Vector3(rngf.randf_range(-1, 1), rngf.randf_range(-1, 1),
+			rngf.randf_range(-1, 1)).normalized()
+		var shard := MeshInstance3D.new()
+		var pm9 := PrismMesh.new()
+		pm9.size = Vector3(rngf.randf_range(1800.0, 4600.0),
+			rngf.randf_range(2200.0, 5400.0), 80.0)
+		shard.mesh = pm9
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smat.albedo_color = Color(col.r, col.g, col.b, 0.45)
+		smat.emission_enabled = true
+		smat.emission = col
+		smat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		shard.material_override = smat
+		shard.extra_cull_margin = 16384.0
+		skyp.add_child(shard)
+		shard.global_position = d9 * (Universe.BOUNDARY - 1500.0)
+		shard.rotation = Vector3(rngf.randf() * TAU, rngf.randf() * TAU, 0)
+		var dur := rngf.randf_range(9.0, 17.0)
+		var fall := shard.create_tween()
+		fall.tween_property(shard, "global_position",
+			d9 * (Universe.BOUNDARY * rngf.randf_range(0.45, 0.75)), dur) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fall.parallel().tween_property(smat, "albedo_color:a", 0.0, dur)
+		fall.tween_callback(shard.queue_free)
+		var spin := shard.create_tween().set_loops()
+		spin.tween_property(shard, "rotation",
+			Vector3(TAU * rngf.randf_range(0.2, 0.6),
+				TAU * rngf.randf_range(0.2, 0.6), 0), 8.0).as_relative()
+
 func sky_show(col: Color, stage: int, linger: bool,
 		burst_delay: float = 0.0) -> ShaderMaterial:
 	mono_sky_clear()
@@ -1357,8 +1398,10 @@ func sky_show(col: Color, stage: int, linger: bool,
 		var bdt := skyp.create_tween()
 		bdt.tween_interval(burst_delay)
 		bdt.tween_callback(_sky_plates.bind(skyp, col, stage))
+		bdt.tween_callback(_sky_fall.bind(skyp, col, stage))
 	else:
 		_sky_plates(skyp, col, stage)
+		_sky_fall(skyp, col, stage)
 	var wheel := skyp.create_tween().set_loops()
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
 	# lifecycle: demo = 30s and gone; the real thing lingers six minutes
