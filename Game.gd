@@ -398,7 +398,10 @@ func _process(delta: float) -> void:
 		if t > 70.0:
 			_salad_t = -1.0
 	# MAX WRATH: the god COMES for you (a whole event, not an instant death)
-	if wrath >= WRATH_MAX and not wrath_event and playtime >= god_standby_until:
+	if wrath >= WRATH_MAX and not wrath_event \
+			and playtime >= god_standby_until \
+			and playtime >= god_restrained_until \
+			and playtime >= god_pacified_until:
 		wrath_event = true
 		var cs := get_tree().current_scene
 		if cs and cs.has_method("noodle_wrath_event"):

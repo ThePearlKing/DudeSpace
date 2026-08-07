@@ -1196,7 +1196,7 @@ func _sky_detonate() -> void:
 	var shroot := Node3D.new()
 	shroot.add_to_group("mono_sky")
 	add_child(shroot)
-	for i in 70:
+	for i in 700:
 		var d9 := Vector3(rng9.randf_range(-1, 1), rng9.randf_range(-1, 1),
 			rng9.randf_range(-1, 1)).normalized()
 		var shard := MeshInstance3D.new()

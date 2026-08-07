@@ -298,8 +298,10 @@ class JudgmentFx extends Node3D:
 	var _oriented := false
 	var target: Node = null
 	var _life := 0.0
+
 	var _tip: MeshInstance3D
 	func _ready() -> void:
+		add_to_group("god_fx")
 		_tip = NoodleGod.make_tendril(600.0, 14.0, randf() * TAU)
 		_tip.rotation_degrees = Vector3(180, 0, 0)   # hangs DOWN from heaven
 		_tip.position = Vector3(0, 900.0, 0)
