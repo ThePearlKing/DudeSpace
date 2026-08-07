@@ -6421,6 +6421,7 @@ func _euclid_landmarks(b) -> void:
 	pyr.mesh = cm
 	var bsh := Shader.new()
 	bsh.code = """shader_type spatial;
+render_mode cull_disabled;
 varying vec2 buv;
 void vertex(){ buv = UV; }
 float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -6445,20 +6446,9 @@ void fragment(){
 	pyr.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
 		sp + Vector3.DOWN * 10.0)
 	_pyramid_exit = sp + Vector3.DOWN * 2.0
-	# THE INTERIOR: a pyramid-shaped chamber -- the same four-sided
-	# form seen from within, brick-lined, with a real floor
-	var inner := MeshInstance3D.new()
-	var im9 := CylinderMesh.new()
-	im9.top_radius = 0.0
-	im9.bottom_radius = 17.0
-	im9.height = 24.0
-	im9.radial_segments = 4
-	inner.mesh = im9
-	inner.material_override = bmat9
-	add_child(inner)
-	inner.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
-		sp + Vector3.DOWN * 13.5)
-	inner.scale = Vector3(-1, 1, 1)   # inverted winding: visible INSIDE
+	# ONE pyramid, walls visible from BOTH sides (cull off): the same
+	# bricks serve as exterior hide and interior chamber -- no second
+	# shell ghosting at the base
 	var ifloor := StaticBody3D.new()
 	var ifm := MeshInstance3D.new()
 	var ifme := CylinderMesh.new()
