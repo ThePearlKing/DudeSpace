@@ -995,6 +995,7 @@ void fragment(){
 	tvroot.add_child(scr)
 
 var _tv_vp: SubViewport = null
+var _tv_watch := 0.0   # remote TVs tuned to ALIEN NEWS keep this warm
 var _tv_cam: Camera3D = null
 var _tv_subs: Array = []   # subtitle Label3Ds, one per studio-feed set
 
@@ -1090,7 +1091,9 @@ func _process(delta: float) -> void:
 		var pv = get_tree().get_first_node_in_group("player")
 		var inside: bool = pv != null and pv.global_position.distance_to(
 			_b.center) < float(_b.radius) + 4.0
-		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if inside \
+		_tv_watch = maxf(0.0, _tv_watch - 0.2)
+		var watched: bool = inside or _tv_watch > 0.0
+		_tv_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if watched \
 			else SubViewport.UPDATE_DISABLED
 		# a watched TV UNPAUSES the station: ping the studio so the show
 		# keeps running, and relay its live captions. The voice stays a
@@ -1098,7 +1101,7 @@ func _process(delta: float) -> void:
 		var st = get_tree().get_first_node_in_group("datamosh_studio")
 		var sub_text := ""
 		var sub_col := Color.WHITE
-		if inside and st != null:
+		if watched and st != null:
 			st.remote_watch = 0.6
 			sub_text = str(st.subtitle())
 			sub_col = st.subtitle_color()

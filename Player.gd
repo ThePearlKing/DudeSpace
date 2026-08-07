@@ -706,6 +706,7 @@ func _start_ghost(cat: String, kind: String) -> void:
 			hudg.flash("RING SNAP %s — [T] toggles · hold CTRL to place free (no dock)" % ("ON" if _ring_snap else "OFF"))
 	_ghost_cat = cat
 	_ghost_kind = kind
+	_ghost_hushed = ""
 	_ghost = MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	if cat == "tvish":

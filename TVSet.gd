@@ -857,6 +857,7 @@ class TV extends StaticBody3D:
 			"alien":
 				var col0 = _find_colony()
 				if col0 != null:
+					col0._tv_watch = 4.0   # keep the colony feed rendering
 					for dsn in get_tree().current_scene.get_children():
 						if dsn is DatamoshStudio:
 							dsn.remote_watch = 6.0
