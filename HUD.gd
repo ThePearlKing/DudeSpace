@@ -15,6 +15,7 @@ var _flash: Label
 var _flash_t: float = 0.0
 var _slots: Array = []       # hotbar cell panels
 var _slot_lbls: Array = []
+var _slot_cds: Array = []
 var _jet_lbl: Label
 var _jet_bg: Panel
 var _jet_fill: ColorRect
@@ -237,6 +238,15 @@ func _build_hotbar() -> void:
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cellp.add_child(lbl)
 		_slot_lbls.append(lbl)
+		# cooldown veil: a dark sheet that drains downward as the
+		# weapon comes back
+		var cdv := ColorRect.new()
+		cdv.color = Color(0, 0, 0, 0.55)
+		cdv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cdv.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		cdv.visible = false
+		cellp.add_child(cdv)
+		_slot_cds.append(cdv)
 
 func _slot_style(selected: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -458,15 +468,22 @@ func _refresh() -> void:
 	for i in _slots.size():
 		_slots[i].add_theme_stylebox_override("panel", _slot_style(i == Inventory.selected))
 		_slot_lbls[i].text = Inventory.slot_text(Inventory.hotbar[i])
-		# heavy weapons wear their reload right on the slot
+		# COOLDOWN veil on every weapon except the zapper: the slot
+		# darkens after a shot and drains open as the weapon returns
 		var wid9 := str(Inventory.hotbar[i]["id"])
-		if Inventory.weapons.has(wid9) \
-				and float(Inventory.weapons[wid9]["rate"]) >= 1.0 \
+		var cdf := 0.0
+		if Inventory.weapons.has(wid9) and wid9 != "zapper" \
 				and i == Inventory.selected:
 			var pl9 = get_tree().get_first_node_in_group("player")
-			if pl9 != null and "_cooldown" in pl9 \
-					and float(pl9._cooldown) > 0.05:
-				_slot_lbls[i].text += "  RELOAD %.1f" % float(pl9._cooldown)
+			if pl9 != null and "_cooldown" in pl9:
+				cdf = clampf(float(pl9._cooldown) \
+					/ maxf(0.05, float(Inventory.weapons[wid9]["rate"])),
+					0.0, 1.0)
+		var cdv9: ColorRect = _slot_cds[i]
+		cdv9.visible = cdf > 0.02
+		if cdv9.visible:
+			var ph9 := (cdv9.get_parent() as Control).size.y
+			cdv9.offset_top = -ph9 * cdf
 		_slot_lbls[i].material = Inventory.ench_text_material() \
 			if int(Inventory.enchant.get(str(Inventory.hotbar[i]["id"]), 0)) > 0 \
 			else null
