@@ -170,8 +170,8 @@ class _ForkStudio extends Node3D:
 		_eye.position = Vector3(0, 0.05, 0.42)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
-		wm.radius = 0.58
-		wm.height = 1.16
+		wm.radius = 0.42
+		wm.height = 0.84
 		white.mesh = wm
 		var emat := StandardMaterial3D.new()
 		emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -183,22 +183,22 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.27
-		pm.height = 0.54
+		pm.radius = 0.2
+		pm.height = 0.4
 		_pupil.mesh = pm
 		var pmat := StandardMaterial3D.new()
 		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		pmat.albedo_color = Color("#0e0a04")
 		_pupil.material_override = pmat
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.48)
+		_pupil.position = Vector3(0, 0, 0.35)
 		var iris := MeshInstance3D.new()
 		var im := TorusMesh.new()
-		im.inner_radius = 0.27
-		im.outer_radius = 0.35
+		im.inner_radius = 0.2
+		im.outer_radius = 0.26
 		iris.mesh = im
 		iris.rotation_degrees = Vector3(90, 0, 0)
-		iris.position = Vector3(0, 0, 0.46)
+		iris.position = Vector3(0, 0, 0.33)
 		var imat := StandardMaterial3D.new()
 		imat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		imat.albedo_color = Color("#c89020")
