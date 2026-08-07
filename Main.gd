@@ -4446,6 +4446,25 @@ class CactusPlant extends StaticBody3D:
 			global_transform.basis.y)
 		queue_free()
 
+## the pyramid's slab: Mind Core is the key, F is the hand
+class PyramidDoor extends StaticBody3D:
+	var opened := false
+	func use() -> void:
+		if opened:
+			return
+		if not Game.mind_core:
+			Sfx.play("denied", -14.0)
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud:
+				hud.flash("SEALED -- activate the Mind Core in the Euclid Temple")
+			return
+		opened = true
+		Sfx.play("rumble", -8.0)
+		var tw := create_tween()
+		tw.tween_property(self, "position",
+			position - global_transform.basis.y * 4.5, 3.0) \
+			.set_trans(Tween.TRANS_SINE)
+
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
 		# EXOTIC FLORA, clustered: little stands of branching orange
@@ -6494,24 +6513,49 @@ void fragment(){
 		colm.global_transform = sxf
 		colm.translate_object_local(Vector3(cos(ca9) * 9.0, 3.5,
 			sin(ca9) * 9.0))
-		var capf := MeshInstance3D.new()
-		var cfm := SphereMesh.new()
-		cfm.radius = 0.45
-		cfm.height = 0.7
-		capf.mesh = cfm
-		capf.material_override = Destructible.make_material(Color("#ff9a1a"), 2.4)
-		add_child(capf)
-		capf.global_transform = sxf
-		capf.translate_object_local(Vector3(cos(ca9) * 9.0, 7.3,
-			sin(ca9) * 9.0))
-		var tl9 := OmniLight3D.new()
-		tl9.light_color = Color("#ffb04a")
-		tl9.light_energy = 1.6
-		tl9.omni_range = 14.0
-		add_child(tl9)
-		tl9.global_transform = sxf
-		tl9.translate_object_local(Vector3(cos(ca9) * 9.0, 7.3,
-			sin(ca9) * 9.0))
+
+	# THE DOOR: one framed opening at the base. Sealed by a slab until
+	# the Mind Core has been activated; then F slides it into the sand.
+	var dxf := Transform3D(_basis_from_up(Vector3.DOWN), sp + Vector3.DOWN * 2.0)
+	var dyaw := PI / 4.0   # centered on one of the four faces
+	var ddir := Vector3(cos(dyaw), 0, sin(dyaw))
+	for fp9 in [[Vector3(0.6, 5.0, 0.8), Vector3(-2.2, 2.5, 0)],
+			[Vector3(0.6, 5.0, 0.8), Vector3(2.2, 2.5, 0)],
+			[Vector3(5.0, 0.6, 0.8), Vector3(0, 5.0, 0)]]:
+		var fr9 := MeshInstance3D.new()
+		fr9.mesh = Surfaces.box_mesh(fp9[0] as Vector3)
+		fr9.material_override = Surfaces.stone(Color("#8a7038"))
+		add_child(fr9)
+		fr9.global_transform = dxf
+		fr9.rotate_object_local(Vector3.UP, dyaw)
+		fr9.translate_object_local(Vector3(0, 0, 15.6))
+		fr9.translate_object_local(fp9[1] as Vector3)
+	var pdoor := PyramidDoor.new()
+	var pdm := MeshInstance3D.new()
+	pdm.mesh = Surfaces.box_mesh(Vector3(3.8, 4.7, 0.5))
+	pdm.material_override = Surfaces.stone(Color("#a08040"))
+	pdoor.add_child(pdm)
+	pdm.position = Vector3(0, 2.35, 0)
+	var pdc := CollisionShape3D.new()
+	pdc.shape = Surfaces.box_shape(Vector3(3.8, 4.7, 0.5))
+	pdc.position = Vector3(0, 2.35, 0)
+	pdoor.add_child(pdc)
+	add_child(pdoor)
+	pdoor.global_transform = dxf
+	pdoor.rotate_object_local(Vector3.UP, dyaw)
+	pdoor.translate_object_local(Vector3(0, 0, 15.6))
+	var pdl := Label3D.new()
+	pdl.text = "PYRAMID DOOR [F]"
+	pdl.font_size = 26
+	pdl.pixel_size = 0.008
+	pdl.modulate = Color("#ffcf40")
+	pdl.outline_size = 8
+	pdl.outline_modulate = Color(0, 0, 0, 0.9)
+	pdl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(pdl)
+	pdl.global_transform = dxf
+	pdl.rotate_object_local(Vector3.UP, dyaw)
+	pdl.translate_object_local(Vector3(0, 5.8, 16.2))
 	# inside the pyramid: the MENGER SHRINE. F + prism shards = enchant.
 	var shrine := MengerShrine.new()
 	add_child(shrine)
