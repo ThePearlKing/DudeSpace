@@ -8,6 +8,8 @@ static var cams: Dictionary = {}      # camera name -> SpyCam node
 static var fork_channel := 0
 static var _fork_vp: SubViewport = null
 static var _fork_drv: Node = null
+static var _dance_vp: SubViewport = null
+static var dance_ping_ms := 0
 static var fork_sub := ""             # current FORK TV subtitle line
 
 const CHANNELS := ["THE DANCE", "NOODLE GOD TV", "MISSING DUDES",
@@ -16,6 +18,22 @@ const CHANNELS := ["THE DANCE", "NOODLE GOD TV", "MISSING DUDES",
 ## ---------------------------------------------------------- FORK TV
 ## the studio lives inside its own SubViewport world: no pocket, no
 ## collisions, unreachable by anything but a screen.
+## a small dedicated studio locked to THE DANCE, for machine screens.
+## Renders only while something nearby keeps pinging it.
+static func dance_feed(tree: SceneTree) -> SubViewport:
+	if _dance_vp != null and is_instance_valid(_dance_vp):
+		return _dance_vp
+	_dance_vp = SubViewport.new()
+	_dance_vp.size = Vector2i(200, 120)
+	_dance_vp.own_world_3d = true
+	_dance_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	tree.current_scene.add_child(_dance_vp)
+	var drv := _ForkStudio.new()
+	drv.lock_channel = 0
+	drv.sleepy = true
+	_dance_vp.add_child(drv)
+	return _dance_vp
+
 static func fork_feed(tree: SceneTree) -> SubViewport:
 	if _fork_vp != null and is_instance_valid(_fork_vp):
 		return _fork_vp
@@ -30,6 +48,8 @@ static func fork_feed(tree: SceneTree) -> SubViewport:
 	return _fork_vp
 
 class _ForkStudio extends Node3D:
+	var lock_channel := -1     # >=0: this studio airs ONE channel forever
+	var sleepy := false        # pauses its viewport when nobody pings
 	var _t := 0.0
 	var _sub_t := 0.0
 	var _sub_i := 0
@@ -230,7 +250,15 @@ class _ForkStudio extends Node3D:
 
 	func _process(delta: float) -> void:
 		_t += delta
-		var ch := TVSet.fork_channel
+		if sleepy:
+			# nobody near a screen? the studio stops rendering entirely
+			var idle: bool = Time.get_ticks_msec() - TVSet.dance_ping_ms > 4000
+			(get_parent() as SubViewport).render_target_update_mode = \
+				SubViewport.UPDATE_DISABLED if idle \
+				else SubViewport.UPDATE_ALWAYS
+			if idle:
+				return
+		var ch := lock_channel if lock_channel >= 0 else TVSet.fork_channel
 		# subtitles roll on every talking channel
 		if SUBS.has(ch):
 			_sub_t += delta
