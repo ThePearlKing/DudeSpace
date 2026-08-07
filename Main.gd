@@ -4458,8 +4458,10 @@ func set_hitbox_debug(on: bool) -> void:
 	if not on:
 		return
 	var seen9 := {}
+	# NOT the player: your camera lives inside your own capsule, and
+	# painting it green paints the whole screen green
 	for g9 in ["enemy", "stalker", "big_stalker", "animal", "machine",
-			"player", "waypoint"]:
+			"waypoint"]:
 		for b9 in get_tree().get_nodes_in_group(g9):
 			if seen9.has(b9):
 				continue
