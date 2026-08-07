@@ -180,7 +180,8 @@ func god_restrain(secs: float) -> void:
 		if is_instance_valid(fx):
 			fx.queue_free()
 var god_pacified_until: float = 0.0  # cheat calm: even a broken sky rests
-var god_peace: float = 0.0         # seconds spent liked: buys forgiveness  # somebody escaped the white zone once: it gave up
+var god_peace: float = 0.0         # seconds spent liked: buys forgiveness
+var sugar_rush_until: float = 0.0  # succulent fruit: fast legs window  # somebody escaped the white zone once: it gave up
 var lime_taken: bool = false    # Harold's spare tetrahedron: claimed
 var lime_wall_open: bool = false  # the riddle wall stays answered
 var harold_shelf_open: bool = false  # the bookshelf-door stays open once found

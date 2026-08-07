@@ -4421,6 +4421,24 @@ func _r_spike(b, cd: Vector3, hrng: RandomNumberGenerator) -> void:
 		nk.rotate_object_local(Vector3.UP, hrng.randf() * TAU)
 		sh8 += nkm.height * 0.94
 
+## a harvestable Euclid succulent: F (or a whack) takes its fruit --
+## a few coins' worth and something to eat. One harvest per plant.
+class CactusPlant extends StaticBody3D:
+	var harvested := false
+	func use() -> void:
+		take_damage(1.0, Vector3.ZERO)
+	func take_damage(_d: float, _from: Vector3) -> void:
+		if harvested:
+			return
+		harvested = true
+		Sfx.play("eat", -10.0)
+		Inventory.add_coins(2 + randi() % 5)
+		var drop := ItemDrop.new()
+		drop.setup("sucfruit", 1 + randi() % 2)
+		get_parent().add_child(drop)
+		drop.global_position = global_position \
+			+ global_transform.basis.y * 1.2
+
 func _populate(b) -> void:
 	if str(b.name) == "Euclid":
 		# EXOTIC FLORA, clustered: little stands of branching orange
@@ -4570,7 +4588,14 @@ func _populate(b) -> void:
 					+ ct2 * srng9.randf_range(-1.4, 1.4))
 					* (6.0 / float(b.radius))).normalized()
 				var sb9 := _basis_from_up(sd9)
-				var sroot := Node3D.new()
+				var sroot := CactusPlant.new()
+				var scs9 := CollisionShape3D.new()
+				var scap9 := CapsuleShape3D.new()
+				scap9.radius = 0.5
+				scap9.height = 1.6
+				scs9.shape = scap9
+				scs9.position = Vector3(0, 0.7, 0)
+				sroot.add_child(scs9)
 				add_child(sroot)
 				sroot.global_transform = Transform3D(sb9,
 					b.center + sd9 * float(b.radius))
@@ -4831,7 +4856,8 @@ func _populate(b) -> void:
 			_spawn_res_nodes(b, 12, "raw_irid", 3)
 			_build_mine(b, MINE_DIRS["Pi"], "raw_irid", 5, Color("#2a8f6a"))
 		"sand":
-			_register_crates(b, 50, 12)
+			# no crate stacks littering the desert -- the living economy
+			# here is the succulents
 			_euclid_landmarks(b)   # Euclid is safe: no evil aliens
 		"life":
 			_register_crates(b, 10, 7)

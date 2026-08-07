@@ -131,6 +131,7 @@ var items: Dictionary = {
 	"charm":      {"name": "Anti-Death Charm", "color": Color("#b56cff")},
 	"ytetra":     {"name": "Yellow Tetrahedron", "color": Color("#ffd23f")},
 	"ltetra":     {"name": "Lime Tetrahedron",   "color": Color("#b6ff3f")},
+	"sucfruit":   {"name": "Succulent Fruit",    "color": Color("#ff9a4d")},
 	"otetra":     {"name": "Orange Tetrahedron", "color": Color("#ff9a3d")},
 	"btetra":     {"name": "Blue Tetrahedron",   "color": Color("#4d9dff")},
 	"rtetra":     {"name": "Red Tetrahedron",    "color": Color("#ff4d4d")},
@@ -590,6 +591,12 @@ func use_item(slot: int) -> bool:
 			if Game.playtime < Game.god_standby_until:
 				pot *= 0.5
 			Game.wrath = maxf(0.0, Game.wrath - pot)
+		"sucfruit":
+			# desert candy: a little heal and ten seconds of fast legs.
+			# Eating another RESETS the clock, so a pocketful is a sprint.
+			Game.heal(12.0)
+			Game.sugar_rush_until = Game.playtime + 10.0
+			Sfx.play("eat")
 		"banana":
 			Game.heal(15.0)
 			Sfx.play("eat")

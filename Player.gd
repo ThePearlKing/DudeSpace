@@ -1154,7 +1154,8 @@ func _physics_process(delta: float) -> void:
 			v_up = JUMP_VEL              # fixed launch -> low gravity jumps higher
 		v_up -= _g * delta
 		var spd9 := WALK_SPEED \
-			* (1.35 if Game.playtime < Game.suit_boost_until else 1.0)
+			* (1.35 if Game.playtime < Game.suit_boost_until else 1.0) \
+			* (1.25 if Game.playtime < Game.sugar_rush_until else 1.0)
 		velocity = wish * spd9 + up * v_up
 	elif Game.underwater:
 		# SWIMMING: the water carries you. Heavy drag, a slow sink,
@@ -1759,6 +1760,19 @@ func _make_held_model(id: String) -> void:
 			_hm_cyl(0.015, 0.3, Vector3(0, 0.05, 0), Color("#b8bcc8"), 0.3)
 			_hm_box(Vector3(0.1, 0.06, 0.01), Vector3(0.05, 0.16, 0),
 				Color("#ffd166"), 1.4)
+		"sucfruit":
+			var fr9 := MeshInstance3D.new()
+			var frm9 := SphereMesh.new()
+			frm9.radius = 0.11
+			frm9.height = 0.18
+			fr9.mesh = frm9
+			fr9.material_override = Destructible.make_material(
+				Color("#ff9a4d"), 0.8)
+			_held.add_child(fr9)
+			for ck9 in 4:
+				var ca9 := TAU * float(ck9) / 4.0
+				_hm_cyl(0.012, 0.07, Vector3(cos(ca9) * 0.05, 0.1,
+					sin(ca9) * 0.05), Color("#ffd23f"), 1.0)
 		"plantfiber":
 			for fx2 in [-0.04, 0.0, 0.04]:
 				_hm_cyl(0.012, 0.3, Vector3(fx2, 0, fx2), Color("#4caf50"), 0.5).rotation_degrees = Vector3(0, 0, fx2 * 200.0)
