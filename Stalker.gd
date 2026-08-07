@@ -1,5 +1,12 @@
 class_name Stalker
 extends Node3D
+
+## a shootable skin: weapons ray-hit this body, the stalker takes it
+class _Hide extends StaticBody3D:
+	var host: Stalker = null
+	func take_damage(d: float, from: Vector3) -> void:
+		if host != null:
+			host.take_damage(d, from)
 ## The stalker-thulhus, back from the old days -- dark hovering things
 ## with real spaghetti tentacles. They come when the noodle god is
 ## angry, hang at the edge of your vision, and face you. Always.
@@ -11,10 +18,38 @@ var _tents: Array = []       # each: Array of segment Node3Ds, base first
 var _departing := false
 var _p = null   # cached player, validity-checked
 
+var hp := 120.0
+var _slain := false
+
 func _ready() -> void:
 	add_to_group("stalker")
 	_phase = randf() * TAU
 	_build()
+	var hide := _Hide.new()
+	hide.host = self
+	var hcs := CollisionShape3D.new()
+	var hcap := CapsuleShape3D.new()
+	hcap.radius = 1.3
+	hcap.height = 3.4
+	hcs.shape = hcap
+	hide.add_child(hcs)
+	add_child(hide)
+
+func take_damage(d: float, _from: Vector3) -> void:
+	if _slain or _departing:
+		return
+	hp -= d
+	Sfx.play("hurt", -18.0)
+	if hp <= 0.0:
+		_slain = true
+		Sfx.play("explode", -12.0)
+		Destructible.spawn_debris(get_parent(), global_position,
+			Vector3(3.0, 3.0, 3.0), Color("#e8d5a0"), Vector3.UP)
+		var drop := ItemDrop.new()
+		drop.setup("noodle", 1)
+		get_parent().add_child(drop)
+		drop.global_position = global_position
+		queue_free()
 
 func _build() -> void:
 	var flesh := Destructible.make_material(Color("#151021"), 0.12)
