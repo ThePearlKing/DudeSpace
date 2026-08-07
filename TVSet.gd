@@ -355,6 +355,30 @@ class SpyCam extends StaticBody3D:
 		dot.material_override = Destructible.make_material(Color("#ff3030"), 2.2)
 		_vis.add_child(dot)
 		dot.position = Vector3(0.1, 0.34, 0)
+		# THE FLOAT: three blue rings hanging under the housing -- the
+		# anti-grav that keeps it up
+		for ri in 3:
+			var ring := MeshInstance3D.new()
+			var rt := TorusMesh.new()
+			rt.outer_radius = 0.16 - float(ri) * 0.035
+			rt.inner_radius = rt.outer_radius - 0.03
+			ring.mesh = rt
+			ring.material_override = Destructible.make_material(
+				Color("#7df9ff"), 1.6 - float(ri) * 0.3)
+			_vis.add_child(ring)
+			ring.position = Vector3(0, -0.06 - float(ri) * 0.09, 0)
+		# THE FLOAT: three blue rings hanging under the housing, the
+		# anti-grav that keeps it up
+		for ri in 3:
+			var ring := MeshInstance3D.new()
+			var rt := TorusMesh.new()
+			rt.outer_radius = 0.16 - float(ri) * 0.035
+			rt.inner_radius = rt.outer_radius - 0.03
+			ring.mesh = rt
+			ring.material_override = Destructible.make_material(
+				Color("#7df9ff"), 1.6 - float(ri) * 0.3)
+			_vis.add_child(ring)
+			ring.position = Vector3(0, -0.06 - float(ri) * 0.09, 0)
 		var cs := CollisionShape3D.new()
 		cs.shape = Surfaces.box_shape(Vector3(0.4, 0.4, 0.5))
 		cs.position = Vector3(0, 0.22, 0)
