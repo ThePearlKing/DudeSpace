@@ -453,6 +453,8 @@ func _process(delta: float) -> void:
 		_hint.text = "WASD steer   Space engine   H hyperdrive   arrows RCS   1/2/3/5/0 time warp   L-click smash   F exit   M map"
 
 func _refresh() -> void:
+	if not is_inside_tree():
+		return
 	_stats.text = "COINS  %d   BANK  %d   ZB  %d\nSCORE  %d      %s %s%s" % [
 		Inventory.coins, Inventory.bank_coins, Inventory.zeptobux, Game.score,
 		Game.date_text(), Game.clock_text(),
