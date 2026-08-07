@@ -225,6 +225,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			_confirm_ghost()   # RMB places. LMB or Esc cancels.
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			_ghost_hushed = _ghost_kind   # stays away till you swap slots
 			_cancel_ghost()
 		get_viewport().set_input_as_handled()
 		return
@@ -354,6 +355,14 @@ var seated: Node3D = null   # bench seat marker we're parked on
 var _ghost: Node3D = null   # placement preview hologram
 var _ghost_cat := ""        # "house" | "furn"
 var _ghost_kind := ""
+# machine/TV/camera ids that place through the ghost. Holding one in
+# hand = the preview is ALREADY up; RMB plants it, LMB tucks it away
+# until you switch slots.
+const AUTO_GHOST_IDS: Array[String] = ["chest", "furnace", "coinifier",
+	"autominer", "spawnbeacon", "generator", "coaldrill", "bioreactor",
+	"rtg", "creativegen", "prisreactor", "nreactor", "capacitor",
+	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv"]
+var _ghost_hushed := ""     # id LMB-dismissed; slot swap clears it
 var _ghost_yaw := 0.0
 var _door_mode: bool = false      # door tool armed: clicks select frames
 var _door_frame: Node3D = null    # first frame clicked
@@ -798,6 +807,23 @@ func _dock_tf_for(near_st: House, side_v: Vector3) -> Transform3D:
 					b.center + rot * (np - b.center))
 	return Transform3D(gb, near_st.global_position + gb * side_v)
 
+## Holding a placeable = seeing where it lands. No click to "enter"
+## the preview -- it lives on the item itself.
+func _auto_ghost() -> void:
+	var id: String = Inventory.slot_id(Inventory.selected)
+	if _ghost != null:
+		# ghost belongs to an item no longer in hand: fold it up
+		if _ghost_cat == "tvish" and id != _ghost_kind:
+			_cancel_ghost()
+		return
+	if id != _ghost_hushed:
+		_ghost_hushed = ""
+	if id == "" or id == _ghost_hushed or not AUTO_GHOST_IDS.has(id):
+		return
+	if _ui_open() or Game.dead or Game.cam_aiming 			or _wreck_mode or _hwreck_mode or _door_mode:
+		return
+	_start_ghost("tvish", id)
+
 func _update_ghost() -> void:
 	if _ghost == null:
 		return
@@ -1010,6 +1036,7 @@ func _physics_process(delta: float) -> void:
 		return
 	# parked on a bench: pinned until a movement key. the humans sit on
 	# their side, you sit on yours. equality.
+	_auto_ghost()
 	if _ghost != null:
 		_update_ghost()
 	if seated != null:
