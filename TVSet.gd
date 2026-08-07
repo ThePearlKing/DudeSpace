@@ -165,7 +165,9 @@ class _ForkStudio extends Node3D:
 		# gold iris ring
 		_eye = Node3D.new()
 		_body.add_child(_eye)
-		_eye.position = Vector3(0, 0.05, 0.15)
+		# proud of the tangle: the pupil and iris stay visible -- the
+		# kinda-mad stare -- instead of vanishing behind crossing coils
+		_eye.position = Vector3(0, 0.05, 0.42)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
 		wm.radius = 0.58
