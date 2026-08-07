@@ -1234,43 +1234,11 @@ func _sky_detonate() -> void:
 		if is_instance_valid(shroot):
 			shroot.queue_free())
 
-func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
-	mono_sky_clear()
-	# CRACKS: a dome at cosmic distance, always around you
-	var crack := MeshInstance3D.new()
-	var ckm := SphereMesh.new()
-	ckm.radius = Universe.BOUNDARY - 900.0
-	ckm.height = ckm.radius * 2.0
-	ckm.radial_segments = 64
-	ckm.rings = 32
-	crack.mesh = ckm
-	var ckmat := ShaderMaterial.new()
-	ckmat.shader = Monolith._crack_shader()
-	ckmat.render_priority = -6   # behind world transparents, above veil
-	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
-	# density is PROGRESS: each link cracks the sky harder than the last
-	ckmat.set_shader_parameter("intensity",
-		0.12 + 0.88 * float(stage + 1) / 8.0)
-	crack.material_override = ckmat
-	crack.extra_cull_margin = 16384.0
-	crack.add_to_group("mono_sky")
-	add_child(crack)
-	crack.global_position = Vector3.ZERO
-	var cktw := create_tween()
-	_sky_tweens.append(cktw)
-	cktw.tween_method(func(v: float) -> void:
-		if is_instance_valid(crack):
-			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 0.1)
-	# SHATTERED GLASS: pieces of the universe's own boundary shaken
-	# loose -- wire triangles exactly like the edge-of-the-universe
-	# plates, but in the piece's color, tilted off the shell, DRIFTING
-	# and tumbling. More pieces every link.
-	var skyp := Node3D.new()
-	skyp.add_to_group("mono_sky")
-	add_child(skyp)
-	skyp.global_position = Vector3.ZERO
-	_skyfx.append(skyp)
-	var tris: Array = []
+## the shard EXPLOSION of a monolith sky show -- separable from the
+## cracks so the stone can drop first and the sky burst after
+func _sky_plates(skyp: Node3D, col: Color, stage: int) -> void:
+	if not is_instance_valid(skyp):
+		return
 	var rngs := RandomNumberGenerator.new()
 	rngs.seed = 991 + stage * 31
 	var nplates := 84 + 14 * stage
@@ -1317,7 +1285,6 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 			plate.add_child(ed)
 			ed.position = (va + vb) * 0.5
 			ed.rotation.y = -atan2((vb - va).z, (vb - va).x)
-		tris.append(plate)
 		var tum := plate.create_tween().set_loops()
 		tum.tween_property(plate, "rotation",
 			Vector3(TAU * rngs.randf_range(0.2, 0.6),
@@ -1342,6 +1309,48 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 	pfade.tween_callback(func() -> void:
 		if is_instance_valid(skyp):
 			skyp.queue_free())
+
+func sky_show(col: Color, stage: int, linger: bool,
+		burst_delay: float = 0.0) -> ShaderMaterial:
+	mono_sky_clear()
+	# CRACKS: a dome at cosmic distance, always around you
+	var crack := MeshInstance3D.new()
+	var ckm := SphereMesh.new()
+	ckm.radius = Universe.BOUNDARY - 900.0
+	ckm.height = ckm.radius * 2.0
+	ckm.radial_segments = 64
+	ckm.rings = 32
+	crack.mesh = ckm
+	var ckmat := ShaderMaterial.new()
+	ckmat.shader = Monolith._crack_shader()
+	ckmat.render_priority = -6   # behind world transparents, above veil
+	ckmat.set_shader_parameter("ccol", Vector3(col.r, col.g, col.b))
+	# density is PROGRESS: each link cracks the sky harder than the last
+	ckmat.set_shader_parameter("intensity",
+		0.12 + 0.88 * float(stage + 1) / 8.0)
+	crack.material_override = ckmat
+	crack.extra_cull_margin = 16384.0
+	crack.add_to_group("mono_sky")
+	add_child(crack)
+	crack.global_position = Vector3.ZERO
+	var cktw := create_tween()
+	_sky_tweens.append(cktw)
+	cktw.tween_method(func(v: float) -> void:
+		if is_instance_valid(crack):
+			ckmat.set_shader_parameter("fade", v), 0.0, 1.0, 0.1)
+	# SHATTERED GLASS, on its own fuse: immediately by default, or
+	# delayed so the burst lands after whatever deserves to go first
+	var skyp := Node3D.new()
+	skyp.add_to_group("mono_sky")
+	add_child(skyp)
+	skyp.global_position = Vector3.ZERO
+	_skyfx.append(skyp)
+	if burst_delay > 0.0:
+		var bdt := skyp.create_tween()
+		bdt.tween_interval(burst_delay)
+		bdt.tween_callback(_sky_plates.bind(skyp, col, stage))
+	else:
+		_sky_plates(skyp, col, stage)
 	var wheel := skyp.create_tween().set_loops()
 	wheel.tween_property(skyp, "rotation:y", TAU, 480.0).as_relative()
 	# lifecycle: demo = 30s and gone; the real thing lingers six minutes
@@ -1356,12 +1365,7 @@ func sky_show(col: Color, stage: int, linger: bool) -> ShaderMaterial:
 		f2.tween_method(func(v: float) -> void:
 			if is_instance_valid(crack):
 				ckmat.set_shader_parameter("fade", v), 1.0, 0.0, fade9)
-		for t9 in tris:
-			if is_instance_valid(t9):
-				var ft := create_tween()
-				ft.tween_property(t9, "scale",
-					Vector3(0.01, 0.01, 0.01), fade9) \
-					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN))
+		pass)   # the shard burst fades itself; only the cracks linger
 	life.tween_interval(fade9 + 2.0)
 	life.tween_callback(func() -> void:
 		for tw9 in _sky_tweens:

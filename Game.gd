@@ -168,7 +168,8 @@ var underwater: bool = false     # inside an ocean world's water right now
 var ai_blessed: bool = false     # synced with the DUDE A.I.: sells pay +10%
 var charts_unlocked: bool = false  # map room star charts: hidden worlds shown
 var suit_boost_until: float = 0.0  # BIG COMPUTER overclock: fast legs until then
-var white_beaten: bool = false  # somebody escaped the white zone once: it gave up
+var white_beaten: bool = false
+var suppress_hurt_until: float = 0.0  # god-grip window: hurt notes muted  # somebody escaped the white zone once: it gave up
 var lime_taken: bool = false    # Harold's spare tetrahedron: claimed
 var lime_wall_open: bool = false  # the riddle wall stays answered
 var harold_shelf_open: bool = false  # the bookshelf-door stays open once found
@@ -295,7 +296,9 @@ func hurt(d: float, vaporize: bool = false, cause: String = "") -> void:
 	d *= 1.0 - Inventory.armor_reduction()   # worn armor soaks its share
 	health = maxf(0.0, health - d)
 	_since_hit = 0.0
-	if playtime - _hurt_sfx_t > 1.5:   # one long note, never a burst
+	if playtime - _hurt_sfx_t > 1.5 \
+			and playtime > suppress_hurt_until:
+		# one long note, never a burst -- and NOTHING while a god has you
 		_hurt_sfx_t = playtime
 		Sfx.play("hurt", -20.0)
 	if health <= 0.0:

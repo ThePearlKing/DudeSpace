@@ -63,6 +63,12 @@ func _ready() -> void:
 	_sounds["smelt"] = _bake(0.5, func(t: float, n: float) -> float:
 		return ((randf() * 2.0 - 1.0) * 0.3 + sin(TAU * 300.0 * t) * 0.3) * exp(-2.2 * n))
 
+	# the GRIP: one long low groan for the whole time a god has you --
+	# every other hurt note is muted while it plays
+	_sounds["godgrip"] = _bake(2.4, func(t: float, n: float) -> float:
+		var f := lerpf(110.0, 45.0, n)
+		var trem := 1.0 + 0.12 * sin(TAU * 5.0 * t)
+		return sin(TAU * f * t * trem) * 0.24 * sin(PI * minf(n * 1.15, 1.0)))
 	_sounds["rumble"] = _bake(1.1, func(t: float, n: float) -> float:
 		var env := sin(PI * n)   # swell in, fade out
 		return ((randf() * 2.0 - 1.0) * 0.35 + sin(TAU * 42.0 * t) * 0.5 + sin(TAU * 63.0 * t) * 0.25) * env)

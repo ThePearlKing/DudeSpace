@@ -339,7 +339,8 @@ class _GrabFx extends Node3D:
 		elif target and is_instance_valid(target):
 			if not _held:
 				_held = true
-				Sfx.play("hurt", -14.0)
+				Game.suppress_hurt_until = Game.playtime + 5.0
+				Sfx.play("godgrip", -8.0)
 			if _life < 2.0:
 				# hoisted: you dangle from the tip, rising
 				var lift := (_life - 0.8) / 1.2
@@ -359,7 +360,6 @@ class _GrabFx extends Node3D:
 						+ b.z * randf_range(-1, 1)).normalized() * 34.0
 				Game.hurt(clampf(Game.health - 5.0, 0.0,
 						8.0 + 2.0 * float(Game.god_cycles)))
-				Sfx.play("explode", -10.0)
 		if _life > 3.4:
 			queue_free()
 
@@ -404,7 +404,8 @@ class _SmackFx extends Node3D:
 			s.position.x = sin(_life * 10.0 + k * 3.0) * (1.0 - drop) * 4.0 * k
 		if drop >= 1.0 and not _hit:
 			_hit = true
-			Sfx.play("explode", -8.0)
+			Game.suppress_hurt_until = Game.playtime + 1.5
+			Sfx.play("explode", -12.0)
 			if target and is_instance_valid(target):
 				Game.hurt(clampf(Game.health - 5.0, 0.0,
 						10.0 + 2.0 * float(Game.god_cycles)))   # stings, never slays
