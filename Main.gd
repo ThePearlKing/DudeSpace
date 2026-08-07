@@ -1155,27 +1155,20 @@ func _sky_detonate() -> void:
 			txn = dirn.cross(Vector3(1, 0, 0))
 		txn = txn.normalized()
 		var tzn := txn.cross(dirn).normalized()
-		var away := (dirn * (0.9 if brng.randf() < 0.5 else -0.55)
-			+ txn * brng.randf_range(-0.7, 0.7)
-			+ tzn * brng.randf_range(-0.7, 0.7)).normalized()
-		var hold9 := 0.5 + brng.randf_range(0.0, 0.5)
+		var away := (dirn * (0.8 if brng.randf() < 0.5 else -0.45)
+			+ txn * brng.randf_range(-0.6, 0.6)
+			+ tzn * brng.randf_range(-0.6, 0.6)).normalized()
 		var sc9 := plate.create_tween()
-		sc9.tween_interval(hold9)
+		sc9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
 		sc9.tween_property(plate, "position",
-			away * Universe.BOUNDARY * brng.randf_range(0.5, 1.1),
-			brng.randf_range(1.2, 2.4)) \
+			away * Universe.BOUNDARY * brng.randf_range(0.2, 0.55),
+			brng.randf_range(5.0, 9.0)) \
 			.as_relative().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		sc9.parallel().tween_property(plate, "scale",
-			Vector3.ONE * brng.randf_range(2.0, 3.2),
-			brng.randf_range(1.2, 2.4))
-		sc9.tween_property(plate, "position",
-			away * Universe.BOUNDARY * brng.randf_range(0.25, 0.5),
-			brng.randf_range(4.0, 6.0)).as_relative()
 		var tb9 := plate.create_tween()
-		tb9.tween_interval(hold9)
+		tb9.tween_interval(1.4 + brng.randf_range(0.0, 1.2))
 		tb9.tween_property(plate, "rotation",
-			Vector3(brng.randf_range(-4.0, 4.0), brng.randf_range(-4.0, 4.0),
-				brng.randf_range(-2.0, 2.0)), 2.4).as_relative()
+			Vector3(brng.randf_range(-2.0, 2.0), brng.randf_range(-2.0, 2.0),
+				brng.randf_range(-1.0, 1.0)), 8.0).as_relative()
 	for f9 in ifc9:
 		var A9 := (iv9[(f9 as Array)[0]] as Vector3).normalized()
 		var B9 := (iv9[(f9 as Array)[1]] as Vector3).normalized()
@@ -1194,7 +1187,7 @@ func _sky_detonate() -> void:
 						pt.call(i9, j9 + 1))
 	var bf9 := create_tween()
 	_sky_tweens.append(bf9)
-	bf9.tween_interval(11.0)
+	bf9.tween_interval(12.0)
 	bf9.tween_callback(func() -> void:
 		if is_instance_valid(bshell):
 			bshell.queue_free())
