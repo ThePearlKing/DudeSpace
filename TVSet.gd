@@ -183,15 +183,19 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.2
-		pm.height = 0.4
+		pm.radius = 0.17
+		pm.height = 0.34
 		_pupil.mesh = pm
 		var pmat := StandardMaterial3D.new()
 		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		pmat.albedo_color = Color("#0e0a04")
 		_pupil.material_override = pmat
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.35)
+		# the sky's exact pupil: kinda-mad scale (0.55 + w*0.65 at
+		# w~0.45 = 0.84 of base) and FLATTENED to 45% depth -- a disc
+		# riding the eyeball, not a full ball
+		_pupil.scale = Vector3(1, 1, 0.45)
+		_pupil.position = Vector3(0, 0, 0.36)
 		var iris := MeshInstance3D.new()
 		var im := TorusMesh.new()
 		im.inner_radius = 0.2
