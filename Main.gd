@@ -2503,7 +2503,6 @@ var _pop_t: float = 30.0
 
 var _bgm: AudioStreamPlayer = null
 var _bgm_gap := 0.0
-var _bgm_last := -1
 var _bgm_order: Array = []
 
 var _rhot_t := 0.0
@@ -2558,18 +2557,12 @@ func _update_bgm(delta: float) -> void:
 	_bgm_gap -= delta
 	if _bgm_gap > 0.0:
 		return
-	# shuffled deck: every track plays once before any repeats -- and a
-	# fresh deck may not open with the song that just ended, so no track
-	# is ever more common than the others, even across the seam
+	# shuffled deck: every track plays once before any repeats
 	if _bgm_order.is_empty():
 		for i in RadioLib.custom_count():
 			_bgm_order.append(i)
 		_bgm_order.shuffle()
-		if _bgm_order.size() > 1 and int(_bgm_order.back()) == _bgm_last:
-			var swp9: int = _bgm_order.pop_back()
-			_bgm_order.push_front(swp9)
-	_bgm_last = int(_bgm_order.pop_back())
-	_bgm.stream = RadioLib.custom_track(_bgm_last)
+	_bgm.stream = RadioLib.custom_track(int(_bgm_order.pop_back()))
 	_bgm.volume_db = -34.0   # fade-in starts from a whisper
 	_bgm.play()
 	# minecraft rules after that: songs are an EVENT, minutes apart
