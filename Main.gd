@@ -2503,7 +2503,7 @@ var _pop_t: float = 30.0
 
 var _bgm: AudioStreamPlayer = null
 var _bgm_gap := 0.0
-var _bgm_order: Array = []
+var _bgm_last := -1
 
 var _rhot_t := 0.0
 var _rhot := false
@@ -2557,12 +2557,15 @@ func _update_bgm(delta: float) -> void:
 	_bgm_gap -= delta
 	if _bgm_gap > 0.0:
 		return
-	# shuffled deck: every track plays once before any repeats
-	if _bgm_order.is_empty():
-		for i in RadioLib.custom_count():
-			_bgm_order.append(i)
-		_bgm_order.shuffle()
-	_bgm.stream = RadioLib.custom_track(int(_bgm_order.pop_back()))
+	# PURE chance every time: any track, never the same one twice in a
+	# row -- and nothing about it saves, so a fresh launch predicts
+	# nothing about what plays first
+	var pick9 := randi() % RadioLib.custom_count()
+	if RadioLib.custom_count() > 1 and pick9 == _bgm_last:
+		pick9 = (pick9 + 1 + randi() % (RadioLib.custom_count() - 1)) \
+			% RadioLib.custom_count()
+	_bgm_last = pick9
+	_bgm.stream = RadioLib.custom_track(pick9)
 	_bgm.volume_db = -34.0   # fade-in starts from a whisper
 	_bgm.play()
 	# minecraft rules after that: songs are an EVENT, minutes apart
@@ -6415,8 +6418,8 @@ func _euclid_landmarks(b) -> void:
 	var pyr := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.0
-	cm.bottom_radius = 22.0
-	cm.height = 36.0
+	cm.bottom_radius = 26.2
+	cm.height = 34.0
 	cm.radial_segments = 4
 	pyr.mesh = cm
 	var bsh := Shader.new()
@@ -6444,7 +6447,7 @@ void fragment(){
 	pyr.material_override = bmat9
 	add_child(pyr)
 	pyr.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
-		sp + Vector3.DOWN * 10.0)
+		sp + Vector3.DOWN * 9.0)
 	_pyramid_exit = sp + Vector3.DOWN * 2.0
 	# ONE pyramid, walls visible from BOTH sides (cull off): the same
 	# bricks serve as exterior hide and interior chamber -- no second
@@ -6518,7 +6521,7 @@ void fragment(){
 		add_child(fr9)
 		fr9.global_transform = dxf
 		fr9.rotate_object_local(Vector3.UP, dyaw)
-		fr9.translate_object_local(Vector3(0, 0, 15.6))
+		fr9.translate_object_local(Vector3(0, 0, 14.0))
 		fr9.translate_object_local(fp9[1] as Vector3)
 	var pdoor := PyramidDoor.new()
 	var pdm := MeshInstance3D.new()
@@ -6533,7 +6536,7 @@ void fragment(){
 	add_child(pdoor)
 	pdoor.global_transform = dxf
 	pdoor.rotate_object_local(Vector3.UP, dyaw)
-	pdoor.translate_object_local(Vector3(0, 0, 15.6))
+	pdoor.translate_object_local(Vector3(0, 0, 14.0))
 	var pdl := Label3D.new()
 	pdl.text = "PYRAMID DOOR [F]"
 	pdl.font_size = 26
@@ -6545,7 +6548,7 @@ void fragment(){
 	add_child(pdl)
 	pdl.global_transform = dxf
 	pdl.rotate_object_local(Vector3.UP, dyaw)
-	pdl.translate_object_local(Vector3(0, 5.8, 16.2))
+	pdl.translate_object_local(Vector3(0, 5.8, 14.6))
 	# inside the pyramid: the MENGER SHRINE. F + prism shards = enchant.
 	var shrine := MengerShrine.new()
 	add_child(shrine)
