@@ -4,7 +4,7 @@ extends StaticBody3D
 ## Placer tool, usable by every human (and the player, F). A carpet is
 ## furniture with no ambitions. A bed is a seat you take lying down.
 
-const KINDS := ["bench", "chair", "sofa", "carpet", "bed", "catwalk", "doorframe"]
+const KINDS := ["bench", "chair", "sofa", "carpet", "bed", "table", "catwalk", "doorframe"]
 
 var kind: String = "bench"
 var yaw: float = -1.0
@@ -19,6 +19,13 @@ func _ready() -> void:
 		Color.from_hsv(randf(), randf_range(0.35, 0.6), randf_range(0.5, 0.8)), 0.06)
 	var seats: Array = []
 	match kind:
+		"table":
+			# a proper table: slab top, apron, four legs -- and a real
+			# SURFACE: TVs and clutter can stand on it
+			_m(Vector3(1.6, 0.09, 1.0), Vector3(0, 0.86, 0), wood)
+			_m(Vector3(1.4, 0.12, 0.84), Vector3(0, 0.76, 0), dark)
+			_legs(1.3, dark)
+			_hitbox(Vector3(1.6, 0.95, 1.0), Vector3(0, 0.45, 0))
 		"chair":
 			_m(Vector3(0.6, 0.08, 0.55), Vector3(0, 0.55, 0), wood)
 			_m(Vector3(0.6, 0.5, 0.08), Vector3(0, 0.85, 0.28), wood)

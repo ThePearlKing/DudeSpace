@@ -7512,6 +7512,12 @@ func restore_world() -> void:
 
 func _spawn_world_obj(id: String) -> Node3D:
 	match id:
+		"tv": return TVSet.TV.new()
+		"tvbig":
+			var tvb := TVSet.TV.new()
+			tvb.big = true
+			return tvb
+		"camtv": return TVSet.SpyCam.new()
 		"chest": return Chest.new()
 		"spawnbeacon": return SpawnBeacon.new()
 		"furnace": return Furnace.new()

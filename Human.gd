@@ -350,8 +350,10 @@ func animate(speed: float, grounded: bool, delta: float, jetting: bool = false) 
 			_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -0.3, delta * 8.0)
 			_leg_l.rotation.z = lerpf(_leg_l.rotation.z, -0.08, delta * 8.0)
 			_leg_r.rotation.z = lerpf(_leg_r.rotation.z, 0.08, delta * 8.0)
-			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -2.4, delta * 6.0)
-			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -2.4, delta * 6.0)
+			_arm_l.rotation.x = lerpf(_arm_l.rotation.x, -0.9, delta * 6.0)
+			_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -0.9, delta * 6.0)
+			_arm_l.rotation.z = lerpf(_arm_l.rotation.z, -1.1, delta * 6.0)
+			_arm_r.rotation.z = lerpf(_arm_r.rotation.z, 1.1, delta * 6.0)
 	elif speed > 0.5:
 		# walk/run cycle: opposite arm-leg swing, faster with speed
 		_cycle += delta * clampf(speed, 2.0, 14.0) * 1.1

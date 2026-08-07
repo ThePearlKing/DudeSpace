@@ -1372,7 +1372,8 @@ const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
-	"nreactor", "waypoint", "rocket", "rocket2", "netanalyser"]
+	"nreactor", "waypoint", "rocket", "rocket2", "netanalyser",
+	"tv", "tvbig", "camtv"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -2086,8 +2087,10 @@ func _use_selected() -> void:
 	match id:
 		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", "netanalyser", \
-		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
-			if Universe.inside_body(global_position):
+		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio", \
+		"tv", "tvbig", "camtv":
+			if Universe.inside_body(global_position) \
+					and id not in ["tv", "tvbig", "camtv"]:
 				Sfx.play("denied")
 				var hudi = get_tree().get_first_node_in_group("hud")
 				if hudi:
@@ -2126,6 +2129,13 @@ func _use_selected() -> void:
 				"radio": n = RadioTower.new()
 				"teleporter": n = EMachines.Teleporter.new()
 				"extender": n = EMachines.Extender.new()
+				"tv":
+					n = TVSet.TV.new()
+				"tvbig":
+					var tvb := TVSet.TV.new()
+					tvb.big = true
+					n = tvb
+				"camtv": n = TVSet.SpyCam.new()
 			get_parent().add_child(n)
 			n.set_meta("placed_id", id)
 			n.set_meta("owner", Net.my_name())
