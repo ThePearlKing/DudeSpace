@@ -1385,6 +1385,9 @@ func sky_show(col: Color, stage: int, linger: bool,
 	crack.add_to_group("mono_sky")
 	add_child(crack)
 	crack.global_position = Vector3.ZERO
+	# not mercy, not approval -- the game simply holds the god off your
+	# back while the sky performs, because getting smacked mid-ceremony
+	# is bad theater. He is not glad. He is just not allowed.
 	Game.god_truce_until = maxf(Game.god_truce_until,
 		Game.playtime + (400.0 if linger else 34.0))
 	var cktw := create_tween()
