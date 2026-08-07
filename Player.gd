@@ -1211,6 +1211,9 @@ func _physics_process(delta: float) -> void:
 				if not sspace.intersect_ray(clr):
 					global_position += up * (rise + 0.05) + fwd * 0.12
 
+	if Game.cam_aiming:
+		velocity = Vector3.ZERO
+		return
 	# cooldowns are PER WEAPON: swapping guns never inherits another
 	# gun's wait (the mass driver was locking the AK)
 	var wid0 := Inventory.slot_id(Inventory.selected)

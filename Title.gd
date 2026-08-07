@@ -330,6 +330,7 @@ const TIPS := [
 	"tip: the Furniture Placer builds benches, chairs, TABLES, beds -- 2 plantfiber each.",
 	"tip: TVs sit on tables and catwalks, MOUNT on walls, and show ALIEN NEWS, spy cameras, and FORK TV.",
 	"tip: wire a computer into a TV and the TV becomes its monitor.",
+	"tip: security cameras float ANYWHERE -- open space or bolted to a wall -- and F aims them rocket-style.",
 	"tip: houses are bigger inside -- and machines, wires, and TVs all work in there.",
 	"the fork is coming.",
 	"tip: gas giants have no ground. do not go looking for the ground.",

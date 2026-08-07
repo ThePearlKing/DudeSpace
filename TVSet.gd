@@ -317,7 +317,10 @@ class _ForkStudio extends Node3D:
 class SpyCam extends StaticBody3D:
 	var cam_name := "camera"
 	var _vis: Node3D = null
+	var _head: Node3D = null      # the aimable part; the mount never moves
 	var _ht := 0.0
+	var _aiming := false
+	var _aimcam: Camera3D = null
 
 	func _process(delta: float) -> void:
 		# the HOUSING floats -- a gentle hover bob on the visuals only.
@@ -327,11 +330,83 @@ class SpyCam extends StaticBody3D:
 		if _vis != null:
 			_vis.position.y = sin(_ht * 1.3) * 0.05
 			_vis.rotation.z = sin(_ht * 0.9) * 0.03
+		if _aiming:
+			# ROCKET-STYLE attitude: W/S pitch, A/D yaw, relative to
+			# what the lens sees. Only the head turns; the mount holds.
+			var r := 1.6 * delta
+			if Input.is_key_pressed(KEY_W):
+				_head.rotate_object_local(Vector3(1, 0, 0), -r)
+			if Input.is_key_pressed(KEY_S):
+				_head.rotate_object_local(Vector3(1, 0, 0), r)
+			if Input.is_key_pressed(KEY_A):
+				_head.rotate_object_local(Vector3(0, 1, 0), r)
+			if Input.is_key_pressed(KEY_D):
+				_head.rotate_object_local(Vector3(0, 1, 0), -r)
+			if Input.is_key_pressed(KEY_F) and not _f_latch:
+				aim_end()
+			_f_latch = Input.is_key_pressed(KEY_F)
+
+	var _f_latch := true
+
+	## your view rides the camera itself: watch it turn from inside
+	func aim_begin() -> void:
+		_aiming = true
+		_f_latch = true
+		Game.cam_aiming = true
+		if _aimcam == null:
+			_aimcam = Camera3D.new()
+			_head.add_child(_aimcam)
+			_aimcam.position = Vector3(0, 0.22, -0.4)
+		_aimcam.current = true
+		var hud = get_tree().get_first_node_in_group("hud")
+		if hud:
+			hud.flash("AIMING %s -- W/S pitch, A/D yaw, F done" % cam_name)
+
+	func aim_end() -> void:
+		_aiming = false
+		Game.cam_aiming = false
+		var pl = get_tree().get_first_node_in_group("player")
+		if pl != null and "_camera" in pl and pl._camera != null:
+			pl._camera.current = true
+
+	## against a wall? grow a mount arm, snap the head to face OUT
+	func _wall_check() -> void:
+		if not is_inside_tree():
+			return
+		var sp := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(
+			global_position + global_transform.basis.y * 0.25,
+			global_position + global_transform.basis.y * 0.25
+			+ global_transform.basis.z * 0.7)
+		q.exclude = [get_rid()]
+		var hit := sp.intersect_ray(q)
+		if hit.size() == 0 or absf((hit["normal"] as Vector3)
+				.dot(global_transform.basis.y)) > 0.4:
+			return
+		# mount plate on the wall + short arm; lens looks along the
+		# wall normal, straight out
+		var n9: Vector3 = hit["normal"]
+		global_position = (hit["position"] as Vector3) + n9 * 0.02
+		look_at(global_position + n9, global_transform.basis.y)
+		var plate := MeshInstance3D.new()
+		plate.mesh = Surfaces.box_mesh(Vector3(0.3, 0.3, 0.06))
+		plate.material_override = Destructible.make_material(Color("#2a2f38"), 0.4)
+		add_child(plate)
+		plate.position = Vector3(0, 0.22, 0.03)
+		var arm := MeshInstance3D.new()
+		arm.mesh = Surfaces.box_mesh(Vector3(0.08, 0.08, 0.3))
+		arm.material_override = Destructible.make_material(Color("#3a3f48"), 0.4)
+		add_child(arm)
+		arm.position = Vector3(0, 0.22, -0.12)
+		_head.position = Vector3(0, 0, -0.3)
 
 	func _ready() -> void:
 		add_to_group("spycam")
+		_head = Node3D.new()
+		add_child(_head)
 		_vis = Node3D.new()
-		add_child(_vis)
+		_head.add_child(_vis)
+		call_deferred("_wall_check")
 		var body := MeshInstance3D.new()
 		body.mesh = Surfaces.box_mesh(Vector3(0.3, 0.22, 0.44))
 		body.material_override = Destructible.make_material(Color("#2a2f38"), 0.4)
@@ -400,6 +475,17 @@ class SpyCam extends StaticBody3D:
 				TVSet.cams.erase(cam_name))
 
 	func use() -> void:
+		var pui := PickUI.new().configure("SECURITY CAMERA", [
+			{"id": "aim", "label": "AIM CAMERA (see through it)"},
+			{"id": "rename", "label": "RENAME"}],
+			func(pick: String) -> void:
+				if pick == "aim":
+					aim_begin()
+				elif pick == "rename":
+					_rename_box())
+		get_tree().current_scene.add_child(pui)
+
+	func _rename_box() -> void:
 		# rename: a real text box, not a cycle
 		var lay := CanvasLayer.new()
 		lay.layer = 46
@@ -637,7 +723,9 @@ class TV extends StaticBody3D:
 					mode = "menu"
 					_apply_screen()
 				elif _vcam != null:
-					_vcam.global_transform = (cn as Node3D).global_transform \
+					var anchor: Node3D = cn._head if "_head" in cn \
+						and cn._head != null else (cn as Node3D)
+					_vcam.global_transform = anchor.global_transform \
 						.translated_local(Vector3(0, 0.22, -0.3))
 			"alien":
 				var ds: DatamoshStudio = null
