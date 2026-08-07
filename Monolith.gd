@@ -290,6 +290,11 @@ func activate() -> void:
 	var m0 = get_tree().current_scene
 	if stage < 7 and m0 != null and m0.has_method("sky_show"):
 		m0.sky_show(col, stage, true, 15.0)
+	elif stage == 7 and m0 != null and m0.has_method("sky_shatter"):
+		# the ending starts like every other link: cracks arrive as the
+		# stone starts down. Its 17s build-up outlasts the 14s descent,
+		# so only the EXPLOSION lands after the stele is in the floor.
+		m0.sky_shatter()
 	# 5. the monolith lowers into the ground while the sky splinters
 	if _root != null:
 		var twl := create_tween()
@@ -304,13 +309,7 @@ func activate() -> void:
 		await twl.finished
 		_root.visible = false
 		tet.visible = false
-	# THE EIGHTH does not get a light show -- it gets THE ending: the
-	# white stone sinks, and then the full break-the-universe sequence
-	# runs (seventeen seconds of worsening cracks, then the detonation).
-	# This was never wired: feeding the white tetrahedron used to play
-	# an ordinary crack sky while only the cheat button knew the truth.
-	if stage == 7 and m0 != null and m0.has_method("sky_shatter"):
-		m0.sky_shatter()
+
 
 	# 6. hologram: a PROJECTOR PUCK left in the ground beams up a flat
 	# 2D pictogram of the next planet -- ring, latitude bands, a bar --
