@@ -164,11 +164,11 @@ class _ForkStudio extends Node3D:
 		# gold iris ring
 		_eye = Node3D.new()
 		_body.add_child(_eye)
-		_eye.position = Vector3(0, 0, 0.1)
+		_eye.position = Vector3(0, 0.1, 0.35)
 		var white := MeshInstance3D.new()
 		var wm := SphereMesh.new()
-		wm.radius = 0.62
-		wm.height = 1.24
+		wm.radius = 0.3
+		wm.height = 0.6
 		white.mesh = wm
 		var emat := StandardMaterial3D.new()
 		emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -180,22 +180,22 @@ class _ForkStudio extends Node3D:
 		_eye.add_child(white)
 		_pupil = MeshInstance3D.new()
 		var pm := SphereMesh.new()
-		pm.radius = 0.3
-		pm.height = 0.6
+		pm.radius = 0.14
+		pm.height = 0.28
 		_pupil.mesh = pm
 		var pmat := StandardMaterial3D.new()
 		pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		pmat.albedo_color = Color("#0e0a04")
 		_pupil.material_override = pmat
 		_eye.add_child(_pupil)
-		_pupil.position = Vector3(0, 0, 0.52)
+		_pupil.position = Vector3(0, 0, 0.25)
 		var iris := MeshInstance3D.new()
 		var im := TorusMesh.new()
-		im.inner_radius = 0.3
-		im.outer_radius = 0.38
+		im.inner_radius = 0.14
+		im.outer_radius = 0.18
 		iris.mesh = im
 		iris.rotation_degrees = Vector3(90, 0, 0)
-		iris.position = Vector3(0, 0, 0.5)
+		iris.position = Vector3(0, 0, 0.24)
 		var imat := StandardMaterial3D.new()
 		imat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		imat.albedo_color = Color("#c89020")
