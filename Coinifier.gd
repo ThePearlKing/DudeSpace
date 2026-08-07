@@ -7,10 +7,12 @@ extends Machine
 const PRICES := {
 	"ingot": 8, "irid": 20, "ultima": 100, "prism": 60, "circle": 95, "uranium": 45, "sulfur": 12,
 	"cooked_meat": 5, "meat": 2, "banana": 2, "shroom": 3, "salad": 15, "coal": 1,
+	"cheese": -10,   # the market HATES cheese. usually.
 }
 const SECS_PER_ITEM := 0.5
 
 var _t: float = 0.0
+var _cheese_warned := false
 var _coin: MeshInstance3D
 var _spin: float = 0.0
 
@@ -63,14 +65,32 @@ func work(delta: float) -> void:
 		in_slot["n"] = int(in_slot["n"]) - 1
 		if int(in_slot["n"]) <= 0:
 			in_slot = {"id": "", "n": 0}
-		Inventory.add_coins(int(PRICES[id]))
-		Sfx.play("coin", -18.0)
+		if id == "cheese":
+			# cheese DRAINS the bank -- unless the market briefly loses
+			# its mind (a small chance of 20-400 back)
+			if randf() < 0.06:
+				Inventory.add_coins(20 + randi() % 381)
+				Sfx.play("coin", -6.0)
+			else:
+				Inventory.bank_coins = maxi(0, Inventory.bank_coins - 10)
+				if Inventory.bank_coins <= 0:
+					Inventory.coins = maxi(0, Inventory.coins - 10)
+				Inventory.changed.emit()
+				Sfx.play("denied", -20.0)
+				if not _cheese_warned:
+					_cheese_warned = true
+					var hud = get_tree().get_first_node_in_group("hud")
+					if hud:
+						hud.flash("WARNING: cheese sells at -10. it is DRAINING your bank account")
+		else:
+			Inventory.add_coins(int(PRICES[id]))
+			Sfx.play("coin", -18.0)
 
 func accepts(id: String) -> bool:
 	return PRICES.has(id)
 
 func info_text() -> String:
-	return "in: %s\nsells 1 item / %.1fs\ningot 8 · irid 20 · ultima 100" % [
+	return "in: %s\nsells 1 item / %.1fs\ningot 8 · irid 20 · ultima 100\nCHEESE: -10/ea (drains BANK). rare payouts happen. allegedly." % [
 		Inventory.slot_text(in_slot), SECS_PER_ITEM]
 
 func actions() -> Array:

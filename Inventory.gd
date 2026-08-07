@@ -7,7 +7,7 @@ extends Node
 signal changed
 
 const STACKABLE := ["raw_ingot", "raw_irid", "ingot", "irid", "ultima", "prism", "uranium", "sulfur", "semicircle", "circle", "waypoint",
-	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire", "sucfruit", "noodle", "grenade"]
+	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire", "sucfruit", "noodle", "grenade", "cheese"]
 const STACK_MAX := 999
 
 var coins: int = 0            # carried coins (lose 50% on death)
@@ -118,6 +118,7 @@ var weapons: Dictionary = {
 	"raygun":    {"name": "Ray Gun",     "dmg": 45.0, "rate": 0.14, "range": 220.0, "color": Color("#4dff9a")},
 	"rail":      {"name": "Rail Cannon", "dmg": 90.0, "rate": 0.70, "range": 400.0, "color": Color("#ff5964")},
 	"massdriver":{"name": "Mass Driver", "dmg": 400.0, "rate": 4.0, "range": 500.0, "color": Color("#ff3d00")},
+	"cheeselauncher":{"name": "Cheese Launcher", "dmg": 1.0, "rate": 1.4, "range": 150.0, "color": Color("#ffd94d")},
 }
 
 # Non-weapon items (tools, placeables, and resources).
@@ -138,6 +139,7 @@ var items: Dictionary = {
 	"ytetra":     {"name": "Yellow Tetrahedron", "color": Color("#ffd23f")},
 	"ltetra":     {"name": "Lime Tetrahedron",   "color": Color("#b6ff3f")},
 	"sucfruit":   {"name": "Succulent Fruit",    "color": Color("#ff9a4d")},
+	"cheese":     {"name": "Cheese",             "color": Color("#ffd94d")},
 	"otetra":     {"name": "Orange Tetrahedron", "color": Color("#ff9a3d")},
 	"btetra":     {"name": "Blue Tetrahedron",   "color": Color("#4d9dff")},
 	"rtetra":     {"name": "Red Tetrahedron",    "color": Color("#ff4d4d")},
@@ -346,6 +348,7 @@ func _ready() -> void:
 		{"id": "eseller",   "tab": "Electric", "name": "Electric Seller","cost": {"ingot": 25, "irid": 15}, "desc": "Sells fast at 1.25x price, 2 EU per sale."},
 
 		{"id": "zapper",    "tab": "Weapons",  "name": "Zapper",         "cost": {"coins": 1600, "ingot": 4}, "desc": "Tiny zaps, torrent of them. 160 DPS hosepipe."},
+		{"id": "cheeselauncher","tab": "Weapons", "name": "Cheese Launcher", "cost": {"cheese": 100, "uranium": 1}, "desc": "Turns whatever it hits INTO cheese. Powered by cheese. Ask no questions."},
 		{"id": "massdriver","tab": "Weapons",  "name": "Mass Driver",    "cost": {"coins": 20000, "irid": 50, "ultima": 30, "uranium": 60}, "desc": "One shot ends arguments. Four seconds of cooldown shown right on the slot."},
 		{"id": "plasma",    "tab": "Weapons",  "name": "Plasma Rifle",   "cost": {"coins": 15000, "irid": 30}, "desc": "Heavy energy damage. 250 DPS does not come cheap."},
 		{"id": "ak47",      "tab": "Weapons",  "name": "AK-47",          "cost": {"ingot": 20, "ultima": 6}, "desc": "CRAFT. Needs the recipe from the Shadow Temple.", "recipe": true},

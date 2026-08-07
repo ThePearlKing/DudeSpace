@@ -105,6 +105,10 @@ func _survey(delta: float) -> void:
 	if b == null or global_position.distance_to(b.center) > float(b.radius) + 25.0:
 		return
 	_grounded = true
+	if target_ore == "cheese":
+		# the moon IS the deposit
+		_native = str(b.name) == "The Moon"
+		return
 	# native = a surface deposit of the target ore exists on THIS planet
 	for o in get_tree().get_nodes_in_group("destructible"):
 		if o is Destructible and is_instance_valid(o) and o._res_id == target_ore \
@@ -134,9 +138,18 @@ func info_text() -> String:
 
 func actions() -> Array:
 	return [
-		["Target: " + Inventory.hotbar_name(target_ore) + "  (switch)", func() -> void:
-			target_ore = "raw_irid" if target_ore == "raw_ingot" else "raw_ingot"
-			_site_t = 0.0
-			Sfx.play("click")
+		["Target: " + Inventory.hotbar_name(target_ore) + "  (pick)", func() -> void:
+			var opts: Array = [
+				{"id": "raw_ingot", "label": "Raw Ingot"},
+				{"id": "raw_irid", "label": "Raw Iridium"}]
+			var b9 = Universe.nearest(global_position)
+			if b9 != null and str(b9.name) == "The Moon":
+				opts.append({"id": "cheese", "label": "CHEESE (this IS the moon)"})
+			var pui := PickUI.new().configure("MINER TARGET", opts,
+				func(pick: String) -> void:
+					target_ore = pick
+					_site_t = 0.0
+					Sfx.play("click"))
+			get_tree().current_scene.add_child(pui)
 			use()],
 	]

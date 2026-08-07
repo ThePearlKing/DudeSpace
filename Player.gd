@@ -1556,6 +1556,11 @@ func _make_held_model(id: String) -> void:
 			"voidhammer":
 				_hm_cyl(0.035, 0.6, Vector3(0, 0, 0.05), Color("#3a2a4a"), 0.2).rotation_degrees = Vector3(90, 0, 0)
 				_hm_box(Vector3(0.3, 0.2, 0.2), Vector3(0, 0, -0.32), col, 1.4)
+			"cheeselauncher":
+				# a fat yellow tube that smells faintly of dairy
+				_hm_cyl(0.09, 0.5, Vector3(0, 0.02, -0.1), Color("#ffd94d"), 0.7, 0.11).rotation_degrees = Vector3(90, 0, 0)
+				_hm_box(Vector3(0.12, 0.14, 0.2), Vector3(0, -0.08, 0.12), Color("#c8a52e"), 0.4)
+				_hm_cyl(0.11, 0.06, Vector3(0, 0.02, -0.36), Color("#8a6f1e"), 0.5)
 			"massdriver":
 				# THE ANSWER: twin heavy rails on a coil stack, orange
 				# core burning between them, stock built like furniture
@@ -1884,6 +1889,25 @@ func _make_held_model(id: String) -> void:
 			_hm_cyl(0.015, 0.3, Vector3(0, 0.05, 0), Color("#b8bcc8"), 0.3)
 			_hm_box(Vector3(0.1, 0.06, 0.01), Vector3(0.05, 0.16, 0),
 				Color("#ffd166"), 1.4)
+		"cheese":
+			var wg := MeshInstance3D.new()
+			var wgm := PrismMesh.new()
+			wgm.size = Vector3(0.16, 0.12, 0.22)
+			wg.mesh = wgm
+			wg.material_override = Destructible.make_material(Color("#ffd94d"), 0.6)
+			wg.rotation_degrees = Vector3(0, 0, 90)
+			_held.add_child(wg)
+			for hx9 in [Vector3(0.03, 0.02, 0.05), Vector3(-0.02, -0.02, -0.03),
+					Vector3(0.01, 0.04, -0.06)]:
+				var hole := MeshInstance3D.new()
+				var hm0 := SphereMesh.new()
+				hm0.radius = 0.022
+				hm0.height = 0.044
+				hole.mesh = hm0
+				hole.material_override = Destructible.make_material(
+					Color("#c8a52e"), 0.2)
+				hole.position = hx9
+				_held.add_child(hole)
 		"sucfruit":
 			var fr9 := MeshInstance3D.new()
 			var frm9 := SphereMesh.new()
@@ -1994,6 +2018,35 @@ func _fire() -> void:
 		Sfx.play("denied")
 		return
 	var w := Inventory.current_weapon()
+	if str(w.get("id", Inventory.slot_id(Inventory.selected))) == "cheeselauncher" \
+			or Inventory.slot_id(Inventory.selected) == "cheeselauncher":
+		var sp9 := get_world_3d().direct_space_state
+		var q9 := PhysicsRayQueryParameters3D.create(_camera.global_position,
+			_camera.global_position - _camera.global_transform.basis.z * 150.0)
+		q9.exclude = [get_rid()]
+		var h9 := sp9.intersect_ray(q9)
+		if h9:
+			var tgt: Node = h9.collider
+			while tgt != null and not (tgt is Enemy or tgt is Stalker \
+					or tgt is BigStalker):
+				tgt = tgt.get_parent()
+			if tgt != null:
+				# CHEESED. no corpse, no coins -- just cheese.
+				var n9 := 2 + randi() % 3
+				for k9 in n9:
+					var d9 := ItemDrop.new()
+					d9.setup("cheese", 1)
+					get_parent().add_child(d9)
+					d9.global_position = (tgt as Node3D).global_position \
+						+ Vector3(randf_range(-1, 1), randf_range(0, 1.5),
+						randf_range(-1, 1))
+				Destructible.spawn_debris(get_parent(),
+					(tgt as Node3D).global_position,
+					Vector3(2, 2, 2), Color("#ffd94d"), Vector3.UP)
+				Sfx.play("eat", -8.0)
+				tgt.queue_free()
+		Sfx.play("shoot", -16.0)
+		return
 	var from := _camera.global_position
 	var dir := -_camera.global_transform.basis.z
 	var to := from + dir * float(w["range"])
