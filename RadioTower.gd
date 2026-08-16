@@ -57,6 +57,10 @@ var _unpow_t: float = 99.0   # how long the buffer has been empty
 var _warn_cd: float = 0.0
 var _last_buf: float = 0.0
 var _in_rate: float = 0.0   # measured incoming EU/s (smoothed)
+# --- LIVE stations: another player's modular synth, on the air right now
+var _live: AudioStreamPlayer3D = null
+var _live_src = null          # the ModSynth we are listening to
+var _live_t: float = 0.0
 
 func _init() -> void:
 	title = "RADIO"
@@ -193,6 +197,18 @@ func _ready() -> void:
 	_hiss.max_db = -7.0
 	_hiss.stream = RadioLib.static_noise()
 	add_child(_hiss)
+	# the live feed rides its own player: the broadcasting rack pushes
+	# its master mix straight into this set
+	_live = AudioStreamPlayer3D.new()
+	_live.bus = "RadioFX"
+	_live.unit_size = 40.0
+	_live.max_distance = 1200.0
+	_live.max_db = -1.0
+	var lg := AudioStreamGenerator.new()
+	lg.mix_rate = SynthEngine.SR
+	lg.buffer_length = 0.25
+	_live.stream = lg
+	add_child(_live)
 	_build_stations()
 
 ## The dial of the universe: who is broadcasting, from where, on what.
@@ -295,6 +311,8 @@ func station_dir(st: Dictionary) -> Vector3:
 
 ## Where a station's signal physically comes from.
 func _src_pos(st: Dictionary) -> Vector3:
+	if st.has("node") and is_instance_valid(st["node"]):
+		return st["node"].global_position
 	if st.has("fixed_dir"):
 		return st["fixed_dir"]
 	if st["body"] != null:
@@ -324,6 +342,8 @@ func signal_for(st: Dictionary) -> float:
 ## ~5 degrees -- it barely spreads with distance, so you hear the one
 ## thing you aimed at, not every solar system stacked behind it.
 func align_for(st: Dictionary) -> float:
+	if str(st.get("type", "")) == "live":
+		return 1.0      # a transmitter, not a planet: it broadcasts at you
 	if _is_local(st):
 		return 1.0
 	# the beam only has to TOUCH the planet's field, not its center dot:
@@ -406,6 +426,8 @@ func work(delta: float) -> void:
 		if hudw:
 			hudw.flash("RADIO BROWNOUT — supply can't keep up with %.1f EU/s drain" % DRAIN)
 	if not powered:
+		if _live_src != null:
+			_drop_live()
 		if _talk.playing:
 			_talk.stop()
 		if _hiss.playing:
@@ -414,6 +436,11 @@ func work(delta: float) -> void:
 		return
 	buf = maxf(0.0, buf - DRAIN * delta)
 	_last_buf = buf
+	# who is on the air right now (checked twice a second, not per frame)
+	_live_t -= delta
+	if _live_t <= 0.0:
+		_live_t = 0.5
+		_refresh_live()
 	# find the strongest signal on the current dial + aim -- every
 	# frame, so dragging the dial/dish changes the sound LIVE. When two
 	# stations are effectively tied, the CLOSEST one wins the receiver.
@@ -436,7 +463,16 @@ func work(delta: float) -> void:
 		_hiss.play()
 	# DISTANCE buries far stations in static: same alignment, worse SNR
 	var clear := bs
-	if best >= 0 and stations[best]["body"] != null:
+	if best >= 0 and str(stations[best].get("type", "")) == "live":
+		# a rack in the Nexus array is heard across the system; one on a
+		# planet somewhere fades like any other local transmitter
+		var src = stations[best].get("node", null)
+		var nexus: bool = is_instance_valid(src) and src.has_method("at_nexus") \
+			and src.at_nexus()
+		var scale: float = 160000.0 if nexus else 9000.0
+		var farL := clampf(_site().distance_to(_src_pos(stations[best])) / scale, 0.0, 1.0)
+		clear = bs * (1.0 - (0.15 if nexus else 0.95) * pow(farL, 1.2))
+	elif best >= 0 and stations[best]["body"] != null:
 		# planet stations fade into static with distance -- scaled to the
 		# whole MAP, so cross-cluster (Sanus from Earth, ~105km) arrives
 		# buried while a neighbour cluster (Euclid, ~56km) is just fuzzy.
@@ -469,6 +505,8 @@ func work(delta: float) -> void:
 		best = _cur_station
 		bs = maxf(bs, 0.4)
 	if best != _cur_station:
+		if _live_src != null:
+			_drop_live()
 		_cur_station = best
 		_talk.stop()
 		_sentence_cd = 0.15
@@ -507,6 +545,9 @@ func work(delta: float) -> void:
 	elif str(st["type"]) != "noodle" and str(st["type"]) != "alien":
 		now_line_col = Color("#ffd166")
 	match str(st["type"]):
+		"live":
+			_serve_live(st)
+			return
 		"music":
 			if not _talk.playing:
 				_serve(func() -> AudioStreamWAV:
@@ -594,6 +635,50 @@ func work(delta: float) -> void:
 
 ## Play a cooked stream if one is ready for this station; otherwise cook
 ## it on a worker thread. Returns true the moment playback starts.
+## Plug this set into a broadcasting rack: it hands us its master mix,
+## we count as one listener, and the rack keeps running for us even if
+## its owner has walked away.
+func _serve_live(st: Dictionary) -> void:
+	var src = st.get("node", null)
+	if not is_instance_valid(src):
+		_drop_live()
+		return
+	if _talk.playing:
+		_talk.stop()
+	if _live_src != src:
+		_drop_live()
+		_live_src = src
+		_live.play()
+		var pb = _live.get_stream_playback()
+		if pb != null and src.engine != null:
+			src.engine.add_cast(pb)
+			src.listeners += 1
+	_live.volume_db = _talk.volume_db
+	_live.max_db = _talk.max_db
+	now_line = "%s — %.1f FM  (live)" % [str(st.get("name", "LIVE")), float(st["freq"])]
+	now_line_col = Color("#7be8ff")
+	now_line_until = Game.playtime + 1.0
+
+func _drop_live() -> void:
+	if _live_src != null and is_instance_valid(_live_src):
+		if _live_src.engine != null and _live.has_method("get_stream_playback"):
+			_live_src.engine.remove_cast(_live.get_stream_playback())
+		_live_src.listeners = maxi(0, int(_live_src.listeners) - 1)
+	_live_src = null
+	if _live != null and _live.playing:
+		_live.stop()
+
+## The live half of the dial, refreshed as stations come and go.
+func _refresh_live() -> void:
+	for i in range(stations.size() - 1, -1, -1):
+		if str(stations[i].get("type", "")) == "live":
+			stations.remove_at(i)
+	for s2 in Airwaves.live_stations():
+		if not is_instance_valid(s2["owner"]):
+			continue
+		stations.append({"name": str(s2["name"]), "freq": float(s2["freq"]),
+			"kind": "live", "type": "live", "body": null, "node": s2["owner"]})
+
 func _serve(builder: Callable, clock_sync: bool) -> bool:
 	if _cooked != null and _cooked_for == _cur_station:
 		_talk.stream = _cooked

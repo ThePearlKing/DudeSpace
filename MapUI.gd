@@ -246,6 +246,28 @@ class _MapView extends Control:
 				"≈ %.0f km  (?)" % (me.distance_to(gp) * 4.0 / 1000.0),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 0.8, 0.3, 0.7))
 
+		# THE NEXUS: a station, not a planet -- drawn as the ring it is,
+		# with its array masts, so it reads as somewhere you can dock
+		var nxm = get_tree().get_first_node_in_group("nexus")
+		if nxm != null and nxm is Node3D:
+			var np2: Vector3 = nxm.global_position
+			var nsp := c + Vector2(np2.x - origin.x, np2.z - origin.z) * scale
+			var ncol := Color("#7be8ff")
+			var puls := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
+			draw_arc(nsp, 13.0 + puls * 5.0, 0, TAU, 32,
+				ncol * Color(1, 1, 1, 0.35 + 0.35 * puls), 2.0)
+			draw_arc(nsp, 9.0, 0, TAU, 28, ncol, 2.5)
+			for k in 4:
+				var aa := TAU * float(k) / 4.0 + 0.4
+				draw_line(nsp + Vector2(cos(aa), sin(aa)) * 3.0,
+					nsp + Vector2(cos(aa), sin(aa)) * 9.0, ncol * Color(1, 1, 1, 0.8), 1.5)
+			draw_circle(nsp, 3.0, ncol)
+			draw_string(font, nsp + Vector2(14, 4), "NEXUS STATION",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ncol)
+			draw_string(font, nsp + Vector2(14, 20),
+				"zero g · %.0f km" % (me.distance_to(np2) * 4.0 / 1000.0),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ncol * Color(1, 1, 1, 0.7))
+
 		var mp := c + Vector2(me.x - origin.x, me.z - origin.z) * scale
 		draw_circle(mp, 5.0, Color("#ffe066"))
 		draw_string(font, mp + Vector2(8, -6), "YOU", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#ffe066"))

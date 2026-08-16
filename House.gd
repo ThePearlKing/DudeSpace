@@ -957,24 +957,45 @@ func _build_interior() -> void:
 			_iroot.add_child(odome)
 			odome.global_position = c + Vector3(0, sz.y * 0.5 - 0.1, 0)
 			_mb_dome_in = odome
-			# the dome is SOLID: a convex shell collider so nobody flies
-			# out through the glass into the pocket void
-			var pts := PackedVector3Array()
-			for ring in 4:
-				var vy := float(ring) / 3.0
-				var rr := 5.6 * sqrt(1.0 - vy * vy)
-				for k in 12:
-					var aa := TAU * float(k) / 12.0
-					pts.append(Vector3(cos(aa) * rr, vy * 4.5, sin(aa) * rr))
-			pts.append(Vector3(0, 4.5, 0))
+			# The dome is a SHELL, not a solid. A convex hull is filled
+			# in, so standing inside one means standing inside solid
+			# geometry -- physics resolves that by shoving you OUT, which
+			# is how you could fly through the glass. This is a faceted
+			# ring of thick panels instead: from the inside it is a wall,
+			# and it is far too thick to tunnel through with a jetpack.
 			var dbody := StaticBody3D.new()
-			var dcol := CollisionShape3D.new()
-			var cvx := ConvexPolygonShape3D.new()
-			cvx.points = pts
-			dcol.shape = cvx
-			dbody.add_child(dcol)
 			_iroot.add_child(dbody)
 			dbody.global_position = odome.global_position
+			var rings := 4
+			for ring in rings:
+				var v0 := float(ring) / float(rings)
+				var v1 := float(ring + 1) / float(rings)
+				var y0 := v0 * 4.5
+				var y1 := v1 * 4.5
+				var r0 := 5.6 * sqrt(maxf(0.0, 1.0 - v0 * v0))
+				var r1 := 5.6 * sqrt(maxf(0.0, 1.0 - v1 * v1))
+				var rm := (r0 + r1) * 0.5
+				var ym := (y0 + y1) * 0.5
+				var slope := atan2(y1 - y0, r0 - r1)
+				var seglen := sqrt(pow(r0 - r1, 2.0) + pow(y1 - y0, 2.0)) + 0.5
+				var segs := 14
+				for k in segs:
+					var aa := TAU * float(k) / float(segs)
+					var pcol := CollisionShape3D.new()
+					var pbox := BoxShape3D.new()
+					pbox.size = Vector3(TAU * rm / float(segs) + 0.4, 0.6, seglen)
+					pcol.shape = pbox
+					pcol.position = Vector3(cos(aa) * rm, ym, sin(aa) * rm)
+					pcol.rotation = Vector3(0, -aa, 0)
+					pcol.rotate_object_local(Vector3.RIGHT, -slope)
+					dbody.add_child(pcol)
+			# and a cap over the very top, where the panels meet
+			var capc := CollisionShape3D.new()
+			var capb := BoxShape3D.new()
+			capb.size = Vector3(3.0, 0.6, 3.0)
+			capc.shape = capb
+			capc.position = Vector3(0, 4.5, 0)
+			dbody.add_child(capc)
 			# wing dressing: bunk west, console east, floor decals
 			_deco(c + Vector3(-9.5, fy - c.y + 0.55, 2.5),
 				Vector3(1.1, 0.5, 2.2), Color("#5a7aa0"))

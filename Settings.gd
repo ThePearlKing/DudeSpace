@@ -13,6 +13,10 @@ var music_vol: float = 1.0       # background-music volume (0..1)
 var sfx_vol: float = 1.0         # sound-effects volume (0..1)
 var radio_vol: float = 1.0       # the radio's own fader (RadioFX bus)
 var voice_vol: float = 1.0       # spoken voices (humans, studio aliens)
+## How solid the modular synth's patch cables are drawn, on screen and
+## on the machine itself. A full rack disappears under its own cabling
+## otherwise. 0.15 = ghosts, 1.0 = solid rubber.
+var cable_alpha: float = 1.0
 
 ## Every spoken voice routes through a runtime "Voice" bus.
 func ensure_voice_bus() -> void:
@@ -61,6 +65,7 @@ func _ready() -> void:
 		sfx_vol = clampf(float(cf.get_value("opts", "sfx_vol", 1.0)), 0.0, 1.0)
 		radio_vol = clampf(float(cf.get_value("opts", "radio_vol", 1.0)), 0.0, 1.0)
 		voice_vol = clampf(float(cf.get_value("opts", "voice_vol", 1.0)), 0.0, 1.0)
+		cable_alpha = clampf(float(cf.get_value("opts", "cable_alpha", 1.0)), 0.12, 1.0)
 		for a in KEY_DEFAULTS:
 			keys[a] = int(cf.get_value("keys", str(a), KEY_DEFAULTS[a]))
 		var fs := bool(cf.get_value("opts", "fullscreen", fullscreen))
@@ -79,6 +84,7 @@ func save_cfg() -> void:
 	cf.set_value("opts", "sfx_vol", sfx_vol)
 	cf.set_value("opts", "radio_vol", radio_vol)
 	cf.set_value("opts", "voice_vol", voice_vol)
+	cf.set_value("opts", "cable_alpha", cable_alpha)
 	for a in KEY_DEFAULTS:
 		cf.set_value("keys", str(a), key(str(a)))
 	cf.save(CFG_PATH)

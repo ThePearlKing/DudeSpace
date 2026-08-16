@@ -215,18 +215,28 @@ func _toggle_view() -> void:
 func camera() -> Camera3D:
 	return _camera
 
+## Where the camera is pointed, in world space. Used by anything that
+## wants to do less work behind your back.
+func look_dir() -> Vector3:
+	if _camera == null:
+		return -global_transform.basis.z
+	return -_camera.global_transform.basis.z
+
 func _ui_open() -> bool:
 	return Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Game.mode != Game.Mode.ON_FOOT or Game.dead:
 		return
-	if _ghost != null and event is InputEventMouseButton and event.pressed:
+	if _ghost != null and event is InputEventMouseButton and event.pressed \
+			and event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_LEFT]:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			_confirm_ghost()   # RMB places. LMB or Esc cancels.
-		elif event.button_index == MOUSE_BUTTON_LEFT:
+		else:
 			_ghost_hushed = _ghost_kind   # stays away till you swap slots
 			_cancel_ghost()
+		# ONLY the two buttons we actually used: this used to swallow the
+		# scroll wheel as well, so holding a placeable froze the hotbar
 		get_viewport().set_input_as_handled()
 		return
 	# door/DESTROY modes only bite while the Furniture Placer is in hand;
@@ -291,7 +301,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if _ghost != null and event is InputEventKey and event.pressed 			and event.keycode == KEY_ESCAPE:
-		_cancel_ghost()
+		# HUSH it, do not just cancel: the preview lives on the held item,
+		# so a plain cancel respawns it next frame and the NEXT Esc eats
+		# itself on the new ghost -- which is how holding a placeable made
+		# the pause menu impossible to open.
+		hush_ghost()
 		get_viewport().set_input_as_handled()
 		return
 	if _ghost != null and event is InputEventKey and event.pressed and event.keycode == KEY_R:
@@ -359,9 +373,15 @@ var _ghost_kind := ""
 # hand = the preview is ALREADY up; RMB plants it, LMB tucks it away
 # until you switch slots.
 const AUTO_GHOST_IDS: Array[String] = ["chest", "furnace", "coinifier",
-	"autominer", "spawnbeacon", "generator", "coaldrill", "bioreactor",
+	"autominer", "autominer2", "autominer3", "crusher",
+	"alloyfurn", "alloyfurn2", "alloyfurn3",
+	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
+	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
+	"spawnbeacon", "generator", "coaldrill", "bioreactor",
 	"rtg", "creativegen", "prisreactor", "nreactor", "capacitor",
-	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv"]
+	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv", "modsynth", "modsynth2",
+	"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch",
+	"teleporter", "extender", "bench", "nterm", "radio"]
 var _ghost_hushed := ""     # id LMB-dismissed; slot swap clears it
 var _ghost_yaw := 0.0
 var _door_mode: bool = false      # door tool armed: clicks select frames
@@ -693,6 +713,68 @@ func _door_holo(anchor: Node3D, sets: Array, delta_b: Vector3, secs: float) -> v
 		if is_instance_valid(root):
 			root.queue_free())
 
+## A previewed machine's REAL footprint: ask the world spawner for one
+## and read its box (box_size is set in _init, before anything spawns).
+func _machine_ghost_size(kind: String) -> Vector3:
+	match kind:
+		"bench": return Vector3(1.9, 1.1, 0.7)
+		"nterm": return Vector3(1.1, 1.7, 0.6)
+	var cs = get_tree().current_scene
+	if cs != null and cs.has_method("_spawn_world_obj"):
+		var probe = cs._spawn_world_obj(kind)
+		if probe != null:
+			var sz := Vector3(1.4, 1.4, 1.4)
+			if "box_size" in probe:
+				sz = probe.box_size
+			probe.free()
+			return sz
+	return Vector3(1.4, 1.4, 1.4)
+
+## Every preview says which way it will FACE. +Z is the front of every
+## placeable in this game (screens, panels, doors, dish bases), so the
+## ghost wears a lit front plate, an arrow poking out of it, and the
+## word FRONT. Rotate with R and the marker turns with it.
+func _add_ghost_front(sz: Vector3) -> void:
+	if _ghost == null:
+		return
+	var zf := sz.z * 0.5
+	var plate := MeshInstance3D.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(sz.x * 0.88, sz.y * 0.88, 0.02)
+	plate.mesh = pm
+	plate.position = Vector3(0, 0, zf + 0.012)
+	var pmat := StandardMaterial3D.new()
+	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pmat.albedo_color = Color(0.35, 0.95, 1.0, 0.30)
+	plate.material_override = pmat
+	_ghost.add_child(plate)
+	var arrow := MeshInstance3D.new()
+	var am := CylinderMesh.new()
+	am.top_radius = 0.0
+	am.bottom_radius = minf(0.26, maxf(0.09, sz.x * 0.16))
+	am.height = minf(0.5, maxf(0.2, sz.z * 0.5 + 0.2))
+	am.radial_segments = 4
+	arrow.mesh = am
+	arrow.rotation_degrees = Vector3(90, 45, 0)
+	arrow.position = Vector3(0, minf(sz.y * 0.5, 0.55), zf + am.height * 0.55)
+	var amat := StandardMaterial3D.new()
+	amat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	amat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	amat.albedo_color = Color(0.2, 1.0, 0.55, 0.85)
+	arrow.material_override = amat
+	_ghost.add_child(arrow)
+	var lbl := Label3D.new()
+	lbl.text = "FRONT"
+	lbl.font_size = 44
+	lbl.pixel_size = 0.0016
+	lbl.modulate = Color(0.55, 1.0, 0.75, 0.95)
+	lbl.outline_size = 10
+	lbl.outline_modulate = Color(0, 0, 0, 0.8)
+	lbl.no_depth_test = true
+	lbl.position = Vector3(0, minf(sz.y * 0.5, 0.55) - 0.28, zf + 0.06)
+	_ghost.add_child(lbl)
+
 func _start_ghost(cat: String, kind: String) -> void:
 	if cat == "house" and Game.zone != "":
 		Sfx.play("denied")   # a house inside a house is asking for trouble
@@ -713,7 +795,8 @@ func _start_ghost(cat: String, kind: String) -> void:
 		# TRUE dimensions: the ghost is the exact footprint
 		bm.size = Vector3(2.74, 2.0, 0.5) if kind == "tvbig" \
 			else (Vector3(1.3, 1.2, 0.45) if kind == "tv" \
-			else Vector3(0.44, 0.7, 0.55))
+			else (Vector3(0.44, 0.7, 0.55) if kind == "camtv"
+				else _machine_ghost_size(kind)))
 	elif cat == "house":
 		var w := 5.0
 		var hh := 3.4
@@ -759,6 +842,7 @@ func _start_ghost(cat: String, kind: String) -> void:
 	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_ghost.material_override = gm
 	get_parent().add_child(_ghost)
+	_add_ghost_front(bm.size)
 
 ## Docked transform for a station piece joining near_st. Sides are
 ## ranked by where you stand -- and standing dead-center (on a STACKED
@@ -938,17 +1022,35 @@ func _confirm_ghost() -> void:
 				var tb := TVSet.TV.new()
 				tb.big = true
 				tn = tb
-			_:
+			"camtv":
 				tn = TVSet.SpyCam.new()
+			_:
+				# every other previewed placeable is a real machine: the
+				# world spawner already knows how to build each one
+				if Universe.inside_body(base_pos):
+					Sfx.play("denied")
+					var hudm = get_tree().get_first_node_in_group("hud")
+					if hudm:
+						hudm.flash("can't place machines inside a planet")
+					_cancel_ghost()
+					return
+				var cs9 = get_tree().current_scene
+				if cs9 != null and cs9.has_method("_spawn_world_obj"):
+					tn = cs9._spawn_world_obj(_ghost_kind)
+				if tn == null:
+					Sfx.play("denied")
+					_cancel_ghost()
+					return
 		get_parent().add_child(tn)
 		tn.set_meta("placed_id", _ghost_kind)
 		tn.set_meta("owner", Net.my_name())
 		tn.global_transform = Transform3D(tf.basis, base_pos)
-		# screen turns to greet its owner
-		var flat9 := (global_position - tn.global_position) \
-			- tf.basis.y * (global_position - tn.global_position).dot(tf.basis.y)
-		if flat9.length() > 0.1:
-			tn.look_at(tn.global_position - flat9, tf.basis.y)
+		# a screen turns to greet its owner; a machine sits square
+		if _ghost_kind in ["tv", "tvbig", "camtv"]:
+			var flat9 := (global_position - tn.global_position) \
+				- tf.basis.y * (global_position - tn.global_position).dot(tf.basis.y)
+			if flat9.length() > 0.1:
+				tn.look_at(tn.global_position - flat9, tf.basis.y)
 		if not Game.creative:
 			Inventory.remove_res(_ghost_kind, 1)
 		Sfx.play("place")
@@ -966,8 +1068,8 @@ func _confirm_ghost() -> void:
 			hn.global_transform = Transform3D(hdeck.global_transform.basis,
 				_deck_hit + hdeck.global_transform.basis.y * 0.6)
 		else:
+			# the preview IS the placement: no surprise rotation
 			hn.global_transform = Transform3D(tf.basis, base_pos)
-			hn.rotate_object_local(Vector3.UP, randf() * TAU)
 		if not Game.creative:
 			Inventory.remove_res("housekit", 1)
 		Sfx.play("place")
@@ -1016,6 +1118,12 @@ func _confirm_ghost() -> void:
 		fn.set_meta("owner", Net.my_name())
 		fn.global_transform = Transform3D(tf.basis, base_pos)
 		Sfx.play("place")
+	_cancel_ghost()
+
+## Put the preview away and KEEP it away until the held item changes.
+func hush_ghost() -> void:
+	if _ghost != null:
+		_ghost_hushed = _ghost_kind
 	_cancel_ghost()
 
 func _cancel_ghost() -> void:
@@ -1923,6 +2031,30 @@ func _make_held_model(id: String) -> void:
 			_hm_box(Vector3(0.16, 0.09, 0.11), Vector3.ZERO, Color("#c04a4a"), 0.2)
 			_hm_box(Vector3(0.05, 0.1, 0.12), Vector3(0.09, 0, 0),
 				Color("#e8dcd0"), 0.2)
+		"biprop":
+			# liquid oxygen and glycerin in one squat pressure bottle
+			_hm_cyl(0.055, 0.2, Vector3(0, 0.02, 0), Color("#8fb8d8"), 0.35)
+			_hm_cyl(0.058, 0.05, Vector3(0, -0.06, 0), Color("#ff8844"), 0.6)
+			_hm_cyl(0.02, 0.05, Vector3(0, 0.14, 0), Color("#c8ccd4"), 0.4)
+		"coolcell":
+			# a finned cartridge, cold blue down the middle
+			_hm_cyl(0.045, 0.24, Vector3.ZERO, Color("#c3ccd6"), 0.4)
+			_hm_cyl(0.03, 0.26, Vector3.ZERO, Color("#7be8ff"), 1.6)
+			for fy in [-0.07, 0.0, 0.07]:
+				_hm_cyl(0.075, 0.012, Vector3(0, fy, 0), Color("#9aa8bc"), 0.3)
+		"plasmatorch":
+			# grip, neck, and the arc at the tip
+			_hm_box(Vector3(0.06, 0.14, 0.06), Vector3(0, -0.06, 0.02),
+				Color("#3a3f4a"), 0.2)
+			_hm_cyl(0.028, 0.22, Vector3(0, 0.06, -0.05), Color("#c8ccd4"), 0.5)
+			_hm_cyl(0.016, 0.05, Vector3(0, 0.06, -0.18), Color("#c86bff"), 2.4)
+		"chemmanual":
+			# a book. Closed, in your hand, until you open it
+			_hm_box(Vector3(0.17, 0.23, 0.035), Vector3.ZERO, Color("#c8a227"), 0.25)
+			_hm_box(Vector3(0.16, 0.215, 0.04), Vector3(0.008, 0, 0),
+				Color("#e8e2d0"), 0.1)
+			_hm_box(Vector3(0.02, 0.23, 0.042), Vector3(-0.078, 0, 0),
+				Color("#8a6a15"), 0.3)
 		"waypoint":
 			_hm_cyl(0.015, 0.3, Vector3(0, 0.05, 0), Color("#b8bcc8"), 0.3)
 			_hm_box(Vector3(0.1, 0.06, 0.01), Vector3(0.05, 0.16, 0),
@@ -2221,13 +2353,79 @@ func _use_selected() -> void:
 		else:
 			place = global_position - global_transform.basis.z * 3.0
 	match id:
-		"chest", "furnace", "coinifier", "autominer", "spawnbeacon", \
+		"biprop":
+			# liquid oxygen and glycerin: a serious pour of rocket fuel
+			Inventory.fuel = minf(Inventory.fuel_max, Inventory.fuel + 250.0)
+			Inventory.remove_res("biprop", 1)
+			Sfx.play("place")
+			var hudbp = get_tree().get_first_node_in_group("hud")
+			if hudbp:
+				hudbp.flash("+250 rocket fuel  (%.0f / %.0f)" % [
+					Inventory.fuel, Inventory.fuel_max])
+			return
+		"coolcell":
+			# slot it into a reactor: the loop comes back to full and
+			# runs colder from here on
+			var rc := _machine_under_crosshair()
+			if rc != null and rc is EMachines.NuclearReactor:
+				rc.coolant = 100.0
+				rc.cooled = int(rc.get("cooled")) + 1 if "cooled" in rc else 1
+				Inventory.remove_res("coolcell", 1)
+				Sfx.play("place")
+				var hudc = get_tree().get_first_node_in_group("hud")
+				if hudc:
+					hudc.flash("coolant cell installed — loop refilled, %d cell(s) fitted"
+						% int(rc.cooled))
+			else:
+				Sfx.play("denied")
+				var hudc2 = get_tree().get_first_node_in_group("hud")
+				if hudc2:
+					hudc2.flash("aim at a nuclear reactor to fit the cell")
+			return
+		"plasmatorch":
+			# cuts one ore block clean out of the rock, whatever it is
+			var sp5 := get_world_3d().direct_space_state
+			var f5 := _camera.global_position
+			var q5 := PhysicsRayQueryParameters3D.create(f5,
+				f5 - _camera.global_transform.basis.z * 6.0)
+			q5.exclude = [get_rid()]
+			var h5 := sp5.intersect_ray(q5)
+			var cut := false
+			if h5:
+				var n5: Node = h5.collider
+				while n5 != null:
+					if n5 is Destructible:
+						n5.destroy((n5.global_position - global_position).normalized())
+						cut = true
+						break
+					n5 = n5.get_parent()
+			Sfx.play("shoot" if cut else "denied", -8.0)
+			if cut:
+				var hudt = get_tree().get_first_node_in_group("hud")
+				if hudt:
+					hudt.flash("plasma cut")
+			return
+		"chemmanual":
+			Game.chem_manual = true
+			if get_tree().get_first_node_in_group("manual_ui") == null:
+				get_tree().current_scene.add_child(ManualUI.new())
+			Sfx.play("learn", -8.0)
+			return
+		"chest", "furnace", "coinifier", "autominer", "autominer2", "autominer3", \
+		"crusher", "alloyfurn", "alloyfurn2", "alloyfurn3", \
+		"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2", \
+		"ultimabatt", \
+		"separator", "separator2", "cryoplant", "cryoplant2", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", "netanalyser", \
-		"tv", "tvbig", "camtv":
+		"tv", "tvbig", "camtv", "modsynth", "modsynth2":
 			# PREVIEW FIRST: a ghost shows exactly where it lands
 			_start_ghost("tvish", id)
 			return
 		"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch", "teleporter", "extender", "bench", "nterm", "radio":
+			# PREVIEW FIRST, like everything else you can put down
+			_start_ghost("tvish", id)
+			return
+		"__never__":
 			if Universe.inside_body(global_position):
 				Sfx.play("denied")
 				var hudi = get_tree().get_first_node_in_group("hud")
@@ -2516,6 +2714,17 @@ func _use_selected() -> void:
 					else:
 						_start_ghost("furn", kind))
 			get_tree().current_scene.add_child(pui2)
+		"blastcharge":
+			# a mining charge: same physics as a grenade, thrown gently,
+			# and it opens ore beds instead of arguments
+			var bc := Grenade.new()
+			get_parent().add_child(bc)
+			bc.global_position = _camera.global_position \
+				- _camera.global_transform.basis.z * 1.0
+			bc.vel = -_camera.global_transform.basis.z * 9.0 \
+				+ global_transform.basis.y * 2.0
+			Inventory.remove_res("blastcharge", 1)
+			Sfx.play("click", -12.0)
 		"grenade":
 			var gr := Grenade.new()
 			get_parent().add_child(gr)
@@ -2851,6 +3060,11 @@ func locate(mode: int) -> void:
 			if rifts is Array:
 				for r in rifts:
 					targets.append(r)
+		7:
+			label = "NEXUS STATION"
+			var nxl = get_tree().get_first_node_in_group("nexus")
+			if nxl != null and nxl is Node3D:
+				targets = [nxl.global_position]
 		6:
 			label = "NOODLE GOD"
 			var nwl = get_tree().get_first_node_in_group("noodle_watcher")

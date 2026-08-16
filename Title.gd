@@ -70,6 +70,17 @@ func _ready() -> void:
 	_build_background()
 	_build_main_menu()
 	add_child(HumanFaceEditor.new())   # F9 face editor works here too
+	# save-doctor rig: CTD_LOAD=<slot> boots straight into that save with
+	# writes disabled, so a broken world can be reproduced and read
+	# WITHOUT the autosave touching the file
+	var dbg := OS.get_environment("CTD_LOAD")
+	if dbg != "":
+		Save.load_slot(int(dbg))
+		Save.ephemeral = true
+		print("SAVEDOCTOR loading slot ", int(dbg), " name=", Save.slot_name(int(dbg)),
+			" (read-only)")
+		get_tree().change_scene_to_file.call_deferred("res://Main.tscn")
+		return
 	# headless LAN test rig: CTD_NET=join connects to localhost as a guest
 	if OS.get_environment("CTD_NET") == "join":
 		Net.guest_name = "Tester"
@@ -407,6 +418,9 @@ func _start_tutorial() -> void:
 			get_tree().change_scene_to_file("res://Main.tscn"))
 		col.add_child(b)
 	mk.call("BASIC SURVIVAL (mine, craft, fly)", "basic")
+	mk.call("ADVANCED (handbook, power, alloys, chemistry, automation)", "advanced")
+	# the reactor sits at the BOTTOM on purpose: it is the last lesson,
+	# and the advanced course hands off into it when it finishes
 	mk.call("NUCLEAR REACTOR (guided startup, safe meltdowns)", "reactor")
 	var back := Button.new()
 	back.text = "back"

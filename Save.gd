@@ -148,7 +148,15 @@ var world_objs: Array = []   # player-placed machines/chests/etc
 
 var _world_set: bool = false
 
+## THE WORLD GUARD. A healthy world array always has content in it (the
+## human census alone is dozens of entries), so an EMPTY one means the
+## collector broke, not that the player bulldozed the planet. Refusing
+## the write is what stands between a script error and somebody's base.
 func set_world(w: Array) -> void:
+	if w.is_empty() and not world_objs.is_empty():
+		push_warning("save: refused to overwrite %d world objects with an empty list"
+			% world_objs.size())
+		return
 	world_objs = w
 	_world_set = true
 
@@ -288,6 +296,7 @@ func apply_progress() -> void:
 	Game.monolith_stage = int(_progress.get("monolith_stage", 0))
 	Game.void_loot = _progress.get("void_loot", {})
 	Game.ai_blessed = bool(_progress.get("ai_blessed", false))
+	Game.chem_manual = bool(_progress.get("chem_manual", false))
 	Game.charts_unlocked = bool(_progress.get("charts_unlocked", false))
 	Game.white_beaten = bool(_progress.get("white_beaten", false))
 	Game.lime_taken = bool(_progress.get("lime_taken", false))
@@ -379,6 +388,7 @@ func save_progress() -> void:
 		"monolith_stage": Game.monolith_stage,
 		"void_loot": Game.void_loot,
 		"ai_blessed": Game.ai_blessed,
+		"chem_manual": Game.chem_manual,
 		"charts_unlocked": Game.charts_unlocked,
 		"white_beaten": Game.white_beaten,
 		"god_peace": Game.god_peace,

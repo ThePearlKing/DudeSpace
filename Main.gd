@@ -13,6 +13,12 @@ var _crate_beds: Array = []
 var _regen_t: float = 6.0
 var _save_t: float = 5.0
 var _ore_t: float = 4.0
+## Deep space, well clear of Home's well: no gravity, no horizon, perfect
+## line of sight to everything.
+## Out past the shader system, high above the plane and further out
+## than anything else: the front edge of the universe, where there is
+## nothing left between the array and everywhere else.
+const NEXUS_POS := Vector3(600.0, 9200.0, -33000.0)
 var _mines: Array = []   # per-planet mine registry
 var _last_soi: String = ""
 var _pyramid_exit: Vector3 = Vector3.ZERO
@@ -334,12 +340,36 @@ func _boot() -> void:
 		_mouth_shot_test()
 	if OS.get_environment("CTD_TEST") == "26":
 		_mainframe_test()
+	if OS.get_environment("CTD_TEST") == "27":
+		_synth_test()
 	if OS.get_environment("CTD_TEST") == "28":
 		_readme_shots()
 	if OS.get_environment("CTD_TEST") == "29":
 		_hole_shot()
 	if OS.get_environment("CTD_TEST") == "30":
 		_edge_shots()
+	if OS.get_environment("CTD_LOAD") != "":
+		_savedoctor_report()
+	if OS.get_environment("CTD_TEST") == "42":
+		_synthsound_test()
+	if OS.get_environment("CTD_TEST") == "41":
+		_broadcast_test()
+	if OS.get_environment("CTD_TEST") == "46":
+		_icons_test()
+	if OS.get_environment("CTD_TEST") == "47":
+		_gravity_demo()
+	if OS.get_environment("CTD_TEST") == "45":
+		_ambient_test()
+	if OS.get_environment("CTD_TEST") == "44":
+		_reload_test()
+	if OS.get_environment("CTD_TEST") == "48":
+		_advtut_test()
+	if OS.get_environment("CTD_TEST") == "43":
+		_chem_test()
+	if OS.get_environment("CTD_TEST") == "40":
+		_factory_test()
+	if OS.get_environment("CTD_TEST") == "31":
+		_savewipe_test()
 	if OS.get_environment("CTD_TEST") == "32":
 		_throat_shot()
 	if OS.get_environment("CTD_TEST") == "39":
@@ -359,6 +389,8 @@ func _boot() -> void:
 			and OS.get_environment("CTD_NET") == "":
 		if Game.tutorial_mode == "reactor":
 			add_child(ReactorTutorial.new())
+		elif Game.tutorial_mode == "advanced":
+			add_child(AdvancedTutorial.new())
 		else:
 			add_child(Tutorial.new())
 	# headless LAN test rig: CTD_NET=host opens this world to LAN (ephemeral)
@@ -2541,6 +2573,15 @@ func _update_bgm(delta: float) -> void:
 					# ANY radio noise counts -- static hiss included
 					_rhot = true
 					break
+			# a running modular synth owns the airspace exactly like a
+			# radio does: you cannot hear your patch over the soundtrack
+			if not _rhot:
+				for sy in get_tree().get_nodes_in_group("modsynth"):
+					if sy is ModSynth and is_instance_valid(sy) and sy.powered \
+							and sy._ply != null and sy._ply.playing \
+							and sy.global_position.distance_to(_player.global_position) < 45.0:
+						_rhot = true
+						break
 	var radio_hot := _rhot
 	if _bgm.stream_paused:
 		# the radio walked out of earshot: the song comes back mid-note
@@ -6566,11 +6607,28 @@ void fragment(){
 	pdl.global_transform = dxf
 	pdl.rotate_object_local(Vector3.UP, dyaw)
 	pdl.translate_object_local(Vector3(0, 5.8, 14.6))
+	_build_nexus()
 	# inside the pyramid: the MENGER SHRINE. F + prism shards = enchant.
 	var shrine := MengerShrine.new()
 	add_child(shrine)
 	shrine.global_transform = Transform3D(_basis_from_up(Vector3.DOWN),
 		sp + Vector3.DOWN * 4.6)
+
+## THE NEXUS: parked far enough from every planet that gravity out there
+## is effectively nothing, which is exactly why the array works so well.
+func _build_nexus() -> void:
+	if get_tree().get_first_node_in_group("nexus") != null:
+		return
+	var nx := NexusStation.new()
+	add_child(nx)
+	nx.global_position = NEXUS_POS
+	# a lamp so it is findable from a long way out
+	var beacon := OmniLight3D.new()
+	beacon.light_color = Color("#7be8ff")
+	beacon.light_energy = 6.0
+	beacon.omni_range = 400.0
+	nx.add_child(beacon)
+	beacon.position = Vector3(0, 12.0, 0)
 
 func _register_crates(b, count: int, value: int) -> void:
 	count = _n(count)
@@ -7313,10 +7371,15 @@ func collect_world() -> Array:
 				"pos": [n.global_position.x, n.global_position.y, n.global_position.z],
 				"up": [up.x, up.y, up.z]})
 			continue
+		# WHICH WAY IT FACED. Saving only 'up' meant every machine, TV
+		# and camera came back on rejoin pointing wherever _basis_from_up
+		# happened to land -- the synth case turned its back on the room.
+		var fwdz: Vector3 = n.global_transform.basis.z
 		var e := {
 			"id": str(n.get_meta("placed_id")),
 			"pos": [n.global_position.x, n.global_position.y, n.global_position.z],
 			"up": [up.x, up.y, up.z],
+			"fwd": [fwdz.x, fwdz.y, fwdz.z],
 			"owner": str(n.get_meta("owner", "")),
 		}
 		if n is Machine:
@@ -7326,13 +7389,21 @@ func collect_world() -> Array:
 			var wo: Array = []
 			for k in n.wires_out.size():
 				var w = n.wires_out[k]
-				if w is Machine.CoilNode and is_instance_valid(w) and idx.has(w.host):
+				# VALIDITY FIRST. A freed node blows up on `is`, and that
+				# error aborts collect_world entirely -- which is how a
+				# whole base once got saved as an empty world. Never ask
+				# a dead reference what type it is.
+				if not is_instance_valid(w):
+					continue
+				if w is Machine.CoilNode and is_instance_valid(w.host) and idx.has(w.host):
 					wo.append([idx[w.host], -1])   # -1 = "that machine's coil"
 				elif idx.has(w):
 					wo.append([idx[w], int(n.wire_ports[k]) if k < n.wire_ports.size() else k + 1])
 			var fo: Array = []
 			for k2 in n.funnels_out.size():
 				var f = n.funnels_out[k2]
+				if not is_instance_valid(f):
+					continue
 				if idx.has(f):
 					fo.append([idx[f], int(n.funnel_ports[k2]) if k2 < n.funnel_ports.size() else k2 + 1])
 			e["wires"] = wo
@@ -7372,6 +7443,13 @@ func collect_world() -> Array:
 			var refb: Basis = _basis_from_up(up)
 			var zz: Vector3 = refb.inverse() * n.global_transform.basis.z
 			e["fyaw"] = atan2(zz.x, zz.z)
+		if n is Factory.BenchLab:
+			e["bottles"] = n.bottles.duplicate()
+		if n is Factory.AlloyFurnace or n is Factory.Processor:
+			e["recipe"] = n.recipe
+			e["charge"] = n.store.duplicate()
+		if n is ModSynth:
+			e["synth"] = n.patch_data()
 		if n is RadioTower:
 			e["rfreq"] = n.freq
 			e["raim"] = [n.aim_dir.x, n.aim_dir.y, n.aim_dir.z]
@@ -7441,6 +7519,19 @@ func restore_world() -> void:
 				n.links.append(int(lv))
 		if n is Furniture:
 			n.kind = str(e.get("fkind", "bench"))
+		if n is Factory.BenchLab:
+			var bt = e.get("bottles", {})
+			if bt is Dictionary:
+				for k in bt.keys():
+					n.bottles[str(k)] = int(bt[k])
+		if n is Factory.AlloyFurnace or n is Factory.Processor:
+			n.recipe = str(e.get("recipe", n.recipe))
+			var chg = e.get("charge", {})
+			if chg is Dictionary:
+				for k in chg.keys():
+					n.store[str(k)] = int(chg[k])
+		if n is ModSynth:
+			n.set_meta("synth_data", e.get("synth", {}))
 		if n is RadioTower:
 			n.freq = float(e.get("rfreq", 98.0))
 			var ra = e.get("raim", [0, 1, 0])
@@ -7472,6 +7563,17 @@ func restore_world() -> void:
 			n.hyperdrive = bool(e.get("hyper", false))
 		else:
 			n.global_transform = Transform3D(_basis_from_up(up), pos)
+			# the saved facing, replayed: flatten it against this spot's
+			# up and rebuild the basis around it
+			var gf = e.get("fwd", null)
+			if gf is Array and (gf as Array).size() == 3 \
+					and not (n is House) and not (n is Furniture):
+				var gz := Vector3(float(gf[0]), float(gf[1]), float(gf[2]))
+				gz = gz - up * gz.dot(up)
+				if gz.length() > 0.01:
+					gz = gz.normalized()
+					n.global_transform = Transform3D(
+						Basis(up.cross(gz).normalized(), up, gz).orthonormalized(), pos)
 			if n is Furniture:
 				n.rotate_object_local(Vector3.UP, float(e.get("fyaw", 0.0)))
 			if n is House:
@@ -7561,6 +7663,23 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"furnace": return Furnace.new()
 		"coinifier": return Coinifier.new()
 		"autominer": return AutoMiner.new()
+		"autominer2": return AutoMiner.new().setup(2)
+		"autominer3": return AutoMiner.new().setup(3)
+		"crusher": return Factory.Crusher.new()
+		"benchlab": return Factory.BenchLab.new()
+		"ultimabatt": return EMachines.UltimaBattery.new()
+		"chemlab": return Factory.Processor.new().setup("chem", 1)
+		"chemlab2": return Factory.Processor.new().setup("chem", 2)
+		"chemlab3": return Factory.Processor.new().setup("chem", 3)
+		"electrolyser": return Factory.Processor.new().setup("electro", 1)
+		"electrolyser2": return Factory.Processor.new().setup("electro", 2)
+		"separator": return Factory.Processor.new().setup("sep", 1)
+		"separator2": return Factory.Processor.new().setup("sep", 2)
+		"cryoplant": return Factory.Processor.new().setup("cryo", 1)
+		"cryoplant2": return Factory.Processor.new().setup("cryo", 2)
+		"alloyfurn": return Factory.AlloyFurnace.new().setup(1)
+		"alloyfurn2": return Factory.AlloyFurnace.new().setup(2)
+		"alloyfurn3": return Factory.AlloyFurnace.new().setup(3)
 		"generator": return EMachines.Generator.new()
 		"coaldrill": return EMachines.CoalDrill.new()
 		"bioreactor": return EMachines.Bioreactor.new()
@@ -7587,6 +7706,11 @@ func _spawn_world_obj(id: String) -> Node3D:
 			return bn
 		"nterm": return NeuralinkTerminal.new()
 		"radio": return RadioTower.new()
+		"modsynth": return ModSynth.new()
+		"modsynth2":
+			var ms2 := ModSynth.new()
+			ms2.mk2 = true
+			return ms2
 		"house": return House.new()
 		"furn": return Furniture.new()
 		"chairseat":
@@ -8432,3 +8556,1398 @@ func _basis_from_up(up: Vector3) -> Basis:
 	var x := t.cross(up).normalized()
 	var z := x.cross(up).normalized()
 	return Basis(x, up, z).orthonormalized()
+
+
+## CTD_TEST=27 -- the modular synth: does the DSP make sound, does the
+## rack build, does the patch survive a save?
+func _synth_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	# --- 1. the engine, offline: run blocks and listen to the numbers
+	var e := SynthEngine.new()
+	e.default_patch()
+	print("SYNTHTEST shipped rack mods=", e.mods.size(),
+		" cables=", e.cables.size(), " (unpatched by design)")
+	# the shipped rack is wired but ungated: open the amp so the test
+	# can hear whether the chain actually passes signal
+	e.set_knob(3, 0, 0.8)   # open the amp: the shipped rack has no gate yet
+	print("SYNTHTEST mods=", e.mods.size(), " cables=", e.cables.size(),
+		" order=", e._order.size())
+	var t0 := Time.get_ticks_usec()
+	var peak := 0.0
+	var rms := 0.0
+	var n := 0
+	for i in 400:
+		e._block()
+		for v in e._mix:
+			peak = maxf(peak, absf(v.x))
+			rms += v.x * v.x
+			n += 1
+	var dt := float(Time.get_ticks_usec() - t0) / 1000000.0
+	var audio_secs := 400.0 * float(SynthEngine.BLK) / SynthEngine.SR
+	print("SYNTHTEST dsp %.3fs of cpu for %.3fs of audio (%.0f%% realtime)"
+		% [dt, audio_secs, dt / audio_secs * 100.0])
+	print("SYNTHTEST peak=%.4f rms=%.4f%s" % [peak, sqrt(rms / float(n)),
+		"   <-- SILENT!" if peak < 0.001 else ""])
+	# EVERY module in the catalogue must have DSP behind it
+	var all_eng := SynthEngine.new()
+	for id0 in SynthMods.ids():
+		all_eng.add_mod(id0, "dude")
+	for i in 8:
+		all_eng._block()
+	# draw every panel once: a widget with no drawing shows up as a blank
+	var dummy := Control.new()
+	add_child(dummy)
+	for mi1 in all_eng.mods.size():
+		SynthPaint.draw_module(dummy, all_eng.mods[mi1], Vector2.ZERO, 3.0,
+			all_eng, mi1)
+	dummy.queue_free()
+	print("SYNTHTEST widgets with NO drawing: ", SynthPaint.undrawn.keys(),
+		"   <-- BLANK PANELS" if SynthPaint.undrawn.size() > 0 else "   (all drawn)")
+	print("SYNTHTEST modules with NO DSP: ", all_eng.unhandled.keys(),
+		"   <-- SILENT MODULES" if all_eng.unhandled.size() > 0 else "   (all implemented)")
+	# every module type, instantiated and run, to catch a bad branch
+	for id in SynthMods.ids():
+		var e2 := SynthEngine.new()
+		e2.add_mod(id, "dude")
+		e2.add_mod("out", "dude")
+		for k in 8:
+			e2._block()
+		var bad := false
+		for v in e2._bus:
+			if is_nan(v) or is_inf(v):
+				bad = true
+				break
+		print("SYNTHTEST module %-8s ok=%s fits=%s" % [id, not bad, SynthMods.fits(id)])
+	# --- 2. the machine in the world
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var ms := ModSynth.new()
+	add_child(ms)
+	ms.set_meta("placed_id", "modsynth")
+	ms.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 4.0)
+	await get_tree().create_timer(0.6).timeout
+	print("SYNTHTEST rack hw surfaces=", (ms._hw.mesh.get_surface_count() if ms._hw.mesh else 0),
+		" cable surfaces=", (ms._cables.mesh.get_surface_count() if ms._cables.mesh else 0),
+		" panel vp=", ms._vp.size)
+	print("SYNTHTEST cores u=", ms.core_ultima, " n=", ms.core_uranium,
+		" ready=", ms.ready_to_run(), " drain=%.2f" % ms.drain())
+	ms.core_ultima = true
+	ms.core_uranium = true
+	ms.buf = 600.0
+	for i in 6:
+		ms.buf = 600.0
+		await get_tree().create_timer(0.4).timeout
+	print("SYNTHTEST powered=", ms.powered, " running=", ms.engine.running,
+		" playing=", ms._ply.playing, " cpu=%.3f" % ms.engine.cpu)
+	# --- 3. the patch survives the round trip
+	var d := ms.patch_data()
+	var ms2 := ModSynth.new()
+	ms2.set_meta("synth_data", d)
+	add_child(ms2)
+	ms2.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 9.0)
+	await get_tree().create_timer(0.4).timeout
+	print("SYNTHTEST roundtrip mods=", ms2.engine.mods.size(), "/", ms.engine.mods.size(),
+		" cables=", ms2.engine.cables.size(), "/", ms.engine.cables.size(),
+		" cores=", ms2.core_ultima, ms2.core_uranium)
+	# --- 4. patch editing while it runs
+	var before := ms.engine.mods.size()
+	# one panel from each house, so the shot proves they are not siblings
+	ms.engine.add_mod("vkeys", "dude")
+	ms.engine.add_mod("dudemix", "dude")
+	ms.engine.add_mod("stonetrig", "mono")
+	ms.engine.add_mod("watcher", "mono")
+	ms.engine.add_mod("mystery", "mono")
+	ms.engine.add_mod("eyefilter", "mono")
+	ms.engine.add_mod("beatbox", "dude")
+	ms.engine.add_mod("gravity", "mono")
+	ms.engine.add_mod("slab", "mono")
+	ms.engine.add_mod("wrathtap", "mono")
+	ms.engine.add_mod("freeze", "mono")
+	ms.engine.add_mod("dustgate", "mono")
+	ms.engine.add_mod("roll", "icos")
+	var added := ms.engine.add_mod("phaser", "icos")
+	var patched: bool = ms.engine.patch(added, 0, 0, 0) if added >= 0 else false
+	await get_tree().create_timer(0.5).timeout
+	print("SYNTHTEST live edit added=", added, " now=", ms.engine.mods.size(),
+		"/", before, " patched=", patched, " still running=", ms.engine.running)
+	# --- 4b. the BEATBOX lanes: every one of T1..T4 must fire
+	var e3 := SynthEngine.new()
+	var bb := e3.add_mod("beatbox", "dude")
+	var ck := e3.add_mod("clock", "dude")
+	e3.patch(ck, 0, bb, 0)
+	for lane in 4:
+		for st4 in 16:
+			e3.set_step(bb, lane * 16 + st4, 1.0 if st4 % 4 == lane else 0.0)
+	var maxo := [0.0, 0.0, 0.0, 0.0, 0.0]
+	for i in 900:
+		e3._block()
+		for oi in 5:
+			var base := (1 + bb * SynthEngine.MAXOUT + oi) * SynthEngine.BLK
+			for k in SynthEngine.BLK:
+				maxo[oi] = maxf(maxo[oi], absf(e3._bus[base + k]))
+	print("SYNTHTEST beatbox MIX=%.2f T1=%.1f T2=%.1f T3=%.1f T4=%.1f%s" % [
+		maxo[0], maxo[1], maxo[2], maxo[3], maxo[4],
+		"   <-- DEAD LANE" if (maxo[2] < 1.0 or maxo[3] < 1.0 or maxo[4] < 1.0) else ""])
+
+	# --- 4c. the Mk2 case: twice the width, one more row
+	var big := ModSynth.new()
+	big.mk2 = true
+	add_child(big)
+	big.set_meta("placed_id", "modsynth2")
+	big.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 16.0)
+	await get_tree().create_timer(0.6).timeout
+	print("SYNTHTEST mk2 rows=%d row_hp=%d rack=%.2f x %.2f box=%s vp=%s" % [
+		big.engine.rows, big.engine.row_hp, big._rw, big._rh,
+		str(big.box_size), str(big._vp.size)])
+	var far := big.engine.add_mod("vco", "icos", 3, 150)
+	print("SYNTHTEST mk2 far slot: mod=%d row=%d hp=%d (needs row 3 + hp>84 to prove the space is real)" % [
+		far, big.engine.mods[far].row if far >= 0 else -1,
+		big.engine.mods[far].hp if far >= 0 else -1])
+
+	# --- 5. undo/redo on the editor itself
+	var ui := SynthUI.new()
+	ui.synth = ms
+	add_child(ui)
+	await get_tree().create_timer(0.4).timeout
+	var n0 := ms.engine.mods.size()
+	var c0 := ms.engine.cables.size()
+	ui._snap("test add")
+	ms.engine.add_mod("vco", "dude")
+	ms.engine.patch(0, 0, 1, 3)
+	var n1 := ms.engine.mods.size()
+	ui._undo_step()
+	await get_tree().create_timer(0.2).timeout
+	var n2 := ms.engine.mods.size()
+	ui._redo_step()
+	await get_tree().create_timer(0.2).timeout
+	# --- a cable must lift off EITHER jack with a plain drag
+	var ui2 := SynthUI.new()
+	ui2.synth = ms
+	add_child(ui2)
+	await get_tree().create_timer(0.3).timeout
+	var e8 := ms.engine
+	var before8 := e8.cables.size()
+	var c8: Dictionary = e8.cables[0] if before8 > 0 else {}
+	if not c8.is_empty():
+		var sm8 := int(c8["sm"])
+		var so8 := int(c8["so"])
+		# simulate grabbing the OUTPUT end: the same path the UI takes
+		var found8 := {}
+		for cc in e8.cables:
+			if int(cc["sm"]) == sm8 and int(cc["so"]) == so8:
+				found8 = cc
+		var lifted := false
+		if not found8.is_empty():
+			e8.unpatch(int(found8["dm"]), true, int(found8["di"]))
+			lifted = e8.cables.size() == before8 - 1
+			e8.patch(sm8, so8, int(found8["dm"]), int(found8["di"]))
+		print("SYNTHTEST lift cable from OUTPUT end: %s (cables %d -> %d -> %d)" % [
+			"works" if lifted else "FAILED", before8, before8 - 1, e8.cables.size()])
+	ui2.queue_free()
+	await get_tree().create_timer(0.2).timeout
+	# --- cable opacity: set it, save it, reload the config, still there
+	Settings.cable_alpha = 0.34
+	Settings.save_cfg()
+	Settings.cable_alpha = 1.0
+	var cfx := ConfigFile.new()
+	if cfx.load(Settings.CFG_PATH) == OK:
+		Settings.cable_alpha = clampf(float(cfx.get_value("opts", "cable_alpha", 1.0)),
+			0.12, 1.0)
+	print("SYNTHTEST cable opacity survives a settings reload: %.2f%s" % [
+		Settings.cable_alpha,
+		"   (saved)" if absf(Settings.cable_alpha - 0.34) < 0.01 else "   <-- LOST"])
+	Settings.cable_alpha = 1.0
+	Settings.save_cfg()
+	print("SYNTHTEST undo: %d -> %d -> undo %d -> redo %d  (cables %d -> %d)%s" % [
+		n0, n1, n2, ms.engine.mods.size(), c0, ms.engine.cables.size(),
+		"   <-- UNDO BROKEN" if n2 != n0 else ""])
+	ui.queue_free()
+	await get_tree().create_timer(0.3).timeout
+	if OS.get_environment("CTD_SHOT") != "":
+		# a camera parked in front of the case, looking straight at it
+		var cam := Camera3D.new()
+		add_child(cam)
+		var fwd: Vector3 = ms.global_transform.basis.z
+		cam.global_position = ms.global_position + up * 1.15 + fwd * 3.1
+		cam.look_at(ms.global_position + up * 1.0, up)
+		cam.current = true
+		await get_tree().create_timer(0.5).timeout
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/synth_case.png")
+		cam.global_position = ms.global_position + up * 1.15 + fwd * 1.25
+		cam.look_at(ms.global_position + up * 1.05, up)
+		await get_tree().create_timer(0.4).timeout
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/synth_close.png")
+		ms._vp.get_texture().get_image().save_png("res://docs/shots/synth_panelart.png")
+		ms.use()
+		await get_tree().create_timer(0.8).timeout
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/synth_ui.png")
+	await get_tree().create_timer(0.5).timeout
+	print("SYNTHTEST done")
+
+
+## CTD_TEST=31 -- the base-eater. A machine wired to a machine that then
+## dies used to leave a freed reference in wires_out; collect_world hit
+## `w is Machine.CoilNode` on it, errored, aborted, and the autosave
+## wrote an EMPTY world over somebody's base. Never again.
+func _savewipe_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var home = Universe.nearest(p.global_position)
+	var up: Vector3 = (p.global_position - home.center).normalized()
+	var made: Array = []
+	for i in 3:
+		var g := EMachines.Generator.new()
+		add_child(g)
+		g.set_meta("placed_id", "generator")
+		g.global_transform = Transform3D(_basis_from_up(up),
+			p.global_position + _basis_from_up(up).x * (3.0 + float(i) * 2.0))
+		made.append(g)
+	await get_tree().create_timer(0.4).timeout
+	made[0].connect_wire(made[1], "power")
+	made[1].connect_wire(made[2], "power")
+	made[0].add_coil()
+	made[2].connect_wire(made[0].coil_node, "power")
+	await get_tree().create_timer(0.3).timeout
+	var before := collect_world().size()
+	print("SAVEWIPE before=%d wires0=%d" % [before, made[0].wires_out.size()])
+	# kill the middle machine WITHOUT touching the wires pointing at it
+	made[1].free()
+	var after := collect_world()
+	print("SAVEWIPE after_free entries=%d%s" % [after.size(),
+		"   <-- WORLD WOULD HAVE BEEN WIPED" if after.size() < before - 2 else ""])
+	# ...and the guard: an empty collect must never reach the file
+	var keep := Save.world_objs.size()
+	Save.set_world(after)
+	Save.set_world([])
+	print("SAVEWIPE guard: stored=%d (was %d, empty write refused=%s)" % [
+		Save.world_objs.size(), keep, Save.world_objs.size() > 0])
+	# and the freed link is gone from the graph entirely
+	await get_tree().create_timer(0.3).timeout
+	print("SAVEWIPE pruned wires0=%d wires2=%d" % [
+		made[0].wires_out.size(), made[2].wires_out.size()])
+	print("SAVEWIPE done")
+
+
+## CTD_LOAD=<slot> boots a real save read-only; this says what actually
+## came back and what state the session is in.
+func _savedoctor_report() -> void:
+	await get_tree().create_timer(6.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var counts := {}
+	for grp in ["house", "machine", "chest", "rocket", "furn", "nterm", "bench"]:
+		counts[grp] = get_tree().get_nodes_in_group(grp).size()
+	var nb = Universe.nearest(p.global_position) if p != null else null
+	print("SAVEDOCTOR groups=", counts)
+	print("SAVEDOCTOR saved_world_entries=", Save.saved_world().size(),
+		" unrestored=", _unrestored.size(), " world_load_ok=", _world_load_ok)
+	if p != null:
+		print("SAVEDOCTOR player pos=", p.global_position,
+			" nearest=", nb.name, " alt=%.0f" % (p.global_position.distance_to(nb.center) - float(nb.radius)))
+	print("SAVEDOCTOR pause_menu=", get_tree().get_first_node_in_group("pause_menu") != null,
+		" paused=", get_tree().paused, " mouse=", Input.mouse_mode,
+		" dead=", Game.dead, " mode=", Game.mode, " zone='", Game.zone, "'")
+	# is anything sitting on top of the input stack?
+	var blockers: Array = []
+	for n in get_tree().root.get_children():
+		if n is CanvasLayer and n.visible:
+			blockers.append(n.name)
+	print("SAVEDOCTOR layers=", blockers)
+	var lay: Array = []
+	for n in get_children():
+		if n is CanvasLayer and n.visible:
+			lay.append([n.name, n.layer])
+	print("SAVEDOCTOR main_layers=", lay)
+	# any modular synth in this save: is its voice actually reaching the
+	# speakers, or is a cable on the wrong jack again?
+	for sy in get_tree().get_nodes_in_group("modsynth"):
+		if not (sy is ModSynth):
+			continue
+		var eng = sy.engine
+		var peak := 0.0
+		for i in 600:
+			eng._block()
+			peak = maxf(peak, eng.cast_level)
+		var lines: Array = []
+		for c in eng.cables:
+			var dd := SynthMods.def(eng.mods[int(c["dm"])].id)
+			lines.append("%s->%s.%s" % [eng.mods[int(c["sm"])].id,
+				eng.mods[int(c["dm"])].id,
+				str((dd["ins"] as Array)[int(c["di"])])])
+		print("SAVEDOCTOR synth mods=%d cables=%d master peak=%.4f%s" % [
+			eng.mods.size(), eng.cables.size(), peak,
+			"   <-- SILENT" if peak < 0.001 else "   (making sound)"])
+		print("SAVEDOCTOR patch: ", " | ".join(lines))
+		# does the arpeggiator actually climb?
+		for ai in eng.mods.size():
+			if eng.mods[ai].id != "arp":
+				continue
+			var seen: Array = []
+			for t in 40:
+				for i in 40:
+					eng._block()
+				var cvv: float = eng.jack_volts(ai, false, 0)
+				var gv: float = eng.jack_volts(ai, false, 1)
+				var tag := "%.2fV%s" % [cvv, "*" if gv > 1.0 else ""]
+				if seen.is_empty() or str(seen[seen.size() - 1]) != tag:
+					seen.append(tag)
+			var mm2 = eng.mods[ai]
+			print("SAVEDOCTOR arp state: step=%.2f held=%.2f lastclk=%.2f lastgate=%.2f  RANGE=%.2f SPREAD=%.2f  clkIn=%.2f gateIn=%.2f cvIn=%.2f  order=%d" % [
+				mm2.s[3], mm2.s[4], mm2.s[1], mm2.s[2],
+				eng.knob_value(ai, 0), eng.knob_value(ai, 1),
+				eng.jack_volts(ai, true, 2), eng.jack_volts(ai, true, 1),
+				eng.jack_volts(ai, true, 0), int(mm2.sw[0])])
+			print("SAVEDOCTOR arp CV walk: ", " ".join(seen),
+				"   <-- STUCK" if seen.size() <= 1 else "   (climbing)")
+	print("SAVEDOCTOR done")
+
+
+## CTD_TEST=33 -- the production chain: ore -> dust -> ingot -> alloy,
+## plus the geology tables and the miner tier gates.
+func _factory_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position - Universe.nearest(p.global_position).center).normalized()
+	print("FACTORY materials=", Mats.all().size(), " ores=", Mats.ores().size(),
+		" alloys=", Mats.alloys().size())
+	for oid in Mats.ores():
+		print("FACTORY  %-16s tier %d · miner mk%d · best: %s" % [oid,
+			int(Mats.def(oid)["tier"]), Mats.miner_tier(oid), Mats.best_worlds(oid)])
+	# every alloy recipe must be buildable from things that exist
+	for aid in Mats.alloys():
+		var rd := Mats.def(aid)
+		for k in (rd["inputs"] as Dictionary).keys():
+			if not (Mats.has(str(k)) or Inventory.items.has(str(k))):
+				print("FACTORY  BROKEN RECIPE ", aid, " wants unknown ", k)
+	# --- the machines, wired to a creative generator
+	var gen := EMachines.CreativeGen.new()
+	add_child(gen)
+	gen.set_meta("placed_id", "creativegen")
+	gen.global_transform = Transform3D(_basis_from_up(up), p.global_position + up * 0.2)
+	var cr := Factory.Crusher.new()
+	add_child(cr)
+	cr.set_meta("placed_id", "crusher")
+	cr.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 4.0)
+	var fu := EMachines.EFurnace.new()
+	add_child(fu)
+	fu.set_meta("placed_id", "efurnace")
+	fu.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 8.0)
+	var af := Factory.AlloyFurnace.new().setup(1)
+	add_child(af)
+	af.set_meta("placed_id", "alloyfurn")
+	af.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 12.0)
+	await get_tree().create_timer(0.5).timeout
+	cr.buf = 300.0
+	fu.buf = 200.0
+	af.buf = 400.0
+	# crush four copper rocks
+	cr.in_slot = {"id": "raw_copper", "n": 4}
+	for i in 14:
+		cr.buf = 300.0
+		await get_tree().create_timer(0.5).timeout
+	print("FACTORY crusher: 4 raw_copper -> ", cr.out_slot,
+		"   (expect 8 dust_copper)")
+	# smelt the dust
+	fu.in_slot = {"id": "dust_copper", "n": int(cr.out_slot.get("n", 0))}
+	for i in 8:
+		fu.buf = 200.0
+		await get_tree().create_timer(0.4).timeout
+	print("FACTORY e-furnace: dust -> ", fu.out_slot, "   (expect copper)")
+	# pour bronze: 3 copper + 1 tin
+	af.recipe = "bronze"
+	af.store = {"copper": 9, "tin": 3}
+	for i in 16:
+		af.buf = 400.0
+		await get_tree().create_timer(0.5).timeout
+	print("FACTORY alloy furnace I: ", af.store, " -> ", af.out_slot,
+		" (%d%%)" % int(af.progress() * 100.0))
+	# tier gates
+	var t3 := Factory.AlloyFurnace.new().setup(3)
+	print("FACTORY tier1 recipes=", Mats.recipes_for_tier(1).size(),
+		" tier2=", Mats.recipes_for_tier(2).size(),
+		" tier3=", Mats.recipes_for_tier(3).size(),
+		" (t3 can pour synthanium=", Mats.recipes_for_tier(3).has("synthanium"), ")")
+	t3.free()
+	var mk1 := AutoMiner.new()
+	var mk3 := AutoMiner.new().setup(3)
+	print("FACTORY miner mk1 can target ", mk1.tier, " -> ",
+		Mats.ores_for_miner(1).size(), " ores · mk3 -> ",
+		Mats.ores_for_miner(3).size(), " ores")
+	mk1.free()
+	mk3.free()
+	# --- a real miner, digging a real new ore out of a real planet
+	var mn := AutoMiner.new().setup(2)
+	add_child(mn)
+	mn.set_meta("placed_id", "autominer2")
+	mn.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).z * 6.0)
+	mn.target_ore = "raw_copper"
+	await get_tree().create_timer(0.6).timeout
+	for i in 16:
+		mn.buf = 900.0
+		await get_tree().create_timer(0.5).timeout
+	print("FACTORY miner mk2 on ", str(Universe.nearest(mn.global_position).name),
+		" richness ", Mats.richness(Universe.nearest(mn.global_position), "raw_copper"),
+		" -> ", mn.out_slot)
+	mn.target_ore = "raw_dudium"
+	await get_tree().create_timer(1.0).timeout
+	print("FACTORY miner mk2 told to dig dudium (needs mk3): ",
+		"REFUSED (correct)" if Mats.miner_tier("raw_dudium") > mn.tier else "accepted (WRONG)")
+	# every material has a name and an inventory row
+	var missing: Array = []
+	for mid in Mats.all().keys():
+		if not Inventory.items.has(mid):
+			missing.append(mid)
+	print("FACTORY items without an inventory row: ", missing)
+	print("FACTORY done")
+
+
+## CTD_TEST=41 -- the airwaves: two racks fighting over one frequency,
+## a radio tuning in live, and the Nexus quality bonus.
+func _broadcast_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var nx = get_tree().get_first_node_in_group("nexus")
+	print("BCAST nexus built=", nx != null, " at ", nx.global_position if nx else "-",
+		" gravity there=%.4f" % Universe.gravity_at(NEXUS_POS).length())
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	# --- rack A, on the ground, asks for 98.0
+	var a := ModSynth.new()
+	add_child(a)
+	a.set_meta("placed_id", "modsynth")
+	a.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 5.0)
+	# --- rack B, floating in the Nexus, ALSO asks for 98.0
+	var b := ModSynth.new()
+	add_child(b)
+	b.set_meta("placed_id", "modsynth")
+	b.global_position = NEXUS_POS + Vector3(4, 2, 0)
+	await get_tree().create_timer(0.6).timeout
+	for r in [a, b]:
+		r.core_ultima = true
+		r.core_uranium = true
+		r.buf = 600.0
+		var ci: int = r.engine.add_mod("cast", "dude")
+		r.engine.mods[ci].name_tag = "RACK A" if r == a else "NEXUS ONE"
+		r.engine.set_knob(ci, 0, SynthMods.knob_norm(
+			SynthMods.def("cast")["knobs"][0], 98.0))
+	for i in 6:
+		a.buf = 600.0
+		b.buf = 600.0
+		await get_tree().create_timer(0.4).timeout
+	print("BCAST A wants 98.0 -> on ", a.on_air_freq, " (", a.station_name, ")")
+	print("BCAST B wants 98.0 -> on ", b.on_air_freq, " (", b.station_name, ")",
+		"  FORWARDED" if absf(b.on_air_freq - 98.0) > 0.01 else "  <-- COLLISION")
+	print("BCAST B at nexus=", b.at_nexus(), "  A at nexus=", a.at_nexus())
+	print("BCAST live dial: ", Airwaves.live_stations().size(), " stations")
+	# --- a radio tunes rack B in
+	var rad := RadioTower.new()
+	add_child(rad)
+	rad.set_meta("placed_id", "radio")
+	rad.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 10.0)
+	await get_tree().create_timer(0.8).timeout
+	rad.buf = 300.0
+	rad.freq = b.on_air_freq
+	for i in 10:
+		rad.buf = 300.0
+		a.buf = 600.0
+		b.buf = 600.0
+		await get_tree().create_timer(0.4).timeout
+	var live_found := false
+	for st in rad.stations:
+		if str(st.get("type", "")) == "live":
+			live_found = true
+	print("BCAST radio sees live stations=", live_found,
+		" tuned=", rad._cur_station, " live_src=", rad._live_src != null,
+		" playing=", rad._live.playing if rad._live else false)
+	print("BCAST rack B listeners=", b.listeners, " casts=", b.engine.cast_count(),
+		" running=", b.engine.running)
+	# a far-away radio should still hear the NEXUS station clearly
+	rad.global_position = p.global_position + up * 3.0 + Vector3(3000, 0, 0)
+	await get_tree().create_timer(1.2).timeout
+	print("BCAST from 3km away: signal=%.2f (nexus station should stay strong)" % rad._last_sig)
+	if OS.get_environment("CTD_SHOT") != "":
+		var cam := Camera3D.new()
+		add_child(cam)
+		cam.global_position = NEXUS_POS + Vector3(115, 26, 115)
+		cam.look_at(NEXUS_POS + Vector3(0, 6, 0), Vector3.UP)
+		cam.current = true
+		cam.far = 8000.0
+		await get_tree().create_timer(0.6).timeout
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/nexus_station.png")
+		cam.global_position = NEXUS_POS + Vector3(22, 30, 22)
+		cam.look_at(NEXUS_POS + Vector3(0, 26, 0), Vector3.UP)
+		await get_tree().create_timer(0.5).timeout
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/nexus_hub.png")
+		b._paint.queue_redraw()
+		await get_tree().create_timer(0.5).timeout
+		b._vp.get_texture().get_image().save_png("res://docs/shots/synth_cast.png")
+	print("BCAST done")
+
+
+## CTD_TEST=42 -- "my synth makes no noise": follow the signal from the
+## shipped patch all the way to the speaker.
+func _synthsound_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	var ms := ModSynth.new()
+	add_child(ms)
+	ms.set_meta("placed_id", "modsynth")
+	ms.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 3.0)
+	await get_tree().create_timer(0.8).timeout
+	print("SOUND fresh rack: mods=", ms.engine.mods.size(),
+		" cables=", ms.engine.cables.size(), " cores=", ms.ready_to_run())
+	for i in ms.engine.mods.size():
+		var mm = ms.engine.mods[i]
+		print("SOUND   %d %-8s row %d hp %d" % [i, mm.id, mm.row, mm.hp])
+	for c in ms.engine.cables:
+		print("SOUND   cable %d:%d -> %d:%d" % [int(c["sm"]), int(c["so"]),
+			int(c["dm"]), int(c["di"])])
+	# offline: does the patch itself produce anything?
+	for i in 40:
+		ms.engine._block()
+	print("SOUND offline master peak=%.4f" % ms.engine.cast_level)
+	# now power it like a player would
+	ms.core_ultima = true
+	ms.core_uranium = true
+	for i in 8:
+		ms.buf = 600.0
+		await get_tree().create_timer(0.35).timeout
+	print("SOUND powered=", ms.powered, " running=", ms.engine.running,
+		" ply.playing=", ms._ply.playing, " master=", ms.engine.master,
+		" live peak=%.4f" % ms.engine.cast_level)
+	var bi := AudioServer.get_bus_index("SynthFX")
+	print("SOUND bus SynthFX idx=", bi, " volume_db=",
+		AudioServer.get_bus_volume_db(bi) if bi >= 0 else "none",
+		" muted=", AudioServer.is_bus_mute(bi) if bi >= 0 else "-",
+		" master_db=", AudioServer.get_bus_volume_db(0),
+		" settings.radio_vol=", Settings.radio_vol)
+	print("SOUND player distance=%.1f (HEAR_RANGE %.0f)" % [
+		p.global_position.distance_to(ms.global_position), ModSynth.HEAR_RANGE])
+	# --- a patch saved BEFORE the CV-jack rework must still play
+	var legacy := {"mods": [
+		{"id": "vco", "b": "dude", "r": 0, "x": 0, "p": [0.5, 0.5, 0.0, 0.5], "s": [1], "t": []},
+		{"id": "vcf", "b": "dude", "r": 0, "x": 12, "p": [0.55, 0.35, 0.75, 0.0], "s": [0], "t": []},
+		{"id": "vca", "b": "dude", "r": 0, "x": 24, "p": [0.3, 1.0], "s": [0], "t": []},
+		{"id": "out", "b": "dude", "r": 0, "x": 30, "p": [0.7], "s": [0], "t": []}],
+		"cables": [[0, 0, 1, 0, 0], [1, 0, 2, 0, 1], [2, 0, 3, 0, 2]]}
+	var old := ModSynth.new()
+	old.set_meta("placed_id", "modsynth")
+	old.set_meta("synth_data", {"patch": legacy, "u": true, "n": true})
+	add_child(old)
+	old.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 7.0)
+	await get_tree().create_timer(0.6).timeout
+	var routed: Array = []
+	for c in old.engine.cables:
+		var dd := SynthMods.def(old.engine.mods[int(c["dm"])].id)
+		routed.append("%s -> %s.%s" % [old.engine.mods[int(c["sm"])].id,
+			old.engine.mods[int(c["dm"])].id,
+			str((dd["ins"] as Array)[int(c["di"])])])
+	print("SOUND legacy patch rerouted: ", routed)
+	for i in 40:
+		old.engine._block()
+	print("SOUND legacy patch peak=%.4f%s" % [old.engine.cast_level,
+		"   <-- STILL SILENT" if old.engine.cast_level < 0.001 else "   (plays)"])
+	# --- two free-running clocks must KEEP their offset for as long as
+	# the rack runs. This is the "my two clocks drifted into sync" test.
+	var e4 := SynthEngine.new()
+	var ca: int = e4.add_mod("clock", "dude")
+	var cb: int = e4.add_mod("clock", "dude")
+	e4.add_mod("out", "dude")
+	# same tempo, deliberately started apart
+	e4.mods[cb].s[0] = 0.37
+	var blocks_per_sec := int(SynthEngine.SR / float(SynthEngine.BLK))
+	for sec in 6:
+		for i in blocks_per_sec * 10:
+			e4._block()
+		var d1: float = e4.mods[ca].s[0]
+		var d2: float = e4.mods[cb].s[0]
+		var gap: float = fposmod(d2 - d1, 1.0)
+		print("SOUND t=%3ds  phase A %.4f  B %.4f  gap %.4f  countA %d countB %d" % [
+			(sec + 1) * 10, d1, d2, gap, int(e4.mods[ca].s[1]), int(e4.mods[cb].s[1])])
+	# --- and an UNDO must not re-sync them either (this is what actually
+	# happened: restoring a patch rebuilt every module with zeroed state)
+	var before_a: float = e4.mods[ca].s[0]
+	var before_b: float = e4.mods[cb].s[0]
+	var snap := e4.to_dict()
+	var e5 := SynthEngine.new()
+	e5.from_dict(snap)
+	var gap_before := fposmod(before_b - before_a, 1.0)
+	var gap_after := fposmod(e5.mods[cb].s[0] - e5.mods[ca].s[0], 1.0)
+	print("SOUND undo/reload: gap %.4f -> %.4f%s" % [gap_before, gap_after,
+		"   <-- RESYNCED (BAD)" if absf(gap_after) < 0.0001 and gap_before > 0.0001
+			else "   (offset survived)"])
+	# --- and the PHASE knob offsets two identical clocks on purpose
+	var e6 := SynthEngine.new()
+	var pa2: int = e6.add_mod("clock", "dude")
+	var pb2: int = e6.add_mod("clock", "dude")
+	e6.set_knob(pb2, 3, 0.5)                  # half a step out
+	var hi_a := 0
+	var hi_b := 0
+	var both := 0
+	for i in 2000:
+		e6._block()
+		var va: float = e6.jack_volts(pa2, false, 0)
+		var vb: float = e6.jack_volts(pb2, false, 0)
+		if va > 1.0:
+			hi_a += 1
+		if vb > 1.0:
+			hi_b += 1
+		if va > 1.0 and vb > 1.0:
+			both += 1
+	print("SOUND PHASE knob: A high %d blocks, B high %d, overlapping %d (0 = perfectly interleaved)"
+		% [hi_a, hi_b, both])
+	# --- two clocks "both at 120" must really both be at 120
+	var e7 := SynthEngine.new()
+	var qa: int = e7.add_mod("clock", "dude")
+	var qb: int = e7.add_mod("clock", "dude")
+	# set them from two knob positions that are CLOSE but not identical --
+	# exactly what happens when you turn two knobs by hand
+	e7.set_knob(qa, 0, 0.357)
+	e7.set_knob(qb, 0, 0.3585)
+	e7.mods[qb].s[0] = 0.4
+	print("SOUND knob snap: A %.2f BPM  B %.2f BPM" % [
+		e7.knob_value(qa, 0), e7.knob_value(qb, 0)])
+	var g0 := fposmod(e7.mods[qb].s[0] - e7.mods[qa].s[0], 1.0)
+	for i in int(SynthEngine.SR / float(SynthEngine.BLK)) * 60:
+		e7._block()
+	var g1 := fposmod(e7.mods[qb].s[0] - e7.mods[qa].s[0], 1.0)
+	print("SOUND hand-set clocks after 60s: gap %.4f -> %.4f%s" % [g0, g1,
+		"   (held)" if absf(g0 - g1) < 0.01 else "   <-- DRIFTED"])
+	# --- is a SLOW sine actually smooth? (an LFO into a pitch input is
+	# the most exposed thing in the rack: any stepping is audible)
+	var e11 := SynthEngine.new()
+	var l11: int = e11.add_mod("lfo", "dude")
+	var kn11: Array = SynthMods.def("lfo")["knobs"]
+	e11.set_knob(l11, 0, SynthMods.knob_norm(kn11[0], 0.05))   # 0.05 Hz
+	e11.set_knob(l11, 1, SynthMods.knob_norm(kn11[1], 1.0))    # +-1 V
+	var prev := 0.0
+	var maxstep := 0.0
+	var uniq := {}
+	for i in 3000:
+		e11._block()
+		var base := (1 + l11 * SynthEngine.MAXOUT + 3) * SynthEngine.BLK
+		for j in SynthEngine.BLK:
+			var v: float = e11._bus[base + j]
+			if i > 2:
+				maxstep = maxf(maxstep, absf(v - prev))
+			prev = v
+			uniq[snappedf(v, 0.0001)] = true
+	print("SOUND slow sine (0.05 Hz, +-1 V): largest sample-to-sample step %.6f V, %d distinct levels%s" % [
+		maxstep, uniq.size(),
+		"   <-- STEPPY" if maxstep > 0.001 or uniq.size() < 200 else "   (smooth)"])
+	# --- the analyser trace must be STILL: capture the same waveform
+	# twice, a moment apart, and the two screens must line up
+	var e13 := SynthEngine.new()
+	var v13: int = e13.add_mod("vco", "dude")
+	var an13: int = e13.add_mod("analyser", "dude")
+	e13.patch(v13, 0, an13, 0)     # SAW: the hardest case, a vertical edge
+	for i in 900:
+		e13._block()
+	var snap1: Array = []
+	for i in 256:
+		snap1.append(e13.mods[an13].d[i])
+	for i in 400:
+		e13._block()
+	var drift := 0.0
+	var mean_drift := 0.0
+	for i in 256:
+		var dd: float = absf(float(snap1[i]) - e13.mods[an13].d[i])
+		drift = maxf(drift, dd)
+		mean_drift += dd
+	mean_drift /= 256.0
+	var pitch13 := e13.jack_volts(an13, false, 0)
+	var mm13 = e13.mods[an13]
+	print("SOUND analyser: mean drift %.4f V (worst point %.2f V, the vertical edge)%s   pitch %.2f V = %.0f Hz   period %.1f samples (true %.1f)" % [
+		mean_drift, drift, "   <-- MOVING" if mean_drift > 0.08 else "   (locked)",
+		pitch13, 261.6256 * pow(2.0, pitch13), mm13.s[2], 22050.0 / 261.6256])
+	# --- and the hard case: a source with no honest period at all. The
+	# trigger cannot help here (every refresh finds a different crossing),
+	# so this is purely the frame matcher holding the picture still.
+	for src in ["mystery", "noise", "lfo"]:
+		var e14 := SynthEngine.new()
+		var s14: int = e14.add_mod(src, "mono" if src == "mystery" else "dude")
+		var a14: int = e14.add_mod("analyser", "dude")
+		e14.patch(s14, 0, a14, 0)
+		for i in 900:
+			e14._block()
+		var snapA: Array = []
+		for i in 256:
+			snapA.append(e14.mods[a14].d[i])
+		for i in 400:
+			e14._block()
+		var md14 := 0.0
+		var amp14 := 0.0
+		for i in 256:
+			md14 += absf(float(snapA[i]) - e14.mods[a14].d[i])
+			amp14 = maxf(amp14, absf(float(snapA[i])))
+		md14 /= 256.0
+		print("SOUND analyser [%s]: mean drift %.4f V of %.2f V amplitude%s" % [
+			src, md14, amp14,
+			"   <-- MOVING" if md14 > maxf(0.08, amp14 * 0.15) else "   (locked)"])
+	print("SOUND done")
+
+
+## CTD_TEST=43 -- the chemistry: the manual bench, its per-compound
+## sequences, the lab families, and the book that lists them all.
+func _chem_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	var hand := Mats.hand_makeable()
+	print("CHEM makeable by hand: ", hand.size(), " -> ", hand)
+	# every sequence must be unique to its compound
+	var seqs := {}
+	var dupes: Array = []
+	for id in Mats.all().keys():
+		var d: Dictionary = Mats.all()[id]
+		if not d.has("inputs"):
+			continue
+		var key := " ".join(Mats.hand_sequence(str(id)))
+		if seqs.has(key):
+			dupes.append([str(id), seqs[key]])
+		seqs[key] = str(id)
+	print("CHEM sequences: ", seqs.size(), " distinct, collisions: ", dupes)
+	for id in hand:
+		print("CHEM   %-12s %s  <- %s" % [id, " -> ".join(Mats.hand_sequence(id)),
+			str(Mats.def(id)["inputs"])])
+	# --- the bench itself
+	var bench := Factory.BenchLab.new()
+	add_child(bench)
+	bench.set_meta("placed_id", "benchlab")
+	bench.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 3.0)
+	await get_tree().create_timer(0.5).timeout
+	Inventory.add_res("coal", 20)
+	Inventory.add_res("plantfiber", 20)
+	Inventory.add_res("raw_ice", 20)
+	Inventory.add_res("sulfur", 20)
+	bench.pour("coal", 2)
+	print("CHEM bench target with 2 coal: ", bench.target(), "  note: ", bench.last_note)
+	var seq: Array = Mats.hand_sequence(bench.target())
+	# a deliberately wrong step first
+	var wrong := "HEAT" if str(seq[0]) != "HEAT" else "STIR"
+	bench.do_op(wrong)
+	print("CHEM wrong step (%s): steps=%d  note: %s" % [wrong, bench.steps.size(),
+		bench.last_note])
+	for op in seq:
+		bench.do_op(str(op))
+	print("CHEM ran the real sequence %s -> out=%s  note: %s" % [str(seq),
+		str(bench.out_slot), bench.last_note])
+	# --- the labs
+	var lab := Factory.Processor.new().setup("chem", 1)
+	add_child(lab)
+	lab.set_meta("placed_id", "chemlab")
+	lab.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 7.0)
+	var sep := Factory.Processor.new().setup("sep", 1)
+	add_child(sep)
+	sep.set_meta("placed_id", "separator")
+	sep.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 11.0)
+	await get_tree().create_timer(0.6).timeout
+	lab.recipe = "lye"
+	lab.store = {"plantfiber": 9, "water": 3}
+	sep.recipe = "nitrogen"
+	for i in 26:
+		lab.buf = 500.0
+		sep.buf = 500.0
+		await get_tree().create_timer(0.4).timeout
+	print("CHEM lab I lye: store=", lab.store, " out=", lab.out_slot)
+	print("CHEM separator (air only): atmosphere=", sep._in_atmosphere(),
+		" out=", sep.out_slot)
+	print("CHEM tier gates: lab1=", Mats.recipes_for("chem", 1).size(),
+		" lab2=", Mats.recipes_for("chem", 2).size(),
+		" lab3=", Mats.recipes_for("chem", 3).size(),
+		" cryo=", Mats.recipes_for("cryo", 3).size(),
+		" electro=", Mats.recipes_for("electro", 2).size())
+	# --- every recipe must reference things that exist
+	var broken: Array = []
+	for id in Mats.all().keys():
+		var d2: Dictionary = Mats.all()[id]
+		if not d2.has("inputs"):
+			continue
+		for k in (d2["inputs"] as Dictionary).keys():
+			if not (Mats.has(str(k)) or Inventory.items.has(str(k))):
+				broken.append([str(id), str(k)])
+	print("CHEM broken recipe references: ", broken)
+	# --- the book
+	Game.chem_manual = true
+	var man := ManualUI.new()
+	add_child(man)
+	await get_tree().create_timer(0.5).timeout
+	print("CHEM manual rows: ", man._grid.get_child_count(),
+		"  (every alloy and compound in the game)")
+	man.queue_free()
+	print("CHEM done")
+
+
+## CTD_TEST=44 -- "I rejoined and my main voice is silent". Build a real
+## patch, run it, save it, load it into a fresh engine, and compare what
+## is still making sound module by module.
+func _reload_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var e := SynthEngine.new()
+	var clk: int = e.add_mod("clock", "dude")
+	var seq: int = e.add_mod("seq8", "dude")
+	var vco: int = e.add_mod("vco", "dude")
+	var vcf: int = e.add_mod("vcf", "dude")
+	var adsr: int = e.add_mod("adsr", "dude")
+	var vca: int = e.add_mod("vca", "dude")
+	var dseq: int = e.add_mod("dseq", "dude")
+	var voice: int = e.add_mod("voice", "dude")
+	var mix: int = e.add_mod("mix4", "dude")
+	var out: int = e.add_mod("out", "dude")
+	e.patch(clk, 0, seq, 0)          # clock -> sequencer
+	e.patch(clk, 0, dseq, 0)         # clock -> trigger seq
+	e.patch(seq, 0, vco, 0)          # pitch -> vco
+	e.patch(seq, 1, adsr, 4)         # gate -> adsr GATE
+	e.patch(vco, 0, vcf, 3)          # saw -> filter in
+	e.patch(vcf, 0, vca, 1)          # lp -> vca in
+	e.patch(adsr, 0, vca, 0)         # env -> vca cv
+	e.patch(vca, 0, mix, 0)
+	e.patch(dseq, 0, voice, 1)       # trigger -> dude voice gate
+	e.patch(voice, 0, mix, 1)
+	e.patch(mix, 0, out, 0)
+	var names := {clk: "clock", seq: "seq8", vco: "vco", vcf: "vcf",
+		adsr: "adsr", vca: "vca", dseq: "dseq", voice: "voice", mix: "mix4"}
+
+	var measure := func(eng, label: String) -> void:
+		var peaks := {}
+		for k in names.keys():
+			peaks[k] = 0.0
+		var master := 0.0
+		for i in 900:
+			eng._block()
+			for k in names.keys():
+				var base := (1 + int(k) * SynthEngine.MAXOUT) * SynthEngine.BLK
+				for j in SynthEngine.BLK:
+					peaks[k] = maxf(peaks[k], absf(eng._bus[base + j]))
+			master = maxf(master, eng.cast_level)
+		var parts: Array = []
+		for k in names.keys():
+			parts.append("%s %.2f%s" % [str(names[k]), float(peaks[k]),
+				"  <-- SILENT" if float(peaks[k]) < 0.01 else ""])
+		print("RELOAD %s master=%.4f | %s" % [label, master, "  ".join(parts)])
+
+	measure.call(e, "before save")
+	var snap := e.to_dict()
+	var e2 := SynthEngine.new()
+	e2.from_dict(snap)
+	measure.call(e2, "after load ")
+	# and again from a patch saved with NO running state, like an old save
+	var old_snap := snap.duplicate(true)
+	for md in old_snap["mods"]:
+		md.erase("z")
+	var e3 := SynthEngine.new()
+	e3.from_dict(old_snap)
+	measure.call(e3, "old-format")
+	# --- the real failure: a patch built AFTER the jack rework but saved
+	# BEFORE the version stamp existed. It must NOT be remapped.
+	var gap := snap.duplicate(true)
+	gap.erase("v")
+	for cbl in gap["cables"]:
+		while (cbl as Array).size() > 5:
+			(cbl as Array).remove_at((cbl as Array).size() - 1)
+	var e4 := SynthEngine.new()
+	e4.from_dict(gap)
+	var vca_in := ""
+	var vca_cv := ""
+	for c2 in e4.cables:
+		if int(c2["dm"]) == vca:
+			var nmz: String = str((SynthMods.def("vca")["ins"] as Array)[int(c2["di"])])
+			if nmz == "IN":
+				vca_in = e4.mods[int(c2["sm"])].id
+			elif nmz == "CV":
+				vca_cv = e4.mods[int(c2["sm"])].id
+	print("RELOAD unstamped-but-new patch: VCA IN <- %s   VCA CV <- %s%s" % [
+		vca_in, vca_cv,
+		"   <-- AUDIO LOST" if vca_in == "" else "   (audio kept)"])
+	measure.call(e4, "gap-format")
+	# --- an ADSR must NOT hold a note open with no gate, however it was
+	# left when the patch was saved
+	var e9 := SynthEngine.new()
+	var a9: int = e9.add_mod("adsr", "dude")
+	var o9: int = e9.add_mod("out", "dude")
+	e9.patch(a9, 0, o9, 0)
+	e9.mods[a9].s[0] = 3.0        # pretend it was saved mid-sustain
+	e9.mods[a9].s[1] = 0.7
+	for i in 200:
+		e9._block()
+	var envv := e9.jack_volts(a9, false, 0)
+	print("RELOAD ungated ADSR (restored mid-sustain): ENV = %.3f V%s" % [envv,
+		"   <-- STUCK OPEN" if envv > 0.05 else "   (closed, correct)"])
+	# and with a gate held it must still sustain
+	var e10 := SynthEngine.new()
+	var c10: int = e10.add_mod("const", "dude")
+	var a10: int = e10.add_mod("adsr", "dude")
+	e10.patch(c10, 3, a10, 4)     # V 4 (5 V) -> GATE
+	for i in 400:
+		e10._block()
+	print("RELOAD gated ADSR: ENV = %.3f V (should sit at sustain)" % [
+		e10.jack_volts(a10, false, 0)])
+	print("RELOAD done")
+
+
+## CTD_TEST=45 -- builds the ambient patch, proves it makes sound, and
+## writes it out as JSON so it can be dropped into a save.
+func _ambient_test() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var e := SynthEngine.new()
+	e.rows = 4
+	e.row_hp = 168
+	var id_of := {}
+	var put := func(id: String, brand: String, row: int, hp: int, key: String) -> void:
+		var i: int = e.add_mod(id, brand, row, hp)
+		if i < 0:
+			print("AMBIENT could not place ", id)
+		id_of[key] = i
+	var knob := func(key: String, kname: String, val: float) -> void:
+		var mi: int = int(id_of[key])
+		var kn: Array = SynthMods.def(e.mods[mi].id)["knobs"]
+		for k in kn.size():
+			if str(kn[k]["n"]) == kname:
+				e.set_knob(mi, k, SynthMods.knob_norm(kn[k], val))
+				return
+		print("AMBIENT no knob ", kname, " on ", e.mods[mi].id)
+	var swi := func(key: String, val: int) -> void:
+		e.set_sw(int(id_of[key]), 0, val)
+	var wire := func(a: String, oname: String, b: String, iname: String) -> void:
+		var am: int = int(id_of[a])
+		var bm: int = int(id_of[b])
+		var oi: int = (SynthMods.def(e.mods[am].id)["outs"] as Array).find(oname)
+		var ii: int = (SynthMods.def(e.mods[bm].id)["ins"] as Array).find(iname)
+		if oi < 0 or ii < 0:
+			print("AMBIENT bad wire ", a, ".", oname, " -> ", b, ".", iname)
+			return
+		if not e.patch(am, oi, bm, ii):
+			print("AMBIENT patch refused ", a, " -> ", b)
+
+	# ---- the bed: a just-intonation drone and a sub
+	put.call("drone", "mono", 0, 0, "drone")
+	put.call("vco", "dude", 0, 16, "sub")
+	# ---- the pad: twenty partials, filtered, swelling
+	put.call("harmonic", "icos", 0, 32, "pad")
+	put.call("vcf", "dude", 0, 62, "padf")
+	put.call("adsr", "dude", 0, 78, "env")
+	put.call("vca", "dude", 0, 94, "padvca")
+	# ---- the top voice: the watcher through the formant filter
+	put.call("watcher", "mono", 1, 0, "top")
+	put.call("eyefilter", "mono", 1, 19, "eye")
+	# ---- motion
+	put.call("clock", "dude", 1, 36, "clk")
+	put.call("euclid", "icos", 1, 47, "euc")
+	put.call("turing", "icos", 1, 58, "tur")
+	put.call("quant", "dude", 1, 71, "qnt")
+	put.call("lfo", "dude", 1, 82, "lfo1")
+	put.call("lfo", "dude", 1, 95, "lfo2")
+	put.call("chaos", "icos", 1, 108, "chaos")
+	# ---- the space
+	put.call("tape", "dude", 2, 0, "tape")
+	put.call("slab", "mono", 2, 13, "slab")
+	put.call("cosmic", "icos", 2, 28, "verb")
+	put.call("dudemix", "dude", 2, 45, "desk")
+	put.call("out", "dude", 2, 76, "out")
+
+	# ---- wiring
+	wire.call("clk", "/8", "euc", "CLK")
+	wire.call("clk", "/4", "tur", "CLK")
+	wire.call("euc", "TRIG", "env", "GATE")
+	wire.call("tur", "CV", "qnt", "IN")
+	wire.call("qnt", "CV", "pad", "V/OCT")
+	wire.call("qnt", "CV", "top", "V/OCT")
+	wire.call("lfo1", "SINE", "padf", "CUTOFF")
+	wire.call("lfo2", "TRI", "drone", "SPREAD CV")
+	wire.call("chaos", "X", "eye", "SWEEP")
+	wire.call("chaos", "Y", "top", "CHISEL CV")
+	wire.call("pad", "OUT", "padf", "IN")
+	wire.call("padf", "LP", "padvca", "IN")
+	wire.call("env", "ENV", "padvca", "CV")
+	wire.call("top", "CARVED", "eye", "IN")
+	wire.call("drone", "OUT", "desk", "IN 1")
+	wire.call("sub", "SINE", "desk", "IN 2")
+	wire.call("padvca", "OUT", "desk", "IN 3")
+	wire.call("eye", "OUT", "tape", "IN")
+	wire.call("tape", "OUT", "desk", "IN 4")
+	wire.call("padvca", "OUT", "slab", "IN")
+	wire.call("slab", "OUT", "desk", "IN 5")
+	wire.call("desk", "MONO", "verb", "IN")
+	wire.call("verb", "L", "out", "L / MONO")
+	wire.call("verb", "R", "out", "R")
+
+	# ---- the settings that make it ambient rather than a test tone
+	knob.call("clk", "BPM", 40.0)
+	knob.call("clk", "WIDTH", 0.6)
+	knob.call("euc", "STEPS", 16.0)
+	knob.call("euc", "FILL", 2.0)
+	knob.call("tur", "LOOP", 0.88)
+	knob.call("tur", "LENGTH", 8.0)
+	knob.call("tur", "RANGE", 1.4)
+	swi.call("qnt", 3)                       # pentatonic
+	knob.call("env", "ATTACK", 3.6)
+	knob.call("env", "DECAY", 3.0)
+	knob.call("env", "SUSTAIN", 0.22)
+	knob.call("env", "RELEASE", 9.0)
+	knob.call("padf", "CUTOFF", 700.0)
+	knob.call("padf", "RES", 0.22)
+	e.set_sw(int(id_of["padf"]), 0, 1)       # 24 dB
+	knob.call("pad", "OCT", -1.0)
+	knob.call("pad", "TILT", 0.5)
+	knob.call("pad", "LEVEL", 0.38)
+	knob.call("drone", "TUNE", -2.0)
+	knob.call("drone", "SPREAD", 0.3)
+	knob.call("drone", "LEVEL", 0.2)
+	e.set_sw(int(id_of["drone"]), 0, 1)      # 1:3:5:7
+	knob.call("sub", "OCT", -2.0)
+	knob.call("top", "TUNE", 1.0)
+	knob.call("top", "CHISEL", 0.45)
+	knob.call("top", "GRAIN", 0.12)
+	knob.call("eye", "SWEEP", 520.0)
+	knob.call("eye", "RES", 0.85)
+	knob.call("eye", "MIX", 0.8)
+	knob.call("lfo1", "RATE", 0.045)
+	knob.call("lfo1", "AMP", 1.6)
+	knob.call("lfo2", "RATE", 0.03)
+	knob.call("lfo2", "AMP", 2.0)
+	knob.call("chaos", "RATE", 0.6)
+	knob.call("chaos", "SPREAD", 1.6)
+	knob.call("tape", "TIME", 0.62)
+	knob.call("tape", "REPEATS", 0.45)
+	knob.call("tape", "MIX", 0.4)
+	knob.call("tape", "WOW", 0.3)
+	knob.call("slab", "TIME", 0.9)
+	knob.call("slab", "REPEATS", 0.45)
+	knob.call("slab", "MIX", 0.5)
+	knob.call("verb", "SIZE", 0.6)
+	knob.call("verb", "SHIMMER", 0.35)
+	knob.call("verb", "MIX", 0.45)
+	knob.call("verb", "DAMP", 0.45)
+	knob.call("verb", "DRIFT", 0.45)
+	knob.call("verb", "WIDTH", 1.0)
+	e.set_sw(int(id_of["verb"]), 0, 2)       # EVENT HORIZON
+	knob.call("out", "VOLUME", 0.62)
+	# the pad's twenty partials: a soft, odd-weighted spectrum
+	var pm = e.mods[int(id_of["pad"])]
+	for i in 20:
+		var amp := 1.0 / pow(float(i + 1), 1.35)
+		if i % 2 == 1:
+			amp *= 0.45
+		pm.st[i] = clampf(amp, 0.0, 1.0)
+	# the desk: bring the voices up, spread them wide
+	for spec in [["LVL 1", 0.22], ["LVL 2", 0.12], ["LVL 3", 0.3], ["LVL 4", 0.2],
+			["LVL 5", 0.16], ["LVL 6", 0.0], ["PAN 1", -0.35], ["PAN 2", 0.0],
+			["PAN 3", 0.3], ["PAN 4", -0.7], ["PAN 5", 0.7], ["MASTER", 0.5]]:
+		knob.call("desk", str(spec[0]), float(spec[1]))
+
+	# ---- does it actually breathe?
+	var peak := 0.0
+	var rms := 0.0
+	var n := 0
+	var quiet := 0
+	for i in int(SynthEngine.SR / float(SynthEngine.BLK)) * 30:
+		e._block()
+		var blockpeak := 0.0
+		for v in e._mix:
+			peak = maxf(peak, absf(v.x))
+			rms += v.x * v.x
+			n += 1
+			blockpeak = maxf(blockpeak, absf(v.x))
+		if blockpeak < 0.001:
+			quiet += 1
+	print("AMBIENT modules=%d cables=%d  peak=%.3f rms=%.4f  silent blocks=%d/%d" % [
+		e.mods.size(), e.cables.size(), peak, sqrt(rms / float(n)), quiet,
+		int(SynthEngine.SR / float(SynthEngine.BLK)) * 30])
+	# --- the long run: track EVERY module minute by minute, so whatever
+	# is quietly accumulating has nowhere to hide
+	var bps := int(SynthEngine.SR / float(SynthEngine.BLK))
+	for minute in 4:
+		var mpeak := 0.0
+		var mods_peak := {}
+		for k in id_of.keys():
+			mods_peak[k] = 0.0
+		for i in bps * 60:
+			e._block()
+			for v in e._mix:
+				mpeak = maxf(mpeak, absf(v.x))
+			if i % 8 == 0:
+				for k in id_of.keys():
+					var mi2: int = int(id_of[k])
+					var base := (1 + mi2 * SynthEngine.MAXOUT) * SynthEngine.BLK
+					var mv: float = float(mods_peak[k])
+					for j in range(0, SynthEngine.MAXOUT * SynthEngine.BLK, 7):
+						mv = maxf(mv, absf(e._bus[base + j]))
+					mods_peak[k] = mv
+		var hot: Array = []
+		for k in mods_peak.keys():
+			if float(mods_peak[k]) > 6.0:
+				hot.append("%s %.1fV" % [str(k), float(mods_peak[k])])
+		hot.sort()
+		print("AMBIENT minute %d: out peak %.3f   over 6V: %s" % [
+			minute + 1, mpeak, ", ".join(hot) if hot.size() > 0 else "none"])
+	var f := FileAccess.open("user://ambient_patch.json", FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(e.to_dict()))
+		f.close()
+		print("AMBIENT written to user://ambient_patch.json")
+	print("AMBIENT done")
+
+
+## CTD_TEST=46 -- every icon in the game, asked for at once. Godot allows
+## 64 viewports per scenario; the pool must stay under that no matter how
+## many materials and machines get added.
+func _icons_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var ids: Array = []
+	for k in Inventory.items.keys():
+		ids.append(str(k))
+	for k in Inventory.weapons.keys():
+		if not ids.has(str(k)):
+			ids.append(str(k))
+	print("ICONS distinct item ids in the game: ", ids.size())
+	var made := 0
+	var refused := 0
+	for id in ids:
+		var t = IconLib.tex(str(id), get_tree())
+		if t == null:
+			refused += 1
+		else:
+			made += 1
+		if made % 12 == 0:
+			await get_tree().process_frame
+	print("ICONS pool size after asking for all of them: ", IconLib._pool.size(),
+		" (cap ", IconLib.MAX_ICONS, ")   served=", made, " deferred=", refused)
+	print("ICONS %s" % ("pool stayed under the limit" if IconLib._pool.size() <= IconLib.MAX_ICONS
+		else "POOL OVER THE CAP"))
+	await get_tree().create_timer(5.0).timeout
+	# after a few seconds the old ones are recyclable again
+	var t2 = IconLib.tex("timmy", get_tree())
+	print("ICONS after the keep-window, a fresh icon: ",
+		"served" if t2 != null else "still deferred",
+		"   pool=", IconLib._pool.size())
+	print("ICONS done")
+
+
+## CTD_TEST=47 -- a rack built to SHOW what GRAVITY WELL does: a voltage
+## dropped into a well, orbiting, escaping, and being kicked back in.
+## Written to user://gravity_patch.json, not into anybody's save.
+func _gravity_demo() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var e := SynthEngine.new()
+	e.rows = 4
+	e.row_hp = 168
+	var idx := {}
+	var put := func(id: String, brand: String, row: int, hp: int, key: String) -> void:
+		var i: int = e.add_mod(id, brand, row, hp)
+		idx[key] = i
+		if i < 0:
+			print("GRAV could not place ", id)
+	var knob := func(key: String, kname: String, val: float) -> void:
+		var mi: int = int(idx[key])
+		var kn: Array = SynthMods.def(e.mods[mi].id)["knobs"]
+		for k in kn.size():
+			if str(kn[k]["n"]) == kname:
+				e.set_knob(mi, k, SynthMods.knob_norm(kn[k], val))
+				return
+	var wire := func(a2: String, oname: String, b2: String, iname: String) -> void:
+		var am: int = int(idx[a2])
+		var bm: int = int(idx[b2])
+		var oi: int = (SynthMods.def(e.mods[am].id)["outs"] as Array).find(oname)
+		var ii: int = (SynthMods.def(e.mods[bm].id)["ins"] as Array).find(iname)
+		if oi < 0 or ii < 0 or not e.patch(am, oi, bm, ii):
+			print("GRAV bad wire ", a2, ".", oname, " -> ", b2, ".", iname)
+
+	# the well itself, and the clock that keeps kicking it
+	put.call("gravity", "mono", 0, 0, "well")
+	put.call("clock", "dude", 0, 14, "clk")
+	put.call("euclid", "icos", 0, 26, "euc")
+	put.call("const", "dude", 0, 38, "cen")
+	# ORBIT drives pitch, VELOCITY opens the filter, ESCAPE fires a drum
+	put.call("quant", "dude", 0, 48, "qnt")
+	put.call("vco", "dude", 0, 60, "vco")
+	put.call("vcf", "dude", 0, 76, "vcf")
+	put.call("adsr", "dude", 1, 0, "env")
+	put.call("vca", "dude", 1, 16, "vca")
+	put.call("drum", "icos", 1, 25, "drum")
+	put.call("watcher", "mono", 1, 41, "sub")
+	# and the panels that SHOW it happening
+	put.call("scope", "dude", 2, 0, "scope")
+	put.call("vector", "icos", 2, 15, "vec")
+	put.call("spectrum", "dude", 2, 30, "spec")
+	put.call("vu", "dude", 2, 51, "vu")
+	put.call("waterfall", "icos", 2, 62, "fall")
+	put.call("dudemix", "dude", 3, 0, "desk")
+	put.call("reverb", "icos", 3, 31, "verb")
+	put.call("out", "dude", 3, 47, "out")
+
+	wire.call("clk", "/4", "euc", "CLK")
+	wire.call("euc", "TRIG", "well", "KICK")        # every hit shoves the mass
+	wire.call("cen", "V 2", "well", "TARGET")       # where the well pulls toward
+	wire.call("well", "ORBIT", "qnt", "IN")         # the orbit IS the melody
+	wire.call("qnt", "CV", "vco", "V/OCT")
+	wire.call("well", "VELOCITY", "vcf", "CUTOFF")  # speed opens the filter
+	wire.call("euc", "TRIG", "env", "GATE")
+	wire.call("vco", "SAW", "vcf", "IN")
+	wire.call("vcf", "LP", "vca", "IN")
+	wire.call("env", "ENV", "vca", "CV")
+	wire.call("well", "ESCAPE", "drum", "TRIG")     # it only drums when it escapes
+	wire.call("well", "ORBIT", "sub", "V/OCT")
+	wire.call("vca", "OUT", "desk", "IN 1")
+	wire.call("drum", "OUT", "desk", "IN 2")
+	wire.call("sub", "CARVED", "desk", "IN 3")
+	wire.call("desk", "MONO", "verb", "IN")
+	wire.call("verb", "L", "out", "L / MONO")
+	wire.call("verb", "R", "out", "R")
+	# every visualiser watching a different part of it
+	wire.call("well", "ORBIT", "scope", "IN A")
+	wire.call("well", "VELOCITY", "scope", "IN B")
+	wire.call("well", "ORBIT", "vec", "X")
+	wire.call("well", "VELOCITY", "vec", "Y")
+	wire.call("desk", "MONO", "spec", "IN")
+	wire.call("desk", "MONO", "fall", "IN")
+	wire.call("vca", "OUT", "vu", "IN 1")
+	wire.call("drum", "OUT", "vu", "IN 2")
+
+	knob.call("clk", "BPM", 96.0)
+	knob.call("euc", "STEPS", 16.0)
+	knob.call("euc", "FILL", 4.0)
+	knob.call("cen", "V 2", 0.0)
+	knob.call("well", "CENTRE", 0.0)
+	knob.call("well", "MASS", 0.9)
+	knob.call("well", "DRAG", 0.16)      # barely damped: it really orbits
+	knob.call("well", "PUSH", 1.5)       # and the kicks are big enough to escape
+	knob.call("vcf", "CUTOFF", 400.0)
+	knob.call("vcf", "RES", 0.35)
+	knob.call("env", "ATTACK", 0.01)
+	knob.call("env", "DECAY", 0.35)
+	knob.call("env", "SUSTAIN", 0.2)
+	knob.call("env", "RELEASE", 0.8)
+	knob.call("vca", "GAIN", 0.0)
+	knob.call("sub", "TUNE", -2.0)
+	knob.call("sub", "CHISEL", 0.4)
+	knob.call("verb", "MIX", 0.3)
+	knob.call("out", "VOLUME", 0.7)
+	for spec in [["LVL 1", 0.62], ["LVL 2", 0.5], ["LVL 3", 0.34], ["MASTER", 0.75]]:
+		knob.call("desk", str(spec[0]), float(spec[1]))
+
+	# --- does the well actually orbit, and does it ever escape?
+	var lo := 99.0
+	var hi := -99.0
+	var escapes := 0
+	var peak := 0.0
+	var wi: int = int(idx["well"])
+	for i in int(SynthEngine.SR / float(SynthEngine.BLK)) * 40:
+		e._block()
+		var orb := e.jack_volts(wi, false, 0)
+		lo = minf(lo, orb)
+		hi = maxf(hi, orb)
+		if e.jack_volts(wi, false, 2) > 1.0:
+			escapes += 1
+		for v in e._mix:
+			peak = maxf(peak, absf(v.x))
+	print("GRAV %d modules, %d cables" % [e.mods.size(), e.cables.size()])
+	print("GRAV orbit swung %.2f V to %.2f V, escaped %d times in 40s, out peak %.3f" % [
+		lo, hi, escapes, peak])
+	var f := FileAccess.open("user://gravity_patch.json", FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(e.to_dict()))
+		f.close()
+		print("GRAV written to user://gravity_patch.json (NOT into any save)")
+	print("GRAV done")
+
+
+## CTD_TEST=48 -- the ADVANCED TUTORIAL and the handbook it teaches from.
+## Walks every step's text, checks every id it names actually exists
+## (kit items, shop allowlist, circled recipes, goal resources), then
+## opens the handbook with a spotlight and counts the circles drawn.
+func _advtut_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var t := AdvancedTutorial.new()
+	add_child(t)
+	await get_tree().process_frame
+	var bad: Array = []
+	for id in AdvancedTutorial.STEPS:
+		if str(t._obj_text(str(id))).strip_edges() == "":
+			bad.append("obj:" + str(id))
+		if str(t._why_text(str(id))).strip_edges() == "":
+			bad.append("why:" + str(id))
+	print("ADVTUT steps: ", AdvancedTutorial.STEPS.size(), "  missing text: ", bad)
+	# every recipe the book is told to circle must be a real material
+	var badcirc: Array = []
+	for k in AdvancedTutorial.CIRCLES.keys():
+		if not AdvancedTutorial.STEPS.has(str(k)):
+			badcirc.append("step?" + str(k))
+		for mid in AdvancedTutorial.CIRCLES[k]:
+			if not Mats.has(str(mid)):
+				badcirc.append(str(k) + "->" + str(mid))
+	print("ADVTUT bad circle ids: ", badcirc)
+	# every shop id the lesson unlocks must be a real catalog entry
+	var shop_ids := {}
+	for e in Inventory.catalog:
+		shop_ids[str(e["id"])] = true
+	var badshop: Array = []
+	for id in AdvancedTutorial.STEPS:
+		for sid in t._allow_for(str(id)):
+			if str(sid) != "*" and not shop_ids.has(str(sid)):
+				badshop.append(str(id) + "->" + str(sid))
+	print("ADVTUT bad shop ids: ", badshop)
+	# the starter kit and every goal resource must be real items
+	var goals := ["dust_copper", "bronze", "water", "sulfuric", "silica",
+		"carbon", "steel", "ingot", "irid", "coal", "raw_copper", "raw_tin",
+		"raw_ice", "raw_sand", "sulfur", "plantfiber", "uranium", "ultima"]
+	var baditem: Array = []
+	for g in goals:
+		if not Inventory.items.has(g):
+			baditem.append(g)
+	print("ADVTUT bad item ids: ", baditem)
+	print("ADVTUT kit given: coins ", Inventory.coins,
+		"  ingot ", Inventory.res_count("ingot"),
+		"  raw_copper ", Inventory.res_count("raw_copper"))
+	# the handbook: centred, gridded, and circling what it was told to.
+	# the lesson is freed FIRST -- a live tutorial re-points the book at
+	# its own current step every frame and would wipe the test's ring
+	t.queue_free()
+	await get_tree().process_frame
+	ManualUI.point_at(["bronze", "sulfuric"])
+	var man := ManualUI.new()
+	add_child(man)
+	await get_tree().create_timer(0.6).timeout
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	var centred: bool = absf(man._root.offset_left + man._root.offset_right) < 1.0 \
+		and absf(man._root.offset_top + man._root.offset_bottom) < 1.0
+	var circles := 0
+	for c in man._grid.get_children():
+		for ch in c.get_children():
+			if ch is ManualUI._Ring:
+				circles += 1
+	print("ADVTUT handbook: rows ", man._grid.get_child_count(),
+		"  columns ", man._grid.columns, "  centred ", centred,
+		"  circles ", circles, "  (viewport ", vp, ")")
+	# headless runs at 64x64, so also check the column formula at the
+	# resolutions a player actually sees
+	for w in [1280.0, 1600.0, 1920.0, 2560.0]:
+		var bw: float = minf(4.0 * ManualUI.CARD_W + 5.0 * ManualUI.GAP + 48.0, w - 80.0)
+		var cols: int = clampi(int((bw - 48.0 + ManualUI.GAP)
+			/ (ManualUI.CARD_W + ManualUI.GAP)), 1, 4)
+		print("ADVTUT columns at ", int(w), "px wide: ", cols)
+	# visual proof when there is a real window: the book as the player
+	# sees it, circles and all
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		var img := get_viewport().get_texture().get_image()
+		img.save_png("res://docs/shots/handbook.png")
+		print("ADVTUT shot: docs/shots/handbook.png")
+	man.queue_free()
+	print("ADVTUT done")

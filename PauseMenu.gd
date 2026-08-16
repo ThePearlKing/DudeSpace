@@ -176,7 +176,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		# placement hologram up? Esc cancels the construction, not the game
 		var pl = get_tree().get_first_node_in_group("player")
 		if pl != null and "_ghost" in pl and pl._ghost != null:
-			pl._cancel_ghost()
+			pl.hush_ghost()   # cancel AND keep it down, so the next Esc opens this menu
 			Sfx.play("click", -18.0)
 			get_viewport().set_input_as_handled()
 			return

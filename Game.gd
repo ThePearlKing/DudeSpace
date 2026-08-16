@@ -119,7 +119,7 @@ var spawn_up: Vector3 = Vector3.UP
 var has_saved_spawn: bool = false   # a save carried its own spawn point
 var tutorial_done: bool = false     # interactive tutorial finished/skipped
 var tutorial_session: bool = false  # throwaway tutorial world (set by Title, never saved)
-var tutorial_mode: String = "basic" # which lesson: "basic" | "reactor"
+var tutorial_mode: String = "basic" # which lesson: "basic" | "advanced" | "reactor"
 var god_standby_until: float = -1.0 # after a death the god broods instead of acting
 var god_cycles: int = 0             # every brood it wakes STRONGER and pettier
 var world_seed: int = 0             # fixes terrain layout across reloads
@@ -140,6 +140,7 @@ var trials_done: bool = false       # temple guardians dead -> maze door open
 
 # --- locator gadget: a temporary green ping the HUD points at ---
 var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow temple · 3 ufo · 4 rifts · 5 mine · 6 connect 4
+var chem_manual: bool = false   # the Chemistry Handbook has been bought
 var locator_targets: Array = []     # Vector3 list -- multi-ping modes fill many
 var locator_label: String = ""
 var locator_until: float = -1.0
@@ -425,6 +426,7 @@ func register_break(size: Vector3, coins: int) -> void:
 	changed.emit()
 
 func reset() -> void:
+	chem_manual = false
 	mode = Mode.ON_FOOT
 	score = 0
 	tutorial_done = false

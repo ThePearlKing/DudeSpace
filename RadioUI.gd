@@ -221,6 +221,26 @@ func _draw_map() -> void:
 		_map.draw_arc(np, 12.5, 0, TAU, 28, Color("#c89020"), 2.5)
 		_map.draw_string(ThemeDB.fallback_font, np + Vector2(-38, 66), "noodle god",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffcf40"))
+	# LIVE transmitters: other people's racks, on the air
+	for st in radio.stations:
+		if str(st.get("type", "")) != "live":
+			continue
+		var src = st.get("node", null)
+		if not is_instance_valid(src):
+			continue
+		var sp := _to_px(src.global_position)
+		sp = sp.clamp(Vector2(18, 18), _map.size - Vector2(18, 18))
+		var puls := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+		_map.draw_arc(sp, 9.0 + puls * 5.0, 0, TAU, 20,
+			Color(0.23, 1.0, 0.42, 0.5 + 0.4 * puls), 1.5)
+		_map.draw_circle(sp, 4.0, Color("#3aff6a"))
+		# a little mast, so it reads as a transmitter and not a planet
+		_map.draw_line(sp, sp + Vector2(0, -12.0), Color("#3aff6a"), 1.5)
+		_map.draw_line(sp + Vector2(-4, -8), sp + Vector2(4, -8),
+			Color("#3aff6a"), 1.0)
+		_map.draw_string(ThemeDB.fallback_font, sp + Vector2(8, -10),
+			"%s  %.1f" % [str(st.get("name", "LIVE")), float(st["freq"])],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#3aff6a"))
 	# the radio + the dish's pointing line
 	var rp := _to_px(radio.global_position)
 	_map.draw_circle(rp, 4.0, Color("#7bffb0"))
@@ -321,6 +341,8 @@ func _draw_spec() -> void:
 		var x := (float(st["freq"]) - 88.0) / 20.0 * sz.x
 		var h := a * (sz.y - 8.0)
 		var col: Color = NEON if radio.signal_for(st) > 0.3 else Color("#ffd166")
+		if str(st.get("type", "")) == "live":
+			col = Color("#3aff6a")      # somebody is broadcasting, right now
 		_spec.draw_rect(Rect2(Vector2(x - 2, sz.y - h), Vector2(4, h)), col)
 		# name the source ON the bar: know which planet is which song
 		_spec.draw_string(ThemeDB.fallback_font,

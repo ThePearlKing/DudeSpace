@@ -111,6 +111,19 @@ func _process(delta: float) -> void:
 		_hit_reset_t -= delta
 		if _hit_reset_t <= 0.0:
 			_hits = 0
+	# a link whose far end died is DEAD DATA: drop it from the graph the
+	# moment we notice, whether or not it had a cable visual. Stale
+	# entries here are what used to poison the world save.
+	for wi in range(wires_out.size() - 1, -1, -1):
+		if not is_instance_valid(wires_out[wi]):
+			wires_out.remove_at(wi)
+			if wi < wire_ports.size():
+				wire_ports.remove_at(wi)
+	for fi in range(funnels_out.size() - 1, -1, -1):
+		if not is_instance_valid(funnels_out[fi]):
+			funnels_out.remove_at(fi)
+			if fi < funnel_ports.size():
+				funnel_ports.remove_at(fi)
 	# prune connections whose far end died -> their cables vanish too
 	for entry in _conn_vis.duplicate():
 		if not is_instance_valid(entry["t"]):
@@ -371,7 +384,10 @@ class CableBody extends StaticBody3D:
 	var dst_m: Node3D
 	var kind_s: String
 
-func _drop_conn(dst: Node3D, kind: String) -> void:
+## `dst` is deliberately UNTYPED: this gets called during cleanup with
+## references that have already been freed, and a typed parameter throws
+## on those -- which used to abort the machine's whole _process frame.
+func _drop_conn(dst, kind: String) -> void:
 	if kind == "power":
 		var i := wires_out.find(dst)
 		if i >= 0:

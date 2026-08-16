@@ -10,6 +10,18 @@ const STACKABLE := ["raw_ingot", "raw_irid", "ingot", "irid", "ultima", "prism",
 	"plantfiber", "shroom", "banana", "salad", "meat", "cooked_meat", "coal", "wire", "sucfruit", "noodle", "grenade", "cheese"]
 const STACK_MAX := 999
 
+## Every mined metal, dust and alloy stacks too -- the material registry
+## owns that list, so adding a metal in Mats.gd is all it takes.
+func is_stackable(id: String) -> bool:
+	return STACKABLE.has(id) or Mats.has(id)
+
+func stackables() -> Array:
+	var out: Array = STACKABLE.duplicate()
+	for k in Mats.all().keys():
+		if not out.has(k):
+			out.append(str(k))
+	return out
+
 var coins: int = 0            # carried coins (lose 50% on death)
 var bank_coins: int = 0       # deposited at an ATM -> safe from death
 var zeptobux: int = 0         # alien-trader currency (traders: planned)
@@ -152,6 +164,28 @@ var items: Dictionary = {
 	"furnace":    {"name": "Furnace",          "color": Color("#ff7a1a")},
 	"coinifier":  {"name": "Sell Station",     "color": Color("#ffe066")},
 	"autominer":  {"name": "Auto-Miner",       "color": Color("#8fe8ff")},
+	"autominer2": {"name": "Auto-Miner Mk2",   "color": Color("#2f6a5a")},
+	"autominer3": {"name": "Deep-Core Miner Mk3", "color": Color("#5a2f6a")},
+	"crusher":    {"name": "Crusher",          "color": Color("#5a5f6a")},
+	"benchlab":   {"name": "Glassware Bench",  "color": Color("#3f5a4a")},
+	"chemmanual": {"name": "Chemistry Handbook", "color": Color("#c8a227")},
+	"chemlab":    {"name": "Chem Lab I",       "color": Color("#2f6a4a")},
+	"chemlab2":   {"name": "Chem Lab II",      "color": Color("#2f6a4a")},
+	"chemlab3":   {"name": "Chem Lab III",     "color": Color("#2f6a4a")},
+	"electrolyser":  {"name": "Electrolyser",  "color": Color("#2a4a72")},
+	"electrolyser2": {"name": "Electrolyser II", "color": Color("#2a4a72")},
+	"separator":  {"name": "Air Separator",    "color": Color("#4a4a6a")},
+	"separator2": {"name": "Separator II",     "color": Color("#4a4a6a")},
+	"cryoplant":  {"name": "Cryo Plant",       "color": Color("#2f6a72")},
+	"cryoplant2": {"name": "Cryo Plant II",    "color": Color("#2f6a72")},
+	"coolcell":   {"name": "Coolant Cell",     "color": Color("#5ad0ff")},
+	"ultimabatt": {"name": "Ultima Battery",   "color": Color("#7df9ff")},
+	"biprop":     {"name": "Bipropellant Charge", "color": Color("#ffb347")},
+	"blastcharge":{"name": "Mining Charge",    "color": Color("#3a3a3a")},
+	"plasmatorch":{"name": "Plasma Torch",     "color": Color("#c86bff")},
+	"alloyfurn":  {"name": "Alloy Furnace I",  "color": Color("#6a4030")},
+	"alloyfurn2": {"name": "Induction Furnace II", "color": Color("#2f5a72")},
+	"alloyfurn3": {"name": "Plasma Furnace III", "color": Color("#5a2f72")},
 	"backpack":   {"name": "Backpack",         "color": Color("#7d9c4a")},
 	"spawnbeacon":{"name": "Spawn Beacon",     "color": Color("#2bff6a")},
 	"rocket":     {"name": "Rocket",           "color": Color("#ff5964")},
@@ -208,6 +242,8 @@ var items: Dictionary = {
 	"camtv":       {"name": "Security Camera", "color": Color("#7df9ff")},
 	"nterm":       {"name": "Neuralink Terminal", "color": Color("#4be38a")},
 	"radio":       {"name": "Intergalactic Radio", "color": Color("#7be8ff")},
+	"modsynth":    {"name": "Modular Synthesizer", "color": Color("#3f5f96")},
+	"modsynth2":   {"name": "Modular Synthesizer Mk2", "color": Color("#7be8ff")},
 	"catfood":    {"name": "Cat Food",         "color": Color("#e8956a")},
 	"boots":      {"name": "Grav Boots",       "color": Color("#888899")},
 	"magnet":     {"name": "Coin Magnet",      "color": Color("#ffcc22")},
@@ -232,8 +268,11 @@ var items: Dictionary = {
 	"ultima_boots":{"name": "Ultima Boots",    "color": Color("#7df9ff")},
 }
 var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier", "autominer",
+	"autominer2", "autominer3", "crusher", "alloyfurn", "alloyfurn2", "alloyfurn3",
+	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
+	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
 	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
-	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser"]
+	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser", "modsynth", "modsynth2"]
 
 var hotbar: Array = []
 var backpack_store: Array = []   # basic pack: 20
@@ -267,6 +306,12 @@ func _blank_containers() -> void:
 		universe_store.append(empty_slot())
 
 func _ready() -> void:
+	# every ore, dust, ingot and alloy becomes a real item: one row in
+	# Mats.gd gives it a name, a colour, a stack and an inventory slot
+	for mid in Mats.all().keys():
+		var md: Dictionary = Mats.all()[mid]
+		if not items.has(mid):
+			items[mid] = {"name": str(md["name"]), "color": md["color"]}
 	catalog = [
 		{"id": "blaster",   "tab": "Gear",     "name": "Blaster",        "cost": {"coins": 90},  "desc": "Basic energy weapon."},
 		{"id": "jetpack",   "tab": "Gear",     "name": "Jetpack",        "cost": {"coins": 130}, "desc": "Right-click to strap on. J to toggle, Space up, C down."},
@@ -330,6 +375,8 @@ func _ready() -> void:
 		{"id": "tvbig", "tab": "Electric", "name": "Big TV",         "cost": {"ingot": 8, "wire": 8, "irid": 2}, "desc": "The living-room slab. Same channels, twice the glass. Wall-mounts too."},
 		{"id": "camtv", "tab": "Electric", "name": "Security Camera", "cost": {"ingot": 2, "wire": 3}, "desc": "Place it, F to NAME it -- then any TV can watch through it."},
 		{"id": "radio", "tab": "Electric", "name": "Intergalactic Radio", "cost": {"ingot": 4, "wire": 5, "coal": 3}, "desc": "Wire it, aim the dish (F: sky map), sweep the dial. The universe talks."},
+		{"id": "modsynth2", "tab": "Electric", "name": "Modular Synthesizer Mk2", "cost": {"ingot": 60, "irid": 40, "wire": 40, "prism": 14, "ultima": 6}, "desc": "The big case: TWICE the width and a fourth row -- 168 HP per row instead of 84. Same modules, same cores, four times the rack. Wire it, seat an ultima core and a uranium cell, F opens it."},
+		{"id": "modsynth", "tab": "Electric", "name": "Modular Synthesizer", "cost": {"ingot": 28, "irid": 14, "wire": 16, "prism": 4}, "desc": "A full eurorack case: VCOs, filters, envelopes, sequencers, logic, reverb -- 30 module types from three houses, patched with real cables. Needs wired power PLUS an ultima core and a uranium cell seated in it. F opens the rack."},
 		{"id": "capacitor", "tab": "Electric", "name": "Capacitor",      "cost": {"ingot": 4, "irid": 1}, "desc": "Stores 600 EU. One in, one out."},
 		{"id": "lightbox", "tab": "Electric", "name": "Light Box",     "cost": {"coins": 60, "ingot": 4}, "desc": "Small indicator lamp. Glows while fed power -- wire a computer output to it. Lights the desk, not the planet."},
 		{"id": "elight",    "tab": "Electric", "name": "Electric Light", "cost": {"coins": 30, "ingot": 1}, "desc": "Sips 0.5 EU/s, floods the area with light."},
@@ -341,6 +388,28 @@ func _ready() -> void:
 		{"id": "teleporter", "tab": "Electric", "name": "Warp Pad",      "cost": {"ultima": 10, "prism": 15, "ingot": 40, "irid": 25}, "desc": "Fast-travel network. Full 1000 EU charge + 2000 coins per warp. F: pick a destination."},
 		{"id": "prisreactor", "tab": "Electric", "name": "Prism Reactor", "cost": {"prism": 35, "irid": 40, "ultima": 8}, "desc": "+8 EU/s forever. Prism shards only grow in the shader system."},
 		{"id": "nreactor",  "tab": "Electric", "name": "Nuclear Reactor", "cost": {"ingot": 30, "irid": 20, "ultima": 6, "uranium": 10}, "desc": "Fission: up to +16 EU/s. Feed uranium, raise the control rods, mind the core temperature. Cooling only carries ~60% power -- run hotter and it CLIMBS. At 1000°C it takes your base with it."},
+		{"id": "crusher",   "tab": "Machines", "name": "Crusher", "cost": {"ingot": 12, "irid": 4}, "desc": "One rock in, TWO dust out -- and dust smelts one for one. Every deposit you own is worth double once this is in the line."},
+		{"id": "alloyfurn", "tab": "Machines", "name": "Alloy Furnace I", "cost": {"ingot": 20, "coal": 8}, "desc": "Pours the first alloys: bronze, brass, steel, electrum. Feed it two metals at once, wire it for power, funnel the bars out."},
+		{"id": "alloyfurn2","tab": "Machines", "name": "Induction Furnace II", "cost": {"steel": 24, "brass": 12, "irid": 10}, "desc": "3x faster, and the only furnace that will pour aerinsteel, invar, nichrome, duralumin or stainless. Built OUT of the alloys it replaces."},
+		{"id": "alloyfurn3","tab": "Machines", "name": "Plasma Furnace III", "cost": {"nichrome": 20, "stainless": 16, "irid": 30, "ultima": 6}, "desc": "8x faster and hot enough for abyssitanium, neptunite, dudalloy and synthanium. Nothing else will melt abyssite."},
+		{"id": "autominer2","tab": "Machines", "name": "Auto-Miner Mk2", "cost": {"steel": 18, "brass": 10, "irid": 12}, "desc": "Bites gold, zinc, titanium and aerinite -- and works ~40% faster on everything the Mk1 could already dig."},
+		{"id": "autominer3","tab": "Machines", "name": "Deep-Core Miner Mk3", "cost": {"stainless": 20, "duralumin": 16, "invar": 12, "ultima": 4}, "desc": "The only rig that will touch abyssite, neptunium or dudium. Three times the speed of a Mk1."},
+		{"id": "benchlab",  "tab": "Machines", "name": "Glassware Bench", "cost": {"ingot": 6, "wire": 4, "plantfiber": 4}, "desc": "Three bottles, a burner and your hands. No power, no automation: drag materials in and work out the sequence yourself. Everything downstream starts here."},
+		{"id": "chemmanual","tab": "Gear"   , "name": "Chemistry Handbook", "cost": {"coins": 300}, "desc": "Somebody already did the work. Every alloy, every compound, what it is for -- and the exact sequence the glassware wants for anything you can make by hand. Right-click to read."},
+		{"id": "chemlab",   "tab": "Machines", "name": "Chem Lab I", "cost": {"ingot": 18, "brass": 6, "wire": 8, "sulfuric": 4, "silica": 2}, "desc": "Where chemistry starts: acids, ash, powders. Feed it water, rock and air and it hands back the compounds every later machine wants."},
+		{"id": "chemlab2",  "tab": "Machines", "name": "Chem Lab II", "cost": {"stainless": 14, "resin": 8, "invar": 6}, "desc": "Runs twice as fast and unlocks nitric acid, saltpetre, coolant, resin and thermite. Built out of its own products."},
+		{"id": "chemlab3",  "tab": "Machines", "name": "Chem Lab III", "cost": {"abyssitanium": 10, "plasmagel": 6, "neptunite": 6, "ultima": 4}, "desc": "The end of the periodic table: plasma gel, oxidium, astronium, ultranium, omegium -- and the toothpaste line."},
+		{"id": "electrolyser", "tab": "Machines", "name": "Electrolyser", "cost": {"ingot": 14, "copper": 12, "wire": 10}, "desc": "Splits water into hydrogen and oxygen with nothing but current. The first machine that makes gas."},
+		{"id": "electrolyser2","tab": "Machines", "name": "Electrolyser II", "cost": {"stainless": 12, "electrum": 8, "resin": 4}, "desc": "Bigger cell, faster split, and it will take brine for chlorine."},
+		{"id": "separator", "tab": "Machines", "name": "Air Separator", "cost": {"ingot": 16, "brass": 8, "wire": 6}, "desc": "Pulls nitrogen and argon straight out of the sky. Needs a planet with an atmosphere and nothing else."},
+		{"id": "separator2","tab": "Machines", "name": "Separator II", "cost": {"duralumin": 12, "invar": 8, "resin": 6}, "desc": "Cold enough to catch neon. Also melts ice into water on the side."},
+		{"id": "cryoplant", "tab": "Machines", "name": "Cryo Plant", "cost": {"stainless": 16, "coolant": 6, "invar": 10}, "desc": "Squeezes gas into liquid: liquid nitrogen, liquid oxygen. Everything cold and expensive starts here."},
+		{"id": "cryoplant2","tab": "Machines", "name": "Cryo Plant II", "cost": {"abyssitanium": 12, "plasmagel": 4, "coolant": 12}, "desc": "Colder still, and fast enough to keep a rocket pad supplied."},
+		{"id": "coolcell",  "tab": "Machines", "name": "Coolant Cell", "cost": {"coolant": 4, "stainless": 3, "invar": 2}, "desc": "Right-click a nuclear reactor or a plasma furnace: its heat headroom goes up for good. Machines that run hot need these."},
+		{"id": "ultimabatt","tab": "Electric", "name": "Ultima Battery", "cost": {"ultima": 3, "electrum": 6, "sulfuric": 4, "plasmagel": 1}, "desc": "12,000 EU in a crystal-cored box: four times an ultra capacitor, and it pushes power out three wires at once. Place it, wire it, forget it."},
+		{"id": "biprop",    "tab": "Rocket",   "name": "Bipropellant Charge", "cost": {"liqoxygen": 4, "glycerin": 3, "duralumin": 2}, "desc": "Right-click: +250 rocket fuel in one pour. Liquid oxygen does what coal never could."},
+		{"id": "blastcharge","tab": "Weapons", "name": "Mining Charge", "cost": {"gunpowder": 4, "steel": 2, "wire": 2}, "desc": "Right-click to place, then shoot it. Opens ore beds the pickaxe would take an hour on.", "count": 2},
+		{"id": "plasmatorch","tab": "Weapons", "name": "Plasma Torch", "cost": {"plasmagel": 3, "nichrome": 6, "argon": 4, "irid": 8}, "desc": "Cuts through anything that isn't a planet. Also the only tool that will open an abyssite vein."},
 		{"id": "efurnace",  "tab": "Electric", "name": "Electric Furnace","cost": {"ingot": 25, "irid": 12}, "desc": "INSTANT smelt, 4 EU per item. Wire power in, funnel ore in."},
 		{"id": "ecomputer", "tab": "Electric", "name": "Electric Computer","cost": {"ingot": 20, "irid": 10}, "desc": "Programmable power gate: inp1, out1..out8. Lua-ish."},
 		{"id": "netanalyser", "tab": "Electric", "name": "Network Analyser", "cost": {"ingot": 8, "irid": 3}, "desc": "Wire it in: full-grid report. EU/s gained, lost, census."},
@@ -425,7 +494,7 @@ func give_no_drop(id: String, n: int = 1) -> int:
 	for cont in [hotbar, backpack_store]:
 		if left <= 0:
 			break
-		if STACKABLE.has(id):
+		if is_stackable(id):
 			for s in cont:
 				if str(s["id"]) == id and int(s["n"]) < STACK_MAX:
 					var take: int = mini(left, STACK_MAX - int(s["n"]))
@@ -437,11 +506,11 @@ func give_no_drop(id: String, n: int = 1) -> int:
 			if left <= 0:
 				break
 			if str(s["id"]) == "":
-				var take2: int = mini(left, STACK_MAX if STACKABLE.has(id) else 1)
+				var take2: int = mini(left, STACK_MAX if is_stackable(id) else 1)
 				s["id"] = id
 				s["n"] = take2
 				left -= take2
-				if not STACKABLE.has(id):
+				if not is_stackable(id):
 					break
 	changed.emit()
 	return left
@@ -480,7 +549,7 @@ func remove_res(id: String, n: int) -> void:
 func clear_slot(i: int) -> void:
 	if i >= 0 and i < 5:
 		# consume ONE from a stack; drop the whole slot otherwise
-		if STACKABLE.has(str(hotbar[i]["id"])) and int(hotbar[i]["n"]) > 1:
+		if is_stackable(str(hotbar[i]["id"])) and int(hotbar[i]["n"]) > 1:
 			hotbar[i]["n"] = int(hotbar[i]["n"]) - 1
 		else:
 			hotbar[i] = empty_slot()
@@ -675,9 +744,9 @@ func cost_text(id: String) -> String:
 	var c := cost_of(id)
 	if c.has("coins"):
 		parts.append("%d coins" % int(c["coins"]))
-	for r in STACKABLE:
+	for r in stackables():
 		if c.has(r):
-			parts.append("%d %s" % [int(c[r]), r])
+			parts.append("%d %s" % [int(c[r]), hotbar_name(str(r))])
 	return " + ".join(parts)
 
 func needs_recipe(id: String) -> bool:
@@ -708,7 +777,7 @@ func can_afford(id: String) -> bool:
 	var c := cost_of(id)
 	if coins < int(c.get("coins", 0)):
 		return false
-	for r in STACKABLE:
+	for r in stackables():
 		if res_count(r) < int(c.get(r, 0)):
 			return false
 	return true
@@ -726,7 +795,7 @@ func buy(id: String) -> bool:
 	var c := cost_of(id)
 	if not Game.free_craft:
 		coins -= int(c.get("coins", 0))
-		for r in STACKABLE:
+		for r in stackables():
 			if c.has(r):
 				remove_res(r, int(c[r]))
 	var cnt := 1

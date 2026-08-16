@@ -6,10 +6,18 @@ extends RefCounted
 ## underneath as the background.
 
 static var _pool := {}   # id -> SubViewport
+static var _used := {}   # id -> when it was last asked for, in msec
+## Godot allows 64 viewports per 3D scenario and every spinning icon is
+## one of them. Once the shop grew past that the renderer started
+## refusing them outright, so the pool is capped and the least recently
+## looked-at icon gets recycled.
+const MAX_ICONS := 40
+const KEEP_MSEC := 4000
 
 ## Quit-time hygiene: free the icon viewports before the renderer dies.
 static func shutdown(tree: SceneTree) -> void:
 	_pool.clear()
+	_used.clear()
 	var h := tree.root.get_node_or_null("IconHost")
 	if h != null:
 		h.free()
@@ -60,8 +68,11 @@ static func build_model_world(id: String, tree: SceneTree) -> Node3D:
 	return holder
 
 static func tex(id: String, tree: SceneTree) -> Texture2D:
+	_used[id] = Time.get_ticks_msec()
 	if _pool.has(id) and is_instance_valid(_pool[id]):
 		return _pool[id].get_texture()
+	if not _make_room():
+		return null      # everything on screen is in use: the colour chip stands in
 	var vp := SubViewport.new()
 	vp.size = Vector2i(96, 96)
 	vp.transparent_bg = true
@@ -84,6 +95,27 @@ static func tex(id: String, tree: SceneTree) -> Texture2D:
 	tw.tween_property(holder, "rotation:y", TAU, 9.0).from(0.0)
 	_pool[id] = vp
 	return vp.get_texture()
+
+## Recycle the icon nobody has looked at for a while. Returns false if
+## every icon in the pool is still in active use, in which case the
+## caller does without rather than blowing the viewport limit.
+static func _make_room() -> bool:
+	while _pool.size() >= MAX_ICONS:
+		var oldest := ""
+		var oldest_t := 9223372036854775807
+		for k in _pool.keys():
+			var t := int(_used.get(k, 0))
+			if t < oldest_t:
+				oldest_t = t
+				oldest = str(k)
+		if oldest == "" or Time.get_ticks_msec() - oldest_t < KEEP_MSEC:
+			return false
+		var vp = _pool[oldest]
+		if is_instance_valid(vp):
+			vp.queue_free()
+		_pool.erase(oldest)
+		_used.erase(oldest)
+	return true
 
 ## The player's own hand model, if it amounts to anything.
 static func _hand_model(id: String, tree: SceneTree) -> Node3D:
@@ -157,6 +189,55 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			tr2.size = Vector3(0.16, 0.02, 0.03)
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "ore":
+			# a fist of rough rock with the metal showing through
+			for ofs in [Vector3(0, -0.02, 0), Vector3(0.11, 0.05, 0.04),
+					Vector3(-0.1, 0.03, -0.06), Vector3(0.02, 0.12, -0.05)]:
+				var rock := SphereMesh.new()
+				rock.radius = 0.15 if ofs.y > 0.0 else 0.2
+				rock.height = 0.26 if ofs.y > 0.0 else 0.34
+				rock.radial_segments = 5
+				rock.rings = 2
+				_p(r, rock, ofs, Color("#4a4038").lerp(c, 0.25), 0.1,
+					Vector3(ofs.x * 300.0, ofs.z * 400.0, ofs.y * 260.0))
+				var vein := BoxMesh.new()
+				vein.size = Vector3(0.09, 0.03, 0.03)
+				_p(r, vein, ofs + Vector3(0.02, 0.09, 0.05), c, 1.1,
+					Vector3(0, ofs.x * 300.0, 25.0))
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "dust":
+			# a little heap of crushed grain on a pan
+			var pan := CylinderMesh.new()
+			pan.top_radius = 0.3
+			pan.bottom_radius = 0.26
+			pan.height = 0.06
+			_p(r, pan, Vector3(0, -0.14, 0), Color("#2c2f36"), 0.05)
+			for k in 7:
+				var g := SphereMesh.new()
+				g.radius = 0.07 - float(k) * 0.006
+				g.height = 0.1 - float(k) * 0.008
+				g.radial_segments = 4
+				g.rings = 2
+				var a := TAU * float(k) / 7.0
+				_p(r, g, Vector3(cos(a) * 0.11, -0.06 + (0.05 if k % 2 == 0 else 0.0),
+					sin(a) * 0.11), c, 0.35)
+			var top := SphereMesh.new()
+			top.radius = 0.1
+			top.height = 0.13
+			top.radial_segments = 5
+			top.rings = 2
+			_p(r, top, Vector3(0, 0.02, 0), c, 0.4)
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "alloy":
+			# a poured bar with a bevelled top and a hot seam down it
+			_p(r, _bx(0.62, 0.16, 0.3), Vector3(0, -0.05, 0), c.darkened(0.25), 0.35)
+			_p(r, _bx(0.5, 0.1, 0.22), Vector3(0, 0.06, 0), c, 0.6)
+			_p(r, _bx(0.44, 0.02, 0.04), Vector3(0, 0.12, 0), c.lightened(0.5), 1.6)
+			_p(r, _bx(0.06, 0.14, 0.24), Vector3(-0.29, -0.03, 0), c.darkened(0.45), 0.2)
+			_p(r, _bx(0.06, 0.14, 0.24), Vector3(0.29, -0.03, 0), c.darkened(0.45), 0.2)
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "ingot":
+			# the plain trapezoid bar, stamped
+			_p(r, _bx(0.6, 0.15, 0.3), Vector3(0, -0.04, 0), c, 0.4)
+			_p(r, _bx(0.46, 0.09, 0.22), Vector3(0, 0.08, 0), c.lightened(0.2), 0.55)
+			_p(r, _bx(0.12, 0.02, 0.12), Vector3(0, 0.13, 0), c.darkened(0.4), 0.15)
 		"raw_ingot", "raw_irid", "coal", "uranium":
 			var lump := SphereMesh.new()
 			lump.radius = [0.32, 0.34, 0.24, 0.26][["raw_ingot", "raw_irid",

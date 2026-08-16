@@ -204,7 +204,9 @@ func _make_cell(item: Dictionary) -> Control:
 	# the color chip is the BACKGROUND; the item's real model spins
 	# in front of it like a tiny shopping channel
 	var spin := TextureRect.new()
-	spin.texture = IconLib.tex(str(item.id), get_tree())
+	var itex := IconLib.tex(str(item.id), get_tree())
+	if itex != null:
+		spin.texture = itex
 	spin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	icon.add_child(spin)
@@ -265,6 +267,19 @@ func _icon_color(id: String) -> Color:
 	if Inventory.items.has(id):
 		return Inventory.items[id]["color"]
 	return Color("#8890a0")
+
+## Only one card ever shows a count. Scrolling a second one clears the
+## first, and buying anything at all clears the lot -- otherwise the grid
+## fills up with stale multipliers nobody asked for.
+func claim_mult(cell) -> void:
+	for c in _cells:
+		var node = c.get("panel")
+		if node != null and node != cell and is_instance_valid(node) \
+				and node.has_method("_set_mult"):
+			node._set_mult(1)
+
+func clear_mults() -> void:
+	claim_mult(null)
 
 func try_buy(id: String) -> void:
 	if not Game.tut_can_buy(id):
@@ -660,21 +675,24 @@ class _ItemCell extends Panel:
 	func _gui_input(event: InputEvent) -> void:
 		if not (event is InputEventMouseButton and event.pressed):
 			return
-		# scroll on a stackable: pick HOW MANY to craft (resets on buy)
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP \
-				and Inventory.STACKABLE.has(id):
-			_set_mult(mult + 1)
-			return
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN \
-				and Inventory.STACKABLE.has(id):
-			_set_mult(mult - 1)
+		# CTRL + scroll on a stackable picks HOW MANY to craft. Plain
+		# scroll is left alone -- it belongs to the list -- and only ONE
+		# card carries a count at a time.
+		if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			if not (event.ctrl_pressed and Inventory.STACKABLE.has(id)):
+				return                      # not accepted: the list scrolls
+			var ui2 := _find_ui()
+			if ui2:
+				ui2.claim_mult(self)        # any other card drops its count
+			_set_mult(mult + (1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -1))
+			accept_event()                  # ...and the list stays put
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			var ui := _find_ui()
 			if ui:
 				_flash_click()
 				var n9 := mult
-				_set_mult(1)
+				ui.clear_mults()
 				for k9 in n9:
 					if not Game.creative and not Inventory.can_buy(id):
 						break

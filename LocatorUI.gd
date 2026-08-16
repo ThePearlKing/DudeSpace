@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Right-click with the Locator: pick a target from a proper menu.
 ## Green ping appears on the HUD for 45s.
 
-const TARGETS := ["SPACE INVADERS", "SHADOW TEMPLE", "UFO", "TIME RIFT", "MINE ENTRANCE", "CONNECT 4 ARENA", "NOODLE GOD"]
+const TARGETS := ["SPACE INVADERS", "SHADOW TEMPLE", "UFO", "TIME RIFT", "MINE ENTRANCE", "CONNECT 4 ARENA", "NOODLE GOD", "NEXUS STATION"]
 
 var _status: Label
 

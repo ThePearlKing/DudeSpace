@@ -680,6 +680,40 @@ class NetworkAnalyser extends Machine:
 			live, wires, gens, caps, stored, cap, _gain, _loss, _gain - _loss]
 
 ## ULTRA capacitor: 10x the storage, feeds wires faster. Late game.
+## The crystal battery: four ultra capacitors' worth of charge in one
+## box, and it feeds three wires at full rate instead of one.
+class UltimaBattery extends Machine:
+	func _init() -> void:
+		title = "ULTIMA BATTERY"
+		box_color = Color("#2a3f5a")
+		refund_id = "ultimabatt"
+		buf_cap = 12000.0
+
+	func _ready() -> void:
+		super._ready()
+		dress_industrial(Color("#141c28"))
+		for i in 4:
+			var cell := BoxMesh.new()
+			cell.size = Vector3(0.22, box_size.y * 0.7, 0.22)
+			part(cell, Vector3(-0.33 + float(i) * 0.22, box_size.y * 0.55, 0.0),
+				Color("#7df9ff"), 1.4)
+		var cap := BoxMesh.new()
+		cap.size = Vector3(box_size.x * 0.9, 0.12, box_size.z * 0.9)
+		part(cap, Vector3(0, box_size.y + 0.06, 0), Color("#0e1622"), 0.05)
+		var core := SphereMesh.new()
+		core.radius = 0.2
+		core.height = 0.4
+		core.radial_segments = 6
+		core.rings = 3
+		var cm := part(core, Vector3(0, box_size.y + 0.28, 0), Color("#7df9ff"), 2.4)
+		cm.material_override = Surfaces.portal(Color("#7df9ff"))
+
+	func port_count(kind: String) -> int:
+		return 3 if kind == "power" else 1
+
+	func info_text() -> String:
+		return "charge: %.0f / %.0f EU\nthree output wires, all at full rate" % [buf, buf_cap]
+
 class UltraCapacitor extends Machine:
 	var _fill: MeshInstance3D
 	var _rate := 0.0
@@ -719,6 +753,10 @@ class UltraCapacitor extends Machine:
 ## Electric furnace: instant smelt, 4 EU per item.
 class EFurnace extends Machine:
 	const RECIPES := {"raw_ingot": "ingot", "raw_irid": "irid", "meat": "cooked_meat"}
+	static func product_of(id: String) -> String:
+		if RECIPES.has(id):
+			return str(RECIPES[id])
+		return Mats.smelts_to(id)
 	const EU_PER := 4.0
 	var _t := 0.0
 	var _mouth: MeshInstance3D
@@ -771,9 +809,9 @@ class EFurnace extends Machine:
 			return
 		_t = 0.0
 		var id := str(in_slot["id"])
-		if not RECIPES.has(id) or int(in_slot["n"]) <= 0 or buf < EU_PER:
+		if product_of(id) == "" or int(in_slot["n"]) <= 0 or buf < EU_PER:
 			return
-		var product: String = RECIPES[id]
+		var product: String = product_of(id)
 		if str(out_slot["id"]) != "" and str(out_slot["id"]) != product:
 			return
 		buf -= EU_PER
@@ -788,7 +826,7 @@ class EFurnace extends Machine:
 		if _mouth and _mouth.material_override is StandardMaterial3D:
 			_mouth.material_override.emission_energy_multiplier = 8.0   # flare
 	func accepts(id: String) -> bool:
-		return RECIPES.has(id)
+		return product_of(id) != ""
 	func info_text() -> String:
 		# sustained rate = wire supply / cost, capped by the 10/s tick
 		var sustained := minf(10.0, _in_rate / EU_PER)
@@ -946,6 +984,10 @@ class NuclearReactor extends Machine:
 	const MAX_EU_S := 16.0        # full-reaction output: the best in the game
 	const HEAT_RATE := 14.0       # degrees/s at full reaction (of 100)
 	const COOL_RATE := 8.0        # passive cooling degrees/s
+	## Every coolant cell fitted buys real headroom -- this is what the
+	## chemistry line is FOR.
+	func cool_rate() -> float:
+		return COOL_RATE * (1.0 + 0.35 * float(cooled))
 	const FUEL_SECS := 60.0       # one uranium = a minute of full burn
 	var rods: float = 1.0         # actual rod insertion (servo-driven, slow)
 	var rods_target: float = 1.0  # where the operator ORDERED the rods
@@ -954,6 +996,7 @@ class NuclearReactor extends Machine:
 	var temp: float = 0.0         # 0..100 internal, shown as 0..1000 deg C
 	var press: float = 0.0        # primary loop pressure, 0..100 bar
 	var coolant: float = 100.0    # coolant inventory %
+	var cooled: int = 0           # coolant cells fitted: each one adds cooling
 	var flow: int = 2             # coolant flow: 0 off · 1 half · 2 full
 	var _scram: bool = false      # rods dropping under gravity, not servo
 	var mode: int = 0             # 0 SHUTDOWN · 1 STARTUP · 2 RUN (permissives)
@@ -1243,7 +1286,7 @@ class NuclearReactor extends Machine:
 			_lowfuel_warned = false
 		# --- thermal-hydraulics: pump + coolant carry heat to the turbine ---
 		var fl := float(flow) * 0.5   # 0 / 0.5 / 1.0
-		var cooling := COOL_RATE * fl * (coolant / 100.0) + 1.5
+		var cooling := cool_rate() * fl * (coolant / 100.0) + 1.5
 		temp = clampf(temp + (power * HEAT_RATE - cooling) * delta, 0.0, 100.0)
 		trip_t = maxf(0.0, trip_t - delta)
 		# electricity flows when the coolant does AND the breaker is

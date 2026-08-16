@@ -5,6 +5,12 @@ extends Machine
 ## fast one.
 
 const RECIPES := {"raw_ingot": "ingot", "raw_irid": "irid", "meat": "cooked_meat"}
+
+## Ore and dust both smelt to the metal the registry says they do.
+static func product_of(id: String) -> String:
+	if RECIPES.has(id):
+		return str(RECIPES[id])
+	return Mats.smelts_to(id)
 const SECS_PER_ITEM := 0.5
 
 var _t: float = 0.0
@@ -49,13 +55,13 @@ func _ready() -> void:
 
 func work(delta: float) -> void:
 	var id := str(in_slot["id"])
-	var lit := RECIPES.has(id) and int(in_slot["n"]) > 0
+	var lit := product_of(id) != "" and int(in_slot["n"]) > 0
 	if _fire and _fire.material_override is StandardMaterial3D:
 		_fire.material_override.emission_energy_multiplier = 4.0 if lit else 0.5
 	if not lit:
 		_t = 0.0
 		return
-	var product: String = RECIPES[id]
+	var product: String = product_of(id)
 	if str(out_slot["id"]) != "" and str(out_slot["id"]) != product:
 		return   # output blocked by a different item
 	_t += delta
@@ -70,7 +76,7 @@ func work(delta: float) -> void:
 			out_slot["n"] = int(out_slot["n"]) + 1
 
 func accepts(id: String) -> bool:
-	return RECIPES.has(id)
+	return product_of(id) != ""
 
 func info_text() -> String:
 	return "in:  %s\nout: %s\nsmelts 1 item / %.1fs" % [
