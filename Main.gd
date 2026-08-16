@@ -362,6 +362,8 @@ func _boot() -> void:
 		_ambient_test()
 	if OS.get_environment("CTD_TEST") == "44":
 		_reload_test()
+	if OS.get_environment("CTD_TEST") == "50":
+		_gasgiant_shots()
 	if OS.get_environment("CTD_TEST") == "48":
 		_advtut_test()
 	if OS.get_environment("CTD_TEST") == "43":
@@ -3472,7 +3474,7 @@ func _build_body(b) -> void:
 	sm.radial_segments = 48
 	sm.rings = 28
 	mi.mesh = sm
-	mi.material_override = _planet_material(b.kind, b.color)
+	mi.material_override = _planet_material(b.kind, b.color, b.name)
 	p.add_child(mi)
 	_register_planet_lod(b, mi)
 	var col := CollisionShape3D.new()
@@ -4089,7 +4091,9 @@ void fragment(){
 	m.set_shader_parameter("tscale", texscale)
 	return m
 
-func _planet_material(kind: String, color: Color) -> Material:
+## `pname` lets the named worlds wear their own weather (the Great Red
+## Spot, the polar hexagon); anything else falls back to generic bands.
+func _planet_material(kind: String, color: Color, pname: String = "") -> Material:
 	match kind:
 		"pixel", "datamosh", "wob", "contrast":
 			return ShaderLib.make(kind, color)
@@ -4242,35 +4246,265 @@ void vertex(){ vn = NORMAL; }
 			vm.shader = vsh
 			return vm
 		"gas":
-			# swirling latitude bands + one big slow storm eye. all clouds,
-			# no ground -- the look warns you before the physics does
+			# THE REAL ONES, stylised: belts and zones alternate in their
+			# own colours and stream in OPPOSITE directions, cloud
+			# filaments stretch along each band, the shear lines curl, and
+			# each world wears the feature it is actually known for --
+			# Jupiter's Great Red Spot, Saturn's polar hexagon, Neptune's
+			# dark spot and methane cirrus, Uranus' near-blank haze.
 			var sh := Shader.new()
-			sh.code = """shader_type spatial;
-render_mode shadows_disabled;
-uniform vec3 base : source_color;
-float band(vec3 n, float t) {
-	float lat = n.y;
-	float w = sin(lat * 14.0 + sin(lat * 5.0 + t * 0.05) * 1.5
-		+ sin(n.x * 3.0 + t * 0.1) * 0.4);
-	return w * 0.5 + 0.5;
+			sh.code = "shader_type spatial;\nrender_mode shadows_disabled;\n" \
+				+ "uniform vec3 base : source_color;\n" \
+				+ "uniform vec3 zone_c : source_color;\n" \
+				+ "uniform vec3 belt_c : source_color;\n" \
+				+ "uniform vec3 spot_c : source_color;\n" \
+				+ "uniform float bands_n;\nuniform float turb;\n" \
+				+ "uniform float spot_on;\nuniform float spot_lat;\n" \
+				+ "uniform float spot_lon;\nuniform float spot_r;\n" \
+				+ "uniform float hex_on;\nuniform float cirrus;\n" \
+				+ "uniform float style;\nuniform float glow_amt;\n" \
+				+ _NOISE_GLSL + """
+float hashf(float x){ return fract(sin(x * 127.1) * 43758.5453); }
+float gband(float lat, float c, float w){
+	float d = (lat - c) / w;
+	return exp(-d * d);
 }
+
+// where the DARK belts actually sit, per world, in radians of latitude.
+// returns 0 = pale zone, 1 = dark belt. this is what makes each giant
+// look like itself instead of like evenly spaced wallpaper.
+float belts(float lat, float st){
+	if (st < 0.5) {
+		// Jupiter: wide pale equatorial zone, the two big equatorial
+		// belts either side of it, then the temperate belts
+		return clamp(gband(lat, 0.21, 0.085) * 1.0
+			+ gband(lat, -0.26, 0.10) * 1.0
+			+ gband(lat, 0.47, 0.055) * 0.75
+			+ gband(lat, -0.55, 0.06) * 0.75
+			+ gband(lat, 0.72, 0.05) * 0.5
+			+ gband(lat, -0.75, 0.05) * 0.5, 0.0, 1.0);
+	} else if (st < 1.5) {
+		// Saturn: the same architecture, far softer and lower contrast
+		return clamp(gband(lat, 0.24, 0.12) * 0.75
+			+ gband(lat, -0.28, 0.13) * 0.75
+			+ gband(lat, 0.55, 0.08) * 0.5
+			+ gband(lat, -0.60, 0.08) * 0.5, 0.0, 1.0);
+	} else if (st < 2.5) {
+		// Uranus: essentially featureless, one faint polar collar
+		return clamp(gband(lat, 0.62, 0.22) * 0.35
+			+ gband(lat, -0.55, 0.25) * 0.25, 0.0, 1.0);
+	} else if (st < 3.5) {
+		// Neptune: a dark equatorial belt and two bright polar collars
+		return clamp(gband(lat, 0.0, 0.20) * 0.85
+			+ gband(lat, -0.62, 0.12) * 0.45
+			+ gband(lat, 0.66, 0.12) * 0.45, 0.0, 1.0);
+	}
+	if (st < 4.5) {
+		// Joule: tight fast jets, many of them, and a wide dark
+		// equatorial belt where the glow comes from
+		return clamp(gband(lat, 0.0, 0.16) * 0.9
+			+ gband(lat, 0.34, 0.07) * 0.8
+			+ gband(lat, -0.38, 0.07) * 0.8
+			+ gband(lat, 0.66, 0.05) * 0.6
+			+ gband(lat, -0.70, 0.05) * 0.6, 0.0, 1.0);
+	}
+	// anonymous giant: rhythmic, but still uneven
+	return clamp(gband(lat, 0.18, 0.11) + gband(lat, -0.30, 0.12) * 0.9
+		+ gband(lat, 0.60, 0.07) * 0.7 + gband(lat, -0.66, 0.07) * 0.7,
+		0.0, 1.0);
+}
+
 void fragment() {
 	vec3 n = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
-	float b1 = band(n, TIME);
-	vec3 dark = base * 0.55;
-	vec3 light = mix(base, vec3(1.0), 0.35);
-	vec3 col = mix(dark, light, b1);
-	// the storm: an oval eye drifting slowly around the equator
-	vec2 eye = vec2(cos(TIME * 0.02), sin(TIME * 0.02));
-	float d = length(vec2(dot(n.xz, eye), (n.y + 0.25) * 2.2));
-	col = mix(base * vec3(1.25, 0.75, 0.65), col, smoothstep(0.12, 0.3, d));
-	ALBEDO = col;
+	float t = TIME;
+	vec3 white = vec3(1.0, 0.98, 0.95);
+	float lat = asin(clamp(n.y, -1.0, 1.0));
+	float lon = atan(n.z, n.x);
+	// --- the named storm, and the way it drags the flow around itself
+	float eye = 0.0; float spin = 0.0; float wall = 0.0;
+	if (spot_on > 0.5) {
+		vec2 d = vec2((lon - spot_lon) * cos(lat), (lat - spot_lat) * 2.0);
+		float r = length(d) / spot_r;
+		eye = smoothstep(1.15, 0.2, r);
+		float ang = atan(d.y, d.x) + (1.0 - r) * 4.0 + t * 0.05;
+		spin = 0.5 + 0.5 * sin(ang * 2.0 + r * 5.0);
+		wall = smoothstep(0.6, 0.98, r) * smoothstep(1.18, 0.98, r);
+		// the belts bend AROUND the oval instead of running through it
+		lon += -d.y * eye * 0.5;
+		lat += d.x * eye * 0.18;
+	}
+	// --- belts and zones: FEW and WIDE, with soft gradients between
+	// them. bands are not evenly spaced either -- the latitude axis is
+	// warped so some belts are fat and some are thin, like the real one
+	float latw = lat + 0.16 * sin(lat * 2.7) + 0.07 * sin(lat * 5.3 + 1.2);
+	float bandf = latw * bands_n;
+	float id = floor(bandf);
+	float fb = fract(bandf);
+	float h = hashf(id * 3.7);
+	float hn = hashf((id + 1.0) * 3.7);
+	float dirb = mod(id, 2.0) < 0.5 ? 1.0 : -1.0;
+	float u = lon + dirb * t * 0.004 * (0.5 + h);
+	// filaments: noise stretched long in longitude, thin in latitude
+	float fil = fbm(vec3(u * 1.5, latw * 13.0, h * 9.0));
+	float fine = fbm(vec3(u * 3.8, latw * 30.0, h * 3.0));
+	// the band profile is a smooth wave, not a step: belt fades into
+	// zone over a third of the band, and the noise ruffles the boundary
+	// the belts sit where that world's belts really sit; the filament
+	// noise only ruffles their edges
+	float prof = belts(lat + (fil - 0.5) * 0.045, style);
+	float belt_amt = 1.0 - smoothstep(0.10, 0.75, prof);
+	vec3 col = mix(belt_c, zone_c, belt_amt);
+	// each band leans its own way in tone, blended into its neighbour so
+	// no seam is ever a drawn line
+	float lean = mix(h, hn, smoothstep(0.0, 1.0, fb)) - 0.5;
+	col = mix(col, mix(col, white, 0.30), clamp(lean, 0.0, 0.5) * turb);
+	col *= 1.0 - clamp(-lean, 0.0, 0.5) * 0.22 * turb;
+	// layers INSIDE the band: bright filaments, darker lanes, fine grain
+	col = mix(col, mix(col, white, 0.5), smoothstep(0.45, 0.9, fil) * 0.45 * turb);
+	col = mix(col, col * 0.86, smoothstep(0.5, 0.15, fil) * 0.4 * turb);
+	col = mix(col, mix(col, white, 0.28), smoothstep(0.6, 0.92, fine) * 0.28 * turb);
+	// where two jets shear past each other the boundary curls
+	float shear = 1.0 - abs(prof - 0.42) * 2.4;
+	float curl = fbm(vec3(u * 4.0 + fil * 2.4, latw * 22.0, 7.0));
+	float ripple = smoothstep(0.6, 1.0, shear)
+		* (0.5 + 0.5 * sin(u * 16.0 + curl * 8.0));
+	col = mix(col, mix(col * 0.88, white, ripple * 0.45),
+		smoothstep(0.55, 1.0, shear) * 0.4 * turb);
+	// --- Saturn's hexagon: the polar jet is a six-sided standing wave
+	if (hex_on > 0.5) {
+		float pl = (1.5708 - lat) / 0.42;           // 0 at the north pole
+		float th = lon + t * 0.01;
+		float hexr = cos(0.5236) / cos(mod(th, 1.0472) - 0.5236);
+		float edge = abs(pl - hexr * 0.62);
+		float hexline = smoothstep(0.16, 0.0, edge);
+		float inside = smoothstep(0.03, -0.08, pl - hexr * 0.62);
+		// smoothstep(1.30, 1.02, lat) reads ZERO at the pole -- the mask
+		// has to RISE toward it, not fall away from it
+		float polar = smoothstep(1.00, 1.28, lat);
+		col = mix(col, mix(belt_c * 0.7, base, 0.35), inside * polar * 0.85);
+		col = mix(col, mix(white, zone_c, 0.15), hexline * polar);
+		// the eye sitting at the centre of the hexagon
+		col = mix(col, mix(belt_c, vec3(0.0), 0.4),
+			smoothstep(0.18, 0.0, pl) * polar);
+	}
+	// --- Neptune's methane cirrus: bright streaks ABOVE the bands
+	if (cirrus > 0.01) {
+		float cf = fbm(vec3(lon * 2.2 + t * 0.02, lat * 9.0, 4.0));
+		float streak = smoothstep(0.62, 0.9, cf)
+			* smoothstep(0.15, 0.45, abs(lat));
+		col = mix(col, white, streak * cirrus);
+	}
+	// --- the spot, painted on top of the band it rides
+	if (spot_on > 0.5) {
+		vec3 eyecol = mix(spot_c, mix(spot_c, white, 0.55), spin * 0.7);
+		col = mix(col, eyecol, eye * 0.95);
+		col = mix(col, mix(spot_c, vec3(0.0), 0.35), wall * eye * 0.5);
+	}
+	// polar hoods (Saturn keeps its own, above)
+	float pole = smoothstep(0.78, 1.15, abs(lat));
+	col = mix(col, mix(base, white, 0.45), pole * 0.55 * (1.0 - hex_on * 0.7));
+	// --- Joule's glow: the shear lines themselves are luminous, and the
+	// poles carry aurorae that ripple on their own clock
+	vec3 glow = vec3(0.0);
+	if (glow_amt > 0.01) {
+		float veins = smoothstep(0.55, 1.0, shear) * (0.35 + 0.65 * ripple);
+		glow += mix(zone_c, white, 0.35) * veins * glow_amt;
+		float aur = smoothstep(0.85, 1.25, abs(lat))
+			* (0.45 + 0.55 * fbm(vec3(lon * 3.0 + t * 0.06, abs(lat) * 8.0, 2.0)));
+		glow += mix(zone_c, vec3(0.6, 1.0, 0.8), 0.5) * aur * glow_amt * 1.4;
+	}
+	float fres = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 3.0);
+	ALBEDO = col + glow * 0.35;
+	EMISSION = base * fres * 0.5 + glow;
 	ROUGHNESS = 0.9;
 }
 """
 			var m := ShaderMaterial.new()
 			m.shader = sh
 			m.set_shader_parameter("base", color)
+			# defaults: an anonymous giant, banded off its own colour
+			var zone: Color = color.lightened(0.42)
+			var belt: Color = color.darkened(0.34)
+			var spot: Color = color.lightened(0.1)
+			var bands_n := 5.0
+			var turb := 0.85
+			var spot_on := 0.0
+			var spot_lat := -0.35
+			var spot_lon := 1.4
+			var spot_r := 0.45
+			var hex_on := 0.0
+			var cirrus := 0.0
+			var style := 5.0
+			var glow_amt := 0.0
+			match pname:
+				"Jupiter":
+					# cream zones, ochre belts, and the Great Red Spot
+					# riding the southern equatorial belt
+					zone = Color("#efdcb4")
+					belt = Color("#a4703f")
+					spot = Color("#c9543a")
+					bands_n = 6.5
+					style = 0.0
+					turb = 1.0
+					spot_on = 1.0
+					spot_lat = -0.36
+					spot_lon = 1.4
+					spot_r = 0.5
+				"Saturn":
+					# soft butter bands, very little contrast, and the
+					# hexagon standing over the north pole
+					zone = Color("#f3e3bb")
+					belt = Color("#c9a768")
+					bands_n = 5.5
+					style = 1.0
+					turb = 0.5
+					hex_on = 1.0
+				"Uranus":
+					# famously featureless: haze over the faintest banding
+					zone = Color("#bdeeeb")
+					belt = Color("#8fd6d4")
+					bands_n = 3.0
+					style = 2.0
+					turb = 0.16
+				"Joule":
+					# green, luminous, and busier than anything in Sol
+					zone = Color("#7dffb8")
+					belt = Color("#166b4a")
+					spot = Color("#b6ff6a")
+					bands_n = 7.0
+					turb = 0.95
+					style = 4.0
+					glow_amt = 1.0
+					spot_on = 1.0
+					spot_lat = -0.22
+					spot_lon = 1.4
+					spot_r = 0.4
+				"Neptune":
+					# deep blue, white methane cirrus, and the dark spot
+					zone = Color("#6f92f0")
+					belt = Color("#2b4bb4")
+					spot = Color("#16224f")
+					bands_n = 4.5
+					style = 3.0
+					turb = 0.55
+					cirrus = 0.55
+					spot_on = 1.0
+					spot_lat = 0.34
+					spot_lon = 1.45
+					spot_r = 0.34
+			m.set_shader_parameter("zone_c", zone)
+			m.set_shader_parameter("belt_c", belt)
+			m.set_shader_parameter("spot_c", spot)
+			m.set_shader_parameter("bands_n", bands_n)
+			m.set_shader_parameter("turb", turb)
+			m.set_shader_parameter("spot_on", spot_on)
+			m.set_shader_parameter("spot_lat", spot_lat)
+			m.set_shader_parameter("spot_lon", spot_lon)
+			m.set_shader_parameter("spot_r", spot_r)
+			m.set_shader_parameter("hex_on", hex_on)
+			m.set_shader_parameter("cirrus", cirrus)
+			m.set_shader_parameter("style", style)
+			m.set_shader_parameter("glow_amt", glow_amt)
 			return m
 		"wireframe":
 			# dark base; real polygon edges added as an overlay in _build_body
@@ -7711,6 +7945,10 @@ func _spawn_world_obj(id: String) -> Node3D:
 			var ms2 := ModSynth.new()
 			ms2.mk2 = true
 			return ms2
+		"modsynth3":
+			var ms3 := ModSynth.new()
+			ms3.mk3 = true
+			return ms3
 		"house": return House.new()
 		"furn": return Furniture.new()
 		"chairseat":
@@ -8707,6 +8945,24 @@ func _synth_test() -> void:
 	print("SYNTHTEST mk2 far slot: mod=%d row=%d hp=%d (needs row 3 + hp>84 to prove the space is real)" % [
 		far, big.engine.mods[far].row if far >= 0 else -1,
 		big.engine.mods[far].hp if far >= 0 else -1])
+
+	# --- 4d. the Mk3 case: three Mk1s wide, five rows
+	var huge := ModSynth.new()
+	huge.mk3 = true
+	add_child(huge)
+	huge.set_meta("placed_id", "modsynth3")
+	huge.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 26.0)
+	await get_tree().create_timer(0.6).timeout
+	print("SYNTHTEST mk3 rows=%d row_hp=%d rack=%.2f x %.2f box=%s vp=%s" % [
+		huge.engine.rows, huge.engine.row_hp, huge._rw, huge._rh,
+		str(huge.box_size), str(huge._vp.size)])
+	var far3 := huge.engine.add_mod("vco", "mono", 4, 230)
+	print("SYNTHTEST mk3 far slot: mod=%d row=%d hp=%d (needs row 4 + hp>168 to prove the wall is real)" % [
+		far3, huge.engine.mods[far3].row if far3 >= 0 else -1,
+		huge.engine.mods[far3].hp if far3 >= 0 else -1])
+	print("SYNTHTEST mk3 rack fits box: ", huge._rh < huge.box_size.y,
+		"  ", huge._rw < huge.box_size.x)
 
 	# --- 5. undo/redo on the editor itself
 	var ui := SynthUI.new()
@@ -9951,3 +10207,50 @@ func _advtut_test() -> void:
 		print("ADVTUT shot: docs/shots/handbook.png")
 	man.queue_free()
 	print("ADVTUT done")
+
+
+## CTD_TEST=50 -- portraits of the four gas giants, one shot each, so the
+## belts, the Great Red Spot and the polar hexagon can be looked at
+## instead of guessed at.
+func _gasgiant_shots() -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_size(Vector2i(1600, 1200))
+	await get_tree().create_timer(1.5).timeout
+	var cam := Camera3D.new()
+	cam.far = 420000.0
+	add_child(cam)
+	cam.current = true
+	for nm in ["Jupiter", "Saturn", "Uranus", "Neptune", "Joule"]:
+		var b = Universe.body_named(nm)
+		if b == null:
+			print("GASSHOT missing body: ", nm)
+			continue
+		# straight-on portrait: the spot sits near longitude +1.4, which
+		# is the +Z face, so the camera stands off along +Z
+		cam.global_position = b.center + Vector3(0, b.radius * 0.28, b.radius * 3.1)
+		cam.look_at(b.center, Vector3.UP)
+		# the planet LOD watches the PLAYER, not this camera: without
+		# dragging the player along, every portrait is the flat far-away
+		# stand-in material instead of the shader
+		var pl9 = get_tree().get_first_node_in_group("player")
+		if pl9 != null:
+			pl9.global_position = cam.global_position
+			pl9.visible = false
+		await get_tree().create_timer(0.8).timeout
+		get_viewport().get_texture().get_image().save_png(
+			"res://docs/shots/gas_%s.png" % str(nm).to_lower())
+		print("GASSHOT ", nm)
+		# Saturn also gets a pole-on shot: the hexagon is only a hexagon
+		# from above
+		if nm == "Saturn":
+			cam.global_position = b.center + Vector3(0, b.radius * 3.0, b.radius * 0.6)
+			cam.look_at(b.center, Vector3(0, 0, -1))
+			var pl8 = get_tree().get_first_node_in_group("player")
+			if pl8 != null:
+				pl8.global_position = cam.global_position
+			await get_tree().create_timer(0.8).timeout
+			get_viewport().get_texture().get_image().save_png(
+				"res://docs/shots/gas_saturn_pole.png")
+			print("GASSHOT Saturn pole")
+	print("GASSHOT done")
+	get_tree().quit()

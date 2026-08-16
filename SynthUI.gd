@@ -67,7 +67,11 @@ func _ready() -> void:
 	top.add_theme_stylebox_override("panel", tsb)
 	root.add_child(top)
 	var title := Label.new()
-	title.text = "MODULAR SYNTHESIZER" + ("  MK2" if synth != null and synth.mk2 else "")
+	title.text = "MODULAR SYNTHESIZER"
+	if synth != null and synth.mk3:
+		title.text += "  MK3"
+	elif synth != null and synth.mk2:
+		title.text += "  MK2"
 	title.add_theme_font_size_override("font_size", 22)
 	title.add_theme_color_override("font_color", NEON)
 	title.position = Vector2(18, 12)

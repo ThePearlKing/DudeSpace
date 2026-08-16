@@ -12,6 +12,7 @@ var _slot_lbls: Array = []
 var _tab: String = "Gear"
 var _tab_btns: Array = []
 var _creative_btn: Button
+var _creative2_btn: Button
 var _equip_slots: Array = []
 var _eq_lbl: Label
 var held: Dictionary = {"id": "", "n": 0}   # stack riding the cursor
@@ -24,13 +25,38 @@ func _rebuild_grid() -> void:
 	if _tab == "Creative":
 		# only things that EXIST but aren't buyable in the normal tabs:
 		# resources, drops, raw ore, weird loot. free.
+		# everything the materials registry adds lives on CREATIVE 2 --
+		# a hundred ores, dusts, bars and compounds buried this tab.
 		var in_catalog := {}
 		for it in Inventory.catalog:
 			in_catalog[str(it.id)] = true
 		for id in Inventory.weapons.keys() + Inventory.items.keys():
 			if id == "fists" or id == "caged_animal" or id == "caged_human" or in_catalog.has(id):
 				continue
+			if Mats.has(str(id)):
+				continue
 			_grid.add_child(_make_cell({"id": id, "name": Inventory.hotbar_name(id), "desc": "creative: free"}))
+	elif _tab == "Creative 2":
+		# the mining and chemistry half: ore, dust, bars, alloys and every
+		# compound, in the order the chain actually runs
+		const KIND_ORDER := {"ore": 0, "dust": 1, "ingot": 2, "alloy": 3}
+		var rows: Array = []
+		for id in Mats.all().keys():
+			var d: Dictionary = Mats.all()[id]
+			rows.append([int(KIND_ORDER.get(str(d.get("kind", "")), 4)),
+				int(d.get("tier", 0)), str(d.get("name", id)), str(id), d])
+		rows.sort_custom(func(a, b):
+			if int(a[0]) != int(b[0]):
+				return int(a[0]) < int(b[0])
+			if int(a[1]) != int(b[1]):
+				return int(a[1]) < int(b[1])
+			return str(a[2]) < str(b[2]))
+		for row in rows:
+			var d2: Dictionary = row[4]
+			var kind := str(d2.get("kind", "material"))
+			_grid.add_child(_make_cell({"id": str(row[3]),
+				"name": str(row[2]),
+				"desc": "creative: free  ·  %s, tier %d" % [kind, int(row[1])]}))
 	else:
 		for item in Inventory.catalog:
 			if item.get("tab", "Gear") == _tab:
@@ -114,7 +140,7 @@ func _ready() -> void:
 	var tabrow := HBoxContainer.new()
 	tabrow.add_theme_constant_override("separation", 8)
 	tabscroll.add_child(tabrow)
-	for t in Inventory.tabs + ["Creative"]:
+	for t in Inventory.tabs + ["Creative", "Creative 2"]:
 		var tb := Button.new()
 		tb.text = t
 		tb.custom_minimum_size = Vector2(125, 40)
@@ -126,6 +152,8 @@ func _ready() -> void:
 		_tab_btns.append(tb)
 		if t == "Creative":
 			_creative_btn = tb
+		elif t == "Creative 2":
+			_creative2_btn = tb
 
 	# --- shop grid ---
 	var scroll := ScrollContainer.new()
@@ -302,9 +330,11 @@ func _refresh() -> void:
 	# the Creative tab only EXISTS with the cheat on
 	if _creative_btn:
 		_creative_btn.visible = Game.creative
-		if _tab == "Creative" and not Game.creative:
-			_tab = "Gear"
-			_rebuild_grid()
+	if _creative2_btn:
+		_creative2_btn.visible = Game.creative
+	if _tab.begins_with("Creative") and not Game.creative:
+		_tab = "Gear"
+		_rebuild_grid()
 	_coin_lbl.text = "COINS %d  ·  ingot %d  irid %d  ultima %d" % [
 		Inventory.coins, Inventory.res_count("ingot"),
 		Inventory.res_count("irid"), Inventory.res_count("ultima")]
@@ -332,7 +362,7 @@ func _refresh() -> void:
 		for it in Inventory.catalog:
 			if Game.tut_can_buy(str(it.id)):
 				hot_tabs[str(it.get("tab", "Gear"))] = true
-	var tabnames: Array = Inventory.tabs + ["Creative"]
+	var tabnames: Array = Inventory.tabs + ["Creative", "Creative 2"]
 	for i in mini(_tab_btns.size(), tabnames.size()):
 		if not lock:
 			_tab_btns[i].modulate = Color(1, 1, 1)

@@ -92,6 +92,13 @@ func _ready() -> void:
 	# ALL water, no land -- you sink through the whole ocean until the
 	# sand floor catches you. The blue monolith waits down there. ---
 	_def("Undros",   TC + Vector3(-4900, -1750, 3050), 110.0, 8.5, "ocean", Color("#1a5fae"))
+	# --- Joule: the Tris system's gas giant. Green, because whatever is
+	# in that atmosphere is not ammonia -- the belts glow along their
+	# shear lines and the poles burn with aurorae the whole system can
+	# see. Biggest thing in Tris that is not the star. ---
+	_def("Joule",    TC + Vector3(6100, 2200, -4300), 300.0, 17.0, "gas",
+		Color("#3fd98a"))
+
 	# --- the rogue: alone in the high dark, farther from everything
 	# than anything -- and furthest of all from the black hole. On no
 	# map, on no locator. The white monolith waits there. ---

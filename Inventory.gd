@@ -244,6 +244,7 @@ var items: Dictionary = {
 	"radio":       {"name": "Intergalactic Radio", "color": Color("#7be8ff")},
 	"modsynth":    {"name": "Modular Synthesizer", "color": Color("#3f5f96")},
 	"modsynth2":   {"name": "Modular Synthesizer Mk2", "color": Color("#7be8ff")},
+	"modsynth3":   {"name": "Modular Synthesizer Mk3", "color": Color("#b388ff")},
 	"catfood":    {"name": "Cat Food",         "color": Color("#e8956a")},
 	"boots":      {"name": "Grav Boots",       "color": Color("#888899")},
 	"magnet":     {"name": "Coin Magnet",      "color": Color("#ffcc22")},
@@ -272,7 +273,7 @@ var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier
 	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
 	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
 	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
-	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser", "modsynth", "modsynth2"]
+	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser", "modsynth", "modsynth2", "modsynth3"]
 
 var hotbar: Array = []
 var backpack_store: Array = []   # basic pack: 20
@@ -375,6 +376,7 @@ func _ready() -> void:
 		{"id": "tvbig", "tab": "Electric", "name": "Big TV",         "cost": {"ingot": 8, "wire": 8, "irid": 2}, "desc": "The living-room slab. Same channels, twice the glass. Wall-mounts too."},
 		{"id": "camtv", "tab": "Electric", "name": "Security Camera", "cost": {"ingot": 2, "wire": 3}, "desc": "Place it, F to NAME it -- then any TV can watch through it."},
 		{"id": "radio", "tab": "Electric", "name": "Intergalactic Radio", "cost": {"ingot": 4, "wire": 5, "coal": 3}, "desc": "Wire it, aim the dish (F: sky map), sweep the dial. The universe talks."},
+		{"id": "modsynth3", "tab": "Electric", "name": "Modular Synthesizer Mk3", "cost": {"steel": 40, "brass": 24, "irid": 90, "wire": 80, "prism": 40, "ultima": 20}, "desc": "The studio wall: FIVE rows at 252 HP each -- three Mk1 cases wide, nine times the rack of the Mk1. Built out of alloy, not plain iron. Wire it, seat an ultima core and a uranium cell, F opens it."},
 		{"id": "modsynth2", "tab": "Electric", "name": "Modular Synthesizer Mk2", "cost": {"ingot": 60, "irid": 40, "wire": 40, "prism": 14, "ultima": 6}, "desc": "The big case: TWICE the width and a fourth row -- 168 HP per row instead of 84. Same modules, same cores, four times the rack. Wire it, seat an ultima core and a uranium cell, F opens it."},
 		{"id": "modsynth", "tab": "Electric", "name": "Modular Synthesizer", "cost": {"ingot": 28, "irid": 14, "wire": 16, "prism": 4}, "desc": "A full eurorack case: VCOs, filters, envelopes, sequencers, logic, reverb -- 30 module types from three houses, patched with real cables. Needs wired power PLUS an ultima core and a uranium cell seated in it. F opens the rack."},
 		{"id": "capacitor", "tab": "Electric", "name": "Capacitor",      "cost": {"ingot": 4, "irid": 1}, "desc": "Stores 600 EU. One in, one out."},

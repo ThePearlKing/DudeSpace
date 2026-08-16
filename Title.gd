@@ -66,6 +66,8 @@ func _ready() -> void:
 	Game.tutorial_allow = ["*"]
 	Save.ephemeral = false
 	Universe.restore_full_universe()
+	if OS.get_environment("CTD_TEST") == "49":
+		_title_shot()
 	Net.leave()   # back at the title = session over
 	_build_background()
 	_build_main_menu()
@@ -428,6 +430,16 @@ func _start_tutorial() -> void:
 	back.pressed.connect(lay.queue_free)
 	col.add_child(back)
 
+## CTD_TEST=49 -- proof shot of the menu, gas giant and all.
+func _title_shot() -> void:
+	await get_tree().create_timer(2.5).timeout
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("res://docs/shots/title_gasgiant.png")
+		print("TITLESHOT docs/shots/title_gasgiant.png")
+	print("TITLESHOT done")
+	get_tree().quit()
+
 func _process(delta: float) -> void:
 	if _bg_pivot:
 		_bg_pivot.rotate_y(delta * 0.15)
@@ -465,16 +477,100 @@ func _tp_mat(style: String, c: Color) -> ShaderMaterial:
 	var frag := ""
 	match style:
 		"gas":
+			# A REAL BANDED GIANT. Belts and zones alternate -- different
+			# colours, different widths, streaming in OPPOSITE directions
+			# -- with cloud filaments stretched along each band, curled
+			# turbulence where two bands shear past each other, and storms
+			# that sit INSIDE a band and drag the flow around themselves.
 			frag = """
+float hashf(float x){ return fract(sin(x * 127.1) * 43758.5453); }
+
+// the belt/zone palette: pastel purples, mauves and creams. index picks
+// a family, so neighbouring bands never come out the same colour
+vec3 band_col(float h, vec3 bs, vec3 wt){
+	vec3 cream  = mix(bs, vec3(1.00, 0.95, 0.86), 0.92);
+	vec3 pale   = mix(bs, wt, 0.72);
+	vec3 lilac  = mix(bs, vec3(0.86, 0.80, 1.00), 0.62);
+	vec3 mauve  = mix(bs, vec3(0.72, 0.55, 0.82), 0.34);
+	vec3 deepv  = mix(bs, vec3(0.35, 0.20, 0.55), 0.20);
+	if (h < 0.22) return cream;
+	if (h < 0.44) return pale;
+	if (h < 0.66) return lilac;
+	if (h < 0.85) return mauve;
+	return deepv;
+}
+
 void fragment(){
 	vec3 n = normalize(vn);
-	float t = TIME * 0.04;
-	float band = sin(n.y * 16.0 + fbm(n * 3.0 + vec3(t, 0.0, t)) * 4.0);
-	vec3 col = mix(base * 0.55, base * 1.25, band * 0.5 + 0.5);
-	float storm = smoothstep(0.22, 0.0, length(n.xy - vec2(0.45, -0.25)));
-	col = mix(col, vec3(0.85, 0.4, 0.25), storm * 0.8);
-	ALBEDO = col; ROUGHNESS = 0.9;
-	EMISSION = col * 0.25;
+	float t = TIME;
+	vec3 white = vec3(1.0, 0.98, 1.0);
+	// spherical coordinates: bands are latitude, flow is longitude
+	float lat = asin(clamp(n.y, -1.0, 1.0));
+	float lon = atan(n.z, n.x);
+	// --- storms first: they DEFLECT the bands that run past them
+	// longitudes chosen so the great spot faces the menu camera; the
+	// case rotates, so the other two swing round behind it
+	vec2 s1 = vec2(1.45, -0.32);  vec2 s2 = vec2(0.35, 0.46);
+	vec2 s3 = vec2(2.55, 0.12);
+	vec2 dv = vec2(0.0);
+	float eye = 0.0; float wall = 0.0; float spin = 0.0;
+	for (int i = 0; i < 3; i++){
+		vec2 c = i == 0 ? s1 : (i == 1 ? s2 : s3);
+		float rr = i == 0 ? 0.52 : (i == 1 ? 0.30 : 0.20);
+		float dirn = i == 1 ? -1.0 : 1.0;
+		// angular offset, longitude squeezed by latitude like a real map
+		vec2 d = vec2((lon - c.x) * cos(lat), lat - c.y);
+		d.y *= 1.9;                       // storms are wider than they are tall
+		float r = length(d) / rr;
+		float fall = smoothstep(1.25, 0.15, r);
+		// drag the surrounding flow around the oval
+		dv += vec2(-d.y, d.x) * dirn * fall * 0.55;
+		float ang = atan(d.y, d.x) + (1.0 - r) * 4.5 * dirn + t * 0.25 * dirn;
+		spin = mix(spin, 0.5 + 0.5 * sin(ang * 2.0 + r * 5.0), fall);
+		wall = max(wall, smoothstep(0.55, 0.95, r) * smoothstep(1.2, 0.95, r));
+		eye = max(eye, fall);
+	}
+	lon += dv.x; lat += dv.y * 0.5;
+	// --- bands: fifteen of them, alternating direction and width
+	float bandf = lat * 7.0;
+	float id = floor(bandf);
+	float fb = fract(bandf);
+	float h = hashf(id * 3.7);
+	float dirb = mod(id, 2.0) < 0.5 ? 1.0 : -1.0;
+	float u = lon + dirb * t * 0.03 * (0.5 + 0.9 * h);
+	// filaments: noise stretched LONG in longitude, thin in latitude
+	float fil = fbm(vec3(u * 1.7, lat * 22.0, h * 9.0));
+	float fine = fbm(vec3(u * 4.5, lat * 46.0, h * 3.0));
+	// turbulence where two bands shear past each other: curls, not lines
+	float seam = 1.0 - abs(fb - 0.5) * 2.0;
+	float curl = fbm(vec3(u * 5.0 + fil * 2.2, lat * 34.0, 7.0));
+	float ripple = smoothstep(0.55, 1.0, seam) * (0.5 + 0.5 * sin(u * 26.0 + curl * 9.0));
+	// --- colour: this band, the next band, blended across the seam
+	vec3 cA = band_col(h, base, white);
+	vec3 cB = band_col(hashf((id + sign(fb - 0.5)) * 3.7), base, white);
+	vec3 col = mix(cA, cB, smoothstep(0.34, 0.5, abs(fb - 0.5)) * 0.45);
+	// layers INSIDE the band: bright filaments and darker lanes
+	col = mix(col, mix(col, white, 0.55), smoothstep(0.45, 0.85, fil) * 0.55);
+	col = mix(col, col * 0.82, smoothstep(0.55, 0.2, fil) * 0.5);
+	col = mix(col, mix(col, white, 0.35), smoothstep(0.6, 0.9, fine) * 0.3);
+	// the shear line itself: churned, half-lit, never a clean stripe
+	col = mix(col, mix(col * 0.78, white, ripple * 0.55), smoothstep(0.5, 1.0, seam) * 0.6);
+	// --- the storms sit on top, inside their band
+	// the spot: warm cream arms wound round a bright core, ringed by a
+	// darker violet eyewall so it sits IN the band instead of on it
+	vec3 eyecol = mix(mix(base, vec3(1.0, 0.88, 0.78), 0.86),
+		vec3(1.0, 0.97, 0.92), spin * 0.75);
+	col = mix(col, eyecol, eye * 0.95);
+	col = mix(col, mix(base, vec3(0.42, 0.26, 0.58), 0.45), wall * eye * 0.7);
+	// polar hoods: colder, paler, and they eat the last band
+	float pole = smoothstep(0.72, 1.0, abs(n.y));
+	col = mix(col, mix(base, white, 0.62), pole * 0.7);
+	// rim light
+	float fres = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 3.0);
+	ALBEDO = col;
+	EMISSION = col * 0.16 + base * fres * 1.1 + white * eye * spin * 0.12;
+	ROUGHNESS = 0.86;
+	SPECULAR = 0.18;
 }
 """
 		"cont":

@@ -23,8 +23,10 @@ const GAPU := 10.0               # gap between rows, panel units
 const PX := 3.2                  # panel texture pixels per panel unit
 
 ## The Mk2 case: twice the width, one more row. Same panels, same
-## engine, four times the rack.
+## engine, four times the rack. The Mk3 goes again: THREE times the Mk1
+## width and five rows -- 252 HP a row, the wall-sized studio case.
 var mk2: bool = false
+var mk3: bool = false
 var _rw: float = RW
 var _px: float = PX
 var _paint_t: float = 0.0            # counts down to the next panel repaint
@@ -75,7 +77,19 @@ func _init() -> void:
 func _ready() -> void:
 	# the Mk2 is a bigger BOX, so its dimensions have to be settled
 	# before Machine builds the chassis
-	if mk2:
+	if mk3:
+		title = "MODULAR SYNTH MK3"
+		refund_id = "modsynth3"
+		_rows = SynthMods.ROWS + 2
+		_rowhp = SynthMods.ROW_HP * 3
+		_rw = RW * 3.0
+		# the panel texture is capped, not scaled with the case: a 3x
+		# wide rack at Mk1 pixel density is a 6000px viewport nobody's
+		# GPU wants to repaint
+		_px = PX * 0.48
+		box_size = Vector3(6.15, 2.92, 0.7)
+		buf_cap = 2600.0
+	elif mk2:
 		title = "MODULAR SYNTH MK2"
 		refund_id = "modsynth2"
 		_rows = SynthMods.ROWS + 1

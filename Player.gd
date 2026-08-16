@@ -379,7 +379,7 @@ const AUTO_GHOST_IDS: Array[String] = ["chest", "furnace", "coinifier",
 	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor",
 	"rtg", "creativegen", "prisreactor", "nreactor", "capacitor",
-	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv", "modsynth", "modsynth2",
+	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv", "modsynth", "modsynth2", "modsynth3",
 	"atm", "ecomputer", "scomputer", "ultracap", "elight", "lightbox", "switch",
 	"teleporter", "extender", "bench", "nterm", "radio"]
 var _ghost_hushed := ""     # id LMB-dismissed; slot swap clears it
@@ -2417,7 +2417,7 @@ func _use_selected() -> void:
 		"ultimabatt", \
 		"separator", "separator2", "cryoplant", "cryoplant2", "spawnbeacon", \
 		"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "nreactor", "capacitor", "efurnace", "eseller", "netanalyser", \
-		"tv", "tvbig", "camtv", "modsynth", "modsynth2":
+		"tv", "tvbig", "camtv", "modsynth", "modsynth2", "modsynth3":
 			# PREVIEW FIRST: a ghost shows exactly where it lands
 			_start_ghost("tvish", id)
 			return
