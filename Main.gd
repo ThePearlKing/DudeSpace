@@ -362,6 +362,12 @@ func _boot() -> void:
 		_ambient_test()
 	if OS.get_environment("CTD_TEST") == "44":
 		_reload_test()
+	if OS.get_environment("CTD_TEST") == "53":
+		_panel_audit()
+	if OS.get_environment("CTD_TEST") == "52":
+		_reverb_test()
+	if OS.get_environment("CTD_TEST") == "51":
+		_mystery_jack_test()
 	if OS.get_environment("CTD_TEST") == "50":
 		_gasgiant_shots()
 	if OS.get_environment("CTD_TEST") == "48":
@@ -10253,4 +10259,206 @@ func _gasgiant_shots() -> void:
 				"res://docs/shots/gas_saturn_pole.png")
 			print("GASSHOT Saturn pole")
 	print("GASSHOT done")
+	get_tree().quit()
+
+
+## CTD_TEST=51 -- the ????? panel's six input jacks. Three sit on the left
+## edge, three sit under the twisty knobs; the complaint was that every
+## one of them patched into the TOP jack. This walks each jack's own
+## screen position back through the UI's hit-test and the engine.
+func _mystery_jack_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	var ms := ModSynth.new()
+	add_child(ms)
+	ms.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 6.0)
+	await get_tree().create_timer(0.6).timeout
+	var e := ms.engine
+	e.clear_cables()
+	var qi := e.add_mod("mystery", "mono", 0, 40)
+	var vi := e.add_mod("lfo", "dude", 1, 0)
+	print("MYSTERY mods: ?????=", qi, " lfo=", vi)
+	var ui := SynthUI.new()
+	ui.synth = ms
+	add_child(ui)
+	await get_tree().create_timer(0.4).timeout
+	var lay := SynthMods.layout("mystery")
+	print("MYSTERY jin layout: ", lay["jin"])
+	# 1. does the hit-test give back the jack you actually clicked?
+	var bad: Array = []
+	for ji in (lay["jin"] as Array).size():
+		var scr := ui._jack_screen(qi, true, ji)
+		var h := ui._hit(scr)
+		if h.is_empty() or str(h.get("kind", "")) != "jin" \
+				or int(h.get("mi", -1)) != qi or int(h.get("i", -1)) != ji:
+			bad.append("%d -> %s" % [ji, str(h)])
+	print("MYSTERY hit-test mismatches: ", bad)
+	# 2. does a patch into each jack STAY on that jack, through a save
+	# and a reload?
+	for ji in (lay["jin"] as Array).size():
+		e.patch(vi, 0, qi, ji)
+	var landed: Array = []
+	for c in e.cables:
+		if int(c["dm"]) == qi:
+			landed.append(int(c["di"]))
+	landed.sort()
+	print("MYSTERY cables landed on jacks: ", landed, "  (want [0, 1, 2, 3, 4, 5])")
+	var data := e.to_dict()
+	var e2 := SynthEngine.new()
+	e2.rows = e.rows
+	e2.row_hp = e.row_hp
+	e2.from_dict(data)
+	var reloaded: Array = []
+	for c2 in e2.cables:
+		if int(c2["dm"]) == qi:
+			reloaded.append(int(c2["di"]))
+	reloaded.sort()
+	print("MYSTERY after save+load: ", reloaded, "  (want the same six)")
+	# 3. do the three knob jacks actually reach the DSP? move one and the
+	# output has to change
+	print("MYSTERY done")
+	get_tree().quit()
+
+
+## CTD_TEST=52 -- the COSMIC REVERB, measured instead of guessed at.
+## A reverb glitches in three ways you can catch offline: it runs away
+## (feedback >= 1), it tears (a sample-to-sample jump far bigger than the
+## signal), or it never decays. This drives one impulse through it and
+## watches the tail.
+func _reverb_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var e := SynthEngine.new()
+	e.rows = 3
+	e.row_hp = 84
+	e.clear_cables()
+	var vi := e.add_mod("vco", "dude", 0, 0)
+	var ri := e.add_mod("cosmic", "icos", 0, 20)
+	var oi := e.add_mod("out", "dude", 0, 60)
+	var din: Array = SynthMods.def("cosmic")["ins"]
+	var dout: Array = SynthMods.def("cosmic")["outs"]
+	print("REVERB jacks in=", din, " out=", dout)
+	var audio_in: int = maxi(0, din.find("IN"))
+	e.patch(vi, 3, ri, audio_in)   # SINE out: a saw would be all edges
+	e.patch(ri, 0, oi, 0)
+	# DRIFT at zero was the worst case: the read head landed on the write
+	# head and the tank fed back on itself with no delay at all
+	e.mods[ri].p[4] = 0.0        # DRIFT = 0
+	e.mods[ri].p[2] = 1.0        # MIX = fully wet
+	var worst_jump := 0.0
+	var peak_drive := 0.0
+	var prev := 0.0
+	var nan_seen := false
+	# 1. drive it for a while, then cut the input and watch the tail
+	for blk in 220:
+		if blk == 60:
+			# cut the source: silence in, tail only
+			e.unpatch(ri, true, audio_in)
+		e._block()
+		var base := (1 + ri * SynthEngine.MAXOUT + 0) * SynthEngine.BLK
+		for k in SynthEngine.BLK:
+			var v: float = e._bus[base + k]
+			if is_nan(v) or is_inf(v):
+				nan_seen = true
+				v = 0.0
+			if blk < 60:
+				peak_drive = maxf(peak_drive, absf(v))
+			elif blk > 64:   # let the cut transient pass first
+				
+				worst_jump = maxf(worst_jump, absf(v - prev))
+			prev = v
+	# 2. the tail, sampled at three points after the input stopped
+	var tail: Array = []
+	for seg in 3:
+		var mx := 0.0
+		for blk2 in 40:
+			e._block()
+			var base2 := (1 + ri * SynthEngine.MAXOUT + 0) * SynthEngine.BLK
+			for k2 in SynthEngine.BLK:
+				mx = maxf(mx, absf(e._bus[base2 + k2]))
+		tail.append(mx)
+	print("REVERB driven peak=%.3f  NaN/inf=%s" % [peak_drive, str(nan_seen)])
+	print("REVERB tail peaks: %.4f -> %.4f -> %.4f  (must fall)" % [
+		tail[0], tail[1], tail[2]])
+	print("REVERB worst sample jump in tail=%.3f  (a tear is a jump the size of the signal)" % worst_jump)
+	var decays: bool = tail[2] < tail[0] * 0.9 and tail[2] < 8.0
+	print("REVERB decays=", decays, "  bounded=", peak_drive < 9.5, "  clean=", not nan_seen)
+	# baseline: the plain reverb, measured exactly the same way, so the
+	# cosmic number means something instead of floating on its own
+	var e2 := SynthEngine.new()
+	e2.rows = 3
+	e2.row_hp = 84
+	e2.clear_cables()
+	var v2 := e2.add_mod("vco", "dude", 0, 0)
+	var r2i := e2.add_mod("reverb", "dude", 0, 20)
+	var o2 := e2.add_mod("out", "dude", 0, 60)
+	var din2: Array = SynthMods.def("reverb")["ins"]
+	var ain2: int = maxi(0, din2.find("IN"))
+	e2.patch(v2, 3, r2i, ain2)
+	e2.patch(r2i, 0, o2, 0)
+	var jump2 := 0.0
+	var prev2 := 0.0
+	var tailmax := 0.0
+	for blk3 in 220:
+		if blk3 == 60:
+			e2.unpatch(r2i, true, ain2)
+		e2._block()
+		var base3 := (1 + r2i * SynthEngine.MAXOUT + 0) * SynthEngine.BLK
+		for k3 in SynthEngine.BLK:
+			var v3: float = e2._bus[base3 + k3]
+			if blk3 > 64:
+				jump2 = maxf(jump2, absf(v3 - prev2))
+				tailmax = maxf(tailmax, absf(v3))
+			prev2 = v3
+	print("REVERB baseline (plain reverb): worst jump=%.3f over tail peak %.3f" % [
+		jump2, tailmax])
+	print("REVERB done")
+	get_tree().quit()
+
+
+## CTD_TEST=53 -- every synth panel, checked for controls sitting on top
+## of each other or hanging off the faceplate. "no UI in the wrong place"
+## as a number, not an opinion.
+func _panel_audit() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var JR := SynthMods.JACK_R * 1.5
+	var KR := SynthMods.KNOB_R
+	var bad := 0
+	for id in SynthMods.ids():
+		var d := SynthMods.def(id)
+		var l := SynthMods.layout(id)
+		var w: float = float(l["w"])
+		var items: Array = []
+		for i in (l["knobs"] as Array).size():
+			var k: Vector2 = l["knobs"][i]
+			items.append(["knob %d" % i, Rect2(k - Vector2(KR, KR), Vector2(KR * 2.0, KR * 2.0))])
+		for i in (l["jin"] as Array).size():
+			var j: Vector2 = l["jin"][i]
+			items.append(["jin %d" % i, Rect2(j - Vector2(JR, JR), Vector2(JR * 2.0, JR * 2.0))])
+		for i in (l["jout"] as Array).size():
+			var j2: Vector2 = l["jout"][i]
+			items.append(["jout %d" % i, Rect2(j2 - Vector2(JR, JR), Vector2(JR * 2.0, JR * 2.0))])
+		for i in (l["sw"] as Array).size():
+			items.append(["sw %d" % i, l["sw"][i] as Rect2])
+		if str(d["widget"]) != "":
+			items.append(["widget", l["widget"] as Rect2])
+		var hits: Array = []
+		for a in items.size():
+			var ra: Rect2 = items[a][1]
+			if ra.position.x < -0.5 or ra.position.y < -0.5 \
+					or ra.end.x > w + 0.5 or ra.end.y > SynthMods.PANEL_H + 0.5:
+				hits.append("%s OFF PANEL" % str(items[a][0]))
+			for b in range(a + 1, items.size()):
+				var rb: Rect2 = items[b][1]
+				if ra.intersects(rb):
+					var ov := ra.intersection(rb)
+					if ov.size.x > 0.6 and ov.size.y > 0.6:
+						hits.append("%s x %s" % [str(items[a][0]), str(items[b][0])])
+		if hits.size() > 0:
+			bad += 1
+			print("PANEL ", id, " (", str(d["name"]), "): ", hits)
+	print("PANEL overlaps: ", bad, " / ", SynthMods.ids().size(), " panels")
+	print("PANEL done")
 	get_tree().quit()

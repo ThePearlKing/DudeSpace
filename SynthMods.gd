@@ -768,7 +768,13 @@ static func layout(id: String) -> Dictionary:
 			"grid": wh = 46.0
 			"muse": wh = 34.0
 			"chords": wh = 26.0
-		out["widget"] = Rect2(3.0, y, w - 6.0, wh)
+		# a panel that wears its jacks on the SIDES has to leave those
+		# columns clear -- a full-width widget drew straight over the top
+		# two jacks and buried them
+		if bool(d.get("side", false)):
+			out["widget"] = Rect2(14.0, y, w - 28.0, wh)
+		else:
+			out["widget"] = Rect2(3.0, y, w - 6.0, wh)
 		y += wh + 5.0
 	# --- knobs, left to right, top to bottom
 	var kn: Array = d["knobs"]
@@ -783,14 +789,24 @@ static func layout(id: String) -> Dictionary:
 	if kn.size() > 0:
 		var rows: int = int(ceil(float(kn.size()) / float(kcols)))
 		var cw := (w - 4.0) / float(kcols)
+		# a row whose knobs carry CV jacks underneath needs the room for
+		# them: without this the jacks of row 1 sat inside the knobs of
+		# row 2 (the cosmic reverb complaint)
+		var row_y: Array = []
+		var yy := y + KNOB_R + 2.0
+		for r in rows:
+			row_y.append(yy)
+			yy += KNOB_PITCH_Y
+			if r * kcols < under:
+				yy += 16.0
 		for i in kn.size():
-			var r: int = i / kcols
+			var r2: int = i / kcols
 			var cc: int = i % kcols
-			var in_row: int = mini(kcols, kn.size() - r * kcols)
+			var in_row: int = mini(kcols, kn.size() - r2 * kcols)
 			var pad := (w - 4.0 - float(in_row) * cw) * 0.5
 			out["knobs"].append(Vector2(2.0 + pad + cw * (float(cc) + 0.5),
-				y + KNOB_R + 2.0 + float(r) * KNOB_PITCH_Y))
-		y += float(rows) * KNOB_PITCH_Y + 3.0
+				float(row_y[r2])))
+		y = yy - KNOB_R + 1.0
 	# a jack bolted under each of the first `under` knobs: the CV input
 	# for the thing the knob sets, exactly where your eye expects it
 	var under_pos: Array = []
@@ -798,7 +814,7 @@ static func layout(id: String) -> Dictionary:
 		for i in mini(under, (out["knobs"] as Array).size()):
 			var kpv: Vector2 = out["knobs"][i]
 			under_pos.append(Vector2(kpv.x, kpv.y + KNOB_R + 11.0))
-		y += 15.0
+		# the room for these was already reserved row by row above
 	# --- switches, full width, stacked
 	for i in (d["sw"] as Array).size():
 		out["sw"].append(Rect2(3.0, y, w - 6.0, 9.0))
@@ -852,6 +868,38 @@ static func layout(id: String) -> Dictionary:
 			var pad2 := (w - 2.0 - float(in_row2) * cw2) * 0.5
 			out[key].append(Vector2(1.0 + pad2 + cw2 * (float(cc2) + 0.5),
 				y0 + float(r2) * JACK_PITCH_Y))
+	# --- crowding pass. The jack block is pinned to the BOTTOM edge and
+	# everything else is stacked from the top, so a busy panel can walk
+	# its switches straight into its jacks. Nothing may overlap: give the
+	# widget back the difference and lift the controls clear.
+	var jack_top: float = (iy0 if irows > 0 else oy0) - JACK_R - 3.0
+	var low := 0.0
+	for kq in out["knobs"]:
+		low = maxf(low, float((kq as Vector2).y) + KNOB_R)
+	for sq in out["sw"]:
+		low = maxf(low, (sq as Rect2).end.y)
+	for uq in under_pos:
+		low = maxf(low, float((uq as Vector2).y) + JACK_R)
+	var need: float = low - jack_top
+	if need > 0.0:
+		# the widget is the only element that can afford to give: shrink
+		# it, never below a usable height, and lift everything under it
+		var wr0: Rect2 = out["widget"]
+		var give: float = 0.0
+		if wr0.size.y > 0.0:
+			give = minf(need, maxf(0.0, wr0.size.y - 18.0))
+			wr0.size.y -= give
+			out["widget"] = wr0
+		var lift: float = give
+		if lift > 0.0:
+			for i in (out["knobs"] as Array).size():
+				out["knobs"][i] = (out["knobs"][i] as Vector2) - Vector2(0.0, lift)
+			for i in (out["sw"] as Array).size():
+				var sr: Rect2 = out["sw"][i]
+				sr.position.y -= lift
+				out["sw"][i] = sr
+			for i in mini(under + topin, (out["jin"] as Array).size()):
+				out["jin"][i] = (out["jin"][i] as Vector2) - Vector2(0.0, lift)
 	_lay[id] = out
 	return out
 

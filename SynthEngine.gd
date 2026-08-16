@@ -1840,16 +1840,33 @@ func _proc(mi: int) -> void:
 			var tickC: int = int(s[4])
 			var lfoC: float = s[5]
 			var shw: int = int(s[6])
+			var shph: float = s[14]
 			for i in BLK:
 				lfoC = fmod(lfoC + 0.23 / SR, 1.0)
 				var inpC: float = b[i3 + i] * 0.20
 				# the shimmer voice: the tail read at double speed, so an
 				# octave up, fed back in gently and damped
-				var shr: float = fmod(float(shw) * 0.5, float(COS_SHIM))
-				var sh0: int = int(shr)
-				var sh1: int = (sh0 + 1) % COS_SHIM
-				var shf: float = shr - floor(shr)
-				var shv: float = (dC[sh0] * (1.0 - shf) + dC[sh1] * shf) * shimC * 0.5
+				# TWO read heads half a buffer apart, crossfaded on a
+				# triangle: a read head running at 2x through a buffer
+				# that is being written crosses the write pointer every
+				# lap, and that crossing is an audible tear. Two heads
+				# mean one is always far from the seam.
+				# the read head runs one sample per sample AHEAD of the
+				# write head (rate 2.0 = an octave up); that lead is what
+				# has to be remembered between blocks
+				shph = fmod(shph + 1.0, float(COS_SHIM))
+				var shA: float = fposmod(float(shw) - shph, float(COS_SHIM))
+				var shB: float = fposmod(shA + float(COS_SHIM) * 0.5, float(COS_SHIM))
+				var xf: float = 1.0 - absf(2.0 * shph / float(COS_SHIM) - 1.0)
+				var a0: int = int(shA)
+				var a1: int = (a0 + 1) % COS_SHIM
+				var af: float = shA - floor(shA)
+				var b0: int = int(shB)
+				var b1: int = (b0 + 1) % COS_SHIM
+				var bf: float = shB - floor(shB)
+				var shvA: float = dC[a0] * (1.0 - af) + dC[a1] * af
+				var shvB: float = dC[b0] * (1.0 - bf) + dC[b1] * bf
+				var shv: float = (shvA * xf + shvB * (1.0 - xf)) * shimC * 0.5
 				var accL := 0.0
 				var accR := 0.0
 				var off := COS_SHIM
@@ -1859,9 +1876,14 @@ func _proc(mi: int) -> void:
 					var wob: float = sin(TAU * (lfoC + float(ci) * 0.17)) * driftC * 9.0
 					# LEFT: fixed write pointer, interpolated modulated read
 					var wp: int = tickC % n
-					var rpf: float = float(wp) - float(n) + wob
+					# read the OLDEST sample in the line, not the one
+					# about to be overwritten: wp - n wraps straight back
+					# onto wp, which is a delay of ZERO samples and turns
+					# the tank into a screaming zero-length feedback loop
+					var rpf: float = float(wp) + 1.0 + wob
 					while rpf < 0.0:
 						rpf += float(n)
+					rpf = fmod(rpf, float(n))
 					var r0i: int = int(rpf) % n
 					var r1i: int = (r0i + 1) % n
 					var frq: float = rpf - floor(rpf)
@@ -1873,9 +1895,10 @@ func _proc(mi: int) -> void:
 					# RIGHT: same line, offset so the two sides differ
 					var n2: int = n + 23
 					var wp2: int = tickC % n2
-					var rpf2: float = float(wp2) - float(n2) - wob
+					var rpf2: float = float(wp2) + 1.0 - wob
 					while rpf2 < 0.0:
 						rpf2 += float(n2)
+					rpf2 = fmod(rpf2, float(n2))
 					var r0j: int = int(rpf2) % n2
 					var r1j: int = (r0j + 1) % n2
 					var frq2: float = rpf2 - floor(rpf2)
@@ -1919,6 +1942,7 @@ func _proc(mi: int) -> void:
 			s[4] = float(tickC)
 			s[5] = lfoC
 			s[6] = float(shw)
+			s[14] = shph
 			peak = clampf(absf(b[o0 + BLK - 1]) / 5.0, 0.0, 1.0)
 		"reverb":
 			var fbk: float = 0.72 + kv[0] * 0.26
