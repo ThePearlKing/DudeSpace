@@ -18,6 +18,11 @@ var shell: ArcadeShell = null
 var edit = null
 var sound = null
 var floppy_in: Dictionary = {}          # the disc currently in the slot
+## Boards fitted in the back. A stock cabinet is deliberately a lesser
+## machine: two canvas sizes, four voices, no modulators, everything on
+## whole pixels. The boards are how it grows.
+var boards := {"expand": false, "smooth": false}
+var user_carts: Array = []              # carts written on this machine
 
 var _screen: MeshInstance3D
 var _screen_mat: ShaderMaterial
@@ -28,6 +33,7 @@ var _tex_pal := ImageTexture.new()
 var _attract_t: float = 0.0
 var _open: bool = false
 var _marquee: MeshInstance3D
+var _board_lamp: MeshInstance3D
 
 const SCREEN_SHADER := """
 shader_type spatial;
@@ -76,12 +82,17 @@ func _ready() -> void:
 	con = ArcadeConsole.new()
 	shell = ArcadeShell.new(con)
 	shell.machine = self
-	shell.carts = ArcadeCarts.shelf()
+	_refresh_shelf()
 	edit = ArcadeEdit.new(con, shell)
 	shell.edit = edit
 	sound = ChipSound.new()
 	add_child(sound)
 	con.sound = sound
+	edit.sound = sound
+	_apply_boards()
+	if not _pending.is_empty():
+		_apply_data(_pending)
+		_pending = {}
 	shell.volume = 0.7
 
 ## The box, the stick, the buttons, the coin door, the light on top.
@@ -216,6 +227,10 @@ func _build_cabinet() -> void:
 	var fslot := BoxMesh.new()
 	fslot.size = Vector3(0.2, 0.02, 0.03)
 	part(fslot, Vector3(0.22, 0.86, hd + 0.005), Color("#08080c"), 0.02)
+	var bled := SphereMesh.new()
+	bled.radius = 0.014
+	bled.height = 0.028
+	_board_lamp = part(bled, Vector3(-0.3, 0.86, hd + 0.01), Color("#2a2a30"), 0.2)
 	var fled := SphereMesh.new()
 	fled.radius = 0.012
 	fled.height = 0.024
@@ -315,6 +330,18 @@ func _up(tex: ImageTexture, layer_obj) -> void:
 ## F: sit down at it. The console keeps whatever state the attract loop
 ## left it in -- you are looking at the same machine, closer.
 func use() -> void:
+	var held := Inventory.slot_id(Inventory.selected)
+	if held == "arcboard" or held == "arcsmooth":
+		var kind := "expand" if held == "arcboard" else "smooth"
+		var hud = get_tree().get_first_node_in_group("hud")
+		if install_board(kind):
+			Inventory.remove_res(held, 1)
+			if hud:
+				hud.flash("board fitted: " + ("expansion -- BIG canvas, eight voices, modulators"
+					if kind == "expand" else "smooth motion -- free positioning unlocked"))
+		elif hud:
+			hud.flash("that board is already in this cabinet")
+		return
 	if _open:
 		return
 	_open = true
@@ -326,13 +353,94 @@ func use() -> void:
 	get_tree().current_scene.add_child(ui)
 	Sfx.play("click")
 
+## Everything about this cabinet that must survive a rejoin.
+func save_data() -> Dictionary:
+	var carts: Array = []
+	for c in user_carts:
+		carts.append((c as ArcadeCart).to_dict())
+	return {"boards": boards.duplicate(), "carts": carts,
+		"floppy": floppy_in.duplicate(true), "sel": shell.sel if shell else 0}
+
+var _pending: Dictionary = {}
+
+## Restore runs BEFORE the node enters the tree, so this may arrive
+## while there is no console to hand it to yet. Stash it and apply it the
+## moment _ready has built one.
+func load_data(d: Dictionary) -> void:
+	if shell == null or con == null:
+		_pending = d.duplicate(true)
+		return
+	_apply_data(d)
+
+func _apply_data(d: Dictionary) -> void:
+	var b = d.get("boards", {})
+	if b is Dictionary:
+		boards["expand"] = bool(b.get("expand", false))
+		boards["smooth"] = bool(b.get("smooth", false))
+	user_carts = []
+	for cd in (d.get("carts", []) as Array):
+		if cd is Dictionary:
+			user_carts.append(ArcadeCart.from_dict(cd))
+	var f = d.get("floppy", {})
+	floppy_in = (f as Dictionary).duplicate(true) if f is Dictionary else {}
+	_apply_boards()
+	_refresh_shelf()
+	if shell:
+		shell.sel = clampi(int(d.get("sel", 0)), 0, maxi(0, shell.carts.size() - 1))
+
 func on_ui_closed() -> void:
 	_open = false
 	_push_screen()
 
+## The shelf is the ROMs plus whatever has been written on this machine.
+func _refresh_shelf() -> void:
+	var out: Array = []
+	out.append_array(ArcadeCarts.shelf())
+	out.append_array(user_carts)
+	shell.carts = out
+	shell.sel = clampi(shell.sel, 0, maxi(0, out.size() - 1))
+
+## Start a new cartridge on this cabinet and open it in the workshop.
+func new_cart() -> ArcadeCart:
+	var c := ArcadeCart.blank("CART %d" % (user_carts.size() + 1))
+	user_carts.append(c)
+	_refresh_shelf()
+	return c
+
+## Push what is fitted through to the console and the sound chip.
+func _apply_boards() -> void:
+	if con != null:
+		con.caps = {"expand": bool(boards.get("expand", false)),
+			"smooth": bool(boards.get("smooth", false))}
+	if sound != null:
+		sound.expanded = bool(boards.get("expand", false))
+	if _board_lamp != null:
+		var m := _board_lamp.material_override as StandardMaterial3D
+		if m:
+			m.albedo_color = Color("#3aff6a") if boards.get("expand", false) \
+				else Color("#2a2a30")
+			m.emission = m.albedo_color
+			m.emission_energy_multiplier = 2.0 if boards.get("expand", false) else 0.2
+
+func install_board(kind: String) -> bool:
+	if bool(boards.get(kind, false)):
+		return false
+	boards[kind] = true
+	_apply_boards()
+	Sfx.play("coin", -8.0)
+	return true
+
 func info_text() -> String:
+	var fitted: Array = []
+	if boards.get("expand", false):
+		fitted.append("expansion")
+	if boards.get("smooth", false):
+		fitted.append("smooth motion")
 	return "A DUDE-16 cabinet. No power lead, no coin needed.\n" \
-		+ "F to play. Games live on the shelf inside; floppies go in the slot."
+		+ "F to play. Games live on the shelf inside; floppies go in the slot.\n" \
+		+ ("boards fitted: " + ", ".join(fitted) if not fitted.is_empty()
+			else "stock machine -- no boards fitted") \
+		+ "\n(hold a board and press F to fit it)"
 
 func can_wire() -> bool:
 	return false

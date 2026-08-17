@@ -120,6 +120,13 @@ func _update_menu(delta: float) -> void:
 		sel = (sel - 1 + carts.size()) % carts.size()
 	if _hit(ArcadeConsole.B_A) or _key_hit(KEY_ENTER):
 		_boot_selected()
+	if _key_hit(KEY_N) and machine != null and machine.has_method("new_cart"):
+		var fresh = machine.new_cart()
+		sel = carts.find(fresh)
+		if edit != null:
+			edit.open(fresh)
+			go(S_EDIT)
+		note("new cartridge started")
 	if _hit(ArcadeConsole.B_Y) or _key_hit(KEY_E):
 		if edit != null:
 			edit.open(carts[sel])
@@ -173,10 +180,16 @@ func _update_settings() -> void:
 				# GAME resolution. The console UI never changes size.
 				if sel >= 0 and sel < carts.size():
 					var c: ArcadeCart = carts[sel]
-					c.res_mode = clampi(c.res_mode + dir, 0,
+					var want := clampi(c.res_mode + dir, 0,
 						ArcadeConsole.RES_MODES.size() - 1)
-					note("game canvas: " + str(
-						ArcadeConsole.RES_MODES[c.res_mode]["name"]))
+					var need := str(ArcadeConsole.RES_MODES[want]["needs"])
+					if need != "" and not con.can(need):
+						note("that canvas needs the %s board fitted" % (
+							"expansion" if need == "expand" else "smooth motion"))
+					else:
+						c.res_mode = want
+						note("game canvas: " + str(
+							ArcadeConsole.RES_MODES[c.res_mode]["name"]))
 			1:
 				scanline = clampf(scanline + 0.1 * float(dir), 0.0, 1.0)
 			2:
@@ -309,7 +322,7 @@ func _draw_menu(u) -> void:
 	# footer keys
 	u.rectfill(0, Pixel.UI_H - 20, Pixel.UI_W, Pixel.UI_H, Pixel.BLACK)
 	u.hline(0, Pixel.UI_W, Pixel.UI_H - 21, Pixel.dark(9))
-	PixelFont.draw(u, "A/ENTER PLAY   Y/E EDIT   SELECT SETTINGS   B/ESC STEP AWAY",
+	PixelFont.draw(u, "A PLAY   Y/E EDIT   N NEW CART   SELECT SETTINGS   B/ESC AWAY",
 		8, Pixel.UI_H - 14, Pixel.hue(23))
 
 ## Slow diagonal drift behind the menus. Cheap, and it stops the screen
@@ -430,6 +443,15 @@ func _draw_settings(u) -> void:
 		["SCANLINES", "%d%%" % int(scanline * 100.0), "how much CRT you want"],
 		["VOLUME", "%d%%" % int(volume * 100.0), "the cabinet speaker"],
 	]
+	# what this particular cabinet is, and what it is not
+	var fitted := "stock machine: two canvases, four voices, whole pixels only"
+	if con.can("expand") and con.can("smooth"):
+		fitted = "both boards fitted: everything unlocked"
+	elif con.can("expand"):
+		fitted = "expansion board: BIG canvas, eight voices, modulators"
+	elif con.can("smooth"):
+		fitted = "smooth motion board: free positioning"
+	PixelFont.draw(u, fitted, bx + 12, by + 112, Pixel.light(9))
 	for i in rows.size():
 		var yy := by + 44 + i * 26
 		var on := i == set_sel

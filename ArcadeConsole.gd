@@ -11,12 +11,35 @@ extends RefCounted
 ## byte up in the palette, so the console UI never changes size when a
 ## cartridge changes resolution, and a full-screen fade costs nothing.
 
-## The game canvas has three sizes. The console's own UI never moves.
+## The game canvas has four settings. The console's own UI never moves,
+## whichever one is picked. The last two need boards in the back of the
+## cabinet -- a stock machine will not run them.
 const RES_MODES := [
-	{"name": "SMALL", "w": 320, "h": 180, "desc": "chunkier pixels, less room"},
-	{"name": "NORMAL", "w": 480, "h": 270, "desc": "the house resolution"},
-	{"name": "BIG", "w": 640, "h": 360, "desc": "finer pixels, more room"},
+	{"name": "SMALL", "w": 320, "h": 180, "desc": "chunkier pixels, less room",
+		"needs": ""},
+	{"name": "NORMAL", "w": 480, "h": 270, "desc": "the house resolution",
+		"needs": ""},
+	{"name": "BIG", "w": 640, "h": 360, "desc": "finer pixels, more room",
+		"needs": "expand"},
+	{"name": "FREE MOTION", "w": 960, "h": 540,
+		"desc": "double density: motion stops landing on whole screen pixels",
+		"needs": "smooth"},
 ]
+
+## What is fitted to this cabinet. The shell and the tracker read these
+## before they offer anything the machine cannot do.
+var caps := {"expand": false, "smooth": false}
+
+func can(what: String) -> bool:
+	return bool(caps.get(what, false))
+
+## The highest canvas this cabinet is allowed to run.
+func allowed_res(mode: int) -> int:
+	var m := clampi(mode, 0, RES_MODES.size() - 1)
+	while m > 0 and str(RES_MODES[m]["needs"]) != "" \
+			and not can(str(RES_MODES[m]["needs"])):
+		m -= 1
+	return m
 
 # buttons, in the order btn() sees them
 const B_LEFT := 0
@@ -83,7 +106,7 @@ func _init() -> void:
 		_pal_remap[i] = i
 
 func _set_res(mode: int) -> void:
-	var m: Dictionary = RES_MODES[clampi(mode, 0, RES_MODES.size() - 1)]
+	var m: Dictionary = RES_MODES[allowed_res(mode)]
 	game_w = int(m["w"])
 	game_h = int(m["h"])
 	if bg == null:

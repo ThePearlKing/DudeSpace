@@ -151,6 +151,12 @@ class Song extends RefCounted:
 	var bpm: int = 125
 	var speed: int = 6             # ticks per row
 	var rows: int = 64
+	## Time signature. rows_per_beat is what makes it mean anything: at
+	## 4 rows to the beat and 4 beats to the bar, every 16th row starts a
+	## bar and the grid says so.
+	var sig_num: int = 4
+	var sig_den: int = 4
+	var rows_per_beat: int = 4
 	var patterns: Array = []       # Array of PackedInt32Array
 	var order: Array = [0]
 	var insts: Array = []          # Array[Inst]
@@ -186,7 +192,9 @@ class Song extends RefCounted:
 		for i in insts:
 			ins.append((i as Inst).to_dict())
 		return {"kind": "song", "title": title, "bpm": bpm, "speed": speed,
-			"rows": rows, "patterns": pats, "order": order.duplicate(),
+			"rows": rows, "sig_num": sig_num, "sig_den": sig_den,
+			"rows_per_beat": rows_per_beat,
+			"patterns": pats, "order": order.duplicate(),
 			"insts": ins, "delay_time": delay_time, "delay_fb": delay_fb,
 			"room": room}
 
@@ -196,6 +204,9 @@ class Song extends RefCounted:
 		s.bpm = int(d.get("bpm", 125))
 		s.speed = int(d.get("speed", 6))
 		s.rows = int(d.get("rows", 64))
+		s.sig_num = int(d.get("sig_num", 4))
+		s.sig_den = int(d.get("sig_den", 4))
+		s.rows_per_beat = int(d.get("rows_per_beat", 4))
 		s.delay_time = float(d.get("delay_time", 0.22))
 		s.delay_fb = float(d.get("delay_fb", 0.35))
 		s.room = float(d.get("room", 0.25))
@@ -417,6 +428,12 @@ var row: int = 0
 var tick: int = 0
 var volume: float = 0.7
 var follow: bool = true            # tracker cursor rides the playhead
+## A stock cabinet runs half the chip: four voices, no filters, no LFOs,
+## no sends. The expansion board wakes the rest of it up.
+var expanded: bool = false
+
+func voices() -> int:
+	return CHANS if expanded else 4
 var cart_sfx: Array = []
 
 var _ply: AudioStreamPlayer3D
@@ -473,8 +490,11 @@ func _exit_tree() -> void:
 		_thread = null
 
 func _recalc_tempo() -> void:
-	# tracker convention: a tick is 2.5/bpm seconds
-	_samples_per_tick = SR * 2.5 / float(maxi(32, song.bpm))
+	# BPM means beats, not tracker rows: a beat is rows_per_beat rows and
+	# a row is `speed` ticks, so a 3/4 song at 90 actually runs at 90.
+	var rpb := float(maxi(1, song.rows_per_beat))
+	var spd := float(maxi(1, song.speed))
+	_samples_per_tick = SR * 60.0 / (float(maxi(20, song.bpm)) * rpb * spd)
 
 ## The audio thread. Everything below runs off the main loop, which is
 ## why a busy frame in the game never stutters the music.
@@ -522,7 +542,7 @@ func _block() -> void:
 	dl_l.resize(BLK)
 	dl_r.resize(BLK)
 	room.resize(BLK)
-	for ci in CHANS:
+	for ci in voices():
 		var c: Chan = chans[ci]
 		if c.stage == 0 or c.mute:
 			c.last_out = 0.0
@@ -532,8 +552,8 @@ func _block() -> void:
 		var lg := sqrt(0.5 * (1.0 - pan))
 		var rg := sqrt(0.5 * (1.0 + pan))
 		_render_voice(c, inst)
-		var ds := inst.delay_send
-		var rs := inst.room_send
+		var ds := inst.delay_send if expanded else 0.0
+		var rs := inst.room_send if expanded else 0.0
 		var peak := 0.0
 		for i in BLK:
 			var v := _vbuf[i]
@@ -558,7 +578,7 @@ func _block() -> void:
 		_dl[_dl_i] = Vector2(clampf(dl_l[i] + echo.y * fb, -3.0, 3.0),
 			clampf(dl_r[i] + echo.x * fb, -3.0, 3.0))
 		_dl_i = (_dl_i + 1) % dsize
-		if song.room > 0.001:
+		if expanded and song.room > 0.001:
 			var wet := 0.0
 			for k in rsize:
 				var buf: PackedFloat32Array = _room_bufs[k]
@@ -594,7 +614,7 @@ func _render_voice(c: Chan, inst: Inst) -> void:
 	var dec := maxf(0.0005, inst.dec)
 	var sus := inst.sus
 	var rel := maxf(0.0005, inst.rel)
-	var has_filter: bool = inst.cut < 0.99 or inst.cut_env != 0.0
+	var has_filter: bool = expanded and (inst.cut < 0.99 or inst.cut_env != 0.0)
 	var samp_n := inst.sample.size()
 	var samp_ratio := 1.0
 	if wave == W_SAMPLE and samp_n > 4:
@@ -608,6 +628,7 @@ func _render_voice(c: Chan, inst: Inst) -> void:
 		if c.ctl_i <= 0:
 			c.ctl_i = CTL
 			var semi := c.note
+			var mods := expanded
 			if c.slide != 0.0 and c.target_note >= 0.0:
 				var d := c.slide * dt * float(CTL)
 				if c.note < c.target_note:
@@ -617,7 +638,7 @@ func _render_voice(c: Chan, inst: Inst) -> void:
 				semi = c.note
 			if inst.pitch_env != 0.0:
 				semi += inst.pitch_env * exp(-c.t_on / maxf(0.001, inst.pitch_time))
-			if inst.vib_depth > 0.0 and c.t_on > inst.vib_delay:
+			if mods and inst.vib_depth > 0.0 and c.t_on > inst.vib_delay:
 				c.lfo += TAU * inst.vib_rate * dt * float(CTL)
 				semi += sin(c.lfo) * inst.vib_depth
 			var f0 := clampf(440.0 * pow(2.0, (semi - 57.0) / 12.0), 8.0, SR * 0.48)
@@ -628,7 +649,7 @@ func _render_voice(c: Chan, inst: Inst) -> void:
 					* exp(-c.t_on / maxf(0.001, inst.cut_time)), 0.02, 1.0)
 			c.c_fc = minf(0.9, 2.0 * sin(PI * clampf(fc0, 0.005, 0.32) * 0.5))
 			c.c_duty = inst.duty
-			if inst.pwm_depth > 0.0:
+			if mods and inst.pwm_depth > 0.0:
 				c.pwm_phase += TAU * inst.pwm_rate * dt * float(CTL)
 				c.c_duty = clampf(inst.duty + sin(c.pwm_phase) * inst.pwm_depth,
 					0.05, 0.95)
@@ -779,6 +800,7 @@ func _play_row() -> void:
 			_break_to = c.fx_p
 		if c.fx == 15 and c.fx_p > 0:
 			song.speed = c.fx_p
+			_recalc_tempo()
 		c.arp_i = 0
 
 func _trigger(c: Chan, semi: float) -> void:
@@ -903,15 +925,25 @@ static func demo_song() -> Song:
 	s.bpm = 124
 	s.speed = 6
 	s.rows = 64
+	s.rows_per_beat = 4
+	s.sig_num = 4
 	s.insts = default_bank()
 	s.order = [0, 1, 0, 2]
+	# widen the mix: the drums hold the middle, everything else has a
+	# side of the room to sit on
+	s.insts[1].pan = -0.45          # soft pulse, left
+	s.insts[3].pan = 0.4            # saw lead, right
+	s.insts[4].pan = -0.2           # pad, a little left
+	s.insts[6].pan = 0.35           # bell, right
+	s.insts[9].pan = 0.5            # hat
+	s.insts[10].pan = -0.5          # open hat
+	s.insts[11].pan = 0.3           # clap
 	for p in 3:
 		s.pattern(p)
 	var bass := [36, 36, 43, 36, 39, 39, 34, 34]
 	var lead := [72, 75, 79, 75, 77, 72, 70, 67]
 	for p in 3:
 		for r in 64:
-			# drums: kick on the beat, snare on the backbeat, hats in eighths
 			if r % 8 == 0:
 				s.set_cell(p, r, 0, [36 + 2, 8, 0, 0, 0])
 			if r % 16 == 8:
@@ -920,17 +952,20 @@ static func demo_song() -> Song:
 				s.set_cell(p, r, 2, [60 + 2, 10, 40, 0, 0])
 			if r % 32 == 30 and p > 0:
 				s.set_cell(p, r, 1, [50 + 2, 12, 0, 0, 0])
-			# bass, walking
 			if r % 4 == 0:
-				s.set_cell(p, r, 3, [int(bass[(r / 4) % 8]) + 2, 3, 0, 0, 0])
-			# pad chords, held
+				var bn: int = int(bass[(r / 4) % 8]) + 2
+				# every fourth bass note glides into the next one
+				var fx := 3 if (r / 4) % 4 == 3 else 0
+				s.set_cell(p, r, 3, [bn, 3, 0, fx, 6 if fx == 3 else 0])
 			if r % 16 == 0:
 				var root: int = int(bass[(r / 4) % 8]) + 12
 				s.set_cell(p, r, 4, [root + 2, 5, 30, 0, 0])
 				s.set_cell(p, r, 5, [root + 7 + 2, 5, 26, 0, 0])
-			# lead, only after the first pattern
 			if p > 0 and r % 8 == 4:
-				s.set_cell(p, r, 6, [int(lead[(r / 8) % 8]) + 2, 1, 48, 0, 0])
+				# the lead arpeggiates on the long notes
+				var ln: int = int(lead[(r / 8) % 8]) + 2
+				s.set_cell(p, r, 6, [ln, 1, 48, 0 if r % 16 == 4 else 0,
+					0x37 if r % 16 == 4 else 0])
 			if p == 2 and r % 8 == 6:
 				s.set_cell(p, r, 7, [int(lead[(r / 8) % 8]) - 12 + 2, 4, 36, 0, 0])
 	return s

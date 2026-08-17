@@ -7687,6 +7687,8 @@ func collect_world() -> Array:
 			e["fyaw"] = atan2(zz.x, zz.z)
 		if n is Factory.BenchLab:
 			e["bottles"] = n.bottles.duplicate()
+		if n is ArcadeMachine:
+			e["arcade"] = n.save_data()
 		if n is Factory.AlloyFurnace or n is Factory.Processor:
 			e["recipe"] = n.recipe
 			e["charge"] = n.store.duplicate()
@@ -7766,6 +7768,10 @@ func restore_world() -> void:
 			if bt is Dictionary:
 				for k in bt.keys():
 					n.bottles[str(k)] = int(bt[k])
+		if n is ArcadeMachine:
+			var ad = e.get("arcade", {})
+			if ad is Dictionary:
+				n.load_data(ad)
 		if n is Factory.AlloyFurnace or n is Factory.Processor:
 			n.recipe = str(e.get("recipe", n.recipe))
 			var chg = e.get("charge", {})
@@ -10623,11 +10629,65 @@ func _arcade_test() -> void:
 	con2.step(1.0 / 60.0)
 	print("ARCADE edited cart runs: crashed=", con2.crashed, " ", con2.crash_msg)
 	# --- the palette is what was promised
+	# --- boards: a stock cabinet must actually be the lesser machine
+	print("ARCADE stock: canvases=", cab.con.allowed_res(3), " voices=",
+		cab.sound.voices(), " (BIG and FREE MOTION should fall back to 1)")
+	cab.install_board("expand")
+	print("ARCADE with expansion: canvas cap=", cab.con.allowed_res(3),
+		" voices=", cab.sound.voices())
+	cab.install_board("smooth")
+	print("ARCADE with both: canvas cap=", cab.con.allowed_res(3), " -> ",
+		ArcadeConsole.RES_MODES[cab.con.allowed_res(3)]["name"])
+	# --- a cabinet remembers its boards and its own cartridges
+	var made := cab.new_cart()
+	made.name = "HOMEMADE"
+	made.code = "function _draw() cls(9) end"
+	var saved := cab.save_data()
+	var cab2 := ArcadeMachine.new()
+	cab2.load_data(saved)
+	add_child(cab2)
+	cab2.global_transform = cab.global_transform
+	await get_tree().create_timer(0.4).timeout
+	print("ARCADE reload: boards=", cab2.boards, " own carts=",
+		cab2.user_carts.size(), " first=",
+		str(cab2.user_carts[0].name) if cab2.user_carts.size() > 0 else "-")
+	cab2.queue_free()
 	print("ARCADE palette: ", Pixel.color_count(), " colours (2 + ",
 		Pixel.HUES.size(), " hues x 3)")
 	print("ARCADE fonts: ", PixelFont.NAMES)
 	print("ARCADE resolutions: ", ArcadeConsole.RES_MODES.map(
 		func(m): return "%s %dx%d" % [m["name"], m["w"], m["h"]]))
+	# --- the tracker: notes go in, the song changes, slides exist
+	sh.edit.tab = ArcadeEdit.T_SOUND
+	sh.edit.sound = cab.sound
+	sh.edit.song = ChipSound.demo_song()
+	sh.edit.cart = ArcadeCart.blank("SONGTEST")
+	sh.edit.trk_row = 0
+	sh.edit.trk_ch = 0
+	sh.edit.trk_col = 0
+	sh.edit.trk_oct = 4
+	cab.con.key_hits.clear()
+	cab.con.key_hits[KEY_Z] = true      # C in the current octave
+	sh.edit.update(1.0 / 60.0)
+	cab.con.key_hits.clear()
+	var typed_cell: Array = sh.edit.song.cell(0, 0, 0)
+	print("ARCADE tracker note entry: cell=", typed_cell, " name=",
+		ArcadeEdit.note_name(int(typed_cell[0])))
+	# a glide, written into the effect column
+	sh.edit.song.set_cell(0, 4, 0, [60 + 2, 1, 0, 3, 6])
+	sh.edit.song.sig_num = 3
+	sh.edit.song.rows_per_beat = 6
+	sh.edit.commit()
+	var round_trip := ChipSound.Song.from_dict(sh.edit.cart.song)
+	print("ARCADE song round-trip: %d/%d at %d rows/beat, %d bpm, cell4=%s" % [
+		round_trip.sig_num, round_trip.sig_den, round_trip.rows_per_beat,
+		round_trip.bpm, str(round_trip.cell(0, 4, 0))])
+	var t4 := Time.get_ticks_usec()
+	for i in 30:
+		sh.update(1.0 / 60.0)
+		sh.draw()
+	print("ARCADE editor SOUND  %.2f ms/frame" % [
+		float(Time.get_ticks_usec() - t4) / 30000.0])
 	# --- the sound chip: does it make a noise, and can it keep up?
 	var snd: ChipSound = cab.sound
 	snd.set_song(ChipSound.demo_song())
@@ -10649,15 +10709,18 @@ func _arcade_test() -> void:
 		peak, sqrt(rms / float(n)), dsp_ms, audio_ms, dsp_ms / audio_ms * 100.0])
 	# stereo: the mix must not be two copies of the same channel
 	var diff := 0.0
+	var widest := 0.0
 	var cnt := 0
-	for b in 120:
+	for b in 400:
 		snd._block()
 		for i in ChipSound.BLK:
 			var v2: Vector2 = snd._mix[i]
-			diff += absf(v2.x - v2.y)
+			var d2 := absf(v2.x - v2.y)
+			diff += d2
+			widest = maxf(widest, d2)
 			cnt += 1
-	print("ARCADE sound stereo spread: %.3f  instruments=%d  channels=%d" % [
-		diff / float(cnt), snd.song.insts.size(), ChipSound.CHANS])
+	print("ARCADE sound stereo: mean spread %.3f, widest %.3f  instruments=%d channels=%d" % [
+		diff / float(cnt), widest, snd.song.insts.size(), ChipSound.CHANS])
 	# every instrument in the bank must actually sound
 	var silent: Array = []
 	for ii in snd.song.insts.size():
