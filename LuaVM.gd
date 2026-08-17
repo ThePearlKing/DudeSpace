@@ -1437,6 +1437,48 @@ func _describe(node) -> String:
 		return "'%s'" % str(node[2][1])
 	return "that value"
 
+## THE COMPUTERS' ENTRY POINT. MiniLua took a source string, a table of
+## variables and a table of host functions, and handed the variables
+## back. This does the same thing, so the programmable machines get the
+## whole language -- functions, loops, tables, the lot -- without any of
+## them having to change how they call it.
+static func run_env(src: String, env: Dictionary, funcs: Dictionary = {},
+		step_budget: int = 400000) -> Dictionary:
+	var vm := LuaVM.new()
+	vm.open_libs()
+	vm.budget = step_budget
+	for k in env.keys():
+		var v = env[k]
+		if v is int:
+			v = float(v)
+		vm.G.rawset(str(k), v)
+	for k in funcs.keys():
+		var f: Callable = funcs[k]
+		# host functions in here return one value; the VM wants a list
+		vm.G.rawset(str(k), Callable(HostShim.new(f), "call_one"))
+	if not vm.run(src):
+		return {"err": vm.err}
+	for k in env.keys():
+		var got = vm.G.rawget(str(k))
+		if got != null:
+			env[k] = got
+	return {"env": env, "out": vm.out_lines}
+
+## Wraps a one-value host function as a VM-shaped one.
+class HostShim extends RefCounted:
+	var f: Callable
+	func _init(fn: Callable) -> void:
+		f = fn
+	func call_one(args: Array) -> Array:
+		var r = f.call(args)
+		return [] if r == null else [r]
+
+## MiniLua had this for reading a value as a number; keep the name so
+## call sites move over unchanged.
+static func _numv(v) -> float:
+	var n = _tonum(v)
+	return float(n) if n != null else 0.0
+
 # =========================================================== the library
 
 ## Install the standard library into the globals table. The host adds

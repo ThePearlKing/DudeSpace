@@ -10736,6 +10736,40 @@ func _arcade_test() -> void:
 		if e < 0.5:
 			silent.append(str(snd.song.insts[ii].name))
 	print("ARCADE silent instruments: ", silent, "   (must be empty)")
+	# --- floppies: one format, four kinds, and one conversion that is
+	# deliberately impossible
+	Inventory.floppy_data = []
+	Inventory.add_res("floppy", 5)
+	var romcart: ArcadeCart = ArcadeCarts.shelf()[1]
+	print("ARCADE disc write cart: ", ArcadeDisc.write(ArcadeDisc.make(
+		"cart", romcart.name, romcart.to_dict())))
+	print("ARCADE disc write script: ", ArcadeDisc.write(ArcadeDisc.make(
+		"script", "SORTER", {"code": "function route(x) return x*2 end\nport = route(3)"})))
+	var back := ArcadeCart.from_dict(ArcadeDisc.take(0))
+	print("ARCADE disc read cart: name=", back.name, " code=", back.code.length(),
+		" chars  sheet=", back.sheet.size(), " bytes")
+	# the same script runs on a computer, because it is the same Lua
+	var res := LuaVM.run_env(str(ArcadeDisc.take(1).get("code", "")),
+		{"port": 0}, {})
+	print("ARCADE computer runs disc script: err=", res.get("err", "none"),
+		" port=", LuaVM.tostr(res.get("env", {}).get("port", 0)))
+	# a modular synth patch, rendered into an arcade instrument
+	var ms := ModSynth.new()
+	add_child(ms)
+	ms.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 7.0)
+	await get_tree().create_timer(0.8).timeout
+	var patch_disc := ArcadeDisc.make("patch", "RACK", ms.patch_data())
+	var inst := ArcadeDisc.patch_to_inst(patch_disc)
+	print("ARCADE patch -> instrument: %s, %d samples rendered (%.2fs)" % [
+		inst.name, inst.sample.size(), float(inst.sample.size()) / ChipSound.SR])
+	print("ARCADE what reads what: patch->modsynth=%s patch->arcade=%s song->modsynth=%s song->arcade=%s script->computer=%s" % [
+		ArcadeDisc.can_read(patch_disc, "modsynth"),
+		ArcadeDisc.can_read(patch_disc, "arcade"),
+		ArcadeDisc.can_read({"kind": "song"}, "modsynth"),
+		ArcadeDisc.can_read({"kind": "song"}, "arcade"),
+		ArcadeDisc.can_read({"kind": "script"}, "computer")])
+	ms.queue_free()
 	cab.queue_free()
 	print("ARCADE done")
 

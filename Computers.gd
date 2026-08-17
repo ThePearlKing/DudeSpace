@@ -1,6 +1,8 @@
 class_name Computers
 extends RefCounted
-## The programmable machines. Scripts are Lua-ish (see MiniLua), edited
+## The programmable machines. Scripts are Lua -- the same Lua the
+## arcade cabinets run, so a script written here fits on a floppy and
+## drops straight into a cartridge. Edited
 ## in-game via the code editor, executed twice a second.
 
 ## ELECTRIC COMPUTER: reads its energy input, gates up to 8 output wires.
@@ -117,14 +119,14 @@ class EComputer extends Machine:
 				"clear": func(_a: Array): cclear(); return 0,
 				"input": func(_a: Array): return console_input,
 			}
-			var res := MiniLua.run(script_src, env, funcs)
+			var res := LuaVM.run_env(script_src, env, funcs)
 			if res.has("err"):
 				last_err = res["err"]
 			else:
 				last_err = ""
 				var e: Dictionary = res["env"]
 				for i in 8:
-					outs[i] = MiniLua._truthy(e.get("out%d" % (i + 1), 0))
+					outs[i] = LuaVM._truthy(e.get("out%d" % (i + 1), 0))
 		# push energy ONLY on enabled ports (port chosen with the wiring tool)
 		for k in wires_out.size():
 			var w = wires_out[k]
@@ -151,10 +153,12 @@ class EComputer extends Machine:
 		return "energy: %.0f / %.0f EU\nout flags: %s\nwired to ports: %s%s" % [buf, buf_cap, flags, ports, e]
 
 	func actions() -> Array:
-		return [["Edit Code", func() -> void:
+		var out: Array = [["Edit Code", func() -> void:
 			var ui := get_tree().get_first_node_in_group("code_ui")
 			if ui and ui.has_method("open_for"):
 				ui.open_for(self)]]
+		out.append_array(Computers.disc_actions(self))
+		return out
 
 ## SORTER COMPUTER: items funnel IN, your script routes them out.
 ##   env: funnel = current item id (string), port starts 0 (= hold)
@@ -257,13 +261,13 @@ class SorterComputer extends Machine:
 		var funcs := {
 			"sort": func(args: Array):
 				if args.size() >= 2:
-					_route = int(MiniLua._numv(args[1]))
+					_route = int(LuaVM._numv(args[1]))
 				return 0,
 			"print": func(args: Array): cprint(args); return 0,
 			"clear": func(_a: Array): cclear(); return 0,
 			"input": func(_a: Array): return console_input,
 		}
-		var res := MiniLua.run(script_src, env, funcs)
+		var res := LuaVM.run_env(script_src, env, funcs)
 		if res.has("err"):
 			last_err = res["err"]
 			return
@@ -286,12 +290,14 @@ class SorterComputer extends Machine:
 		return "holding: %s\nfunnel ports wired: %d%s" % [Inventory.slot_text(in_slot), funnels_out.size(), e]
 
 	func actions() -> Array:
-		return [
+		var out: Array = [
 			["Edit Code", func() -> void:
 				var ui := get_tree().get_first_node_in_group("code_ui")
 				if ui and ui.has_method("open_for"):
 					ui.open_for(self)],
 		]
+		out.append_array(Computers.disc_actions(self))
+		return out
 
 	func take_output_from_in() -> void:
 		if str(in_slot["id"]) == "":
@@ -300,3 +306,48 @@ class SorterComputer extends Machine:
 		Inventory.add_res(str(in_slot["id"]), int(in_slot["n"]))
 		in_slot = {"id": "", "n": 0}
 		Sfx.play("coin")
+
+
+## Scripts go on floppies like everything else, and the arcade reads the
+## same discs -- a sorter routine and a cartridge are the same language
+## now, so the disc does not care which machine wrote it.
+static func disc_actions(m) -> Array:
+	return [
+		["Write script to a floppy", func() -> void:
+			var hud = m.get_tree().get_first_node_in_group("hud")
+			if Inventory.res_count("floppy") <= 0:
+				Sfx.play("denied")
+				if hud:
+					hud.flash("no blank floppies -- cut some at a disc maker")
+				return
+			var disc := ArcadeDisc.make("script", str(m.title) + " SCRIPT",
+				{"code": m.script_src})
+			if ArcadeDisc.write(disc):
+				Sfx.play("coin", -10.0)
+				if hud:
+					hud.flash("script written to floppy")],
+		["Load a script from a floppy", func() -> void:
+			var hud2 = m.get_tree().get_first_node_in_group("hud")
+			var opts: Array = []
+			var carried := ArcadeDisc.carried()
+			for i in carried.size():
+				var d: Dictionary = carried[i]
+				if ArcadeDisc.kind_of(d) != "script":
+					continue
+				opts.append({"id": str(i), "label": ArcadeDisc.label(d)})
+			if opts.is_empty():
+				Sfx.play("denied")
+				if hud2:
+					hud2.flash("no script discs in your bags")
+				return
+			var pui := PickUI.new().configure("SCRIPT DISCS", opts,
+				func(pick: String) -> void:
+					var d2 := ArcadeDisc.take(int(pick))
+					if d2.is_empty():
+						return
+					m.script_src = str(d2.get("code", m.script_src))
+					Sfx.play("click")
+					if hud2:
+						hud2.flash("script loaded: " + str(d2.get("name", "?"))))
+			m.get_tree().current_scene.add_child(pui)],
+	]

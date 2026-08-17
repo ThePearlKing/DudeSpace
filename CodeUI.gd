@@ -149,7 +149,7 @@ func _test(src: String) -> String:
 		"clear": func(_a: Array): return 0,
 		"input": func(_a: Array): return "",
 	}
-	var res := MiniLua.run(src, env, funcs)
+	var res := LuaVM.run_env(src, env, funcs)
 	return str(res.get("err", ""))
 
 func _check() -> void:

@@ -681,8 +681,55 @@ func use() -> void:
 	get_tree().current_scene.add_child(ui)
 
 func info_text() -> String:
-	return "%d modules · %d cables · %.1f EU/s" % [engine.mods.size(),
-		engine.cables.size(), drain()]
+	return "%d modules · %d cables · %.1f EU/s\nblank floppies: %d   written: %d" % [
+		engine.mods.size(), engine.cables.size(), drain(),
+		Inventory.res_count("floppy"), ArcadeDisc.carried().size()]
+
+## Patches ride on the same floppies as everything else, which is how a
+## rack you built here ends up as an instrument in somebody's arcade
+## cabinet on another planet.
+func actions() -> Array:
+	return [
+		["Write this patch to a floppy", func() -> void:
+			if Inventory.res_count("floppy") <= 0:
+				Sfx.play("denied")
+				var hud = get_tree().get_first_node_in_group("hud")
+				if hud:
+					hud.flash("no blank floppies -- cut some at a disc maker")
+				return
+			var disc := ArcadeDisc.make("patch", "PATCH %d MOD" % engine.mods.size(),
+				patch_data())
+			if ArcadeDisc.write(disc):
+				Sfx.play("coin", -10.0)
+				var hud2 = get_tree().get_first_node_in_group("hud")
+				if hud2:
+					hud2.flash("patch written to floppy")],
+		["Load a patch from a floppy", func() -> void:
+			var opts: Array = []
+			var carried := ArcadeDisc.carried()
+			for i in carried.size():
+				var d: Dictionary = carried[i]
+				if ArcadeDisc.kind_of(d) != "patch":
+					continue
+				opts.append({"id": str(i), "label": ArcadeDisc.label(d)})
+			if opts.is_empty():
+				Sfx.play("denied")
+				var hud3 = get_tree().get_first_node_in_group("hud")
+				if hud3:
+					hud3.flash("no patch discs in your bags")
+				return
+			var pui := PickUI.new().configure("PATCH DISCS", opts,
+				func(pick: String) -> void:
+					var d2 := ArcadeDisc.take(int(pick))
+					if d2.is_empty():
+						return
+					apply_data(d2)
+					Sfx.play("click")
+					var hud4 = get_tree().get_first_node_in_group("hud")
+					if hud4:
+						hud4.flash("patch loaded: " + str(d2.get("name", "?"))))
+			get_tree().current_scene.add_child(pui)],
+	]
 
 # ------------------------------------------------------------ save/load
 

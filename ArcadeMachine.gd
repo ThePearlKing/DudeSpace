@@ -407,6 +407,12 @@ func new_cart() -> ArcadeCart:
 	_refresh_shelf()
 	return c
 
+## A cartridge read off a floppy joins this machine's own shelf.
+func adopt_cart(c: ArcadeCart) -> void:
+	c.readonly = false
+	user_carts.append(c)
+	_refresh_shelf()
+
 ## Push what is fitted through to the console and the sound chip.
 func _apply_boards() -> void:
 	if con != null:

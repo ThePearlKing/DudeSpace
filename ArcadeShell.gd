@@ -16,6 +16,7 @@ const S_PAUSE := 3
 const S_CRASH := 4
 const S_EDIT := 5
 const S_SETTINGS := 6
+const S_DISC := 7
 
 var con: ArcadeConsole = null
 var edit = null                     # ArcadeEdit, set by the host
@@ -38,8 +39,11 @@ var _wipe: float = 0.0
 var _wipe_dir: int = 0
 var _next_state: int = -1
 
-const MENU_ITEMS := ["RESUME", "RESTART", "EDIT THIS CART", "SETTINGS",
-	"EJECT / SHELF", "LEAVE CABINET"]
+const MENU_ITEMS := ["RESUME", "RESTART", "EDIT THIS CART", "FLOPPY SLOT",
+	"SETTINGS", "EJECT / SHELF", "LEAVE CABINET"]
+
+var disc_sel: int = 0
+var disc_side: int = 0          # 0 = discs you carry, 1 = things to write
 
 func _init(c: ArcadeConsole) -> void:
 	con = c
@@ -96,6 +100,8 @@ func update(delta: float) -> void:
 				go(S_MENU)
 		S_SETTINGS:
 			_update_settings()
+		S_DISC:
+			_update_disc()
 		S_EDIT:
 			if edit != null:
 				edit.update(delta)
@@ -133,6 +139,8 @@ func _update_menu(delta: float) -> void:
 			go(S_EDIT)
 	if _hit(ArcadeConsole.B_SELECT):
 		go(S_SETTINGS)
+	if _hit(ArcadeConsole.B_X) or _key_hit(KEY_F):
+		go(S_DISC)
 	if _hit(ArcadeConsole.B_B) or _key_hit(KEY_ESCAPE):
 		quit_requested = true
 
@@ -163,9 +171,10 @@ func _update_pause() -> void:
 			if edit != null:
 				edit.open(carts[sel])
 				go(S_EDIT)
-		3: go(S_SETTINGS)
-		4: go(S_MENU)
-		5: quit_requested = true
+		3: go(S_DISC)
+		4: go(S_SETTINGS)
+		5: go(S_MENU)
+		6: quit_requested = true
 
 func _update_settings() -> void:
 	var rows := 3
@@ -212,6 +221,7 @@ func draw() -> void:
 		S_PAUSE: _draw_pause(u)
 		S_CRASH: _draw_crash(u)
 		S_SETTINGS: _draw_settings(u)
+		S_DISC: _draw_disc(u)
 		S_EDIT:
 			if edit != null:
 				edit.draw(u)
@@ -466,3 +476,162 @@ func _draw_settings(u) -> void:
 		bx + 12, by + 124, Pixel.hue(23))
 	PixelFont.draw(u, "always 480x270, whatever the cartridge is doing.",
 		bx + 12, by + 134, Pixel.hue(23))
+
+# --- the floppy slot ---------------------------------------------------
+## Left: what you are carrying. Right: what this machine could write.
+## Reading a disc does the obvious thing for its kind, and the one
+## conversion that does not exist (song back into a patch) is simply not
+## on the list.
+func _write_options() -> Array:
+	var out: Array = []
+	if sel >= 0 and sel < carts.size():
+		var c: ArcadeCart = carts[sel]
+		out.append(["whole cartridge: " + c.name, "cart"])
+		out.append(["just the code, as a script", "script"])
+		out.append(["the song, for another cabinet", "song"])
+	return out
+
+func _update_disc() -> void:
+	var carried: Array = ArcadeDisc.carried()
+	var writes := _write_options()
+	if _hit(ArcadeConsole.B_LEFT):
+		disc_side = 0
+	if _hit(ArcadeConsole.B_RIGHT):
+		disc_side = 1
+	var n := carried.size() if disc_side == 0 else writes.size()
+	if n > 0:
+		if _hit(ArcadeConsole.B_DOWN):
+			disc_sel = (disc_sel + 1) % n
+		if _hit(ArcadeConsole.B_UP):
+			disc_sel = (disc_sel - 1 + n) % n
+	if _hit(ArcadeConsole.B_B) or _key_hit(KEY_ESCAPE):
+		go(S_MENU)
+		return
+	if not (_hit(ArcadeConsole.B_A) or _key_hit(KEY_ENTER)):
+		return
+	if disc_side == 0:
+		if disc_sel < carried.size():
+			_read_disc(disc_sel)
+	elif disc_sel < writes.size():
+		_write_disc(str(writes[disc_sel][1]))
+
+func _read_disc(i: int) -> void:
+	var d: Dictionary = ArcadeDisc.take(i)
+	if d.is_empty():
+		return
+	match ArcadeDisc.kind_of(d):
+		"cart":
+			var c := ArcadeCart.from_dict(d)
+			if machine != null and machine.has_method("adopt_cart"):
+				machine.adopt_cart(c)
+			carts = machine.shell.carts if machine != null else carts
+			sel = carts.find(c)
+			note("loaded cartridge: " + c.name)
+		"script":
+			if edit != null and sel < carts.size():
+				if carts[sel].readonly:
+					note("that cartridge is a ROM -- start a new one first (N)")
+					return
+				edit.open(carts[sel])
+				edit.lines = str(d.get("code", "")).split("\n")
+				edit.commit()
+				note("script loaded into the code editor")
+		"song":
+			if edit != null:
+				edit.song = ChipSound.Song.from_dict(d)
+				edit.commit()
+				if con.sound != null:
+					con.sound.set_song(edit.song)
+				note("song loaded: " + str(d.get("title", d.get("name", "?"))))
+		"patch":
+			if edit != null and edit.song != null:
+				var inst := ArcadeDisc.patch_to_inst(d)
+				if inst.sample.size() < 32:
+					note("that patch made no sound to render")
+					return
+				edit.song.insts.append(inst)
+				edit.trk_inst = edit.song.insts.size() - 1
+				edit.commit()
+				if con.sound != null:
+					con.sound.set_song(edit.song)
+				note("patch rendered into instrument %d: %s" % [
+					edit.trk_inst, inst.name])
+		_:
+			note("this machine cannot read that disc")
+
+func _write_disc(kind: String) -> void:
+	if sel < 0 or sel >= carts.size():
+		return
+	var c: ArcadeCart = carts[sel]
+	if Inventory.res_count("floppy") <= 0:
+		note("no blank floppies -- cut some at a disc maker")
+		return
+	var payload: Dictionary = {}
+	match kind:
+		"cart":
+			payload = ArcadeDisc.make("cart", c.name, c.to_dict())
+		"script":
+			payload = ArcadeDisc.make("script", c.name + " CODE", {"code": c.code})
+		"song":
+			var sd: Dictionary = edit.song.to_dict() if (edit != null
+				and edit.song != null) else c.song
+			if sd.is_empty():
+				note("this cartridge has no song on it")
+				return
+			payload = ArcadeDisc.make("song", str(sd.get("title", c.name)), sd)
+	if ArcadeDisc.write(payload):
+		note("written: " + ArcadeDisc.label(payload))
+		Sfx.play("coin", -14.0)
+
+func _draw_disc(u) -> void:
+	u.clear(Pixel.dark(22))
+	_draw_backdrop(u)
+	u.rectfill(0, 0, Pixel.UI_W, 24, Pixel.BLACK)
+	PixelFont.draw(u, "FLOPPY SLOT", 8, 7, Pixel.light(9), PixelFont.BOLD)
+	PixelFont.draw(u, "a disc holds anything. every machine reads what it knows.",
+		120, 9, Pixel.hue(23))
+	# left: the discs in your bags
+	var carried: Array = ArcadeDisc.carried()
+	u.rectfill(8, 34, 232, 224, Pixel.BLACK)
+	u.rect(8, 34, 232, 224, Pixel.hue(9) if disc_side == 0 else Pixel.dark(9))
+	PixelFont.draw(u, "IN YOUR BAGS (%d)" % carried.size(), 14, 38, Pixel.hue(4))
+	if carried.is_empty():
+		PixelFont.draw(u, "nothing written yet.", 14, 56, Pixel.dark(23))
+		PixelFont.draw(u, "blanks are cut at a disc maker.", 14, 68, Pixel.dark(23))
+	for i in mini(carried.size(), 12):
+		var d: Dictionary = carried[i]
+		var y := 54 + i * 14
+		var on: bool = disc_side == 0 and i == disc_sel
+		if on:
+			u.rectfill(12, y - 2, 228, y + 10, Pixel.dark(11))
+		PixelFont.draw(u, ArcadeDisc.label(d).substr(0, 30), 16, y,
+			Pixel.WHITE if on else Pixel.GRAY)
+	if disc_side == 0 and disc_sel < carried.size():
+		PixelFont.draw(u, ArcadeDisc.describe(carried[disc_sel]).substr(0, 44),
+			14, 210, Pixel.hue(9))
+	# right: what this machine can put on a blank
+	var writes := _write_options()
+	u.rectfill(244, 34, Pixel.UI_W - 8, 224, Pixel.BLACK)
+	u.rect(244, 34, Pixel.UI_W - 8, 224, Pixel.hue(9) if disc_side == 1 else Pixel.dark(9))
+	PixelFont.draw(u, "WRITE A BLANK (%d spare)" % Inventory.res_count("floppy"),
+		250, 38, Pixel.hue(4))
+	for i in writes.size():
+		var y2 := 58 + i * 16
+		var on2: bool = disc_side == 1 and i == disc_sel
+		if on2:
+			u.rectfill(248, y2 - 3, Pixel.UI_W - 12, y2 + 10, Pixel.dark(11))
+		PixelFont.draw(u, str(writes[i][0]).substr(0, 30), 252, y2,
+			Pixel.WHITE if on2 else Pixel.GRAY)
+	var notes := [
+		"a patch from a modular synth loads here",
+		"as a playable instrument in the tracker.",
+		"",
+		"a song will NOT go back the other way:",
+		"the song is the notes, the patch is the",
+		"machine that made them.",
+	]
+	for i in notes.size():
+		PixelFont.draw(u, str(notes[i]), 250, 130 + i * 11, Pixel.hue(23))
+	u.rectfill(0, Pixel.UI_H - 18, Pixel.UI_W, Pixel.UI_H, Pixel.BLACK)
+	PixelFont.draw(u, "LEFT/RIGHT SIDE   A READ or WRITE   B BACK", 8,
+		Pixel.UI_H - 13, Pixel.hue(23))
