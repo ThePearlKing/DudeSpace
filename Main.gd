@@ -10718,6 +10718,7 @@ func _arcade_test() -> void:
 	# --- holding the machine must cost nothing: a held copy is a MODEL
 	var t9 := Time.get_ticks_usec()
 	var held_model: Node3D = p.model_for("arcade")
+	var build_us := Time.get_ticks_usec() - t9
 	add_child(held_model)
 	await get_tree().process_frame
 	var woke := false
@@ -10725,8 +10726,8 @@ func _arcade_test() -> void:
 		for n2 in n.get_children():
 			if n2 is ArcadeMachine:
 				woke = (n2 as ArcadeMachine)._woken
-	print("ARCADE held model: %.2f ms to build, console built=%s (must be false)" % [
-		float(Time.get_ticks_usec() - t9) / 1000.0, woke])
+	print("ARCADE held model: %.2f ms to build, %d parts, console built=%s" % [
+		float(build_us) / 1000.0, _deep_parts(held_model), woke])
 	held_model.queue_free()
 	# --- the new items are objects, not grey cubes
 	var thin_items: Array = []
