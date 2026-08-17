@@ -334,7 +334,7 @@ func _update_sprite() -> void:
 	_sprite_mouse()
 
 func _sprite_canvas_rect() -> Rect2i:
-	return Rect2i(16, 52, 16 * spr_zoom, 16 * spr_zoom)
+	return Rect2i(14, 44, 16 * spr_zoom, 16 * spr_zoom)
 
 func _sprite_mouse() -> void:
 	if cart == null:
@@ -345,17 +345,17 @@ func _sprite_mouse() -> void:
 	# palette strip click
 	var pr := _palette_rect()
 	if con.mouse_down and pr.has_point(Vector2i(mx, my)):
-		var col := (mx - pr.position.x) / 11
-		var row := (my - pr.position.y) / 11
-		var idx := row * 12 + col
+		var col := (mx - pr.position.x) / 10
+		var row := (my - pr.position.y) / 10
+		var idx := row * 8 + col
 		if idx >= 0 and idx < Pixel.color_count():
 			spr_color = idx
 		return
 	# sprite picker grid
 	var gr := _sheet_rect()
 	if con.mouse_down and gr.has_point(Vector2i(mx, my)):
-		var gx := (mx - gr.position.x) / 12
-		var gy := (my - gr.position.y) / 12
+		var gx := (mx - gr.position.x) / 11
+		var gy := (my - gr.position.y) / 11
 		spr_sel = clampi(gy * 16 + gx, 0, 255)
 		return
 	if not r.has_point(Vector2i(mx, my)):
@@ -475,8 +475,8 @@ func _update_map() -> void:
 		cart.mset(tx, ty, map_tile)
 	var gr := _sheet_rect()
 	if con.mouse_down and gr.has_point(mp):
-		map_tile = clampi(((mp.y - gr.position.y) / 12) * 16
-			+ (mp.x - gr.position.x) / 12, 0, 255)
+		map_tile = clampi(((mp.y - gr.position.y) / 11) * 16
+			+ (mp.x - gr.position.x) / 11, 0, 255)
 
 func _update_info() -> void:
 	pass
@@ -633,17 +633,29 @@ func _draw_lua_line(u, src: String, x: int, y: int) -> void:
 		i += 1
 
 # --- sprite tab --------------------------------------------------------
+## The palette sits beside the canvas, thirteen to a row, so all
+## seventy-four colours are on screen at once and none of them fall off
+## the bottom of it.
 func _palette_rect() -> Rect2i:
-	return Rect2i(16, 52 + 16 * spr_zoom + 8, 12 * 11, 7 * 11)
+	return Rect2i(212, 98, 8 * 10, 10 * 10)
 
 func _sheet_rect() -> Rect2i:
-	return Rect2i(Pixel.UI_W - 200, 40, 16 * 12, 16 * 12)
+	return Rect2i(300, 44, 16 * 11, 16 * 11)
 
 func _draw_sprite(u) -> void:
 	if cart == null:
 		return
 	var slide := int((1.0 - _panel_in) * 30.0)
 	var r := _sprite_canvas_rect()
+	# tools
+	for i in TOOLS.size():
+		var tx := 14 + i * 46
+		var on := i == spr_tool
+		u.rectfill(tx, 26, tx + 42, 40, Pixel.dark(11) if on else Pixel.BLACK)
+		u.rect(tx, 26, tx + 42, 40, Pixel.hue(4) if on else Pixel.dark(9))
+		PixelFont.draw(u, str(TOOLS[i]), tx + 4, 30,
+			Pixel.WHITE if on else Pixel.hue(23))
+		PixelFont.draw(u, str(i + 1), tx + 36, 31, Pixel.dark(23))
 	# canvas: checkerboard under the transparent index, then the pixels
 	u.rectfill(r.position.x - 2, r.position.y - 2 - slide,
 		r.position.x + r.size.x + 1, r.position.y + r.size.y + 1 - slide,
@@ -659,50 +671,52 @@ func _draw_sprite(u) -> void:
 					Pixel.dark(22) if checker else Pixel.dark(23))
 			else:
 				u.rectfill(dx, dy, dx + spr_zoom - 1, dy + spr_zoom - 1, v)
-	# grid lines every 4 px, so you can count without squinting
 	for g in range(0, 17, 4):
 		u.vline(r.position.x + g * spr_zoom, r.position.y - slide,
 			r.position.y + r.size.y - slide, Pixel.dark(9))
 		u.hline(r.position.x, r.position.x + r.size.x,
 			r.position.y + g * spr_zoom - slide, Pixel.dark(9))
-	# 1:1 preview, bobbing gently
+	# 1:1 preview, and the same sprite doubled, both bobbing gently
 	var bob := int(round(sin(t * 3.0) * 1.0))
-	u.rectfill(r.position.x + r.size.x + 12, r.position.y - slide,
-		r.position.x + r.size.x + 12 + 17, r.position.y + 17 - slide, Pixel.BLACK)
+	var pvx := 212
+	u.rectfill(pvx, 44, pvx + 78, 90, Pixel.BLACK)
+	u.rect(pvx, 44, pvx + 78, 90, Pixel.dark(9))
+	PixelFont.draw(u, "SPRITE %d" % spr_sel, pvx + 3, 47, Pixel.hue(23))
 	u.blit(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(spr_sel),
-		ArcadeCart.spr_y(spr_sel), 16, 16, r.position.x + r.size.x + 13,
-		r.position.y + 1 - slide + bob)
-	# palette: every colour the machine has, in hue rows
+		ArcadeCart.spr_y(spr_sel), 16, 16, pvx + 5, 62 + bob)
+	u.blit_scaled(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(spr_sel),
+		ArcadeCart.spr_y(spr_sel), 16, 16, pvx + 30, 58 + bob, 2)
+	# palette: every colour the machine has, thirteen to a row
 	var pr := _palette_rect()
+	PixelFont.draw(u, "PALETTE %d" % Pixel.color_count(),
+		pr.position.x, pr.position.y - 10, Pixel.hue(23))
 	for i in Pixel.color_count():
-		var px2 := pr.position.x + (i % 12) * 11
-		var py2 := pr.position.y + (i / 12) * 11
-		u.rectfill(px2, py2, px2 + 9, py2 + 9, i)
+		var px2 := pr.position.x + (i % 8) * 10
+		var py2 := pr.position.y + (i / 8) * 10
+		u.rectfill(px2, py2, px2 + 8, py2 + 8, i)
 		if i == spr_color:
-			u.rect(px2 - 1, py2 - 1, px2 + 10, py2 + 10, Pixel.WHITE)
+			u.rect(px2 - 1, py2 - 1, px2 + 9, py2 + 9, Pixel.WHITE)
 	PixelFont.draw(u, "COLOUR %d" % spr_color, pr.position.x,
-		pr.position.y - 10, Pixel.hue(23))
-	# tools
-	for i in TOOLS.size():
-		var tx := 16 + i * 46
-		var on := i == spr_tool
-		u.rectfill(tx, 30, tx + 42, 44, Pixel.dark(11) if on else Pixel.BLACK)
-		u.rect(tx, 30, tx + 42, 44, Pixel.hue(4) if on else Pixel.dark(9))
-		PixelFont.draw(u, str(TOOLS[i]), tx + 4, 34,
-			Pixel.WHITE if on else Pixel.hue(23))
-	# the sheet: all 256 sprites, with the selected one ringed
+		pr.position.y + 104, Pixel.light(4))
+	u.rectfill(pr.position.x + 56, pr.position.y + 102, pr.position.x + 76,
+		pr.position.y + 112, spr_color)
+	# the sheet: all 256 sprites with the selected one ringed
 	var gr := _sheet_rect()
 	var gx := gr.position.x + int((1.0 - _panel_in) * 60.0)
 	u.rectfill(gx - 3, gr.position.y - 12, gx + gr.size.x + 3,
 		gr.position.y + gr.size.y + 3, Pixel.BLACK)
-	PixelFont.draw(u, "SHEET", gx, gr.position.y - 10, Pixel.hue(9))
+	u.rect(gx - 3, gr.position.y - 12, gx + gr.size.x + 3,
+		gr.position.y + gr.size.y + 3, Pixel.dark(9))
+	PixelFont.draw(u, "SHEET  256 sprites", gx, gr.position.y - 10, Pixel.hue(9))
 	for i in 256:
-		var sx := gx + (i % 16) * 12
-		var sy := gr.position.y + (i / 16) * 12
-		u.blit_scaled(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
-			ArcadeCart.spr_y(i), 16, 16, sx, sy, 1)
-	u.rect(gx + (spr_sel % 16) * 12 - 1, gr.position.y + (spr_sel / 16) * 12 - 1,
-		gx + (spr_sel % 16) * 12 + 12, gr.position.y + (spr_sel / 16) * 12 + 12,
+		var sx := gx + (i % 16) * 11
+		var sy := gr.position.y + (i / 16) * 11
+		if (i / 16 + i % 16) % 2 == 0:
+			u.rectfill(sx, sy, sx + 10, sy + 10, Pixel.dark(22))
+		u.blit(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
+			ArcadeCart.spr_y(i), 11, 11, sx, sy)
+	u.rect(gx + (spr_sel % 16) * 11 - 1, gr.position.y + (spr_sel / 16) * 11 - 1,
+		gx + (spr_sel % 16) * 11 + 11, gr.position.y + (spr_sel / 16) * 11 + 11,
 		Pixel.light(4))
 
 # --- map tab -----------------------------------------------------------
@@ -741,14 +755,16 @@ func _draw_map(u) -> void:
 	var gr := _sheet_rect()
 	PixelFont.draw(u, "TILES", gr.position.x, gr.position.y - 10, Pixel.hue(9))
 	for i in 256:
-		var sx := gr.position.x + (i % 16) * 12
-		var sy := gr.position.y + (i / 16) * 12
-		u.blit_scaled(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
-			ArcadeCart.spr_y(i), 16, 16, sx, sy, 1)
-	u.rect(gr.position.x + (map_tile % 16) * 12 - 1,
-		gr.position.y + (map_tile / 16) * 12 - 1,
-		gr.position.x + (map_tile % 16) * 12 + 12,
-		gr.position.y + (map_tile / 16) * 12 + 12, Pixel.light(4))
+		var sx := gr.position.x + (i % 16) * 11
+		var sy := gr.position.y + (i / 16) * 11
+		if (i / 16 + i % 16) % 2 == 0:
+			u.rectfill(sx, sy, sx + 10, sy + 10, Pixel.dark(22))
+		u.blit(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
+			ArcadeCart.spr_y(i), 11, 11, sx, sy)
+	u.rect(gr.position.x + (map_tile % 16) * 11 - 1,
+		gr.position.y + (map_tile / 16) * 11 - 1,
+		gr.position.x + (map_tile % 16) * 11 + 11,
+		gr.position.y + (map_tile / 16) * 11 + 11, Pixel.light(4))
 
 # --- tracker -----------------------------------------------------------
 func _update_sound() -> void:
@@ -905,107 +921,126 @@ static func note_name(n: int) -> String:
 func _draw_sound(u) -> void:
 	if song == null:
 		return
+	# Six channels on screen at a time, scrolling to keep the cursor in
+	# view: a column needs room for a note, an instrument, a volume and
+	# an effect without any of them touching.
 	var x0 := 6
-	var y0 := 30
+	var y0 := 46
 	var row_h := 9
-	var shown := 22
+	var col_w := 46
+	var shown_ch := 6
+	var first_ch := clampi(trk_ch - shown_ch / 2, 0,
+		maxi(0, ChipSound.CHANS - shown_ch))
+	var grid_w := 22 + shown_ch * col_w
+	var shown := 20
 	var first := clampi(trk_row - shown / 2, 0, maxi(0, song.rows - shown))
-	# --- the grid
-	u.rectfill(x0, y0 - 8, x0 + 330, y0 + shown * row_h + 4, Pixel.BLACK)
-	# channel headers with live meters
+	u.rectfill(x0, y0 - 18, x0 + grid_w, y0 + shown * row_h + 4, Pixel.BLACK)
 	var meters: Array = sound.meters() if sound != null else []
 	var voices: int = sound.voices() if sound != null else ChipSound.CHANS
-	for ch in ChipSound.CHANS:
-		var cx := x0 + 22 + ch * 38
-		if ch >= voices:
-			# the voices the expansion board would add, shown but dark
-			u.rectfill(cx, y0 - 7, cx + 34, y0 - 2, Pixel.dark(22))
-			PixelFont.draw(u, "CH%d" % (ch + 1), cx, y0 - 16, Pixel.dark(22))
-			PixelFont.draw(u, "LOCK", cx, y0 - 7, Pixel.dark(0))
+	for i in shown_ch:
+		var ch := first_ch + i
+		if ch >= ChipSound.CHANS:
+			break
+		var cx := x0 + 22 + i * col_w
+		var locked_ch: bool = ch >= voices
+		PixelFont.draw(u, "CH%d" % (ch + 1), cx, y0 - 17,
+			Pixel.dark(22) if locked_ch else (Pixel.WHITE if ch == trk_ch
+				else Pixel.hue(23)))
+		if locked_ch:
+			PixelFont.draw(u, "LOCKED", cx + 4, y0 - 8, Pixel.dark(0))
 			continue
-		# the meter climbs with what the voice is actually doing
 		var lvl := int(clampf(float(meters[ch]) if ch < meters.size() else 0.0,
-			0.0, 1.0) * 8.0)
-		u.rectfill(cx, y0 - 7, cx + 34, y0 - 2, Pixel.dark(22))
+			0.0, 1.0) * 9.0)
+		u.rectfill(cx, y0 - 8, cx + 36, y0 - 4, Pixel.dark(22))
 		if lvl > 0:
-			u.rectfill(cx, y0 - 7, cx + lvl * 4, y0 - 2,
-				Pixel.hue(9) if lvl < 6 else Pixel.hue(0))
-		PixelFont.draw(u, "CH%d" % (ch + 1), cx, y0 - 16,
-			Pixel.WHITE if ch == trk_ch else Pixel.dark(23))
+			u.rectfill(cx, y0 - 8, cx + lvl * 4, y0 - 4,
+				Pixel.hue(9) if lvl < 7 else Pixel.hue(0))
 	for i in shown:
 		var r := first + i
 		if r >= song.rows:
 			break
 		var y := y0 + i * row_h
 		var beat := r % song.rows_per_beat == 0
-		var bar := r % (song.rows_per_beat * song.sig_num) == 0
+		var bar := r % (song.rows_per_beat * maxi(1, song.sig_num)) == 0
 		if bar:
-			u.rectfill(x0, y - 1, x0 + 330, y + row_h - 2, Pixel.dark(11))
+			u.rectfill(x0, y - 1, x0 + grid_w, y + row_h - 2, Pixel.dark(11))
 		elif beat:
-			u.rectfill(x0, y - 1, x0 + 330, y + row_h - 2, Pixel.dark(22))
+			u.rectfill(x0, y - 1, x0 + grid_w, y + row_h - 2, Pixel.dark(22))
 		if r == trk_row:
-			u.rectfill(x0, y - 1, x0 + 330, y + row_h - 2, Pixel.dark(9))
+			u.rectfill(x0, y - 1, x0 + grid_w, y + row_h - 2, Pixel.dark(9))
 		PixelFont.draw(u, "%02d" % r, x0 + 2, y,
 			Pixel.light(4) if bar else Pixel.hue(23))
-		for ch in ChipSound.CHANS:
-			if ch >= voices:
+		for i2 in shown_ch:
+			var ch2 := first_ch + i2
+			if ch2 >= voices:
 				continue
-			var cell := song.cell(trk_pat, r, ch)
-			var cx := x0 + 22 + ch * 38
+			var cell := song.cell(trk_pat, r, ch2)
+			var cx2 := x0 + 22 + i2 * col_w
 			var nn := note_name(int(cell[0]))
 			var ncol := Pixel.dark(23)
 			if int(cell[0]) >= 2:
 				ncol = Pixel.light(9)
 			elif int(cell[0]) == 1:
 				ncol = Pixel.hue(0)
-			PixelFont.draw(u, nn, cx, y, ncol)
-			if int(cell[1]) > 0:
-				PixelFont.draw(u, "%X" % int(cell[1]), cx + 19, y, Pixel.hue(4))
-			if int(cell[3]) > 0 or int(cell[4]) > 0:
-				PixelFont.draw(u, "%X%X" % [int(cell[3]), int(cell[4]) & 0xF],
-					cx + 26, y, Pixel.hue(6))
-	# cursor block
+			PixelFont.draw(u, nn, cx2, y, ncol)
+			PixelFont.draw(u, "%X" % int(cell[1]) if int(cell[1]) > 0 else ".",
+				cx2 + 21, y, Pixel.hue(4) if int(cell[1]) > 0 else Pixel.dark(22))
+			PixelFont.draw(u, "%X" % mini(15, int(cell[2]) / 4) if int(cell[2]) > 0
+				else ".", cx2 + 28, y,
+				Pixel.hue(7) if int(cell[2]) > 0 else Pixel.dark(22))
+			var has_fx: bool = int(cell[3]) > 0 or int(cell[4]) > 0
+			PixelFont.draw(u, "%X%X" % [int(cell[3]), int(cell[4]) & 0xF]
+				if has_fx else "..", cx2 + 35, y,
+				Pixel.hue(6) if has_fx else Pixel.dark(22))
+	# the cursor sits under whichever sub-column is being edited
 	var cyy := y0 + (trk_row - first) * row_h
-	var cxx: int = x0 + 22 + trk_ch * 38 + int([0, 19, 19, 26, 31][trk_col])
+	var cxx: int = x0 + 22 + (trk_ch - first_ch) * col_w \
+		+ int([0, 21, 28, 35, 41][trk_col])
 	u.rect(cxx - 1, cyy - 1, cxx + int([17, 5, 5, 5, 5][trk_col]), cyy + 7,
 		Pixel.light(4) if fmod(t, 0.6) < 0.4 else Pixel.hue(4))
+	if ChipSound.CHANS > shown_ch:
+		PixelFont.draw(u, "<%d-%d of %d>" % [first_ch + 1,
+			first_ch + shown_ch, ChipSound.CHANS], x0 + 2, y0 + shown * row_h + 6,
+			Pixel.dark(23))
 	# --- right hand panel
-	var px := 344
-	u.rectfill(px, 24, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.BLACK)
-	u.rect(px, 24, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.dark(9))
+	var px := x0 + grid_w + 6
+	u.rectfill(px, 26, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.BLACK)
+	u.rect(px, 26, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.dark(9))
 	var titles := ["PATTERN", "INSTRUMENT", "SONG"]
-	PixelFont.draw(u, str(titles[trk_panel]), px + 6, 28, Pixel.light(4),
+	PixelFont.draw(u, str(titles[trk_panel]), px + 6, 30, Pixel.light(4),
 		PixelFont.BOLD)
-	PixelFont.draw(u, "TAB switches", px + 6, 38, Pixel.dark(23))
+	PixelFont.draw(u, "TAB switches panel", px + 6, 40, Pixel.dark(23))
 	if trk_panel == 1:
-		_draw_inst_panel(u, px, 50)
+		_draw_inst_panel(u, px, 52)
 	elif trk_panel == 2:
-		_draw_song_panel(u, px, 50)
+		_draw_song_panel(u, px, 52)
 	else:
-		_draw_pattern_panel(u, px, 50)
+		_draw_pattern_panel(u, px, 52)
 
 func _draw_pattern_panel(u, px: int, y: int) -> void:
 	var inst_name := "-"
 	if trk_inst < song.insts.size():
 		inst_name = str(song.insts[trk_inst].name)
 	var rows := [
-		"INST   %d %s" % [trk_inst, inst_name],
-		"OCTAVE %d   [ ]" % trk_oct,
-		"STEP   %d" % trk_step,
-		"PATTERN %d of %d" % [trk_pat, song.patterns.size()],
+		"INST  %d %s" % [trk_inst, inst_name.substr(0, 11)],
+		"OCTAVE %d  [ ] change" % trk_oct,
+		"STEP  %d" % trk_step,
+		"PATTERN %d/%d" % [trk_pat, song.patterns.size()],
 		"",
-		"SPACE  play / stop",
-		"ZSXDCV keys are the piano",
-		"Q2W3E  the octave above",
-		"'      note off",
-		"-/=    change instrument",
+		"SPACE play or stop",
+		"ZSXDCV.. is the piano",
+		"Q2W3E.. octave above",
+		"'  note off",
+		"-/= pick instrument",
 		"",
-		"SLIDES, in the effect column:",
-		" 1xx  slide up",
-		" 2xx  slide down",
-		" 3xx  glide to the next note",
-		" 0xy  arpeggio",
-		" 8xx  pan   Axy vol slide",
+		"EFFECT COLUMN",
+		" 1xx slide up",
+		" 2xx slide down",
+		" 3xx glide to note",
+		" 0xy arpeggio",
+		" 8xx pan",
+		" Axy volume slide",
+		" Fxx speed",
 	]
 	for i in rows.size():
 		PixelFont.draw(u, str(rows[i]), px + 6, y + i * 10,
@@ -1016,8 +1051,7 @@ func _draw_inst_panel(u, px: int, y: int) -> void:
 		return
 	var inst: ChipSound.Inst = song.insts[clampi(trk_inst, 0, song.insts.size() - 1)]
 	PixelFont.draw(u, "%d %s" % [trk_inst, inst.name], px + 6, y, Pixel.light(9))
-	PixelFont.draw(u, "arrows edit - shift = big steps", px + 6, y + 9,
-		Pixel.dark(23))
+	PixelFont.draw(u, "arrows edit, shift x4", px + 6, y + 9, Pixel.dark(23))
 	var top := clampi(trk_ip - 8, 0, maxi(0, INST_PARAMS.size() - 17))
 	for i in mini(17, INST_PARAMS.size()):
 		var pi := top + i
@@ -1038,14 +1072,14 @@ func _draw_inst_panel(u, px: int, y: int) -> void:
 		var locked_p: bool = EXPAND_PARAMS.has(str(p[1])) and not con.can("expand")
 		PixelFont.draw(u, str(p[0]), px + 8, yy,
 			Pixel.dark(23) if locked_p else (Pixel.WHITE if on else Pixel.hue(23)))
-		PixelFont.draw(u, txt, px + 86, yy,
+		PixelFont.draw(u, txt, px + 78, yy,
 			Pixel.dark(23) if locked_p else (Pixel.light(4) if on else Pixel.GRAY))
 		if locked_p:
-			PixelFont.draw(u, "-", px + 140, yy, Pixel.hue(0))
+			PixelFont.draw(u, "x", px + 138, yy, Pixel.hue(0))
 		# a little bar so the value is readable at a glance
 		var frac := clampf((val - float(p[2])) / maxf(0.001,
 			float(p[3]) - float(p[2])), 0.0, 1.0)
-		u.rectfill(px + 118, yy + 2, px + 118 + int(frac * 20.0), yy + 5,
+		u.rectfill(px + 112, yy + 2, px + 112 + int(frac * 22.0), yy + 5,
 			Pixel.hue(9))
 
 func _draw_song_panel(u, px: int, y: int) -> void:
@@ -1064,13 +1098,11 @@ func _draw_song_panel(u, px: int, y: int) -> void:
 			u.rectfill(px + 4, yy - 1, Pixel.UI_W - 8, yy + 8, Pixel.dark(11))
 		PixelFont.draw(u, str(rows[i]), px + 8, yy,
 			Pixel.WHITE if on else Pixel.hue(23))
-	PixelFont.draw(u, "up/down pick, left/right change", px + 6, y + 80,
-		Pixel.dark(23))
-	PixelFont.draw(u, "a bar is %d rows at %d/%d" % [
-		song.rows_per_beat * song.sig_num, song.sig_num, song.sig_den],
-		px + 6, y + 94, Pixel.hue(9))
-	PixelFont.draw(u, "F7 play from the top", px + 6, y + 110, Pixel.hue(23))
-	PixelFont.draw(u, "F8 stop", px + 6, y + 120, Pixel.hue(23))
+	PixelFont.draw(u, "up/down pick a row,", px + 6, y + 80, Pixel.dark(23))
+	PixelFont.draw(u, "left/right change it", px + 6, y + 90, Pixel.dark(23))
+	PixelFont.draw(u, "a bar = %d rows" % [song.rows_per_beat * song.sig_num],
+		px + 6, y + 106, Pixel.hue(9))
+	PixelFont.draw(u, "F7 play  F8 stop", px + 6, y + 120, Pixel.hue(23))
 
 func _draw_info(u) -> void:
 	pass

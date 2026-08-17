@@ -27,10 +27,10 @@ const SHADER := """
 shader_type canvas_item;
 // Three indexed layers and one palette strip. Every colour on screen is
 // a byte that lands in pal_tex; nothing here interpolates.
-uniform sampler2D bg_tex : filter_nearest, repeat_disable;
-uniform sampler2D main_tex : filter_nearest, repeat_disable;
-uniform sampler2D ui_tex : filter_nearest, repeat_disable;
-uniform sampler2D pal_tex : filter_nearest, repeat_disable;
+uniform sampler2D bg_tex : filter_nearest, repeat_enable;
+uniform sampler2D main_tex : filter_nearest, repeat_enable;
+uniform sampler2D ui_tex : filter_nearest, repeat_enable;
+uniform sampler2D pal_tex : filter_nearest, repeat_enable;
 uniform vec2 ui_size = vec2(480.0, 270.0);
 uniform vec2 game_size = vec2(480.0, 270.0);
 uniform vec2 bg_off = vec2(0.0, 0.0);
@@ -38,10 +38,11 @@ uniform float scan : hint_range(0.0, 1.0) = 0.35;
 uniform float glow : hint_range(0.0, 1.0) = 0.25;
 
 vec4 look(sampler2D t, vec2 uv, vec2 size) {
-	vec2 p = (floor(uv * size) + 0.5) / size;
-	if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) {
-		return vec4(0.0);
-	}
+	// wrap, so a scrolled background tiles instead of running off the
+	// edge of its own texture and going black
+	// wrap, so a scrolled background tiles instead of running off its
+	// own texture; the other layers never sample outside 0..1 anyway
+	vec2 p = (floor(fract(uv) * size) + 0.5) / size;
 	float idx = floor(texture(t, p).r * 255.0 + 0.5);
 	return texture(pal_tex, vec2((idx + 0.5) / 256.0, 0.5));
 }

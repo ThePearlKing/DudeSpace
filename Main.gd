@@ -376,6 +376,8 @@ func _boot() -> void:
 		_chem_test()
 	if OS.get_environment("CTD_TEST") == "54":
 		_arcade_test()
+	if OS.get_environment("CTD_TEST") == "55":
+		_arcade_shots()
 	if OS.get_environment("CTD_TEST") == "40":
 		_factory_test()
 	if OS.get_environment("CTD_TEST") == "31":
@@ -10780,3 +10782,106 @@ func con_type(sh, text: String) -> void:
 		sh.con.text_typed = text[i]
 		sh.edit.update(1.0 / 60.0)
 	sh.con.text_typed = ""
+
+
+## CTD_TEST=55 -- pictures of the arcade, because a console is a thing
+## you look at. Saves the boot screen, the shelf, two games, both
+## editors and the cabinet itself into docs/shots.
+func _arcade_shots() -> void:
+	await get_tree().create_timer(2.5).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	var cab := ArcadeMachine.new()
+	add_child(cab)
+	cab.set_meta("placed_id", "arcade")
+	cab.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 4.0)
+	cab.install_board("expand")
+	await get_tree().create_timer(1.0).timeout
+	var dir := "res://docs/shots/"
+	# --- the cabinet in the world, attract loop lit
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.current = true
+	var fwd: Vector3 = cab.global_transform.basis.z
+	cam.global_position = cab.global_position + fwd * 2.6 + up * 1.5
+	cam.look_at(cab.global_position + up * 1.4, up)
+	for i in 40:
+		await get_tree().process_frame
+	await get_tree().create_timer(1.2).timeout
+	await _shot(dir + "arcade_cabinet.png")
+	# --- inside: the console UI itself
+	var ui := ArcadeUI.new()
+	ui.con = cab.con
+	ui.shell = cab.shell
+	ui.machine = cab
+	get_tree().current_scene.add_child(ui)
+	cab._open = true
+	cab.shell._enter(ArcadeShell.S_BOOT)
+	cab.shell.t = 2.6
+	await get_tree().create_timer(0.5).timeout
+	await _shot(dir + "arcade_boot.png")
+	cab.shell._enter(ArcadeShell.S_MENU)
+	await get_tree().create_timer(0.6).timeout
+	await _shot(dir + "arcade_shelf.png")
+	# --- a game, mid-play
+	cab.shell.sel = 0
+	cab.shell._boot_selected()
+	cab.shell._enter(ArcadeShell.S_RUN)
+	for i in 200:
+		cab.con.btn_held[ArcadeConsole.B_A] = (i % 6) == 0
+		cab.con.btn_held[ArcadeConsole.B_LEFT] = (i / 30) % 2 == 0
+		await get_tree().process_frame
+	await _shot(dir + "arcade_voidwing.png")
+	cab.shell.sel = 2
+	cab.shell._boot_selected()
+	cab.shell._enter(ArcadeShell.S_RUN)
+	for i in 240:
+		cab.con.btn_held[ArcadeConsole.B_RIGHT] = true
+		cab.con.btn_held[ArcadeConsole.B_A] = (i % 40) < 6
+		await get_tree().process_frame
+	await _shot(dir + "arcade_dudedash.png")
+	cab.shell.sel = 1
+	cab.shell._boot_selected()
+	cab.shell._enter(ArcadeShell.S_RUN)
+	for i in 260:
+		cab.con.btn_held[ArcadeConsole.B_DOWN] = (i % 9) < 4
+		cab.con.btn_held[ArcadeConsole.B_A] = (i % 23) == 0
+		await get_tree().process_frame
+	await _shot(dir + "arcade_blockparty.png")
+	# --- the workshop
+	cab.shell.edit.open(cab.shell.carts[0])
+	cab.shell.state = ArcadeShell.S_EDIT
+	cab.shell.edit.tab = ArcadeEdit.T_CODE
+	await get_tree().create_timer(0.5).timeout
+	await _shot(dir + "arcade_code.png")
+	cab.shell.edit.tab = ArcadeEdit.T_SPRITE
+	# put something in the sprite editor worth photographing
+	for y in 16:
+		for x in 16:
+			var v := 0
+			if (x - 8) * (x - 8) + (y - 8) * (y - 8) < 40:
+				v = 2 + ((x + y) % 8) * 3
+			cab.shell.carts[0].sheet[y * ArcadeCart.SHEET_W + x] = v
+	await get_tree().create_timer(0.5).timeout
+	await _shot(dir + "arcade_sprite.png")
+	cab.shell.edit.tab = ArcadeEdit.T_SOUND
+	cab.shell.edit.song = ChipSound.demo_song()
+	cab.sound.set_song(cab.shell.edit.song)
+	cab.sound.play_music(0)
+	await get_tree().create_timer(1.4).timeout
+	await _shot(dir + "arcade_tracker.png")
+	cab.shell.edit.trk_panel = 1
+	await get_tree().create_timer(0.4).timeout
+	await _shot(dir + "arcade_instrument.png")
+	cab.shell.state = ArcadeShell.S_DISC
+	await get_tree().create_timer(0.4).timeout
+	await _shot(dir + "arcade_disc.png")
+	print("ARCADE SHOTS done")
+
+func _shot(path: String) -> void:
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(path)
+	print("SHOT ", path)

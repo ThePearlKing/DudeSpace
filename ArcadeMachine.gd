@@ -38,16 +38,16 @@ var _board_lamp: MeshInstance3D
 const SCREEN_SHADER := """
 shader_type spatial;
 render_mode unshaded, cull_disabled;
-uniform sampler2D bg_tex : filter_nearest;
-uniform sampler2D main_tex : filter_nearest;
-uniform sampler2D ui_tex : filter_nearest;
-uniform sampler2D pal_tex : filter_nearest;
+uniform sampler2D bg_tex : filter_nearest, repeat_enable;
+uniform sampler2D main_tex : filter_nearest, repeat_enable;
+uniform sampler2D ui_tex : filter_nearest, repeat_enable;
+uniform sampler2D pal_tex : filter_nearest, repeat_enable;
 uniform vec2 ui_size = vec2(480.0, 270.0);
 uniform vec2 game_size = vec2(480.0, 270.0);
 uniform float scan : hint_range(0.0, 1.0) = 0.4;
 
 vec4 look(sampler2D t, vec2 uv, vec2 size) {
-	vec2 p = (floor(uv * size) + 0.5) / size;
+	vec2 p = (floor(fract(uv) * size) + 0.5) / size;
 	float idx = floor(texture(t, p).r * 255.0 + 0.5);
 	return texture(pal_tex, vec2((idx + 0.5) / 256.0, 0.5));
 }
@@ -150,7 +150,7 @@ func _build_cabinet() -> void:
 	name_lbl.text = "DUDE-16"
 	name_lbl.font_size = 64
 	name_lbl.pixel_size = 0.0016
-	name_lbl.modulate = Color("#2a1d3a")
+	name_lbl.modulate = Color("#1b1230")
 	name_lbl.position = Vector3(0, 1.87, hd - 0.205)
 	name_lbl.no_depth_test = false
 	add_child(name_lbl)
@@ -214,19 +214,49 @@ func _build_cabinet() -> void:
 		part(sbtn, Vector3(0.3 + float(i) * 0.06, 1.06, hd + 0.03),
 			Color("#fdfdf5") if i == 0 else Color("#fee761"), 0.6,
 			Vector3(-14, 0, 0))
+	# --- the front, below the deck: art panel, stripes, and an emblem,
+	# because a cabinet with a blank front is a fridge
+	var artp := BoxMesh.new()
+	artp.size = Vector3(CAB_W - 0.06, 0.62, 0.02)
+	part(artp, Vector3(0, 0.5, hd + 0.005), Color("#20183a"), 0.12)
+	for i in 3:
+		var stripe := BoxMesh.new()
+		stripe.size = Vector3(CAB_W - 0.12, 0.05, 0.012)
+		part(stripe, Vector3(0, 0.28 + float(i) * 0.09, hd + 0.014),
+			[Color("#ff5c7c"), Color("#feae34"), Color("#4fa4ff")][i], 1.1,
+			Vector3(0, 0, 6.0 - float(i) * 6.0))
+	# a chunky pixel star, built the way the console would draw one
+	var star_px := [[0, 3], [-1, 2], [1, 2], [-2, 1], [2, 1], [-1, 1], [0, 1],
+		[1, 1], [-3, 0], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [3, 0],
+		[-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-2, -2], [2, -2],
+		[-3, -3], [3, -3]]
+	for px in star_px:
+		var blk := BoxMesh.new()
+		blk.size = Vector3(0.055, 0.055, 0.012)
+		part(blk, Vector3(float(px[0]) * 0.055, 0.62 + float(px[1]) * 0.055,
+			hd + 0.02), Color("#fee761"), 1.3)
+	# neon down both front corners: the thing you see from across a room
+	for nx in [-1.0, 1.0]:
+		var neon := BoxMesh.new()
+		neon.size = Vector3(0.02, 1.5, 0.02)
+		part(neon, Vector3(nx * (hw - 0.015), 1.0, hd + 0.015),
+			Color("#26c2cd") if nx < 0.0 else Color("#e14bd6"), 2.6)
 	# --- coin door, return cup, and the floppy slot beside it
 	var door := BoxMesh.new()
-	door.size = Vector3(0.34, 0.3, 0.04)
-	part(door, Vector3(0, 0.72, hd - 0.01), Color("#3a3446"), 0.1)
+	door.size = Vector3(0.32, 0.22, 0.035)
+	part(door, Vector3(0, 0.16, hd + 0.005), Color("#3a3446"), 0.1)
 	var slot := BoxMesh.new()
-	slot.size = Vector3(0.03, 0.09, 0.02)
-	part(slot, Vector3(-0.07, 0.8, hd + 0.015), Color("#08080c"), 0.02)
+	slot.size = Vector3(0.03, 0.08, 0.02)
+	part(slot, Vector3(-0.07, 0.2, hd + 0.022), Color("#08080c"), 0.02)
 	var cup := BoxMesh.new()
-	cup.size = Vector3(0.16, 0.07, 0.03)
-	part(cup, Vector3(0, 0.62, hd + 0.01), Color("#08080c"), 0.02)
+	cup.size = Vector3(0.14, 0.06, 0.03)
+	part(cup, Vector3(0.06, 0.12, hd + 0.022), Color("#08080c"), 0.02)
 	var fslot := BoxMesh.new()
 	fslot.size = Vector3(0.2, 0.02, 0.03)
-	part(fslot, Vector3(0.22, 0.86, hd + 0.005), Color("#08080c"), 0.02)
+	part(fslot, Vector3(0.2, 0.93, hd + 0.005), Color("#08080c"), 0.02)
+	var fplate := BoxMesh.new()
+	fplate.size = Vector3(0.26, 0.09, 0.015)
+	part(fplate, Vector3(0.2, 0.93, hd), Color("#2a2735"), 0.1)
 	var bled := SphereMesh.new()
 	bled.radius = 0.014
 	bled.height = 0.028
@@ -234,7 +264,7 @@ func _build_cabinet() -> void:
 	var fled := SphereMesh.new()
 	fled.radius = 0.012
 	fled.height = 0.024
-	part(fled, Vector3(0.35, 0.86, hd + 0.01), Color("#3aff6a"), 2.0)
+	part(fled, Vector3(0.34, 0.93, hd + 0.012), Color("#3aff6a"), 2.0)
 	# --- speaker grilles under the marquee
 	for i in 12:
 		var hole := CylinderMesh.new()

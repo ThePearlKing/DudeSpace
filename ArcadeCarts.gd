@@ -18,12 +18,221 @@ static func shelf() -> Array:
 		c.readonly = true
 	return _shelf
 
+
+# ------------------------------------------------------------------ art
+## Sprites are authored here as rows of letters, one letter per pixel,
+## so the art lives next to the code that draws it. A dot is the
+## transparent index; everything else is a colour out of the palette.
+const INK := {
+	".": 0, "W": 1, "k": 72, "g": 71, "G": 73,
+	"r": 2, "R": 4, "d": 3, "o": 8, "O": 10, "y": 14, "Y": 16,
+	"n": 20, "N": 22, "e": 23, "t": 26, "c": 29, "C": 31,
+	"s": 32, "S": 34, "b": 38, "B": 40, "i": 41, "v": 44, "V": 46,
+	"u": 47, "m": 50, "p": 53, "P": 55, "w": 56, "T": 59, "a": 11,
+	"l": 17, "z": 68, "Z": 70,
+}
+
+static func paint(c: ArcadeCart, n: int, rows: Array) -> void:
+	var ox := ArcadeCart.spr_x(n)
+	var oy := ArcadeCart.spr_y(n)
+	for y in mini(16, rows.size()):
+		var line: String = rows[y]
+		for x in mini(16, line.length()):
+			var ch := line[x]
+			if not INK.has(ch):
+				continue
+			c.sheet[(oy + y) * ArcadeCart.SHEET_W + ox + x] = int(INK[ch])
+
+## The shared sprite sheet every built-in draws from.
+static func _stock_art(c: ArcadeCart) -> void:
+	# 0: the VOIDWING itself
+	paint(c, 0, [
+		"................",
+		".......WW.......",
+		"......WSSW......",
+		"......sSSs......",
+		".....sSSSSs.....",
+		".....sSbbSs.....",
+		"....ssSbbSss....",
+		"...sssSbbSsss...",
+		"..sbssSbbSssbs..",
+		".sbbssSSSSssbbs.",
+		".sbb.sssssss.bs.",
+		"..b..soooos..b..",
+		".....sOOOOs.....",
+		"......oyyo......",
+		".......yy.......",
+		"................"])
+	# 1: fighter
+	paint(c, 1, [
+		"................",
+		"................",
+		"...pp......pp...",
+		"...ppp....ppp...",
+		"....pppmmppp....",
+		"....pmmmmmmp....",
+		"...pmmWWWWmmp...",
+		"..pmmWkkkkWmmp..",
+		"..pmmWkrrkWmmp..",
+		"...pmmWWWWmmp...",
+		"....pmmmmmmp....",
+		"....ppp..ppp....",
+		"...pp......pp...",
+		"................",
+		"................",
+		"................"])
+	# 2: hulk
+	paint(c, 2, [
+		"................",
+		"......vvvv......",
+		"....vvVVVVvv....",
+		"...vVVuuuuVVv...",
+		"..vVVuuuuuuVVv..",
+		"..vVuuWWWWuuVv..",
+		".vVVuWkkkkWuVVv.",
+		".vVuuWkrrkWuuVv.",
+		".vVuuWWWWWWuuVv.",
+		".vVVuuuuuuuuVVv.",
+		"..vVVuuuuuuVVv..",
+		"..vvVVuuuuVVvv..",
+		"...vv.VVVV.vv...",
+		"....v.v..v.v....",
+		"................",
+		"................"])
+	# 3: a burst
+	paint(c, 3, [
+		"................",
+		".......y........",
+		"...y..yYy..y....",
+		"....y.yYy.y.....",
+		"..y..yYYYy..y...",
+		"...yyYYoYYyy....",
+		"....yYoooYy.....",
+		"..yyYooRooYyy...",
+		"..yyYooRooYyy...",
+		"....yYoooYy.....",
+		"...yyYYoYYyy....",
+		"..y..yYYYy..y...",
+		"....y.yYy.y.....",
+		"...y..yYy..y....",
+		".......y........",
+		"................"])
+	# 4: the dude, standing
+	paint(c, 4, [
+		"................",
+		".....TTTTT......",
+		"....TTTTTTT.....",
+		"....TWkTkWT.....",
+		"....TTTTTTT.....",
+		".....TTTTT......",
+		"......TTT.......",
+		"...ccCCCCCcc....",
+		"..cccCCCCCccc...",
+		"..cc.CCCCC.cc...",
+		"..c..CCCCC..c...",
+		".....bbbbb......",
+		".....bb.bb......",
+		"....bb...bb.....",
+		"...kkk...kkk....",
+		"................"])
+	# 5: coin
+	paint(c, 5, [
+		"................",
+		"................",
+		".....yyyyy......",
+		"...yyYYYYYyy....",
+		"..yYYYaaaYYYy...",
+		"..yYYaaaaaYYy...",
+		".yYYaaWWWaaYYy..",
+		".yYaaaWWWaaaYy..",
+		".yYaaaWWWaaaYy..",
+		".yYYaaWWWaaYYy..",
+		"..yYYaaaaaYYy...",
+		"..yYYYaaaYYYy...",
+		"...yyYYYYYyy....",
+		".....yyyyy......",
+		"................",
+		"................"])
+	# 6: crate tile
+	paint(c, 6, [
+		"TTTTTTTTTTTTTTTT",
+		"TwwwwwwwwwwwwwwT",
+		"TwWwwwwwwwwwwWwT",
+		"TwwwTwwwwwwTwwwT",
+		"TwwwwTwwwwTwwwwT",
+		"TwwwwwTwwTwwwwwT",
+		"TwwwwwwTTwwwwwwT",
+		"TwwwwwwTTwwwwwwT",
+		"TwwwwwTwwTwwwwwT",
+		"TwwwwTwwwwTwwwwT",
+		"TwwwTwwwwwwTwwwT",
+		"TwWwwwwwwwwwwWwT",
+		"TwwwwwwwwwwwwwwT",
+		"TwwwwwwwwwwwwwwT",
+		"TwwwwwwwwwwwwwwT",
+		"TTTTTTTTTTTTTTTT"])
+	# 7: ground tile
+	paint(c, 7, [
+		"nnnnnnnnnnnnnnnn",
+		"nNnnnNnnnnNnnnnN",
+		"wwwwwwwwwwwwwwww",
+		"wwTwwwwwTwwwwwww",
+		"wwwwwwwwwwwwTwww",
+		"wwwwTwwwwwwwwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwwwwwwTwwwwwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwTwwwwwwwwTwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwwwTwwwwwwwwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwwwwwwwwwwwwwww",
+		"wwwwwwwwwwwwwwww"])
+	# 8: a block, for the puzzle
+	paint(c, 8, [
+		"cccccccccccccccc",
+		"cCCCCCCCCCCCCCCc",
+		"cCCCCCCCCCCCCCtc",
+		"cCCttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"cCtttttttttttttc",
+		"ctttttttttttttte",
+		"cccccccccccccccc"])
+	# 9: star / pickup
+	paint(c, 9, [
+		"................",
+		".......W........",
+		"......WYW.......",
+		"......WYW.......",
+		"..W...YYY...W...",
+		"...WWYYYYYWW....",
+		"....WYYYYYW.....",
+		".WWWYYYYYYYWWW..",
+		"....WYYYYYW.....",
+		"...WWYYYYYWW....",
+		"..W..YYYYY..W...",
+		"......WYW.......",
+		"......WYW.......",
+		".......W........",
+		"................",
+		"................"])
+
 static func _cart(nm: String, author: String, code: String, res_mode: int = 1) -> ArcadeCart:
 	var c := ArcadeCart.new()
 	c.name = nm
 	c.author = author
 	c.code = code
 	c.res_mode = res_mode
+	_stock_art(c)
 	return c
 
 # ---------------------------------------------------------------------
@@ -201,10 +410,8 @@ function _draw()
   for i = 1, #foes do
     local f = foes[i]
     local x, y = flr(f.x), flr(f.y)
-    circfill(x, y, f.r, f.c)
-    circfill(x, y - 2, f.r - 3, f.c + 2)
-    line(x - f.r, y + 2, x, y + f.r, f.c + 1)
-    line(x + f.r, y + 2, x, y + f.r, f.c + 1)
+    -- the hulks are the big ones; everything else flies a fighter
+    spr(f.hp > 1 and 2 or 1, x - 8, y - 8)
   end
   for i = 1, #shots do
     local s = shots[i]
@@ -216,7 +423,9 @@ function _draw()
     pset(flr(b.x), flr(b.y), b.c)
   end
   for i = 1, #pops do
-    circ(flr(pops[i].x), flr(pops[i].y), pops[i].r, 1)
+    local o = pops[i]
+    if o.life > 4 then spr(3, flr(o.x) - 8, flr(o.y) - 8) end
+    circ(flr(o.x), flr(o.y), o.r, 1)
   end
 
   if ship.inv <= 0 or frames() % 6 < 3 then draw_ship() end
@@ -244,10 +453,8 @@ end
 
 function draw_ship()
   local x, y = flr(ship.x), flr(ship.y)
-  tri(x, y - 9, x - 7, y + 6, x + 7, y + 6, 32)
-  tri(x, y - 6, x - 4, y + 4, x + 4, y + 4, 34)
-  rectfill(x - 1, y - 10, x + 1, y - 4, 1)
-  -- engine flare, flickering
+  spr(0, x - 8, y - 8)
+  -- engine flare, flickering, drawn under the hull
   local f = 3 + flr(rnd(3))
   tri(x - 3, y + 6, x + 3, y + 6, x, y + 6 + f, 8)
   tri(x - 1, y + 6, x + 1, y + 6, x, y + 6 + f + 2, 14)
@@ -606,15 +813,18 @@ function _draw()
   bgscroll(flr(cam * 0.35) % W, 0)
   cls(255)
   camera(flr(cam), 0)
-  rectfill(flr(cam), GROUND + 10, flr(cam) + W, H, 65)
-  rectfill(flr(cam), GROUND + 10, flr(cam) + W, GROUND + 13, 67)
+  for gx = flr(cam / 16) * 16, flr(cam) + W, 16 do
+    spr(7, gx, GROUND + 10)
+    spr(7, gx, GROUND + 26)
+  end
   for i = 1, #blocks do
     local b = blocks[i]
     if b.x > cam - 100 and b.x < cam + W + 40 then
-      rectfill(b.x, b.y, b.x + b.w, GROUND + 12, 56)
-      rectfill(b.x, b.y, b.x + b.w, b.y + 3, 58)
-      for k = 0, flr(b.w / 16) do
-        line(b.x + k * 16, b.y + 4, b.x + k * 16, GROUND + 10, 57)
+      -- crates stacked to the ground, sixteen pixels at a time
+      for ky = b.y, GROUND + 4, 16 do
+        for kx = b.x, b.x + b.w - 8, 16 do
+          spr(6, flr(kx), flr(ky))
+        end
       end
     end
   end
@@ -622,8 +832,7 @@ function _draw()
     local c = coins[i]
     if not c.got and c.x > cam - 20 and c.x < cam + W + 20 then
       local y = c.y + sin(t() * 3 + c.bob) * 3
-      circfill(flr(c.x), flr(y), 4, 14)
-      circfill(flr(c.x), flr(y), 2, 16)
+      spr(5, flr(c.x) - 8, flr(y) - 8)
     end
   end
   for i = 1, #sparks do
@@ -647,21 +856,17 @@ end
 
 function draw_dude()
   local x, y = flr(p.x), flr(p.y)
-  local lean = flr(p.vx * 0.6)
-  -- legs move with speed, not with a timer
-  local step = sin(dist * 0.09) * 4
-  if p.on then
-    line(x, y - 8, x - 3 + step, y, 32)
-    line(x, y - 8, x + 3 - step, y, 32)
-  else
-    line(x, y - 8, x - 4, y - 2, 32)
-    line(x, y - 8, x + 4, y - 1, 32)
+  -- the sprite leans with the run, and bobs on every other stride
+  local bob = 0
+  if p.on and abs(p.vx) > 0.5 then
+    bob = flr(abs(sin(dist * 0.09)) * 2)
   end
-  rectfill(x - 4 + lean, y - 20, x + 4 + lean, y - 7, 34)
-  circfill(x + lean, y - 24, 5, 61)
-  circfill(x + lean + p.face * 2, y - 25, 1, 0)
+  spr(4, x - 8, y - 16 - bob, 1, 1, p.face < 0)
   if p.dash > 0 then
-    circ(x, y - 12, 10 + p.dash, 29)
+    circ(x, y - 8, 10 + p.dash, 29)
+    for k = 1, 3 do
+      spr(4, x - 8 - p.face * k * 5, y - 16, 1, 1, p.face < 0)
+    end
   end
 end
 """)
