@@ -190,19 +190,42 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
 		"floppy", "floppy_data":
-			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
-			_p(r, _bx(0.56, 0.56, 0.06), Vector3.ZERO, shell_col, 0.15)
-			_p(r, _bx(0.26, 0.18, 0.08), Vector3(0.09, 0.22, 0),
-				Color("#c8ccd4"), 0.35)
-			_p(r, _bx(0.44, 0.22, 0.075), Vector3(0, -0.12, 0.005),
-				Color("#e8e2d0") if id == "floppy" else Color("#fee761"), 0.25)
-			if id == "floppy_data":
+			# the same disc as in your hand, at icon size
+			var shell: Color = ArcadeDisc.item_color(id)
+			var written: bool = id == "floppy_data"
+			_p(r, _bx(0.6, 0.6, 0.07), Vector3.ZERO, shell, 0.18)
+			_p(r, _bx(0.56, 0.56, 0.08), Vector3(0, 0, 0.004),
+				shell.lightened(0.12), 0.22)
+			_p(r, _bx(0.11, 0.11, 0.09), Vector3(0.25, 0.25, 0),
+				shell.darkened(0.55), 0.1, Vector3(0, 0, 45))
+			_p(r, _bx(0.26, 0.19, 0.09), Vector3(0.08, 0.25, 0),
+				Color("#c8ccd4"), 0.4)
+			_p(r, _bx(0.09, 0.15, 0.1), Vector3(0.155, 0.25, 0),
+				Color("#4a4f5a"), 0.15)
+			var hub := CylinderMesh.new()
+			hub.top_radius = 0.07
+			hub.bottom_radius = 0.07
+			hub.height = 0.085
+			_p(r, hub, Vector3(-0.015, -0.015, 0), Color("#2a2a30"), 0.1,
+				Vector3(90, 0, 0))
+			var hub2 := CylinderMesh.new()
+			hub2.top_radius = 0.034
+			hub2.bottom_radius = 0.034
+			hub2.height = 0.095
+			_p(r, hub2, Vector3(-0.015, -0.015, 0), Color("#9aa4b2"), 0.3,
+				Vector3(90, 0, 0))
+			_p(r, _bx(0.055, 0.055, 0.09), Vector3(-0.25, -0.25, 0),
+				Color("#101014"), 0.05)
+			_p(r, _bx(0.45, 0.25, 0.088), Vector3(0, -0.1, 0.006),
+				Color("#eae4d4") if written else Color("#d8d2c2"), 0.22)
+			_p(r, _bx(0.45, 0.05, 0.092), Vector3(0, 0.005, 0.008),
+				shell.lightened(0.25), 0.45)
+			if written:
 				for ly in 3:
-					_p(r, _bx(0.3, 0.02, 0.08),
-						Vector3(-0.03, -0.06 - float(ly) * 0.055, 0.01),
-						Color("#3a3446"), 0.1)
-			_p(r, _bx(0.06, 0.06, 0.075), Vector3(-0.22, -0.22, 0),
-				Color("#1a1a20"), 0.1)
+					_p(r, _bx(0.3 - float(ly) * 0.055, 0.018, 0.096),
+						Vector3(-0.055 + float(ly) * 0.027,
+							-0.09 - float(ly) * 0.055, 0.01),
+						Color("#2a2735"), 0.08)
 		"arcboard", "arcsmooth":
 			var bc := Color("#1e4a2a") if id == "arcboard" else Color("#1e3a5a")
 			_p(r, _bx(0.62, 0.4, 0.04), Vector3.ZERO, bc, 0.15)

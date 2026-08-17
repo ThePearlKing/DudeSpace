@@ -173,7 +173,7 @@ var items: Dictionary = {
 	"chemlab2":   {"name": "Chem Lab II",      "color": Color("#2f6a4a")},
 	"chemlab3":   {"name": "Chem Lab III",     "color": Color("#2f6a4a")},
 	"voidsiphon": {"name": "Void Siphon",      "color": Color("#241436")},
-	"arcade":     {"name": "Arcade Cabinet",   "color": Color("#2a2338")},
+	"arcade":     {"name": "Arcade Machine",   "color": Color("#2a2338")},
 	"floppy":     {"name": "Blank Floppy",     "color": Color("#3a3f4a")},
 	"floppy_data":{"name": "Written Floppy",   "color": Color("#4fa4ff")},
 	"discmaker":  {"name": "Disc Maker",       "color": Color("#3f3a56")},
@@ -294,6 +294,9 @@ var caged_data: Array = []   # genomes of caged animals (persisted)
 ## were written. Same trick as caged animals: the item is a counter, the
 ## contents live here, and both are saved.
 var floppy_data: Array = []
+## Shell colours of the BLANK floppies you are carrying, newest last.
+## Blanks are otherwise interchangeable, but their colour is not.
+var floppy_blanks: Array = []
 
 # --- the tabbed catalog. "cost" may mix coins + resources. ---
 var tabs: Array = ["Gear", "Rocket", "Machines", "Electric", "Armor", "Weapons"]
@@ -419,9 +422,9 @@ func _ready() -> void:
 		{"id": "separator", "tab": "Machines", "name": "Air Separator", "cost": {"ingot": 16, "brass": 8, "wire": 6}, "desc": "Pulls nitrogen and argon straight out of the sky. Needs a planet with an atmosphere and nothing else."},
 		{"id": "separator2","tab": "Machines", "name": "Separator II", "cost": {"duralumin": 12, "invar": 8, "resin": 6}, "desc": "Cold enough to catch neon. Also melts ice into water on the side."},
 		{"id": "cryoplant", "tab": "Machines", "name": "Cryo Plant", "cost": {"stainless": 16, "coolant": 6, "invar": 10}, "desc": "Squeezes gas into liquid: liquid nitrogen, liquid oxygen. Everything cold and expensive starts here."},
-		{"id": "arcade",    "tab": "Machines", "name": "Arcade Cabinet", "cost": {"steel": 12, "wire": 10, "resin": 6, "silica": 4}, "desc": "An upright cabinet with a DUDE-16 inside it: 74 colours, six pixel fonts, and a Lua machine that will run anything you can write. Needs no power lead -- nobody has ever worked out why. Four games on the shelf, and an editor for your own."},
-		{"id": "arcboard", "tab": "Machines", "name": "Expansion Board", "cost": {"silica": 6, "gold": 4, "resin": 4, "wire": 6}, "desc": "Fits in the back of an arcade cabinet: the BIG 640x360 canvas, all eight sound voices, and every modulator in the chip -- filters, LFOs, pulse-width, the delay and the room. A stock machine runs four plain voices and two canvases. Hold it and press F at a cabinet."},
-		{"id": "arcsmooth", "tab": "Machines", "name": "Smooth Motion Board", "cost": {"electrum": 6, "silica": 8, "plasmagel": 1}, "desc": "Doubles the density of the game canvas so movement stops landing on whole screen pixels. The console's own menus stay exactly where they are -- this is for the games. Hold it and press F at a cabinet."},
+		{"id": "arcade",    "tab": "Machines", "name": "Arcade Machine", "cost": {"steel": 12, "wire": 10, "resin": 6, "silica": 4}, "desc": "An upright cabinet with a DUDE-16 inside it: 74 colours, six pixel fonts, and a Lua machine that will run anything you can write. Needs no power lead -- nobody has ever worked out why. Four games on the shelf, and an editor for your own."},
+		{"id": "arcboard", "tab": "Machines", "name": "Expansion Board", "cost": {"silica": 6, "gold": 4, "resin": 4, "wire": 6}, "desc": "Fits in the back of an arcade machine: the BIG 640x360 canvas, all eight sound voices, and every modulator in the chip -- filters, LFOs, pulse-width, the delay and the room. A stock machine runs four plain voices and two canvases. Hold it and press F at the machine."},
+		{"id": "arcsmooth", "tab": "Machines", "name": "Smooth Motion Board", "cost": {"electrum": 6, "silica": 8, "plasmagel": 1}, "desc": "Doubles the density of the game canvas so movement stops landing on whole screen pixels. The console's own menus stay exactly where they are -- this is for the games. Hold it and press F at the machine."},
 		{"id": "discmaker", "tab": "Machines", "name": "Disc Maker", "cost": {"stainless": 8, "resin": 6, "wire": 8, "brass": 4}, "desc": "Cuts blank floppies and writes anything to them: a whole game, a loose script, a synth patch, a song. Whatever a machine can hold, a floppy can carry to another machine."},
 		{"id": "floppy",    "tab": "Gear",     "name": "Blank Floppy", "cost": {"coins": 20}, "desc": "Holds one of anything -- cartridge, script, patch or song. Write it at a disc maker, carry it anywhere, hand it to somebody."},
 		{"id": "voidsiphon","tab": "Machines", "name": "Void Siphon", "cost": {"abyssitanium": 14, "neptunite": 10, "liqnitrogen": 8, "ultima": 6}, "desc": "Winds liquid black hole off an event horizon a thread at a time. Runs on power alone -- but only parked beside TIN 618, and Harold is the only rock out there to stand on."},

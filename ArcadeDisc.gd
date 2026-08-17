@@ -18,6 +18,35 @@ extends RefCounted
 
 const KINDS := ["cart", "script", "patch", "song"]
 
+## Blank shells come out of the cutter in whatever colour the machine
+## had loaded, which is to say: whatever it felt like. The colour sticks
+## to that disc for the rest of its life -- cut it blue, write a game to
+## it, and it is the blue one on the shelf forever.
+const SHELL_COLORS := [
+	"#2f3440", "#e43b44", "#f77622", "#feae34", "#b6d53c", "#1ebc73",
+	"#0b8a8f", "#26c2cd", "#4fa4ff", "#285cc4", "#5a3fd6", "#8b5ce8",
+	"#b04ad6", "#e14bd6", "#ff89c9", "#c98f6a", "#e4c9a0", "#97a3b6",
+]
+
+static func random_shell() -> int:
+	return randi() % SHELL_COLORS.size()
+
+static func shell_color(i: int) -> Color:
+	return Color(str(SHELL_COLORS[clampi(i, 0, SHELL_COLORS.size() - 1)]))
+
+## The colour to draw an item in. A blank shows the next shell you would
+## write to; a written disc shows the most recent one you wrote.
+static func item_color(id: String) -> Color:
+	if id == "floppy":
+		if Inventory.floppy_blanks.size() > 0:
+			return shell_color(int(Inventory.floppy_blanks[
+				Inventory.floppy_blanks.size() - 1]))
+		return shell_color(0)
+	if Inventory.floppy_data.size() > 0:
+		var d: Dictionary = Inventory.floppy_data[Inventory.floppy_data.size() - 1]
+		return shell_color(int(d.get("shell", 8)))
+	return shell_color(8)
+
 static func make(kind: String, name: String, payload: Dictionary) -> Dictionary:
 	var d := payload.duplicate(true)
 	d["kind"] = kind
@@ -29,6 +58,20 @@ static func kind_of(disc: Dictionary) -> String:
 
 static func label(disc: Dictionary) -> String:
 	return "[%s] %s" % [kind_of(disc).to_upper(), str(disc.get("name", "untitled"))]
+
+## The palette index closest to this disc's shell, for the pixel UIs.
+static func shell_pixel(disc: Dictionary) -> int:
+	var want := shell_color(int(disc.get("shell", 8)))
+	var cols := Pixel.colors()
+	var best := 1
+	var bd := 999.0
+	for i in cols.size():
+		var c: Color = cols[i]
+		var dd := absf(c.r - want.r) + absf(c.g - want.g) + absf(c.b - want.b)
+		if dd < bd:
+			bd = dd
+			best = i
+	return best
 
 ## What can read this disc, in words, for the machine that is holding it.
 static func describe(disc: Dictionary) -> String:
@@ -126,13 +169,28 @@ static func write(disc: Dictionary) -> bool:
 	if Inventory.res_count("floppy") <= 0:
 		return false
 	Inventory.remove_res("floppy", 1)
-	Inventory.floppy_data.append(disc.duplicate(true))
+	var d := disc.duplicate(true)
+	# the shell the blank was cut in goes with it
+	if Inventory.floppy_blanks.size() > 0:
+		d["shell"] = int(Inventory.floppy_blanks.pop_back())
+	elif not d.has("shell"):
+		d["shell"] = random_shell()
+	Inventory.floppy_data.append(d)
 	Inventory.give("floppy_data", 1)
 	return true
 
 static func erase(index: int) -> void:
 	if index < 0 or index >= Inventory.floppy_data.size():
 		return
+	var d: Dictionary = Inventory.floppy_data[index]
+	Inventory.floppy_blanks.append(int(d.get("shell", 0)))
 	Inventory.floppy_data.remove_at(index)
 	Inventory.remove_res("floppy_data", 1)
 	Inventory.give("floppy", 1)
+
+## Cut a fresh blank in a colour of the machine's choosing.
+static func cut_blank() -> int:
+	var c := random_shell()
+	Inventory.floppy_blanks.append(c)
+	Inventory.give("floppy", 1)
+	return c

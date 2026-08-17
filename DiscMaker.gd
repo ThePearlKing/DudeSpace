@@ -10,6 +10,7 @@ extends Machine
 ## other, not the other way round.
 
 var discs: Array = []            # floppies sitting in the tray
+var _last_shell: int = 0         # colour of the last blank it cut
 
 func _init() -> void:
 	title = "DISC MAKER"
@@ -58,7 +59,11 @@ func actions() -> Array:
 				Sfx.play("denied")
 				return
 			buf -= 5.0
-			Inventory.give("floppy", 1)
+			var shell := ArcadeDisc.cut_blank()
+			_last_shell = shell
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud:
+				hud.flash("blank cut: %s shell" % ArcadeDisc.SHELL_COLORS[shell])
 			Sfx.play("click")],
 		["Take everything in the tray", func() -> void:
 			for d in discs:
@@ -75,8 +80,7 @@ func write_disc(payload: Dictionary) -> bool:
 	if buf < 8.0:
 		return false
 	buf -= 8.0
-	Inventory.remove_res("floppy", 1)
-	Inventory.floppy_data.append(payload.duplicate(true))
-	Inventory.give("floppy_data", 1)
+	if not ArcadeDisc.write(payload):
+		return false
 	Sfx.play("coin", -12.0)
 	return true

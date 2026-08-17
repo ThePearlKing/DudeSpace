@@ -319,6 +319,8 @@ func apply_progress() -> void:
 	Inventory.caged_data = cg if cg is Array else []
 	var fl = _progress.get("floppies", [])
 	Inventory.floppy_data = fl if fl is Array else []
+	var fb = _progress.get("floppy_blanks", [])
+	Inventory.floppy_blanks = fb if fb is Array else []
 	Inventory.changed.emit()
 	Game.changed.emit()
 
@@ -412,6 +414,7 @@ func save_progress() -> void:
 		"world": world_objs if _world_set else _progress.get("world", []),
 		"caged": Inventory.caged_data,
 		"floppies": Inventory.floppy_data,
+		"floppy_blanks": Inventory.floppy_blanks,
 		"pet_g": _pet_genome,
 		"pet_stay": _pet_stay,
 		"pos": _last_pos,

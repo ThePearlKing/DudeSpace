@@ -2049,22 +2049,45 @@ func _make_held_model(id: String) -> void:
 			_hm_cyl(0.028, 0.22, Vector3(0, 0.06, -0.05), Color("#c8ccd4"), 0.5)
 			_hm_cyl(0.016, 0.05, Vector3(0, 0.06, -0.18), Color("#c86bff"), 2.4)
 		"floppy", "floppy_data":
-			# a three and a half inch disc: shell, shutter, label
-			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
-			_hm_box(Vector3(0.19, 0.19, 0.02), Vector3.ZERO, shell_col, 0.15)
-			_hm_box(Vector3(0.085, 0.06, 0.026), Vector3(0.03, 0.08, 0),
-				Color("#c8ccd4"), 0.35)
-			_hm_box(Vector3(0.03, 0.05, 0.028), Vector3(0.055, 0.08, 0),
+			# A three-and-a-half inch disc, built like one: a coloured
+			# shell with a chamfered corner, a sprung metal shutter, the
+			# hub showing through, a write-protect window, and a label
+			# you have written on if the disc has anything on it.
+			var shell: Color = ArcadeDisc.item_color(id)
+			var written: bool = id == "floppy_data"
+			_hm_box(Vector3(0.2, 0.2, 0.022), Vector3.ZERO, shell, 0.18)
+			_hm_box(Vector3(0.19, 0.19, 0.026), Vector3(0, 0, 0.001),
+				shell.lightened(0.12), 0.2)
+			# the corner they cut off so you cannot put it in upside down
+			_hm_box(Vector3(0.035, 0.035, 0.03), Vector3(0.083, 0.083, 0),
+				shell.darkened(0.55), 0.1).rotation_degrees = Vector3(0, 0, 45)
+			# shutter: brushed metal, with the slot cut in it
+			_hm_box(Vector3(0.088, 0.062, 0.03), Vector3(0.028, 0.082, 0),
+				Color("#c8ccd4"), 0.4)
+			_hm_box(Vector3(0.03, 0.05, 0.034), Vector3(0.052, 0.082, 0),
+				Color("#4a4f5a"), 0.15)
+			_hm_box(Vector3(0.088, 0.008, 0.032), Vector3(0.028, 0.11, 0),
 				Color("#8d97a5"), 0.3)
-			_hm_box(Vector3(0.15, 0.075, 0.024), Vector3(0, -0.04, 0.002),
-				Color("#e8e2d0") if id == "floppy" else Color("#fee761"), 0.25)
-			if id == "floppy_data":
+			# the hub, seen through the middle of the shell
+			_hm_cyl(0.022, 0.026, Vector3(-0.005, -0.005, 0),
+				Color("#2a2a30"), 0.1).rotation_degrees = Vector3(90, 0, 0)
+			_hm_cyl(0.011, 0.03, Vector3(-0.005, -0.005, 0),
+				Color("#9aa4b2"), 0.3).rotation_degrees = Vector3(90, 0, 0)
+			# write-protect window, bottom left
+			_hm_box(Vector3(0.018, 0.018, 0.03), Vector3(-0.082, -0.082, 0),
+				Color("#101014"), 0.05)
+			# the label: paper, a colour flash matching the shell, and
+			# ruled lines that only a written disc has anything on
+			_hm_box(Vector3(0.15, 0.082, 0.028), Vector3(0, -0.032, 0.002),
+				Color("#eae4d4") if written else Color("#d8d2c2"), 0.22)
+			_hm_box(Vector3(0.15, 0.016, 0.03), Vector3(0, 0.001, 0.003),
+				shell.lightened(0.25), 0.45)
+			if written:
 				for ly in 3:
-					_hm_box(Vector3(0.1, 0.006, 0.026),
-						Vector3(-0.01, -0.02 - float(ly) * 0.018, 0.003),
-						Color("#3a3446"), 0.1)
-			_hm_box(Vector3(0.02, 0.02, 0.024), Vector3(-0.075, -0.075, 0),
-				Color("#1a1a20"), 0.1)
+					_hm_box(Vector3(0.1 - float(ly) * 0.018, 0.006, 0.032),
+						Vector3(-0.018 + float(ly) * 0.009,
+							-0.03 - float(ly) * 0.018, 0.004),
+						Color("#2a2735"), 0.08)
 		"arcboard", "arcsmooth":
 			# a board: substrate, chips, an edge connector, traces
 			var bc := Color("#1e4a2a") if id == "arcboard" else Color("#1e3a5a")

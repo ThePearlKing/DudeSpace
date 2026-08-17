@@ -10701,6 +10701,19 @@ func _arcade_test() -> void:
 		sh.draw()
 	print("ARCADE editor SOUND  %.2f ms/frame" % [
 		float(Time.get_ticks_usec() - t4) / 30000.0])
+	# --- holding the machine must cost nothing: a held copy is a MODEL
+	var t9 := Time.get_ticks_usec()
+	var held_model: Node3D = p.model_for("arcade")
+	add_child(held_model)
+	await get_tree().process_frame
+	var woke := false
+	for n in held_model.get_children():
+		for n2 in n.get_children():
+			if n2 is ArcadeMachine:
+				woke = (n2 as ArcadeMachine)._woken
+	print("ARCADE held model: %.2f ms to build, console built=%s (must be false)" % [
+		float(Time.get_ticks_usec() - t9) / 1000.0, woke])
+	held_model.queue_free()
 	# --- the new items are objects, not grey cubes
 	var thin_items: Array = []
 	for iid in ["arcade", "discmaker", "floppy", "floppy_data", "arcboard",

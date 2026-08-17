@@ -70,7 +70,7 @@ void fragment() {
 """
 
 func _init() -> void:
-	title = "ARCADE CABINET"
+	title = "ARCADE MACHINE"
 	box_color = Color("#1b1a24")
 	box_size = Vector3(CAB_W, CAB_H, CAB_D)
 	buf_cap = 0.0                       # NO electricity. It just runs.
@@ -79,6 +79,20 @@ func _init() -> void:
 func _ready() -> void:
 	super._ready()
 	_build_cabinet()
+
+## The console, the shell, the workshop and the sound chip are built the
+## first time this machine is actually a machine -- somebody standing
+## near it, or sitting at it. A copy of this node held in your hand or
+## floating as a placement ghost is a MODEL: it must not spin up an
+## interpreter, three drawing layers and an audio thread, which is
+## exactly what it used to do, sixty times a second, at three frames a
+## second.
+var _woken: bool = false
+
+func wake() -> void:
+	if _woken:
+		return
+	_woken = true
 	con = ArcadeConsole.new()
 	shell = ArcadeShell.new(con)
 	shell.machine = self
@@ -129,15 +143,31 @@ func _build_cabinet() -> void:
 		var lowpanel := BoxMesh.new()
 		lowpanel.size = Vector3(0.02, 0.8, CAB_D * 0.9)
 		part(lowpanel, Vector3(sx * (hw + 0.005), 0.45, 0), Color("#241d33"), 0.08)
-	# --- T-molding: bright edging down every corner, like the real thing
+	# --- T-molding: bright edging down the corners the cabinet actually
+	# has. The upper section is shallower than the lower one, so the back
+	# edging steps in with it instead of standing in mid air.
+	var upper_hd := CAB_D * 0.36
 	for sx2 in [-1.0, 1.0]:
-		var edge := BoxMesh.new()
-		edge.size = Vector3(0.035, CAB_H - 0.1, 0.035)
-		part(edge, Vector3(sx2 * hw, (CAB_H - 0.1) * 0.5, hd - 0.02),
+		var low_front := BoxMesh.new()
+		low_front.size = Vector3(0.035, 0.9, 0.035)
+		part(low_front, Vector3(sx2 * hw, 0.45, hd - 0.02),
 			Color("#f2f2f7"), 0.35)
-		var edge2 := BoxMesh.new()
-		edge2.size = Vector3(0.035, CAB_H - 0.1, 0.035)
-		part(edge2, Vector3(sx2 * hw, (CAB_H - 0.1) * 0.5, -hd + 0.02),
+		var low_back := BoxMesh.new()
+		low_back.size = Vector3(0.035, 0.9, 0.035)
+		part(low_back, Vector3(sx2 * hw, 0.45, -hd + 0.02),
+			Color("#f2f2f7"), 0.35)
+		var up_front := BoxMesh.new()
+		up_front.size = Vector3(0.035, 1.05, 0.035)
+		part(up_front, Vector3(sx2 * hw, 1.42, upper_hd - 0.1),
+			Color("#f2f2f7"), 0.35)
+		var up_back := BoxMesh.new()
+		up_back.size = Vector3(0.035, 1.05, 0.035)
+		part(up_back, Vector3(sx2 * hw, 1.42, -upper_hd + 0.02),
+			Color("#f2f2f7"), 0.35)
+		# the step between the two sections, so the join reads as built
+		var step := BoxMesh.new()
+		step.size = Vector3(0.035, 0.035, CAB_D * 0.34)
+		part(step, Vector3(sx2 * hw, 0.9, (hd + upper_hd) * 0.5 - 0.06),
 			Color("#f2f2f7"), 0.35)
 	# --- marquee: a lit sign box over the screen
 	var mar := BoxMesh.new()
@@ -305,6 +335,8 @@ func _process(delta: float) -> void:
 	var d := global_position.distance_to(p.global_position)
 	if d > 22.0:
 		return                        # too far to read: screen holds still
+	if not _woken:
+		wake()
 	# claim the "live screen" slot for this frame if we are the closest
 	var fr := Engine.get_process_frames()
 	if fr != _live_frame:
@@ -358,6 +390,7 @@ func _up(tex: ImageTexture, layer_obj) -> void:
 ## F: sit down at it. The console keeps whatever state the attract loop
 ## left it in -- you are looking at the same machine, closer.
 func use() -> void:
+	wake()
 	var held := Inventory.slot_id(Inventory.selected)
 	if held == "arcboard" or held == "arcsmooth":
 		var kind := "expand" if held == "arcboard" else "smooth"
@@ -396,7 +429,7 @@ var _pending: Dictionary = {}
 ## while there is no console to hand it to yet. Stash it and apply it the
 ## moment _ready has built one.
 func load_data(d: Dictionary) -> void:
-	if shell == null or con == null:
+	if not _woken or shell == null or con == null:
 		_pending = d.duplicate(true)
 		return
 	_apply_data(d)
@@ -419,10 +452,13 @@ func _apply_data(d: Dictionary) -> void:
 
 func on_ui_closed() -> void:
 	_open = false
-	_push_screen()
+	if _woken:
+		_push_screen()
 
 ## The shelf is the ROMs plus whatever has been written on this machine.
 func _refresh_shelf() -> void:
+	if shell == null:
+		return
 	var out: Array = []
 	out.append_array(ArcadeCarts.shelf())
 	out.append_array(user_carts)
@@ -431,6 +467,7 @@ func _refresh_shelf() -> void:
 
 ## Start a new cartridge on this cabinet and open it in the workshop.
 func new_cart() -> ArcadeCart:
+	wake()
 	var c := ArcadeCart.blank("CART %d" % (user_carts.size() + 1))
 	user_carts.append(c)
 	_refresh_shelf()
@@ -438,6 +475,7 @@ func new_cart() -> ArcadeCart:
 
 ## A cartridge read off a floppy joins this machine's own shelf.
 func adopt_cart(c: ArcadeCart) -> void:
+	wake()
 	c.readonly = false
 	user_carts.append(c)
 	_refresh_shelf()
@@ -458,6 +496,7 @@ func _apply_boards() -> void:
 			m.emission_energy_multiplier = 2.0 if boards.get("expand", false) else 0.2
 
 func install_board(kind: String) -> bool:
+	wake()
 	if bool(boards.get(kind, false)):
 		return false
 	boards[kind] = true
