@@ -1564,7 +1564,7 @@ const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
 	"nreactor", "waypoint", "rocket", "rocket2", "netanalyser",
-	"tv", "tvbig", "camtv"]
+	"tv", "tvbig", "camtv", "arcade", "discmaker"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -2048,6 +2048,42 @@ func _make_held_model(id: String) -> void:
 				Color("#3a3f4a"), 0.2)
 			_hm_cyl(0.028, 0.22, Vector3(0, 0.06, -0.05), Color("#c8ccd4"), 0.5)
 			_hm_cyl(0.016, 0.05, Vector3(0, 0.06, -0.18), Color("#c86bff"), 2.4)
+		"floppy", "floppy_data":
+			# a three and a half inch disc: shell, shutter, label
+			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
+			_hm_box(Vector3(0.19, 0.19, 0.02), Vector3.ZERO, shell_col, 0.15)
+			_hm_box(Vector3(0.085, 0.06, 0.026), Vector3(0.03, 0.08, 0),
+				Color("#c8ccd4"), 0.35)
+			_hm_box(Vector3(0.03, 0.05, 0.028), Vector3(0.055, 0.08, 0),
+				Color("#8d97a5"), 0.3)
+			_hm_box(Vector3(0.15, 0.075, 0.024), Vector3(0, -0.04, 0.002),
+				Color("#e8e2d0") if id == "floppy" else Color("#fee761"), 0.25)
+			if id == "floppy_data":
+				for ly in 3:
+					_hm_box(Vector3(0.1, 0.006, 0.026),
+						Vector3(-0.01, -0.02 - float(ly) * 0.018, 0.003),
+						Color("#3a3446"), 0.1)
+			_hm_box(Vector3(0.02, 0.02, 0.024), Vector3(-0.075, -0.075, 0),
+				Color("#1a1a20"), 0.1)
+		"arcboard", "arcsmooth":
+			# a board: substrate, chips, an edge connector, traces
+			var bc := Color("#1e4a2a") if id == "arcboard" else Color("#1e3a5a")
+			_hm_box(Vector3(0.24, 0.15, 0.012), Vector3.ZERO, bc, 0.15)
+			for cx9 in [-0.06, 0.03]:
+				_hm_box(Vector3(0.07, 0.05, 0.016), Vector3(cx9, 0.02, 0.006),
+					Color("#15151c"), 0.1)
+				for pin in 4:
+					_hm_box(Vector3(0.008, 0.008, 0.014),
+						Vector3(cx9 - 0.03 + float(pin) * 0.02, -0.012, 0.006),
+						Color("#c8ccd4"), 0.4)
+			for tr in 3:
+				_hm_box(Vector3(0.2, 0.004, 0.014),
+					Vector3(0, -0.03 - float(tr) * 0.015, 0.006),
+					Color("#3aff6a") if id == "arcboard" else Color("#4fa4ff"), 1.2)
+			for gold in 8:
+				_hm_box(Vector3(0.012, 0.02, 0.014),
+					Vector3(-0.09 + float(gold) * 0.026, -0.072, 0.004),
+					Color("#ffd23f"), 0.6)
 		"chemmanual":
 			# a book. Closed, in your hand, until you open it
 			_hm_box(Vector3(0.17, 0.23, 0.035), Vector3.ZERO, Color("#c8a227"), 0.25)
@@ -2530,6 +2566,42 @@ func _use_selected() -> void:
 				if hudt:
 					hudt.flash("plasma cut")
 			return
+		"floppy", "floppy_data":
+			# a three and a half inch disc: shell, shutter, label
+			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
+			_hm_box(Vector3(0.19, 0.19, 0.02), Vector3.ZERO, shell_col, 0.15)
+			_hm_box(Vector3(0.085, 0.06, 0.026), Vector3(0.03, 0.08, 0),
+				Color("#c8ccd4"), 0.35)
+			_hm_box(Vector3(0.03, 0.05, 0.028), Vector3(0.055, 0.08, 0),
+				Color("#8d97a5"), 0.3)
+			_hm_box(Vector3(0.15, 0.075, 0.024), Vector3(0, -0.04, 0.002),
+				Color("#e8e2d0") if id == "floppy" else Color("#fee761"), 0.25)
+			if id == "floppy_data":
+				for ly in 3:
+					_hm_box(Vector3(0.1, 0.006, 0.026),
+						Vector3(-0.01, -0.02 - float(ly) * 0.018, 0.003),
+						Color("#3a3446"), 0.1)
+			_hm_box(Vector3(0.02, 0.02, 0.024), Vector3(-0.075, -0.075, 0),
+				Color("#1a1a20"), 0.1)
+		"arcboard", "arcsmooth":
+			# a board: substrate, chips, an edge connector, traces
+			var bc := Color("#1e4a2a") if id == "arcboard" else Color("#1e3a5a")
+			_hm_box(Vector3(0.24, 0.15, 0.012), Vector3.ZERO, bc, 0.15)
+			for cx9 in [-0.06, 0.03]:
+				_hm_box(Vector3(0.07, 0.05, 0.016), Vector3(cx9, 0.02, 0.006),
+					Color("#15151c"), 0.1)
+				for pin in 4:
+					_hm_box(Vector3(0.008, 0.008, 0.014),
+						Vector3(cx9 - 0.03 + float(pin) * 0.02, -0.012, 0.006),
+						Color("#c8ccd4"), 0.4)
+			for tr in 3:
+				_hm_box(Vector3(0.2, 0.004, 0.014),
+					Vector3(0, -0.03 - float(tr) * 0.015, 0.006),
+					Color("#3aff6a") if id == "arcboard" else Color("#4fa4ff"), 1.2)
+			for gold in 8:
+				_hm_box(Vector3(0.012, 0.02, 0.014),
+					Vector3(-0.09 + float(gold) * 0.026, -0.072, 0.004),
+					Color("#ffd23f"), 0.6)
 		"chemmanual":
 			Game.chem_manual = true
 			if get_tree().get_first_node_in_group("manual_ui") == null:

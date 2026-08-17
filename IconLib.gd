@@ -189,6 +189,34 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			tr2.size = Vector3(0.16, 0.02, 0.03)
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
+		"floppy", "floppy_data":
+			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
+			_p(r, _bx(0.56, 0.56, 0.06), Vector3.ZERO, shell_col, 0.15)
+			_p(r, _bx(0.26, 0.18, 0.08), Vector3(0.09, 0.22, 0),
+				Color("#c8ccd4"), 0.35)
+			_p(r, _bx(0.44, 0.22, 0.075), Vector3(0, -0.12, 0.005),
+				Color("#e8e2d0") if id == "floppy" else Color("#fee761"), 0.25)
+			if id == "floppy_data":
+				for ly in 3:
+					_p(r, _bx(0.3, 0.02, 0.08),
+						Vector3(-0.03, -0.06 - float(ly) * 0.055, 0.01),
+						Color("#3a3446"), 0.1)
+			_p(r, _bx(0.06, 0.06, 0.075), Vector3(-0.22, -0.22, 0),
+				Color("#1a1a20"), 0.1)
+		"arcboard", "arcsmooth":
+			var bc := Color("#1e4a2a") if id == "arcboard" else Color("#1e3a5a")
+			_p(r, _bx(0.62, 0.4, 0.04), Vector3.ZERO, bc, 0.15)
+			for cx9 in [-0.16, 0.08]:
+				_p(r, _bx(0.18, 0.13, 0.06), Vector3(cx9, 0.05, 0.02),
+					Color("#15151c"), 0.1)
+			for tr in 3:
+				_p(r, _bx(0.5, 0.012, 0.05), Vector3(0, -0.08 - float(tr) * 0.04,
+					0.02), Color("#3aff6a") if id == "arcboard"
+					else Color("#4fa4ff"), 1.2)
+			for gold in 8:
+				_p(r, _bx(0.03, 0.05, 0.05),
+					Vector3(-0.23 + float(gold) * 0.066, -0.19, 0.02),
+					Color("#ffd23f"), 0.6)
 		"toothpaste", "ulti_toothpaste", "ultra_toothpaste", "omega_toothpaste":
 			# a crimped tube with a screw cap -- it is still toothpaste
 			_p(r, _bx(0.2, 0.5, 0.12), Vector3(0, -0.02, 0), c, 0.35)

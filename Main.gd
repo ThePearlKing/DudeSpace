@@ -10701,6 +10701,44 @@ func _arcade_test() -> void:
 		sh.draw()
 	print("ARCADE editor SOUND  %.2f ms/frame" % [
 		float(Time.get_ticks_usec() - t4) / 30000.0])
+	# --- the new items are objects, not grey cubes
+	var thin_items: Array = []
+	for iid in ["arcade", "discmaker", "floppy", "floppy_data", "arcboard",
+			"arcsmooth"]:
+		var hm: Node3D = p.model_for(iid)
+		var im: Node3D = IconLib.build_model(iid, get_tree())
+		# a machine builds its parts in _ready, so the model has to be in
+		# the tree before it is worth counting -- which is exactly what
+		# the icon viewport does with it
+		add_child(hm)
+		add_child(im)
+		await get_tree().process_frame
+		if _deep_parts(hm) < 4 or _deep_parts(im) < 4:
+			thin_items.append([iid, _deep_parts(hm), _deep_parts(im)])
+		hm.queue_free()
+		im.queue_free()
+	print("ARCADE items with no model: ", thin_items, "  (must be empty)")
+	# --- FREE MOTION: the double density canvas actually runs
+	var fm := ArcadeCart.blank("SMOOTH")
+	fm.res_mode = 3
+	fm.code = "W,H=res() function _draw() cls(0) circfill(W/2,H/2,40,29) end"
+	var fmcon := ArcadeConsole.new()
+	fmcon.caps = {"expand": true, "smooth": true}
+	fmcon.boot(fm)
+	fmcon.step(1.0 / 60.0)
+	print("ARCADE free motion canvas: %dx%d crashed=%s" % [fmcon.game_w,
+		fmcon.game_h, fmcon.crashed])
+	# --- floppies survive a save and a load
+	Inventory.floppy_data = [ArcadeDisc.make("song", "SAVED SONG",
+		ChipSound.demo_song().to_dict())]
+	Save.save_progress()
+	var wrote: bool = str(Save._progress.get("floppies", [])).contains("SAVED SONG")
+	Inventory.floppy_data = []
+	Save.apply_progress()
+	print("ARCADE floppy persistence: written=%s, restored=%d disc(s), first=%s" % [
+		wrote, Inventory.floppy_data.size(),
+		str(Inventory.floppy_data[0].get("name", "?"))
+			if Inventory.floppy_data.size() > 0 else "-"])
 	# --- the sound chip: does it make a noise, and can it keep up?
 	var snd: ChipSound = cab.sound
 	snd.set_song(ChipSound.demo_song())
@@ -10976,3 +11014,13 @@ func _lua_bench() -> float:
 	var t0 := Time.get_ticks_usec()
 	vm.call_global("work", [10000.0])
 	return float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+## Count the meshes in a model tree, however deep they are nested.
+func _deep_parts(n: Node) -> int:
+	var c := 0
+	for ch in n.get_children():
+		if ch is MeshInstance3D:
+			c += 1
+		c += _deep_parts(ch)
+	return c

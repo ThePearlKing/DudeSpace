@@ -33,8 +33,36 @@ The dudes' control planet — a motherboard in space, hollow, and fully built in
 
 On Harold stands a stele nobody carved, with a tetrahedral socket and pictograms that reflect what they point at. Feed it the Yellow Tetrahedron (the lab on Big Computer knows where one is) and the sky fills with turning triangles, the stone sinks into the ground, and somewhere on Earth something buried begins to rise. Eight monoliths, eight colors, eight worlds — the tracker above your inventory keeps score.
 
+## The arcade
+
+An upright cabinet with a whole fantasy console inside it, and no power lead -- nobody has worked out why it runs.
+
+![The cabinet](docs/shots/arcade_cabinet.png)
+
+**DUDE-16.** Seventy-four colours (black, white, and twenty-four hues each with a dark and a light) on three indexed layers the GPU composites through a palette strip, so a full-screen fade or a parallax scroll costs nothing. Six pixel typefaces, one drawn by hand at 5x7 and the rest cut from it. Everything lands on the pixel grid -- games, menus, the caret in the code editor.
+
+**Cartridges are Lua.** A real interpreter: closures, tables, metatables, varargs, multiple returns, pcall, string patterns. The programmable computers run the same one, so a sorter script and a cartridge are the same language. Six games ship on the shelf and every one is editable: a shmup, a bullet-board battle, a pseudo-3D racer, a falling-block puzzle, a runner with real momentum, and an API tour that doubles as the manual.
+
+![VOIDWING](docs/shots/arcade_voidwing.png)
+![NEON DRIFT](docs/shots/arcade_neondrift.png)
+![SOUL BOARD](docs/shots/arcade_soulboard.png)
+
+**The workshop** has a syntax-colouring code editor, a 16x16 sprite editor with the whole palette on screen, a tilemap painter with a live minimap, a cartridge panel, and a tracker.
+
+![The code editor](docs/shots/arcade_code.png)
+![The sprite editor](docs/shots/arcade_sprite.png)
+
+**The sound chip** is eight voices, none of them a bare square wave: each has a filter with its own envelope, an LFO on pitch and another on pulse width, a noise blend so a snare is a body plus a wash, a place in the stereo field, and sends into a shared delay and a small room. The tracker has real time signatures, the three slide effects, arpeggio, per-voice meters and a QWERTY piano.
+
+![The tracker](docs/shots/arcade_tracker.png)
+
+**Floppies hold anything** -- a whole cartridge, a loose script, a modular synth patch, a chiptune. Cut blanks at a disc maker, carry them anywhere, hand them to somebody. A synth patch loads into any modular synth OR renders down into a playable arcade instrument; a song loads into any other cabinet's tracker. A song never becomes a patch: the song is the notes, the patch is the machine that made them.
+
+**A stock cabinet is deliberately the lesser machine** -- two canvas sizes, four plain voices, no modulators. The expansion board unlocks the 640x360 canvas, all eight voices and every modulator; the smooth motion board unlocks a double-density canvas where movement stops landing on whole screen pixels. Left alone, the cabinet plays the shelf to itself.
+
 ## Systems, briefly
 
+- **Arcade**: cabinets that need no power, a Lua fantasy console with its own editors and tracker, floppies that carry games, scripts, patches and songs between machines.
 - **Machines + power**: generators, coal drills, bioreactors, RTGs, capacitors that report EU/s, electric furnaces, sell stations, teleporter warp pads, logic coils, wires and item funnels. Placement is honest: no rockets or machines inside planets.
 - **Progression**: ores → ingots → iridium → ultima; temples with real puzzles (a terminal, a blind maze, a boolean lock); a shadow realm; a permadeath apple with a full cinematic; an infinite shrinking Menger pyramid.
 - **Multiplayer**: LAN with discovery — chat, synced building, shared monolith progress, friendly fire, riding other people's rockets.
