@@ -250,12 +250,16 @@ static func _build() -> void:
 		"Neon, astronium and oxidium held in one lattice. It hums.",
 		"Timmy's Substance · the only coolant a 4D line will accept")
 
-	# --- the far end. These exist so the chain is visible in the manual;
-	# the last two ingredients are not made in a lab at all.
-	_row("liqblackhole", "Liquid Black Hole", "#1a0d2a", "liquid", 5,
-		{"uses": "Timmy's Substance · the only thing that will hold a 4D line open"})
-	_row("dna4d", "4D Potassium-Overclocked DNA", "#7dff9a", "solid", 5,
-		{"uses": "Timmy's Substance · overclocked growth vats"})
+	# --- the far end. Neither of these is made in a lab. One is drawn
+	# off a horizon, the other is grown, and both want their own machine.
+	_make("liqblackhole", "Liquid Black Hole", "#1a0d2a", "liquid", "void", 3,
+		{}, 1, 120.0,
+		"A thread of horizon, wound off slowly and kept in a bottle that never touches it.",
+		"Timmy's Substance · the only thing that will hold a 4D line open")
+	_make("dna4d", "4D Potassium-Overclocked DNA", "#7dff9a", "solid", "vat", 3,
+		{"meat": 4, "potnitrate": 12, "plasmagel": 1, "ultima": 1}, 1, 80.0,
+		"Living code fed saltpetre until it started counting in four directions.",
+		"Timmy's Substance · overclocked growth vats")
 	_make("trunc_synth", "Truncated Synthanium", "#9a6bff", "solid", "chem", 3,
 		{"synthanium": 8, "raw_sand": 12, "aquaregia": 2}, 1, 48.0,
 		"Synthanium with its corners taken off. Twelve faces short of a solid and all the better for it.",

@@ -2112,13 +2112,138 @@ func _make_held_model(id: String) -> void:
 				var lump := _hm_box(Vector3(0.13, 0.1, 0.11), lofs, Color("#101014"), 0.03)
 				lump.rotation_degrees = Vector3(lofs.x * 260.0, lofs.y * 340.0, lofs.z * 300.0)
 		_:
-			if Inventory.placeables.has(id):
+			if Mats.has(id) and str(Mats.def(id).get("kind", "")) in \
+					["liquid", "gas", "solid"]:
+				_hm_chem(id)
+			elif Inventory.placeables.has(id):
 				# mini machine: coloured body, dark base, glow dot
 				_hm_box(Vector3(0.36, 0.3, 0.36), Vector3(0, 0.02, 0), col, 0.5)
 				_hm_box(Vector3(0.42, 0.08, 0.42), Vector3(0, -0.17, 0), dark, 0.15)
 				_hm_box(Vector3(0.08, 0.08, 0.02), Vector3(0, 0.06, -0.19), col.lightened(0.5), 2.0)
 			else:
 				_hm_box(Vector3(0.42, 0.42, 0.42), Vector3.ZERO, col, 0.6)
+
+## CHEMISTRY IN HAND. Every compound is glassware you can recognise
+## across the room: a flask for a liquid, a pressure bottle for a gas, a
+## clamp jar for a solid -- and the four that earned their own shape.
+func _hm_chem(id: String) -> void:
+	var c: Color = Mats.def(id).get("color", Color("#c0c0c0"))
+	match id:
+		"toothpaste", "ulti_toothpaste", "ultra_toothpaste", "omega_toothpaste":
+			_hm_box(Vector3(0.07, 0.19, 0.045), Vector3(0, 0.01, 0), c, 0.35)
+			_hm_box(Vector3(0.085, 0.02, 0.012), Vector3(0, 0.1, 0),
+				c.darkened(0.4), 0.2)
+			_hm_box(Vector3(0.055, 0.012, 0.05), Vector3(0, 0.04, 0),
+				c.lightened(0.5), 0.9)
+			_hm_cyl(0.022, 0.04, Vector3(0, -0.11, 0), c.darkened(0.55), 0.2)
+			return
+		"timmy":
+			var core := MeshInstance3D.new()
+			var cm := SphereMesh.new()
+			cm.radius = 0.07
+			cm.height = 0.14
+			cm.radial_segments = 4
+			cm.rings = 2
+			core.mesh = cm
+			core.material_override = Destructible.make_material(c, 2.2)
+			_held.add_child(core)
+			for rr in [Vector3.ZERO, Vector3(90, 0, 0), Vector3(0, 0, 90)]:
+				var ring := MeshInstance3D.new()
+				var rm := TorusMesh.new()
+				rm.inner_radius = 0.09
+				rm.outer_radius = 0.105
+				ring.mesh = rm
+				ring.rotation_degrees = rr
+				ring.material_override = Destructible.make_material(
+					Color("#7df9ff"), 1.6)
+				_held.add_child(ring)
+			return
+		"liqblackhole":
+			_hm_cyl(0.07, 0.18, Vector3(0, -0.01, 0), Color("#2a2438"), 0.1, 0.055)
+			var ev := MeshInstance3D.new()
+			var em := SphereMesh.new()
+			em.radius = 0.045
+			em.height = 0.09
+			ev.mesh = em
+			ev.material_override = Destructible.make_material(Color("#05030a"), 0.0)
+			ev.position = Vector3(0, -0.01, 0)
+			_held.add_child(ev)
+			var acc := MeshInstance3D.new()
+			var am := TorusMesh.new()
+			am.inner_radius = 0.05
+			am.outer_radius = 0.068
+			acc.mesh = am
+			acc.position = Vector3(0, -0.01, 0)
+			acc.material_override = Destructible.make_material(Color("#c86bff"), 2.4)
+			_held.add_child(acc)
+			_hm_box(Vector3(0.04, 0.03, 0.04), Vector3(0, 0.1, 0),
+				Color("#8a8f9a"), 0.3)
+			return
+		"dna4d":
+			for k in 7:
+				var t9 := float(k) / 6.0
+				var a9 := t9 * TAU * 1.2
+				var y9 := -0.11 + t9 * 0.22
+				var b1 := MeshInstance3D.new()
+				var bm := SphereMesh.new()
+				bm.radius = 0.022
+				bm.height = 0.044
+				b1.mesh = bm
+				b1.position = Vector3(cos(a9) * 0.05, y9, sin(a9) * 0.05)
+				b1.material_override = Destructible.make_material(c, 1.2)
+				_held.add_child(b1)
+				var b2 := MeshInstance3D.new()
+				b2.mesh = bm
+				b2.position = Vector3(-cos(a9) * 0.05, y9, -sin(a9) * 0.05)
+				b2.material_override = Destructible.make_material(
+					Color("#7be8ff"), 1.2)
+				_held.add_child(b2)
+				if k % 2 == 0:
+					_hm_box(Vector3(0.1, 0.008, 0.008), Vector3(0, y9, 0),
+						Color("#e8f0d8"), 0.6).rotation_degrees = \
+						Vector3(0, -rad_to_deg(a9), 0)
+			return
+	match str(Mats.def(id).get("kind", "")):
+		"liquid":
+			# round-bottom flask: bulb of product, glass neck, stopper
+			var bulb := MeshInstance3D.new()
+			var bmm := SphereMesh.new()
+			bmm.radius = 0.075
+			bmm.height = 0.15
+			bulb.mesh = bmm
+			bulb.position = Vector3(0, -0.03, 0)
+			bulb.material_override = Destructible.make_material(c, 0.9)
+			_held.add_child(bulb)
+			_hm_cyl(0.03, 0.09, Vector3(0, 0.07, 0), Color("#b8ccd8"), 0.25, 0.024)
+			_hm_box(Vector3(0.036, 0.022, 0.036), Vector3(0, 0.125, 0),
+				Color("#5a4a3a"), 0.15)
+		"gas":
+			# pressure bottle: steel shell, lit window, valve and gauge
+			_hm_cyl(0.06, 0.18, Vector3(0, -0.01, 0), Color("#8d97a5"), 0.15, 0.055)
+			_hm_cyl(0.045, 0.09, Vector3(0, -0.01, 0), c, 1.6)
+			_hm_cyl(0.02, 0.045, Vector3(0, 0.11, 0), Color("#c8722f"), 0.3, 0.015)
+			_hm_cyl(0.022, 0.012, Vector3(0.045, 0.09, 0), Color("#e8e2d0"),
+				0.5).rotation_degrees = Vector3(0, 0, 90)
+		_:
+			# clamp-lid jar with the compound heaped inside
+			_hm_cyl(0.07, 0.15, Vector3(0, -0.02, 0), Color("#aebfcc"), 0.1)
+			for k in 4:
+				var a8 := TAU * float(k) / 4.0
+				var gr := MeshInstance3D.new()
+				var gm := SphereMesh.new()
+				gm.radius = 0.03
+				gm.height = 0.05
+				gm.radial_segments = 4
+				gm.rings = 2
+				gr.mesh = gm
+				gr.position = Vector3(cos(a8) * 0.028, -0.045 + (0.02 if k % 2 else 0.0),
+					sin(a8) * 0.028)
+				gr.material_override = Destructible.make_material(c, 0.7)
+				_held.add_child(gr)
+			_hm_cyl(0.075, 0.025, Vector3(0, 0.065, 0), Color("#6f7f93"), 0.2)
+			_hm_box(Vector3(0.022, 0.055, 0.012), Vector3(0, 0.035, 0.072),
+				Color("#c8ccd4"), 0.3)
+
 
 func _held_color(id: String) -> Color:
 	if Inventory.weapons.has(id):

@@ -189,6 +189,130 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			tr2.size = Vector3(0.16, 0.02, 0.03)
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
+		"toothpaste", "ulti_toothpaste", "ultra_toothpaste", "omega_toothpaste":
+			# a crimped tube with a screw cap -- it is still toothpaste
+			_p(r, _bx(0.2, 0.5, 0.12), Vector3(0, -0.02, 0), c, 0.35)
+			_p(r, _bx(0.24, 0.06, 0.03), Vector3(0, 0.24, 0), c.darkened(0.4), 0.2)
+			_p(r, _bx(0.16, 0.03, 0.13), Vector3(0, 0.1, 0), c.lightened(0.5), 0.9)
+			var tcap := CylinderMesh.new()
+			tcap.top_radius = 0.06
+			tcap.bottom_radius = 0.06
+			tcap.height = 0.1
+			_p(r, tcap, Vector3(0, -0.32, 0), c.darkened(0.55), 0.2)
+		"timmy":
+			# the most complicated material anybody has made: a lit core
+			# inside two crossed rings, spinning on nothing
+			var core := SphereMesh.new()
+			core.radius = 0.2
+			core.height = 0.4
+			core.radial_segments = 4
+			core.rings = 2
+			_p(r, core, Vector3.ZERO, c, 2.2)
+			for rr in [Vector3.ZERO, Vector3(90, 0, 0), Vector3(0, 0, 90)]:
+				var ring0 := TorusMesh.new()
+				ring0.inner_radius = 0.26
+				ring0.outer_radius = 0.3
+				_p(r, ring0, Vector3.ZERO, Color("#7df9ff"), 1.6, rr)
+		"liqblackhole":
+			# a bottle with a hole in it. The hole is the point
+			var jarm := CylinderMesh.new()
+			jarm.top_radius = 0.16
+			jarm.bottom_radius = 0.2
+			jarm.height = 0.46
+			_p(r, jarm, Vector3(0, -0.04, 0), Color("#2a2438"), 0.1)
+			var evt := SphereMesh.new()
+			evt.radius = 0.13
+			evt.height = 0.26
+			_p(r, evt, Vector3(0, -0.04, 0), Color("#05030a"), 0.0)
+			var acc := TorusMesh.new()
+			acc.inner_radius = 0.14
+			acc.outer_radius = 0.19
+			_p(r, acc, Vector3(0, -0.04, 0), Color("#c86bff"), 2.4)
+			_p(r, _bx(0.1, 0.08, 0.1), Vector3(0, 0.23, 0), Color("#8a8f9a"), 0.3)
+		"dna4d":
+			# two strands climbing past each other, rungs between them
+			for k in 8:
+				var t9 := float(k) / 7.0
+				var a9 := t9 * TAU * 1.2
+				var bead := SphereMesh.new()
+				bead.radius = 0.055
+				bead.height = 0.11
+				var y9 := -0.28 + t9 * 0.56
+				_p(r, bead, Vector3(cos(a9) * 0.13, y9, sin(a9) * 0.13), c, 1.2)
+				_p(r, bead.duplicate(), Vector3(-cos(a9) * 0.13, y9,
+					-sin(a9) * 0.13), Color("#7be8ff"), 1.2)
+				if k % 2 == 0:
+					_p(r, _bx(0.26, 0.018, 0.018), Vector3(0, y9, 0),
+						Color("#e8f0d8"), 0.6,
+						Vector3(0, -rad_to_deg(a9), 0))
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "liquid":
+			# a round-bottom flask, filled to the shoulder, stoppered
+			var bulb := SphereMesh.new()
+			bulb.radius = 0.22
+			bulb.height = 0.42
+			_p(r, bulb, Vector3(0, -0.08, 0), Color(c, 0.9), 0.9)
+			var neck := CylinderMesh.new()
+			neck.top_radius = 0.07
+			neck.bottom_radius = 0.09
+			neck.height = 0.26
+			_p(r, neck, Vector3(0, 0.19, 0), Color("#b8ccd8"), 0.25)
+			_p(r, _bx(0.11, 0.06, 0.11), Vector3(0, 0.34, 0), Color("#5a4a3a"), 0.15)
+			var lip := TorusMesh.new()
+			lip.inner_radius = 0.075
+			lip.outer_radius = 0.1
+			_p(r, lip, Vector3(0, 0.29, 0), Color("#d8e8f0"), 0.4)
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "gas":
+			# a pressure bottle: shoulder, valve, gauge, and the gas lit
+			# up inside the glass window
+			var body9 := CylinderMesh.new()
+			body9.top_radius = 0.17
+			body9.bottom_radius = 0.19
+			body9.height = 0.5
+			_p(r, body9, Vector3(0, -0.04, 0), Color("#8d97a5"), 0.15)
+			var win := CylinderMesh.new()
+			win.top_radius = 0.13
+			win.bottom_radius = 0.13
+			win.height = 0.26
+			_p(r, win, Vector3(0, -0.04, 0), c, 1.6)
+			var shoulder := SphereMesh.new()
+			shoulder.radius = 0.17
+			shoulder.height = 0.2
+			shoulder.is_hemisphere = true
+			_p(r, shoulder, Vector3(0, 0.21, 0), Color("#9aa8bc"), 0.2)
+			var valve9 := CylinderMesh.new()
+			valve9.top_radius = 0.045
+			valve9.bottom_radius = 0.06
+			valve9.height = 0.12
+			_p(r, valve9, Vector3(0, 0.35, 0), Color("#c8722f"), 0.3)
+			var gauge := CylinderMesh.new()
+			gauge.top_radius = 0.06
+			gauge.bottom_radius = 0.06
+			gauge.height = 0.03
+			_p(r, gauge, Vector3(0.13, 0.3, 0), Color("#e8e2d0"), 0.5,
+				Vector3(0, 0, 90))
+		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "solid":
+			# a clamp-lid jar with the compound heaped inside it
+			var jar := CylinderMesh.new()
+			jar.top_radius = 0.21
+			jar.bottom_radius = 0.21
+			jar.height = 0.4
+			_p(r, jar, Vector3(0, -0.06, 0), Color("#aebfcc"), 0.1)
+			for k in 5:
+				var gr := SphereMesh.new()
+				gr.radius = 0.09 - float(k) * 0.008
+				gr.height = 0.12 - float(k) * 0.01
+				gr.radial_segments = 4
+				gr.rings = 2
+				var a8 := TAU * float(k) / 5.0
+				_p(r, gr, Vector3(cos(a8) * 0.08, -0.12 + (0.05 if k % 2 else 0.0),
+					sin(a8) * 0.08), c, 0.7)
+			var lid := CylinderMesh.new()
+			lid.top_radius = 0.22
+			lid.bottom_radius = 0.22
+			lid.height = 0.07
+			_p(r, lid, Vector3(0, 0.17, 0), Color("#6f7f93"), 0.2)
+			_p(r, _bx(0.06, 0.16, 0.03), Vector3(0, 0.09, 0.21),
+				Color("#c8ccd4"), 0.3)
 		_ when Mats.has(id) and str(Mats.def(id).get("kind", "")) == "ore":
 			# a fist of rough rock with the metal showing through
 			for ofs in [Vector3(0, -0.02, 0), Vector3(0.11, 0.05, 0.04),

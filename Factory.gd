@@ -276,14 +276,19 @@ class Processor extends Machine:
 		"electro": ["ELECTROLYSER", "ELECTROLYSER II", "ELECTROLYSER III"],
 		"sep": ["AIR SEPARATOR", "SEPARATOR II", "SEPARATOR III"],
 		"cryo": ["CRYO PLANT", "CRYO PLANT II", "CRYO PLANT III"],
+		"void": ["VOID SIPHON", "VOID SIPHON", "VOID SIPHON"],
+		"vat": ["GROWTH VAT", "GROWTH VAT", "GROWTH VAT"],
 	}
 	const FAM_COLS := {"chem": "#2f6a4a", "electro": "#2a4a72",
-		"sep": "#4a4a6a", "cryo": "#2f6a72"}
+		"sep": "#4a4a6a", "cryo": "#2f6a72", "void": "#241436",
+		"vat": "#2f5a3a"}
 	const FAM_REFUND := {
 		"chem": ["chemlab", "chemlab2", "chemlab3"],
 		"electro": ["electrolyser", "electrolyser2", "electrolyser3"],
 		"sep": ["separator", "separator2", "separator3"],
 		"cryo": ["cryoplant", "cryoplant2", "cryoplant3"],
+		"void": ["voidsiphon", "voidsiphon", "voidsiphon"],
+		"vat": ["growthvat", "growthvat", "growthvat"],
 	}
 
 	func setup(fam: String, t: int) -> Processor:
@@ -346,6 +351,38 @@ class Processor extends Machine:
 				fin.size = Vector3(box_size.x + 0.3, 0.05, 0.5)
 				part(fin, Vector3(0, 0.4 + float(i) * 0.3, -box_size.z * 0.4),
 					Color("#a8d8ff"), 0.5)
+		elif family == "void":
+			# a caged accretion ring over the vessel, and the black
+			# sphere it is winding thread off. Nothing here is flat.
+			var disk := TorusMesh.new()
+			disk.inner_radius = 0.5
+			disk.outer_radius = 0.86
+			part(disk, Vector3(0, box_size.y + 1.15, 0), Color("#c86bff"), 2.4)
+			var hole := SphereMesh.new()
+			hole.radius = 0.3
+			hole.height = 0.6
+			part(hole, Vector3(0, box_size.y + 1.15, 0), Color("#05030a"), 0.0)
+			for k in 6:
+				var ang := TAU * float(k) / 6.0
+				var strut := CylinderMesh.new()
+				strut.top_radius = 0.045
+				strut.bottom_radius = 0.045
+				strut.height = 0.8
+				part(strut, Vector3(cos(ang) * 0.72, box_size.y + 0.78,
+					sin(ang) * 0.72), Color("#6f7f93"), 0.2)
+		elif family == "vat":
+			# a ribbed grow tank with a light bar down each side
+			for i in 3:
+				var rib := TorusMesh.new()
+				rib.inner_radius = 0.44
+				rib.outer_radius = 0.52
+				part(rib, Vector3(0, box_size.y + 0.15 + float(i) * 0.32, 0),
+					Color("#9aa8bc"), 0.2)
+			for sx2 in [-1.0, 1.0]:
+				var bar := BoxMesh.new()
+				bar.size = Vector3(0.05, 0.8, 0.05)
+				part(bar, Vector3(sx2 * 0.56, box_size.y + 0.45, -0.4),
+					Color("#7dff9a"), 2.0)
 
 	func rate() -> float:
 		return SPEED[tier - 1]
@@ -379,7 +416,7 @@ class Processor extends Machine:
 		# an air separator pulls its feedstock out of the sky, so it runs
 		# on power alone -- but only where there IS a sky
 		var free_feed: bool = needs().is_empty()
-		if free_feed and not _in_atmosphere():
+		if free_feed and not _feed_ok():
 			_glow = maxf(0.0, _glow - delta)
 			return
 		var running: bool = (free_feed or _has_all()) and not blocked and buf > 0.0
@@ -408,6 +445,22 @@ class Processor extends Machine:
 			mm.emission_energy_multiplier = 0.2 + _glow * 3.5
 			mm.albedo_color.a = 0.2 + _glow * 0.35
 
+	## Where a no-input machine gets its feedstock: air for the
+	## separator, the horizon itself for the void siphon.
+	func _feed_ok() -> bool:
+		if family == "void":
+			return _near_black_hole()
+		return _in_atmosphere()
+
+	## Close enough to TIN 618 to wind thread off it. Measured in hole
+	## radii so it survives a universe rescale; Harold, parked 8200m out,
+	## is the only rock that qualifies.
+	func _near_black_hole() -> bool:
+		var bh = Universe.body_named("TIN 618")
+		if bh == null:
+			return false
+		return global_position.distance_to(bh.center) <= float(bh.radius) * 9.0
+
 	## Air only exists where a planet is holding some.
 	func _in_atmosphere() -> bool:
 		var b = Universe.nearest(global_position)
@@ -435,13 +488,16 @@ class Processor extends Machine:
 			parts.append("%s %d/%d" % [Inventory.hotbar_name(str(k)),
 				int(store.get(k, 0)), int(needs()[k])])
 		lines.append("charge: " + (", ".join(parts) if parts.size() > 0
-			else "drawn from the air"))
+			else ("wound off the horizon" if family == "void"
+				else "drawn from the air")))
 		lines.append("energy: %.0f / %.0f EU  (%.0f EU/s while running)" % [
 			buf, buf_cap, EU_RATE[tier - 1]])
 		lines.append("progress: %d%%   out: %s" % [int(progress() * 100.0),
 			Inventory.slot_text(out_slot)])
-		if needs().is_empty() and not _in_atmosphere():
-			lines.append("NO ATMOSPHERE HERE — this one needs air to pull apart")
+		if needs().is_empty() and not _feed_ok():
+			lines.append("NO EVENT HORIZON IN REACH — park this beside TIN 618"
+				if family == "void"
+				else "NO ATMOSPHERE HERE — this one needs air to pull apart")
 		elif not needs().is_empty() and not _has_all():
 			lines.append("waiting on feedstock")
 		elif buf <= 0.0:

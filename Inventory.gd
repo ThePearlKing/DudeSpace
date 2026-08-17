@@ -172,6 +172,8 @@ var items: Dictionary = {
 	"chemlab":    {"name": "Chem Lab I",       "color": Color("#2f6a4a")},
 	"chemlab2":   {"name": "Chem Lab II",      "color": Color("#2f6a4a")},
 	"chemlab3":   {"name": "Chem Lab III",     "color": Color("#2f6a4a")},
+	"voidsiphon": {"name": "Void Siphon",      "color": Color("#241436")},
+	"growthvat":  {"name": "Growth Vat",       "color": Color("#2f5a3a")},
 	"electrolyser":  {"name": "Electrolyser",  "color": Color("#2a4a72")},
 	"electrolyser2": {"name": "Electrolyser II", "color": Color("#2a4a72")},
 	"separator":  {"name": "Air Separator",    "color": Color("#4a4a6a")},
@@ -271,7 +273,8 @@ var items: Dictionary = {
 var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier", "autominer",
 	"autominer2", "autominer3", "crusher", "alloyfurn", "alloyfurn2", "alloyfurn3",
 	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
-	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
+	"separator", "separator2", "cryoplant", "cryoplant2", "voidsiphon",
+	"growthvat", "ultimabatt",
 	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
 	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser", "modsynth", "modsynth2", "modsynth3"]
 
@@ -406,6 +409,8 @@ func _ready() -> void:
 		{"id": "separator", "tab": "Machines", "name": "Air Separator", "cost": {"ingot": 16, "brass": 8, "wire": 6}, "desc": "Pulls nitrogen and argon straight out of the sky. Needs a planet with an atmosphere and nothing else."},
 		{"id": "separator2","tab": "Machines", "name": "Separator II", "cost": {"duralumin": 12, "invar": 8, "resin": 6}, "desc": "Cold enough to catch neon. Also melts ice into water on the side."},
 		{"id": "cryoplant", "tab": "Machines", "name": "Cryo Plant", "cost": {"stainless": 16, "coolant": 6, "invar": 10}, "desc": "Squeezes gas into liquid: liquid nitrogen, liquid oxygen. Everything cold and expensive starts here."},
+		{"id": "voidsiphon","tab": "Machines", "name": "Void Siphon", "cost": {"abyssitanium": 14, "neptunite": 10, "liqnitrogen": 8, "ultima": 6}, "desc": "Winds liquid black hole off an event horizon a thread at a time. Runs on power alone -- but only parked beside TIN 618, and Harold is the only rock out there to stand on."},
+		{"id": "growthvat", "tab": "Machines", "name": "Growth Vat", "cost": {"stainless": 18, "resin": 12, "coolant": 8, "dudalloy": 4}, "desc": "Meat, saltpetre, plasma gel and one ultima crystal go in. What comes out counts in four directions and is the other half of Timmy's Substance."},
 		{"id": "cryoplant2","tab": "Machines", "name": "Cryo Plant II", "cost": {"abyssitanium": 12, "plasmagel": 4, "coolant": 12}, "desc": "Colder still, and fast enough to keep a rocket pad supplied."},
 		{"id": "coolcell",  "tab": "Machines", "name": "Coolant Cell", "cost": {"coolant": 4, "stainless": 3, "invar": 2}, "desc": "Right-click a nuclear reactor or a plasma furnace: its heat headroom goes up for good. Machines that run hot need these."},
 		{"id": "ultimabatt","tab": "Electric", "name": "Ultima Battery", "cost": {"ultima": 3, "electrum": 6, "sulfuric": 4, "plasmagel": 1}, "desc": "12,000 EU in a crystal-cored box: four times an ultra capacitor, and it pushes power out three wires at once. Place it, wire it, forget it."},

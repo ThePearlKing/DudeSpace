@@ -92,7 +92,7 @@ func _ready() -> void:
 	tabs.add_theme_constant_override("separation", 8)
 	_root.add_child(tabs)
 	for t in ["ALL", "BY HAND", "ALLOYS", "CHEM LAB", "ELECTROLYSER",
-			"SEPARATOR", "CRYO"]:
+			"SEPARATOR", "CRYO", "VOID", "VAT"]:
 		var b := Button.new()
 		b.text = t
 		b.custom_minimum_size = Vector2(104, 34)
@@ -161,7 +161,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 const FAM_LABEL := {"alloy": "ALLOY FURNACE", "chem": "CHEM LAB",
-	"electro": "ELECTROLYSER", "sep": "SEPARATOR", "cryo": "CRYO PLANT"}
+	"electro": "ELECTROLYSER", "sep": "SEPARATOR", "cryo": "CRYO PLANT",
+	"void": "VOID SIPHON", "vat": "GROWTH VAT"}
 
 func _rebuild() -> void:
 	for c in _grid.get_children():
@@ -193,6 +194,12 @@ func _rebuild() -> void:
 					continue
 			"CRYO":
 				if fam != "cryo":
+					continue
+			"VOID":
+				if fam != "void":
+					continue
+			"VAT":
+				if fam != "vat":
 					continue
 		if q != "" and not str(d["name"]).to_lower().contains(q) \
 				and not str(id).to_lower().contains(q):

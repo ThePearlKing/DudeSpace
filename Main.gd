@@ -7917,6 +7917,8 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"separator2": return Factory.Processor.new().setup("sep", 2)
 		"cryoplant": return Factory.Processor.new().setup("cryo", 1)
 		"cryoplant2": return Factory.Processor.new().setup("cryo", 2)
+		"voidsiphon": return Factory.Processor.new().setup("void", 3)
+		"growthvat": return Factory.Processor.new().setup("vat", 3)
 		"alloyfurn": return Factory.AlloyFurnace.new().setup(1)
 		"alloyfurn2": return Factory.AlloyFurnace.new().setup(2)
 		"alloyfurn3": return Factory.AlloyFurnace.new().setup(3)
@@ -9654,6 +9656,85 @@ func _chem_test() -> void:
 	print("CHEM manual rows: ", man._grid.get_child_count(),
 		"  (every alloy and compound in the game)")
 	man.queue_free()
+	# --- is the whole tree actually REACHABLE from things you can dig,
+	# grow or shoot? Anything that isn't is a dead recipe.
+	var reach: Dictionary = {}
+	for mid in Mats.all().keys():
+		if not (Mats.all()[mid] as Dictionary).has("inputs"):
+			reach[str(mid)] = true          # ore, dust, ingot: dug up
+	for iid in Inventory.items.keys():
+		reach[str(iid)] = true              # bought, looted or butchered
+	for extra in ["coal", "sulfur", "plantfiber", "meat", "prism", "ultima",
+			"uranium", "ingot", "irid"]:
+		reach[extra] = true
+	var moved := true
+	while moved:
+		moved = false
+		for mid in Mats.all().keys():
+			var md: Dictionary = Mats.all()[mid]
+			if reach.has(str(mid)) or not md.has("inputs"):
+				continue
+			var ok9 := true
+			for k in (md["inputs"] as Dictionary).keys():
+				if not reach.has(str(k)):
+					ok9 = false
+					break
+			if ok9:
+				reach[str(mid)] = true
+				moved = true
+	var dead: Array = []
+	for mid in Mats.all().keys():
+		if not reach.has(str(mid)):
+			dead.append(str(mid))
+	print("CHEM unreachable materials: ", dead, "   (must be empty)")
+	# --- the void siphon: refuses to run anywhere but beside TIN 618
+	var vs := Factory.Processor.new().setup("void", 3)
+	add_child(vs)
+	vs.set_meta("placed_id", "voidsiphon")
+	vs.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 15.0)
+	await get_tree().create_timer(0.4).timeout
+	print("CHEM siphon at home: recipe=", vs.recipe, " feed_ok=", vs._feed_ok())
+	var bh = Universe.body_named("TIN 618")
+	var harold = Universe.body_named("Harold")
+	vs.global_position = harold.center + Vector3(0, harold.radius + 1.0, 0)
+	print("CHEM siphon on Harold (%.0fm out, gate %.0fm): feed_ok=%s" % [
+		harold.center.distance_to(bh.center), bh.radius * 9.0,
+		str(vs._feed_ok())])
+	for i in 8:
+		vs.buf = vs.buf_cap
+		vs.work(4.0)
+	print("CHEM siphon out: ", vs.out_slot)
+	# --- the growth vat: meat, saltpetre, plasma gel, one ultima
+	var gv := Factory.Processor.new().setup("vat", 3)
+	add_child(gv)
+	gv.set_meta("placed_id", "growthvat")
+	gv.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 19.0)
+	await get_tree().create_timer(0.4).timeout
+	gv.store = {"meat": 4, "potnitrate": 12, "plasmagel": 1, "ultima": 1}
+	for i in 6:
+		gv.buf = gv.buf_cap
+		gv.work(4.0)
+	print("CHEM vat recipe=", gv.recipe, " out=", gv.out_slot,
+		" leftover=", gv.store)
+	vs.queue_free()
+	gv.queue_free()
+	# --- every compound must be REAL GLASSWARE in the hand and in the
+	# bag, never the grey fallback cube
+	var thin: Array = []
+	for mid in Mats.all().keys():
+		var k9 := str((Mats.all()[mid] as Dictionary).get("kind", ""))
+		if not (k9 in ["liquid", "gas", "solid"]):
+			continue
+		var hand_m: Node3D = p.model_for(str(mid))
+		var icon_m: Node3D = IconLib.build_model(str(mid), get_tree())
+		if hand_m.get_child_count() < 3 or icon_m.get_child_count() < 3:
+			thin.append([str(mid), hand_m.get_child_count(),
+				icon_m.get_child_count()])
+		hand_m.queue_free()
+		icon_m.queue_free()
+	print("CHEM compounds with no real model: ", thin, "   (must be empty)")
 	print("CHEM done")
 
 
