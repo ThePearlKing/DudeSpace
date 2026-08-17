@@ -292,7 +292,8 @@ func _lex(src: String) -> bool:
 						"\\": buf2 += "\\"
 						"\"": buf2 += "\""
 						"'": buf2 += "'"
-						"0": buf2 += char(0)
+						"0": buf2 += ""      # a NUL in a Lua string stays out
+						                     # of the host's strings entirely
 						_: buf2 += e
 					_pos += 1
 					continue

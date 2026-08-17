@@ -173,6 +173,10 @@ var items: Dictionary = {
 	"chemlab2":   {"name": "Chem Lab II",      "color": Color("#2f6a4a")},
 	"chemlab3":   {"name": "Chem Lab III",     "color": Color("#2f6a4a")},
 	"voidsiphon": {"name": "Void Siphon",      "color": Color("#241436")},
+	"arcade":     {"name": "Arcade Cabinet",   "color": Color("#2a2338")},
+	"floppy":     {"name": "Blank Floppy",     "color": Color("#3a3f4a")},
+	"floppy_data":{"name": "Written Floppy",   "color": Color("#4fa4ff")},
+	"discmaker":  {"name": "Disc Maker",       "color": Color("#3f3a56")},
 	"growthvat":  {"name": "Growth Vat",       "color": Color("#2f5a3a")},
 	"electrolyser":  {"name": "Electrolyser",  "color": Color("#2a4a72")},
 	"electrolyser2": {"name": "Electrolyser II", "color": Color("#2a4a72")},
@@ -274,7 +278,7 @@ var placeables: Array = ["chest", "spawnbeacon", "rocket", "furnace", "coinifier
 	"autominer2", "autominer3", "crusher", "alloyfurn", "alloyfurn2", "alloyfurn3",
 	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
 	"separator", "separator2", "cryoplant", "cryoplant2", "voidsiphon",
-	"growthvat", "ultimabatt",
+	"growthvat", "arcade", "discmaker", "ultimabatt",
 	"generator", "coaldrill", "bioreactor", "rtg", "creativegen", "prisreactor", "capacitor", "efurnace", "eseller",
 	"atm", "ecomputer", "scomputer", "ultracap", "elight", "switch", "teleporter", "extender", "netanalyser", "modsynth", "modsynth2", "modsynth3"]
 
@@ -284,6 +288,10 @@ var prism_store: Array = []      # prism pack: 40, its own bag
 var universe_store: Array = []   # universe pack: 20, ender-style (all universe packs share it)
 var selected: int = 0
 var caged_data: Array = []   # genomes of caged animals (persisted)
+## What every written floppy in your bags is carrying, in the order they
+## were written. Same trick as caged animals: the item is a counter, the
+## contents live here, and both are saved.
+var floppy_data: Array = []
 
 # --- the tabbed catalog. "cost" may mix coins + resources. ---
 var tabs: Array = ["Gear", "Rocket", "Machines", "Electric", "Armor", "Weapons"]
@@ -409,6 +417,9 @@ func _ready() -> void:
 		{"id": "separator", "tab": "Machines", "name": "Air Separator", "cost": {"ingot": 16, "brass": 8, "wire": 6}, "desc": "Pulls nitrogen and argon straight out of the sky. Needs a planet with an atmosphere and nothing else."},
 		{"id": "separator2","tab": "Machines", "name": "Separator II", "cost": {"duralumin": 12, "invar": 8, "resin": 6}, "desc": "Cold enough to catch neon. Also melts ice into water on the side."},
 		{"id": "cryoplant", "tab": "Machines", "name": "Cryo Plant", "cost": {"stainless": 16, "coolant": 6, "invar": 10}, "desc": "Squeezes gas into liquid: liquid nitrogen, liquid oxygen. Everything cold and expensive starts here."},
+		{"id": "arcade",    "tab": "Machines", "name": "Arcade Cabinet", "cost": {"steel": 12, "wire": 10, "resin": 6, "silica": 4}, "desc": "An upright cabinet with a DUDE-16 inside it: 74 colours, six pixel fonts, and a Lua machine that will run anything you can write. Needs no power lead -- nobody has ever worked out why. Four games on the shelf, and an editor for your own."},
+		{"id": "discmaker", "tab": "Machines", "name": "Disc Maker", "cost": {"stainless": 8, "resin": 6, "wire": 8, "brass": 4}, "desc": "Cuts blank floppies and writes anything to them: a whole game, a loose script, a synth patch, a song. Whatever a machine can hold, a floppy can carry to another machine."},
+		{"id": "floppy",    "tab": "Gear",     "name": "Blank Floppy", "cost": {"coins": 20}, "desc": "Holds one of anything -- cartridge, script, patch or song. Write it at a disc maker, carry it anywhere, hand it to somebody."},
 		{"id": "voidsiphon","tab": "Machines", "name": "Void Siphon", "cost": {"abyssitanium": 14, "neptunite": 10, "liqnitrogen": 8, "ultima": 6}, "desc": "Winds liquid black hole off an event horizon a thread at a time. Runs on power alone -- but only parked beside TIN 618, and Harold is the only rock out there to stand on."},
 		{"id": "growthvat", "tab": "Machines", "name": "Growth Vat", "cost": {"stainless": 18, "resin": 12, "coolant": 8, "dudalloy": 4}, "desc": "Meat, saltpetre, plasma gel and one ultima crystal go in. What comes out counts in four directions and is the other half of Timmy's Substance."},
 		{"id": "cryoplant2","tab": "Machines", "name": "Cryo Plant II", "cost": {"abyssitanium": 12, "plasmagel": 4, "coolant": 12}, "desc": "Colder still, and fast enough to keep a rocket pad supplied."},

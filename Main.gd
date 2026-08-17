@@ -374,6 +374,8 @@ func _boot() -> void:
 		_advtut_test()
 	if OS.get_environment("CTD_TEST") == "43":
 		_chem_test()
+	if OS.get_environment("CTD_TEST") == "54":
+		_arcade_test()
 	if OS.get_environment("CTD_TEST") == "40":
 		_factory_test()
 	if OS.get_environment("CTD_TEST") == "31":
@@ -7919,6 +7921,8 @@ func _spawn_world_obj(id: String) -> Node3D:
 		"cryoplant2": return Factory.Processor.new().setup("cryo", 2)
 		"voidsiphon": return Factory.Processor.new().setup("void", 3)
 		"growthvat": return Factory.Processor.new().setup("vat", 3)
+		"arcade": return ArcadeMachine.new()
+		"discmaker": return DiscMaker.new()
 		"alloyfurn": return Factory.AlloyFurnace.new().setup(1)
 		"alloyfurn2": return Factory.AlloyFurnace.new().setup(2)
 		"alloyfurn3": return Factory.AlloyFurnace.new().setup(3)
@@ -10543,3 +10547,94 @@ func _panel_audit() -> void:
 	print("PANEL overlaps: ", bad, " / ", SynthMods.ids().size(), " panels")
 	print("PANEL done")
 	get_tree().quit()
+
+
+## CTD_TEST=54 -- the arcade: a real cabinet placed in the world, every
+## built-in cartridge run, and the editor driven through its tabs. This
+## is the one that catches "the console works but the machine does not".
+func _arcade_test() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var p = get_tree().get_first_node_in_group("player")
+	var up: Vector3 = (p.global_position
+		- Universe.nearest(p.global_position).center).normalized()
+	# --- the cabinet itself
+	var cab := ArcadeMachine.new()
+	add_child(cab)
+	cab.set_meta("placed_id", "arcade")
+	cab.global_transform = Transform3D(_basis_from_up(up),
+		p.global_position + _basis_from_up(up).x * 3.0)
+	await get_tree().create_timer(0.6).timeout
+	print("ARCADE cabinet: parts=", cab.get_child_count(),
+		" needs_power=", cab.buf_cap > 0.0, " shelf=", cab.shell.carts.size())
+	# --- every cartridge on the shelf actually runs
+	var slowest := 0.0
+	for c in ArcadeCarts.shelf():
+		var con := ArcadeConsole.new()
+		con.sound = cab.sound
+		con.boot(c)
+		var t0 := Time.get_ticks_usec()
+		var frames := 0
+		for i in 180:
+			con.btn_held[ArcadeConsole.B_RIGHT] = (i / 20) % 2 == 0
+			con.btn_held[ArcadeConsole.B_A] = (i % 7) == 0
+			con.btn_held[ArcadeConsole.B_B] = (i % 31) == 0
+			con.btn_held[ArcadeConsole.B_DOWN] = (i % 5) == 0
+			con.step(1.0 / 60.0)
+			frames += 1
+			if con.crashed:
+				break
+		var per := float(Time.get_ticks_usec() - t0) / 1000.0 / float(maxi(frames, 1))
+		slowest = maxf(slowest, per)
+		print("ARCADE cart %-12s %s frames=%d %.2f ms/frame %s" % [c.name,
+			"ok" if not con.crashed else "CRASHED", frames, per, con.crash_msg])
+	print("ARCADE slowest cartridge: %.2f ms/frame (a frame is 16.7)" % slowest)
+	# --- the shell and every editor tab draw without complaint
+	var sh: ArcadeShell = cab.shell
+	sh._enter(ArcadeShell.S_MENU)
+	var t1 := Time.get_ticks_usec()
+	for i in 30:
+		sh.update(1.0 / 60.0)
+		sh.draw()
+	print("ARCADE menu draw: %.2f ms/frame" % [
+		float(Time.get_ticks_usec() - t1) / 30000.0])
+	sh.edit.open(sh.carts[0])
+	sh.state = ArcadeShell.S_EDIT
+	for tb in [ArcadeEdit.T_CODE, ArcadeEdit.T_SPRITE, ArcadeEdit.T_MAP]:
+		sh.edit.tab = tb
+		var t2 := Time.get_ticks_usec()
+		for i in 30:
+			sh.update(1.0 / 60.0)
+			sh.draw()
+		print("ARCADE editor %-6s %.2f ms/frame" % [ArcadeEdit.TABS[tb],
+			float(Time.get_ticks_usec() - t2) / 30000.0])
+	# --- typing into the code editor really edits the cartridge
+	sh.edit.tab = ArcadeEdit.T_CODE
+	sh.edit.cart = ArcadeCart.blank("TYPED")
+	sh.edit.open(sh.edit.cart)
+	sh.edit.cur_l = 0
+	sh.edit.cur_c = 0
+	con_type(sh, "x=1")
+	print("ARCADE typing: first line is now '", str(sh.edit.lines[0]), "'")
+	# --- a cart written in the editor boots
+	sh.edit.lines = ["function _draw() cls(3) print('made here', 10, 10, 1) end"]
+	sh.edit.commit()
+	var con2 := ArcadeConsole.new()
+	con2.boot(sh.edit.cart)
+	con2.step(1.0 / 60.0)
+	print("ARCADE edited cart runs: crashed=", con2.crashed, " ", con2.crash_msg)
+	# --- the palette is what was promised
+	print("ARCADE palette: ", Pixel.color_count(), " colours (2 + ",
+		Pixel.HUES.size(), " hues x 3)")
+	print("ARCADE fonts: ", PixelFont.NAMES)
+	print("ARCADE resolutions: ", ArcadeConsole.RES_MODES.map(
+		func(m): return "%s %dx%d" % [m["name"], m["w"], m["h"]]))
+	cab.queue_free()
+	print("ARCADE done")
+
+
+## Feed characters to the editor the way a keyboard would.
+func con_type(sh, text: String) -> void:
+	for i in text.length():
+		sh.con.text_typed = text[i]
+		sh.edit.update(1.0 / 60.0)
+	sh.con.text_typed = ""
