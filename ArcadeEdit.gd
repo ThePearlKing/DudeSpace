@@ -55,6 +55,8 @@ var trk_inst: int = 0
 var trk_panel: int = 0          # 0 pattern, 1 instrument, 2 song
 var trk_ip: int = 0             # selected instrument parameter
 var _clip_row: Array = []
+var info_sel: int = 0
+var renaming: bool = false
 var song: ChipSound.Song = null
 var sound = null                # the ChipSound node, set by the shell
 
@@ -132,7 +134,7 @@ func open(c: ArcadeCart) -> void:
 	t = 0.0
 
 func typing() -> bool:
-	return tab == T_CODE or tab == T_SOUND
+	return tab == T_CODE or tab == T_SOUND or (tab == T_INFO and renaming)
 
 func commit() -> void:
 	if cart == null or cart.readonly:
@@ -175,6 +177,8 @@ func update(delta: float) -> void:
 		_set_tab(T_MAP)
 	if con.key_hits.has(KEY_F4):
 		_set_tab(T_SOUND)
+	if con.key_hits.has(KEY_F6):
+		_set_tab(T_INFO)
 	if con.key_hits.has(KEY_F5):
 		_run()
 		return
@@ -478,8 +482,76 @@ func _update_map() -> void:
 		map_tile = clampi(((mp.y - gr.position.y) / 11) * 16
 			+ (mp.x - gr.position.x) / 11, 0, 255)
 
+## The cartridge itself: what it is called, who wrote it, how big its
+## canvas is, and the two things you always end up wanting -- a copy you
+## are allowed to edit, and a floppy to put it on.
+const INFO_ROWS := ["NAME", "AUTHOR", "CANVAS", "COPY TO A NEW CART",
+	"WRITE TO A FLOPPY"]
+
 func _update_info() -> void:
-	pass
+	if cart == null:
+		return
+	if renaming:
+		for code in con.key_hits.keys():
+			var k := int(code)
+			if k == KEY_ENTER or k == KEY_ESCAPE:
+				renaming = false
+			elif k == KEY_BACKSPACE:
+				if info_sel == 0:
+					cart.name = cart.name.substr(0, maxi(0, cart.name.length() - 1))
+				else:
+					cart.author = cart.author.substr(0,
+						maxi(0, cart.author.length() - 1))
+		if con.text_typed != "":
+			if info_sel == 0:
+				cart.name = (cart.name + con.text_typed).substr(0, 18)
+			else:
+				cart.author = (cart.author + con.text_typed).substr(0, 18)
+		return
+	for code in con.key_hits.keys():
+		match int(code):
+			KEY_UP:
+				info_sel = (info_sel - 1 + INFO_ROWS.size()) % INFO_ROWS.size()
+			KEY_DOWN:
+				info_sel = (info_sel + 1) % INFO_ROWS.size()
+			KEY_LEFT, KEY_RIGHT:
+				if info_sel == 2:
+					var dir := 1 if int(code) == KEY_RIGHT else -1
+					var want := clampi(cart.res_mode + dir, 0,
+						ArcadeConsole.RES_MODES.size() - 1)
+					var need := str(ArcadeConsole.RES_MODES[want]["needs"])
+					if need != "" and not con.can(need):
+						shell.note("that canvas needs the %s board" % (
+							"expansion" if need == "expand" else "smooth motion"))
+					else:
+						cart.res_mode = want
+			KEY_ENTER:
+				_info_activate()
+
+func _info_activate() -> void:
+	match info_sel:
+		0, 1:
+			if cart.readonly:
+				shell.note("a ROM keeps its name -- copy it first")
+			else:
+				renaming = true
+		3:
+			var copy := cart.duplicate_cart()
+			copy.name = (cart.name + " COPY").substr(0, 18)
+			copy.readonly = false
+			if shell.machine != null and shell.machine.has_method("adopt_cart"):
+				shell.machine.adopt_cart(copy)
+				shell.carts = shell.machine.shell.carts
+				shell.sel = shell.carts.find(copy)
+				open(copy)
+				shell.note("copied -- this one you can edit")
+		4:
+			commit()
+			if Inventory.res_count("floppy") <= 0:
+				shell.note("no blank floppies -- cut some at a disc maker")
+				return
+			if ArcadeDisc.write(ArcadeDisc.make("cart", cart.name, cart.to_dict())):
+				shell.note("written to a floppy: " + cart.name)
 
 # ================================================================== draw
 
@@ -502,13 +574,17 @@ func _draw_frame(u) -> void:
 	var glide := int(round(_tab_glide * float(tab_w)))
 	u.rectfill(8 + glide, 2, 8 + glide + tab_w - 4, 19, Pixel.dark(11))
 	u.hline(8 + glide, 8 + glide + tab_w - 4, 20, Pixel.hue(4))
+	# F5 is RUN, so the tabs are F1-F4 and F6
+	var keys := ["F1", "F2", "F3", "F4", "F6"]
 	for i in TABS.size():
 		var x := 8 + i * tab_w
 		var on := i == tab
 		PixelFont.draw(u, str(TABS[i]), x + 8, 7,
 			Pixel.WHITE if on else Pixel.hue(23),
 			PixelFont.BOLD if on else PixelFont.SYS)
-		PixelFont.draw(u, "F%d" % (i + 1), x + 8, 15, Pixel.dark(23))
+		PixelFont.draw(u, str(keys[i]), x + 8, 15, Pixel.dark(23))
+	PixelFont.draw(u, "F5 RUN", 8 + TABS.size() * tab_w + 6, 11,
+		Pixel.light(4) if fmod(t, 1.2) < 0.6 else Pixel.hue(4))
 	# running highlight
 	var sweep := int(fmod(t * 90.0, float(Pixel.UI_W)))
 	u.hline(sweep, sweep + 24, 21, Pixel.hue(9))
@@ -533,6 +609,9 @@ func _draw_status(u) -> void:
 		T_MAP:
 			hint = "DRAG TO PAINT   ARROWS SCROLL   TILE %d   %d,%d" % [
 				map_tile, map_cam.x, map_cam.y]
+		T_INFO:
+			hint = "ENTER edit   ARROWS pick   %s" % (
+				"typing a name -- ENTER when done" if renaming else "ESC shelf")
 		T_SOUND:
 			hint = "SPACE PLAY   TAB PANEL   OCT %d   INST %d   %d/%d @ %d BPM" % [
 				trk_oct, trk_inst, song.sig_num if song else 4,
@@ -741,19 +820,30 @@ func _draw_map(u) -> void:
 				continue
 			u.blit_scaled(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(tile),
 				ArcadeCart.spr_y(tile), 16, 16, dx, dy, 1)
-	# minimap of the whole 128x64 field, with the view window marked
-	var mm_x := Pixel.UI_W - 150
-	var mm_y := Pixel.UI_H - 90
-	u.rectfill(mm_x, mm_y, mm_x + 128, mm_y + 64, Pixel.BLACK)
-	for y in 64:
+	# the whole 128x64 field at a glance, half height, with the window
+	# you are looking through marked on it
+	var mm_x := 12
+	var mm_y := Pixel.UI_H - 62
+	u.rectfill(mm_x - 2, mm_y - 10, mm_x + 130, mm_y + 34, Pixel.BLACK)
+	u.rect(mm_x - 2, mm_y - 10, mm_x + 130, mm_y + 34, Pixel.dark(9))
+	PixelFont.draw(u, "WHOLE MAP  128x64", mm_x, mm_y - 9, Pixel.hue(23))
+	for y in 32:
 		for x in 128:
-			if cart.mget(x, y) != 0:
-				u.pset(mm_x + x, mm_y + y, Pixel.hue(9))
-	u.rect(mm_x + map_cam.x, mm_y + map_cam.y, mm_x + map_cam.x + 22,
-		mm_y + map_cam.y + 14, Pixel.light(4))
+			var t1 := cart.mget(x, y * 2)
+			var t2 := cart.mget(x, y * 2 + 1)
+			if t1 != 0 or t2 != 0:
+				u.pset(mm_x + x, mm_y + y, Pixel.hue(9) if t1 != 0
+					else Pixel.dark(9))
+	u.rect(mm_x + map_cam.x, mm_y + map_cam.y / 2, mm_x + map_cam.x + 22,
+		mm_y + map_cam.y / 2 + 7, Pixel.light(4))
 	# tile picker
 	var gr := _sheet_rect()
-	PixelFont.draw(u, "TILES", gr.position.x, gr.position.y - 10, Pixel.hue(9))
+	u.rectfill(gr.position.x - 3, gr.position.y - 12, gr.position.x + gr.size.x + 3,
+		gr.position.y + gr.size.y + 3, Pixel.BLACK)
+	u.rect(gr.position.x - 3, gr.position.y - 12, gr.position.x + gr.size.x + 3,
+		gr.position.y + gr.size.y + 3, Pixel.dark(9))
+	PixelFont.draw(u, "TILES  pick one, then paint", gr.position.x,
+		gr.position.y - 10, Pixel.hue(9))
 	for i in 256:
 		var sx := gr.position.x + (i % 16) * 11
 		var sy := gr.position.y + (i / 16) * 11
@@ -1105,4 +1195,74 @@ func _draw_song_panel(u, px: int, y: int) -> void:
 	PixelFont.draw(u, "F7 play  F8 stop", px + 6, y + 120, Pixel.hue(23))
 
 func _draw_info(u) -> void:
-	pass
+	if cart == null:
+		return
+	var x := 20
+	var y := 40 + int((1.0 - _panel_in) * 20.0)
+	u.rectfill(x, y, x + 250, y + 190, Pixel.BLACK)
+	u.rect(x, y, x + 250, y + 190, Pixel.dark(9))
+	PixelFont.draw(u, "CARTRIDGE", x + 8, y + 8, Pixel.light(4), PixelFont.WIDE)
+	var vals := [cart.name, cart.author,
+		str(ArcadeConsole.RES_MODES[cart.res_mode]["name"]), "", ""]
+	for i in INFO_ROWS.size():
+		var yy := y + 34 + i * 18
+		var on := i == info_sel
+		if on:
+			u.rectfill(x + 6, yy - 3, x + 244, yy + 11, Pixel.dark(11))
+		PixelFont.draw(u, str(INFO_ROWS[i]), x + 12, yy,
+			Pixel.WHITE if on else Pixel.hue(23))
+		var v := str(vals[i])
+		if i == 0 or i == 1:
+			if renaming and on:
+				v += "_" if fmod(t, 0.6) < 0.35 else " "
+			PixelFont.draw(u, v, x + 110, yy, Pixel.light(9))
+		elif i == 2:
+			PixelFont.draw(u, "< %s >" % v, x + 110, yy, Pixel.light(9))
+	PixelFont.draw(u, str(ArcadeConsole.RES_MODES[cart.res_mode]["desc"]),
+		x + 12, y + 128, Pixel.dark(23))
+	PixelFont.draw(u, "ENTER to rename or run the action", x + 12, y + 146,
+		Pixel.hue(23))
+	PixelFont.draw(u, "ROM cartridges must be copied first", x + 12, y + 158,
+		Pixel.hue(23))
+	# --- what is actually on this cartridge
+	var px := 290
+	u.rectfill(px, 40, Pixel.UI_W - 10, 230, Pixel.BLACK)
+	u.rect(px, 40, Pixel.UI_W - 10, 230, Pixel.dark(9))
+	PixelFont.draw(u, "CONTENTS", px + 8, 46, Pixel.light(9), PixelFont.BOLD)
+	var used_spr := 0
+	for i in 256:
+		var any := false
+		for yy2 in 16:
+			for xx2 in 16:
+				if cart.sheet[(ArcadeCart.spr_y(i) + yy2) * ArcadeCart.SHEET_W
+						+ ArcadeCart.spr_x(i) + xx2] != 0:
+					any = true
+					break
+			if any:
+				break
+		if any:
+			used_spr += 1
+	var used_tiles := 0
+	for i in cart.map_data.size():
+		if cart.map_data[i] != 0:
+			used_tiles += 1
+	var song_rows := "none"
+	if not cart.song.is_empty():
+		song_rows = "%s, %d patterns" % [str(cart.song.get("title", "?")),
+			(cart.song.get("patterns", []) as Array).size()]
+	var lines2 := [
+		"CODE     %d lines" % (cart.code.count("\n") + 1),
+		"SPRITES  %d of 256 drawn" % used_spr,
+		"MAP      %d tiles placed" % used_tiles,
+		"SOUND    %d effects" % cart.sfx.size(),
+		"SONG     %s" % song_rows,
+		"SAVED    %d values" % cart.data.size(),
+		"WRITE    %s" % ("ROM, locked" if cart.readonly else "editable"),
+	]
+	for i in lines2.size():
+		PixelFont.draw(u, str(lines2[i]), px + 8, 66 + i * 12, Pixel.hue(23))
+	# the first row of the sheet, as a strip, so you can see the art
+	for i in 8:
+		u.blit(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
+			ArcadeCart.spr_y(i), 16, 16, px + 8 + i * 20, 168)
+	PixelFont.draw(u, "F5 runs it, ESC goes back", px + 8, 200, Pixel.dark(23))

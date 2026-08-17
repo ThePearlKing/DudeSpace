@@ -233,6 +233,7 @@ static func _cart(nm: String, author: String, code: String, res_mode: int = 1) -
 	c.code = code
 	c.res_mode = res_mode
 	_stock_art(c)
+	c.song = ChipSound.demo_song().to_dict()
 	return c
 
 # ---------------------------------------------------------------------

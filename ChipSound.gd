@@ -883,14 +883,18 @@ func toggle() -> void:
 		play_music(order_i)
 
 ## A cartridge sound effect: a short run of notes on a spare channel.
+## Sound effects take the LAST voice the cabinet has, so a stock four
+## voice machine gives one up to effects and keeps three for the song.
 func play_sfx(n: int, chan: int = -1) -> void:
 	_mx.lock()
-	var ch := chan if chan >= 0 else CHANS - 1
-	var c: Chan = chans[ch % CHANS]
+	var ch := chan if chan >= 0 else voices() - 1
+	var c: Chan = chans[clampi(ch, 0, CHANS - 1)]
 	var d: Dictionary = {}
 	if n >= 0 and n < cart_sfx.size() and cart_sfx[n] is Dictionary:
 		d = cart_sfx[n]
-	c.inst = int(d.get("inst", 6))
+	elif not cart_sfx.is_empty():
+		d = cart_sfx[0]
+	c.inst = clampi(int(d.get("inst", 6)), 0, maxi(0, song.insts.size() - 1))
 	c.vol = float(d.get("vol", 0.7))
 	_trigger(c, float(d.get("note", 60)))
 	_mx.unlock()

@@ -30,6 +30,23 @@ func _init() -> void:
 	sheet.fill(0)
 	flags.resize(256)
 	map_data.resize(MAP_W * MAP_H)
+	sfx = default_sfx()
+
+## Eight sounds every cartridge starts with, so sfx(0) does something
+## the moment you write it. Each is an instrument out of the chip's bank
+## plus a note: a shot, a hit, a boom, a coin, a jump, a step, a blip and
+## a chime.
+static func default_sfx() -> Array:
+	return [
+		{"name": "SHOT", "inst": 3, "note": 74, "vol": 0.5},
+		{"name": "HIT", "inst": 8, "note": 55, "vol": 0.8},
+		{"name": "BOOM", "inst": 11, "note": 40, "vol": 0.9},
+		{"name": "COIN", "inst": 6, "note": 84, "vol": 0.6},
+		{"name": "JUMP", "inst": 0, "note": 69, "vol": 0.5},
+		{"name": "STEP", "inst": 9, "note": 70, "vol": 0.35},
+		{"name": "BLIP", "inst": 5, "note": 77, "vol": 0.45},
+		{"name": "CHIME", "inst": 6, "note": 91, "vol": 0.55},
+	]
 
 ## Where sprite n starts in the sheet.
 static func spr_x(n: int) -> int:

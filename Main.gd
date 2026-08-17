@@ -10875,6 +10875,17 @@ func _arcade_shots() -> void:
 	cab.shell.edit.trk_panel = 1
 	await get_tree().create_timer(0.4).timeout
 	await _shot(dir + "arcade_instrument.png")
+	cab.shell.state = ArcadeShell.S_EDIT
+	cab.shell.edit.tab = ArcadeEdit.T_INFO
+	await get_tree().create_timer(0.4).timeout
+	await _shot(dir + "arcade_cart.png")
+	cab.shell.edit.tab = ArcadeEdit.T_MAP
+	# put a few tiles down so the map tab has something on it
+	for mx in 22:
+		for my in range(9, 14):
+			cab.shell.carts[0].mset(mx, my, 7 if my > 9 else 6)
+	await get_tree().create_timer(0.4).timeout
+	await _shot(dir + "arcade_map.png")
 	cab.shell.state = ArcadeShell.S_DISC
 	await get_tree().create_timer(0.4).timeout
 	await _shot(dir + "arcade_disc.png")
