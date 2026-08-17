@@ -10628,6 +10628,51 @@ func _arcade_test() -> void:
 	print("ARCADE fonts: ", PixelFont.NAMES)
 	print("ARCADE resolutions: ", ArcadeConsole.RES_MODES.map(
 		func(m): return "%s %dx%d" % [m["name"], m["w"], m["h"]]))
+	# --- the sound chip: does it make a noise, and can it keep up?
+	var snd: ChipSound = cab.sound
+	snd.set_song(ChipSound.demo_song())
+	snd.play_music(0)
+	var peak := 0.0
+	var rms := 0.0
+	var n := 0
+	var t3 := Time.get_ticks_usec()
+	for b in 200:                       # 200 blocks = 1.16 s of audio
+		snd._block()
+		for i in ChipSound.BLK:
+			var v: Vector2 = snd._mix[i]
+			peak = maxf(peak, maxf(absf(v.x), absf(v.y)))
+			rms += v.x * v.x + v.y * v.y
+			n += 2
+	var dsp_ms := float(Time.get_ticks_usec() - t3) / 1000.0
+	var audio_ms := 200.0 * float(ChipSound.BLK) / ChipSound.SR * 1000.0
+	print("ARCADE sound: peak=%.3f rms=%.3f  %.1f ms of cpu for %.0f ms of audio (%.1f%% of one core)" % [
+		peak, sqrt(rms / float(n)), dsp_ms, audio_ms, dsp_ms / audio_ms * 100.0])
+	# stereo: the mix must not be two copies of the same channel
+	var diff := 0.0
+	var cnt := 0
+	for b in 120:
+		snd._block()
+		for i in ChipSound.BLK:
+			var v2: Vector2 = snd._mix[i]
+			diff += absf(v2.x - v2.y)
+			cnt += 1
+	print("ARCADE sound stereo spread: %.3f  instruments=%d  channels=%d" % [
+		diff / float(cnt), snd.song.insts.size(), ChipSound.CHANS])
+	# every instrument in the bank must actually sound
+	var silent: Array = []
+	for ii in snd.song.insts.size():
+		snd.stop_music()
+		for c in snd.chans:
+			c.stage = 0
+		snd.play_note(0, 60.0, 1.0, ii)
+		var e := 0.0
+		for b in 40:
+			snd._block()
+			for i in ChipSound.BLK:
+				e += absf(snd._mix[i].x) + absf(snd._mix[i].y)
+		if e < 0.5:
+			silent.append(str(snd.song.insts[ii].name))
+	print("ARCADE silent instruments: ", silent, "   (must be empty)")
 	cab.queue_free()
 	print("ARCADE done")
 
