@@ -10738,6 +10738,45 @@ func _arcade_test() -> void:
 		if e < 0.5:
 			silent.append(str(snd.song.insts[ii].name))
 	print("ARCADE silent instruments: ", silent, "   (must be empty)")
+	# --- does the triangle filler actually fill?
+	var tc := ArcadeCart.blank("TRI")
+	tc.code = "function _draw() cls(0) tri(10,10,100,10,60,60,2) " \
+		+ "tri(120,60,220,60,170,10,14) end"
+	var tcon := ArcadeConsole.new()
+	tcon.boot(tc)
+	tcon.step(1.0 / 60.0)
+	var filled_a := 0
+	var filled_b := 0
+	for y in 70:
+		for x in 240:
+			var v := tcon.main.pget(x, y)
+			if v == 2:
+				filled_a += 1
+			elif v == 14:
+				filled_b += 1
+	print("ARCADE trifill: point-down=%d px, point-up=%d px (both should be ~2000)" % [
+		filled_a, filled_b])
+	# --- how fast can a cartridge actually paint?
+	var fc := ArcadeCart.blank("FILL")
+	fc.code = "W,H=res() function _draw() for i=1,10 do rectfill(0,0,W,H,i) end end"
+	var fcon := ArcadeConsole.new()
+	fcon.boot(fc)
+	var tf := Time.get_ticks_usec()
+	for i in 20:
+		fcon.step(1.0 / 60.0)
+	var us_per_screen := float(Time.get_ticks_usec() - tf) / 200.0
+	print("ARCADE fill rate: %.0f us per full screen (%d px), %.1f ms for ten" % [
+		us_per_screen, fcon.game_w * fcon.game_h, us_per_screen * 10.0 / 1000.0])
+	var tc2 := ArcadeCart.blank("TRIS")
+	tc2.code = "W,H=res() function _draw() for i=1,40 do tri(0,0,W,0,W/2,H,i) end end"
+	var tcon2 := ArcadeConsole.new()
+	tcon2.boot(tc2)
+	var tt := Time.get_ticks_usec()
+	for i in 20:
+		tcon2.step(1.0 / 60.0)
+	print("ARCADE triangle rate: %.0f us per half-screen triangle" % [
+		float(Time.get_ticks_usec() - tt) / 800.0])
+	print("ARCADE lua speed: %.2f ms per 10k loop iterations" % [_lua_bench()])
 	# --- floppies: one format, four kinds, and one conversion that is
 	# deliberately impossible
 	Inventory.floppy_data = []
@@ -10842,7 +10881,7 @@ func _arcade_shots() -> void:
 		cab.con.btn_held[ArcadeConsole.B_A] = (i % 40) < 6
 		await get_tree().process_frame
 	await _shot(dir + "arcade_dudedash.png")
-	cab.shell.sel = 1
+	cab.shell.sel = 3
 	cab.shell._boot_selected()
 	cab.shell._enter(ArcadeShell.S_RUN)
 	for i in 260:
@@ -10850,6 +10889,23 @@ func _arcade_shots() -> void:
 		cab.con.btn_held[ArcadeConsole.B_A] = (i % 23) == 0
 		await get_tree().process_frame
 	await _shot(dir + "arcade_blockparty.png")
+	cab.shell.sel = 1
+	cab.shell._boot_selected()
+	cab.shell._enter(ArcadeShell.S_RUN)
+	for i in 220:
+		cab.con.btn_held[ArcadeConsole.B_LEFT] = (i / 40) % 2 == 0
+		cab.con.btn_held[ArcadeConsole.B_RIGHT] = (i / 40) % 2 == 1
+		await get_tree().process_frame
+	await _shot(dir + "arcade_soulboard.png")
+	cab.shell.sel = 2
+	cab.shell._boot_selected()
+	cab.shell._enter(ArcadeShell.S_RUN)
+	for i in 300:
+		cab.con.btn_held[ArcadeConsole.B_A] = true
+		cab.con.btn_held[ArcadeConsole.B_RIGHT] = (i % 60) < 8
+		cab.con.btn_held[ArcadeConsole.B_LEFT] = (i % 60) >= 30 and (i % 60) < 38
+		await get_tree().process_frame
+	await _shot(dir + "arcade_neondrift.png")
 	# --- the workshop
 	cab.shell.edit.open(cab.shell.carts[0])
 	cab.shell.state = ArcadeShell.S_EDIT
@@ -10896,3 +10952,14 @@ func _shot(path: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(path)
 	print("SHOT ", path)
+
+
+## How much Lua a cartridge can afford in a frame, measured rather than
+## guessed. Ten thousand loop iterations of arithmetic.
+func _lua_bench() -> float:
+	var vm := LuaVM.new()
+	vm.open_libs()
+	vm.run("function work(n) local s=0 for i=1,n do s=s+i*2 end return s end")
+	var t0 := Time.get_ticks_usec()
+	vm.call_global("work", [10000.0])
+	return float(Time.get_ticks_usec() - t0) / 1000.0

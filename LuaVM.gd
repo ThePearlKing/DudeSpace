@@ -973,7 +973,12 @@ func _assign(target: Array, val, sc: Scope) -> void:
 			G.rawset(n, val)
 		E_INDEX:
 			var obj = _eval(target[1], sc)
-			var key = _eval(target[2], sc)
+			var kn2: Array = target[2]
+			var key = kn2[1] if int(kn2[0]) == E_STR else _eval(kn2, sc)
+			if obj is Table and (obj as Table).meta == null and key != null:
+				# plain table write: straight into the dictionary
+				(obj as Table).rawset(key, val)
+				return
 			_setindex(obj, key, val)
 		_:
 			_rt("cannot assign to that")
@@ -1018,7 +1023,8 @@ func _eval(node, sc: Scope) -> Variant:
 		E_FALSE: return false
 		E_INDEX:
 			var obj = _eval(node[1], sc)
-			var key = _eval(node[2], sc)
+			var kn: Array = node[2]
+			var key = kn[1] if int(kn[0]) == E_STR else _eval(kn, sc)
 			if obj is Table:
 				# plain table read, no metatable: straight out of the dict
 				var tb: Table = obj
@@ -1148,7 +1154,21 @@ func _eval_multi(node, sc: Scope) -> Array:
 	match int(node[0]):
 		E_CALL:
 			line = int(node[3])
-			var f = _eval(node[1], sc)
+			var fnode: Array = node[1]
+			var f
+			if int(fnode[0]) == E_NAME:
+				var fname: String = fnode[1]
+				var fs: Scope = sc
+				f = null
+				while fs != null:
+					if fs.v.has(fname):
+						f = fs.v[fname]
+						break
+					fs = fs.parent
+				if fs == null:
+					f = G.h.get(fname, null)
+			else:
+				f = _eval(fnode, sc)
 			if f == null:
 				_rt("tried to call %s, which is nil" % _describe(node[1]))
 				return []

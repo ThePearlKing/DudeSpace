@@ -294,19 +294,56 @@ class Layer extends RefCounted:
 			var dx := int(sqrt(float(r * r - dy * dy)))
 			hline(xm - dx, xm + dx, ym + dy, idx)
 
-	## Flat-filled triangle, scanline style.
-	func trifill(x0: int, y0: int, x1: int, y1: int, x2: int, y2: int, idx: int) -> void:
-		var pts := [[x0, y0], [x1, y1], [x2, y2]]
-		pts.sort_custom(func(a, b): return int(a[1]) < int(b[1]))
-		var ax: int = pts[0][0]
-		var ay: int = pts[0][1]
-		var bx: int = pts[1][0]
-		var by: int = pts[1][1]
-		var cx2: int = pts[2][0]
-		var cy2: int = pts[2][1]
-		for y in range(ay, cy2 + 1):
-			var xa := _edge(ax, ay, cx2, cy2, y)
-			var xb := _edge(ax, ay, bx, by, y) if y < by else _edge(bx, by, cx2, cy2, y)
+	## Flat-filled triangle, scanline style. The three points are sorted
+	## by hand: this gets called a few hundred times a frame by anything
+	## drawing a road or a fan, and an Array plus a sort lambda per call
+	## costs more than the fill does.
+	func trifill(x0: int, y0: int, x1: int, y1: int, x2: int, y2: int,
+			idx: int) -> void:
+		var ax := x0
+		var ay := y0
+		var bx := x1
+		var by := y1
+		var cx2 := x2
+		var cy2 := y2
+		var t := 0
+		if ay > by:
+			t = ax
+			ax = bx
+			bx = t
+			t = ay
+			ay = by
+			by = t
+		if by > cy2:
+			t = bx
+			bx = cx2
+			cx2 = t
+			t = by
+			by = cy2
+			cy2 = t
+		if ay > by:
+			t = ax
+			ax = bx
+			bx = t
+			t = ay
+			ay = by
+			by = t
+		if cy2 == ay:
+			hline(mini(ax, mini(bx, cx2)), maxi(ax, maxi(bx, cx2)), ay, idx)
+			return
+		# clip vertically before walking the scanlines
+		var y_from := maxi(ay, cy + cam_y)
+		var y_to := mini(cy2, cy + ch - 1 + cam_y)
+		var long_dx := float(cx2 - ax) / float(cy2 - ay)
+		for y in range(y_from, y_to + 1):
+			var xa := ax + int(float(y - ay) * long_dx)
+			var xb := 0
+			if y < by:
+				xb = ax if by == ay else ax + int(float(x1 - x0) * 0.0) \
+					+ int(float(bx - ax) * float(y - ay) / float(by - ay))
+			else:
+				xb = bx if cy2 == by else bx \
+					+ int(float(cx2 - bx) * float(y - by) / float(cy2 - by))
 			hline(xa, xb, y, idx)
 
 	static func _edge(x0: int, y0: int, x1: int, y1: int, y: int) -> int:
