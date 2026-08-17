@@ -143,6 +143,10 @@ var locator_mode: int = 0           # 0 alien ship · 1 invaders · 2 shadow tem
 var chem_manual: bool = false   # the Chemistry Handbook has been bought
 var locator_targets: Array = []     # Vector3 list -- multi-ping modes fill many
 var locator_label: String = ""
+## Where you died last. Remembered, never displayed unless you ask the
+## locator for it.
+var last_death: Vector3 = Vector3.ZERO
+var has_last_death: bool = false
 var locator_until: float = -1.0
 var locator_lie: float = 1.0   # displayed-distance multiplier (cosmic readings)
 var locator_planet := ""   # planet-name lock: ping tracks it while it moves

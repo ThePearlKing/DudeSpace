@@ -265,12 +265,20 @@ func _build_cabinet() -> void:
 		blk.size = Vector3(0.055, 0.055, 0.012)
 		part(blk, Vector3(float(px[0]) * 0.055, 0.62 + float(px[1]) * 0.055,
 			hd + 0.02), Color("#fee761"), 1.3)
-	# neon down both front corners: the thing you see from across a room
+	# Neon down the front corners -- but the cabinet steps back above the
+	# control deck, so the neon steps with it. One run per section:
+	# lengths that ignore the step read as four poles stuck through the
+	# machine, which is exactly what they looked like.
+	var upper_front := CAB_D * 0.36 - 0.06
 	for nx in [-1.0, 1.0]:
-		var neon := BoxMesh.new()
-		neon.size = Vector3(0.02, 1.5, 0.02)
-		part(neon, Vector3(nx * (hw - 0.015), 1.0, hd + 0.015),
-			Color("#26c2cd") if nx < 0.0 else Color("#e14bd6"), 2.6)
+		var col_n := Color("#26c2cd") if nx < 0.0 else Color("#e14bd6")
+		var neon_low := BoxMesh.new()
+		neon_low.size = Vector3(0.02, 0.72, 0.02)
+		part(neon_low, Vector3(nx * (hw - 0.015), 0.5, hd + 0.015), col_n, 2.6)
+		var neon_up := BoxMesh.new()
+		neon_up.size = Vector3(0.02, 0.82, 0.02)
+		part(neon_up, Vector3(nx * (hw - 0.015), 1.44, upper_front + 0.02),
+			col_n, 2.6)
 	# --- coin door, return cup, and the floppy slot beside it
 	var door := BoxMesh.new()
 	door.size = Vector3(0.32, 0.22, 0.035)

@@ -310,7 +310,20 @@ func station_dir(st: Dictionary) -> Vector3:
 	return (sp - Universe.nearest(sp).center).normalized()
 
 ## Where a station's signal physically comes from.
+## Where the NEXUS array is, if there is one. Every rack that goes on
+## the air uplinks to it, so a live channel is heard coming off the
+## station and not off whatever rock its owner happens to be standing on.
+func nexus_pos() -> Variant:
+	var n = get_tree().get_first_node_in_group("nexus_station")
+	if n != null and n is Node3D:
+		return (n as Node3D).global_position
+	return null
+
 func _src_pos(st: Dictionary) -> Vector3:
+	if str(st.get("type", "")) == "live":
+		var np = nexus_pos()
+		if np != null:
+			return np
 	if st.has("node") and is_instance_valid(st["node"]):
 		return st["node"].global_position
 	if st.has("fixed_dir"):
@@ -343,7 +356,18 @@ func signal_for(st: Dictionary) -> float:
 ## thing you aimed at, not every solar system stacked behind it.
 func align_for(st: Dictionary) -> float:
 	if str(st.get("type", "")) == "live":
-		return 1.0      # a transmitter, not a planet: it broadcasts at you
+		# every live channel is relayed by the Nexus array, so it is the
+		# ARRAY you point at -- one target, however many people are on
+		# the air. No array in the sky and they broadcast at you direct.
+		var np = nexus_pos()
+		if np == null:
+			return 1.0
+		var to_nexus: Vector3 = (np - _site())
+		if to_nexus.length() < 400.0:
+			return 1.0                      # standing on the thing
+		var dot := aim_dir.normalized().dot(to_nexus.normalized())
+		# a big dish array is a generous target: about fifteen degrees
+		return clampf((dot - 0.955) / 0.045, 0.0, 1.0)
 	if _is_local(st):
 		return 1.0
 	# the beam only has to TOUCH the planet's field, not its center dot:
@@ -467,8 +491,12 @@ func work(delta: float) -> void:
 		# a rack in the Nexus array is heard across the system; one on a
 		# planet somewhere fades like any other local transmitter
 		var src = stations[best].get("node", null)
-		var nexus: bool = is_instance_valid(src) and src.has_method("at_nexus") \
-			and src.at_nexus()
+		# a channel on the Nexus array is heard across the system whether
+		# or not the rack itself is parked there -- the array is what is
+		# doing the transmitting
+		var nexus: bool = nexus_pos() != null \
+			or (is_instance_valid(src) and src.has_method("at_nexus") \
+				and src.at_nexus())
 		var scale: float = 160000.0 if nexus else 9000.0
 		var farL := clampf(_site().distance_to(_src_pos(stations[best])) / scale, 0.0, 1.0)
 		clear = bs * (1.0 - (0.15 if nexus else 0.95) * pow(farL, 1.2))

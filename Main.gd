@@ -2467,6 +2467,12 @@ func _map_pick_test() -> void:
 		print("MAPTEST body_at says: ", m.body_at(ev.position))
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	# R on the death screen, as a single press: the per-frame poll alone
+	# missed it if the frame it landed on was busy
+	if Game.dead and event is InputEventKey and event.pressed \
+			and not event.echo and event.keycode == KEY_R:
+		_do_respawn()
+		return
 	# F1: toggle clean-screenshot mode -- HUD and hand vanish, F1 again
 	# brings them back
 	if event is InputEventKey and event.pressed and not event.echo \
@@ -2969,6 +2975,14 @@ func _process(delta: float) -> void:
 					_hud.flash("MAZE DOOR UNSEALED")
 
 	if Game.dead and Input.is_key_pressed(KEY_R):
+		_do_respawn()
+
+## R on the death screen, whether it arrives as a held key or a single
+## press -- the poll alone missed it if the frame it landed on was busy.
+func _do_respawn() -> void:
+	if not Game.dead:
+		return
+	if true:
 		Engine.time_scale = 1.0
 		if Game.permadead:
 			get_tree().change_scene_to_file("res://Title.tscn")

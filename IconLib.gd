@@ -189,6 +189,24 @@ static func build_model(id: String, tree: SceneTree = null) -> Node3D:
 			tr2.size = Vector3(0.16, 0.02, 0.03)
 			_p(r, tr2, Vector3(0.05, 0.04, 0.07), Color("#ffb000"), 1.6,
 				Vector3(0, -30, 0))
+		"arcade":
+			_p(r, _bx(0.42, 0.68, 0.36), Vector3(0, 0.02, 0), Color("#2a2338"), 0.12)
+			_p(r, _bx(0.36, 0.22, 0.04), Vector3(0, 0.16, 0.19), Color("#0e0d14"), 0.05)
+			_p(r, _bx(0.3, 0.17, 0.02), Vector3(0, 0.16, 0.21), Color("#4fa4ff"), 1.6)
+			_p(r, _bx(0.42, 0.08, 0.06), Vector3(0, 0.32, 0.17), Color("#ffe9a8"), 1.4)
+			_p(r, _bx(0.42, 0.05, 0.2), Vector3(0, 0.0, 0.16), Color("#1a1626"), 0.1)
+			for nx9 in [-1.0, 1.0]:
+				_p(r, _bx(0.02, 0.56, 0.02), Vector3(nx9 * 0.21, 0.06, 0.19),
+					Color("#26c2cd") if nx9 < 0.0 else Color("#e14bd6"), 2.2)
+		"discmaker":
+			_p(r, _bx(0.5, 0.46, 0.42), Vector3.ZERO, Color("#3f3a56"), 0.12)
+			_p(r, _bx(0.32, 0.03, 0.05), Vector3(0, 0.06, 0.22), Color("#08080c"), 0.03)
+			_p(r, _bx(0.42, 0.07, 0.32), Vector3(0, 0.26, 0), Color("#2a2735"), 0.1)
+			var lens2 := CylinderMesh.new()
+			lens2.top_radius = 0.05
+			lens2.bottom_radius = 0.05
+			lens2.height = 0.03
+			_p(r, lens2, Vector3(0, 0.31, 0), Color("#4fa4ff"), 1.4)
 		"floppy", "floppy_data":
 			# the same disc as in your hand, at icon size
 			var shell: Color = ArcadeDisc.item_color(id)

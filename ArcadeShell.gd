@@ -325,7 +325,7 @@ func _draw_boot(u) -> void:
 	if t > 0.5:
 		PixelFont.draw_centered(u, "DUDE-16", cx, ly, Pixel.light(4),
 			PixelFont.HUGE, PixelFont.SHADOW, Pixel.dark(0))
-		PixelFont.draw_centered(u, "16-BIT ENTERTAINMENT SYSTEM", cx, ly + 30,
+		PixelFont.draw_centered(u, "ENTERTAINMENT SYSTEM", cx, ly + 30,
 			Pixel.hue(9), PixelFont.SYS, PixelFont.PLAIN, 0, 1)
 	# palette sweep: every colour the machine has, marching past
 	if t > 1.4:

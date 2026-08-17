@@ -124,13 +124,12 @@ func _ready() -> void:
 	var cs9 = get_tree().current_scene
 	if cs9 == null or cs9.get("_load_layer") == null:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	# dying pins a locator ping on the spot -- your stuff is THERE
+	# dying REMEMBERS the spot; it does not paint it on your screen.
+	# If you want to go back for your things, ask the locator for LAST
+	# DEATH and it will point you.
 	Game.killed.connect(func() -> void:
-		Game.locator_planet = ""
-		Game.locator_targets = [global_position]
-		Game.locator_label = "WHERE YOU DIED"
-		Game.locator_lie = 1.0
-		Game.locator_until = Game.playtime + 240.0)
+		Game.last_death = global_position
+		Game.has_last_death = true)
 
 func _char_color() -> Color:
 	var hex: String = Save.character.get("color", "3aa0ff")
@@ -377,6 +376,7 @@ const AUTO_GHOST_IDS: Array[String] = ["chest", "furnace", "coinifier",
 	"alloyfurn", "alloyfurn2", "alloyfurn3",
 	"benchlab", "chemlab", "chemlab2", "chemlab3", "electrolyser", "electrolyser2",
 	"separator", "separator2", "cryoplant", "cryoplant2", "ultimabatt",
+	"voidsiphon", "growthvat", "arcade", "discmaker",
 	"spawnbeacon", "generator", "coaldrill", "bioreactor",
 	"rtg", "creativegen", "prisreactor", "nreactor", "capacitor",
 	"efurnace", "eseller", "netanalyser", "tv", "tvbig", "camtv", "modsynth", "modsynth2", "modsynth3",
@@ -1564,7 +1564,7 @@ const HELD_MACHINE_IDS := ["chest", "furnace", "coinifier", "autominer",
 	"capacitor", "ultracap", "efurnace", "eseller", "atm", "ecomputer",
 	"scomputer", "elight", "lightbox", "switch", "teleporter", "extender",
 	"nreactor", "waypoint", "rocket", "rocket2", "netanalyser",
-	"tv", "tvbig", "camtv", "arcade", "discmaker"]
+	"tv", "tvbig", "camtv"]
 
 func _held_machine(id: String) -> bool:
 	if not HELD_MACHINE_IDS.has(id):
@@ -2048,6 +2048,38 @@ func _make_held_model(id: String) -> void:
 				Color("#3a3f4a"), 0.2)
 			_hm_cyl(0.028, 0.22, Vector3(0, 0.06, -0.05), Color("#c8ccd4"), 0.5)
 			_hm_cyl(0.016, 0.05, Vector3(0, 0.06, -0.18), Color("#c86bff"), 2.4)
+		"arcade":
+			# a hand-sized cabinet: nine parts, not the hundred the real
+			# one is made of. Holding a machine must not cost a frame.
+			_hm_box(Vector3(0.17, 0.3, 0.16), Vector3(0, 0.02, 0),
+				Color("#2a2338"), 0.12)
+			_hm_box(Vector3(0.15, 0.09, 0.02), Vector3(0, 0.11, 0.08),
+				Color("#0e0d14"), 0.05)
+			_hm_box(Vector3(0.13, 0.07, 0.01), Vector3(0, 0.11, 0.092),
+				Color("#4fa4ff"), 1.6)
+			_hm_box(Vector3(0.17, 0.035, 0.03), Vector3(0, 0.17, 0.07),
+				Color("#ffe9a8"), 1.4)
+			_hm_box(Vector3(0.17, 0.02, 0.09), Vector3(0, 0.03, 0.07),
+				Color("#1a1626"), 0.1)
+			_hm_cyl(0.008, 0.03, Vector3(-0.05, 0.05, 0.08),
+				Color("#c8ccd4"), 0.4)
+			_hm_box(Vector3(0.014, 0.014, 0.014), Vector3(-0.05, 0.068, 0.08),
+				Color("#e43b44"), 0.6)
+			for bx9 in [-0.01, 0.02, 0.05]:
+				_hm_box(Vector3(0.016, 0.008, 0.016), Vector3(bx9, 0.045, 0.075),
+					Color("#feae34"), 0.7)
+			for nx9 in [-1.0, 1.0]:
+				_hm_box(Vector3(0.008, 0.24, 0.008), Vector3(nx9 * 0.085, 0.05, 0.08),
+					Color("#26c2cd") if nx9 < 0.0 else Color("#e14bd6"), 2.2)
+		"discmaker":
+			_hm_box(Vector3(0.22, 0.2, 0.18), Vector3.ZERO, Color("#3f3a56"), 0.12)
+			_hm_box(Vector3(0.14, 0.012, 0.02), Vector3(0, 0.03, 0.092),
+				Color("#08080c"), 0.03)
+			_hm_box(Vector3(0.18, 0.03, 0.14), Vector3(0, 0.115, 0),
+				Color("#2a2735"), 0.1)
+			_hm_cyl(0.02, 0.012, Vector3(0, 0.135, 0), Color("#4fa4ff"), 1.4)
+			_hm_box(Vector3(0.012, 0.012, 0.012), Vector3(0.08, 0.03, 0.095),
+				Color("#3aff6a"), 2.0)
 		"floppy", "floppy_data":
 			# A three-and-a-half inch disc, built like one: a coloured
 			# shell with a chamfered corner, a sprung metal shutter, the
@@ -2589,6 +2621,38 @@ func _use_selected() -> void:
 				if hudt:
 					hudt.flash("plasma cut")
 			return
+		"arcade":
+			# a hand-sized cabinet: nine parts, not the hundred the real
+			# one is made of. Holding a machine must not cost a frame.
+			_hm_box(Vector3(0.17, 0.3, 0.16), Vector3(0, 0.02, 0),
+				Color("#2a2338"), 0.12)
+			_hm_box(Vector3(0.15, 0.09, 0.02), Vector3(0, 0.11, 0.08),
+				Color("#0e0d14"), 0.05)
+			_hm_box(Vector3(0.13, 0.07, 0.01), Vector3(0, 0.11, 0.092),
+				Color("#4fa4ff"), 1.6)
+			_hm_box(Vector3(0.17, 0.035, 0.03), Vector3(0, 0.17, 0.07),
+				Color("#ffe9a8"), 1.4)
+			_hm_box(Vector3(0.17, 0.02, 0.09), Vector3(0, 0.03, 0.07),
+				Color("#1a1626"), 0.1)
+			_hm_cyl(0.008, 0.03, Vector3(-0.05, 0.05, 0.08),
+				Color("#c8ccd4"), 0.4)
+			_hm_box(Vector3(0.014, 0.014, 0.014), Vector3(-0.05, 0.068, 0.08),
+				Color("#e43b44"), 0.6)
+			for bx9 in [-0.01, 0.02, 0.05]:
+				_hm_box(Vector3(0.016, 0.008, 0.016), Vector3(bx9, 0.045, 0.075),
+					Color("#feae34"), 0.7)
+			for nx9 in [-1.0, 1.0]:
+				_hm_box(Vector3(0.008, 0.24, 0.008), Vector3(nx9 * 0.085, 0.05, 0.08),
+					Color("#26c2cd") if nx9 < 0.0 else Color("#e14bd6"), 2.2)
+		"discmaker":
+			_hm_box(Vector3(0.22, 0.2, 0.18), Vector3.ZERO, Color("#3f3a56"), 0.12)
+			_hm_box(Vector3(0.14, 0.012, 0.02), Vector3(0, 0.03, 0.092),
+				Color("#08080c"), 0.03)
+			_hm_box(Vector3(0.18, 0.03, 0.14), Vector3(0, 0.115, 0),
+				Color("#2a2735"), 0.1)
+			_hm_cyl(0.02, 0.012, Vector3(0, 0.135, 0), Color("#4fa4ff"), 1.4)
+			_hm_box(Vector3(0.012, 0.012, 0.012), Vector3(0.08, 0.03, 0.095),
+				Color("#3aff6a"), 2.0)
 		"floppy", "floppy_data":
 			# a three and a half inch disc: shell, shutter, label
 			var shell_col := Color("#3a3f4a") if id == "floppy" else Color("#2a4a72")
@@ -3290,12 +3354,18 @@ func locate(mode: int) -> void:
 			var nwl = get_tree().get_first_node_in_group("noodle_watcher")
 			if nwl != null and nwl is Node3D:
 				targets = [nwl.global_position]
+	if Game.locator_mode == 8:
+		# the spot you died on, if you have. Asked for, never volunteered.
+		label = "LAST DEATH"
+		if Game.has_last_death:
+			targets = [Game.last_death]
 	var hud = get_tree().get_first_node_in_group("hud")
 	if targets.is_empty():
 		Game.locator_until = -1.0
 		Sfx.play("denied", -16.0)
 		if hud:
-			hud.flash("LOCATOR: no %s found" % label)
+			hud.flash("LOCATOR: no %s found" % ("death on record" if
+				Game.locator_mode == 8 else label))
 		return
 	Game.locator_targets = targets
 	Game.locator_label = label

@@ -321,6 +321,10 @@ func apply_progress() -> void:
 	Inventory.floppy_data = fl if fl is Array else []
 	var fb = _progress.get("floppy_blanks", [])
 	Inventory.floppy_blanks = fb if fb is Array else []
+	var ld = _progress.get("last_death", null)
+	if ld is Array and (ld as Array).size() == 3:
+		Game.last_death = Vector3(float(ld[0]), float(ld[1]), float(ld[2]))
+	Game.has_last_death = bool(_progress.get("has_last_death", false))
 	Inventory.changed.emit()
 	Game.changed.emit()
 
@@ -415,6 +419,8 @@ func save_progress() -> void:
 		"caged": Inventory.caged_data,
 		"floppies": Inventory.floppy_data,
 		"floppy_blanks": Inventory.floppy_blanks,
+		"last_death": [Game.last_death.x, Game.last_death.y, Game.last_death.z],
+		"has_last_death": Game.has_last_death,
 		"pet_g": _pet_genome,
 		"pet_stay": _pet_stay,
 		"pos": _last_pos,

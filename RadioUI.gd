@@ -221,26 +221,43 @@ func _draw_map() -> void:
 		_map.draw_arc(np, 12.5, 0, TAU, 28, Color("#c89020"), 2.5)
 		_map.draw_string(ThemeDB.fallback_font, np + Vector2(-38, 66), "noodle god",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffcf40"))
-	# LIVE transmitters: other people's racks, on the air
+	# LIVE channels do not each get a dot on the map: they all come off
+	# the Nexus array, so the array gets the dot. Point the dish at it
+	# and it lists who is on the air; otherwise the map stays a map
+	# instead of a wall of other people's station names.
+	var live_list: Array = []
 	for st in radio.stations:
-		if str(st.get("type", "")) != "live":
-			continue
-		var src = st.get("node", null)
-		if not is_instance_valid(src):
-			continue
-		var sp := _to_px(src.global_position)
+		if str(st.get("type", "")) == "live":
+			live_list.append(st)
+	var nx = radio.nexus_pos()
+	if nx != null and live_list.size() > 0:
+		var sp := _to_px(nx)
 		sp = sp.clamp(Vector2(18, 18), _map.size - Vector2(18, 18))
+		var aimed: bool = radio.align_for(live_list[0]) > 0.35
 		var puls := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
-		_map.draw_arc(sp, 9.0 + puls * 5.0, 0, TAU, 20,
-			Color(0.23, 1.0, 0.42, 0.5 + 0.4 * puls), 1.5)
-		_map.draw_circle(sp, 4.0, Color("#3aff6a"))
-		# a little mast, so it reads as a transmitter and not a planet
-		_map.draw_line(sp, sp + Vector2(0, -12.0), Color("#3aff6a"), 1.5)
-		_map.draw_line(sp + Vector2(-4, -8), sp + Vector2(4, -8),
-			Color("#3aff6a"), 1.0)
-		_map.draw_string(ThemeDB.fallback_font, sp + Vector2(8, -10),
-			"%s  %.1f" % [str(st.get("name", "LIVE")), float(st["freq"])],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#3aff6a"))
+		var col := Color("#3aff6a") if aimed else Color(0.23, 1.0, 0.42, 0.55)
+		_map.draw_arc(sp, 10.0 + puls * 6.0, 0, TAU, 22,
+			Color(col.r, col.g, col.b, 0.4 + 0.4 * puls), 1.5)
+		_map.draw_circle(sp, 4.0, col)
+		# a mast, so it reads as an array and not a planet
+		_map.draw_line(sp, sp + Vector2(0, -14.0), col, 1.5)
+		_map.draw_line(sp + Vector2(-5, -10), sp + Vector2(5, -10), col, 1.0)
+		_map.draw_line(sp + Vector2(-3, -14), sp + Vector2(3, -14), col, 1.0)
+		_map.draw_string(ThemeDB.fallback_font, sp + Vector2(9, -12),
+			"NEXUS RELAY  %d live" % live_list.size(),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+		if aimed:
+			# aimed at it: now show who is actually on
+			var ly := 4.0
+			for st2 in live_list:
+				_map.draw_string(ThemeDB.fallback_font, sp + Vector2(12, ly),
+					"%.1f  %s" % [float(st2["freq"]), str(st2.get("name", "LIVE"))],
+					HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#9dffc4"))
+				ly += 12.0
+		else:
+			_map.draw_string(ThemeDB.fallback_font, sp + Vector2(9, 2),
+				"aim here to list them", HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+				Color(0.6, 1.0, 0.72, 0.5))
 	# the radio + the dish's pointing line
 	var rp := _to_px(radio.global_position)
 	_map.draw_circle(rp, 4.0, Color("#7bffb0"))
