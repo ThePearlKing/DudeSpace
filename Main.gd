@@ -10574,6 +10574,17 @@ func _arcade_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	print("ARCADE cabinet: parts=", cab.get_child_count(),
 		" needs_power=", cab.buf_cap > 0.0, " shelf=", cab.shell.carts.size())
+	# --- the attract loop plays the games to an empty room
+	for i in 30:
+		cab.shell.attract_step(0.08)
+	var first_state := cab.shell.state
+	for i in 220:
+		cab.shell.attract_step(0.08)
+	print("ARCADE attract: state=%d cart=%s frames_run=%d (0=boot 2=running)" % [
+		cab.shell.state, str(cab.shell.carts[cab.shell.sel].name), cab.con.frame])
+	cab.shell.take_over()
+	print("ARCADE take over: attract=%s state=%d (1=shelf)" % [cab.shell.attract,
+		cab.shell.state if cab.shell._next_state < 0 else cab.shell._next_state])
 	# --- every cartridge on the shelf actually runs
 	var slowest := 0.0
 	for c in ArcadeCarts.shelf():
@@ -10839,7 +10850,9 @@ func _arcade_shots() -> void:
 	cab.install_board("expand")
 	await get_tree().create_timer(1.0).timeout
 	var dir := "res://docs/shots/"
-	# --- the cabinet in the world, attract loop lit
+	# let the attract loop get into a game before the photograph
+	for i in 60:
+		cab.shell.attract_step(0.25)
 	var cam := Camera3D.new()
 	add_child(cam)
 	cam.current = true

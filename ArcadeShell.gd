@@ -34,6 +34,13 @@ var machine = null                  # the cabinet, for floppy access
 
 ## Selection glide: the highlight box eases toward the selected row
 ## instead of snapping, but always lands on whole pixels.
+## Attract mode: when nobody is at the cabinet it plays the games to
+## itself, in front of anyone walking past, and hands over the moment
+## somebody actually sits down.
+var attract: bool = false
+var attract_t: float = 0.0
+var attract_i: int = 0
+
 var _sel_y: float = 0.0
 var _wipe: float = 0.0
 var _wipe_dir: int = 0
@@ -48,7 +55,12 @@ var disc_side: int = 0          # 0 = discs you carry, 1 = things to write
 func _init(c: ArcadeConsole) -> void:
 	con = c
 
+## Start a wipe to another state. A transition already under way wins:
+## without this, a state that asks to leave every frame (the boot screen
+## does) restarts its own wipe forever and never actually goes anywhere.
 func go(s: int) -> void:
+	if _wipe_dir != 0:
+		return
 	_next_state = s
 	_wipe_dir = 1
 	_wipe = 0.0
@@ -64,6 +76,51 @@ func note(m: String) -> void:
 	msg_t = 2.6
 
 # ================================================================ update
+
+## Driven by the cabinet instead of a player: cycle the shelf, play each
+## cartridge for a while, and press the buttons for it.
+func attract_step(delta: float) -> void:
+	attract = true
+	attract_t += delta
+	if state == S_BOOT:
+		update(delta)
+		if t > 3.2:
+			attract_t = 99.0
+		return
+	if attract_t > 14.0:
+		attract_t = 0.0
+		attract_i += 1
+		var roms: Array = []
+		for i in carts.size():
+			if (carts[i] as ArcadeCart).readonly:
+				roms.append(i)
+		if roms.is_empty():
+			return
+		sel = int(roms[attract_i % roms.size()])
+		con.boot(carts[sel])
+		if con.sound != null and con.sound.has_method("load_cart"):
+			con.sound.load_cart(carts[sel])
+		state = S_CRASH if con.crashed else S_RUN
+		t = 0.0
+		return
+	# somebody has to hold the stick
+	var f := con.frame
+	con.btn_held[ArcadeConsole.B_A] = (f % 11) < 3
+	con.btn_held[ArcadeConsole.B_B] = (f % 47) < 2
+	con.btn_held[ArcadeConsole.B_LEFT] = (f % 90) < 26
+	con.btn_held[ArcadeConsole.B_RIGHT] = (f % 90) >= 45 and (f % 90) < 71
+	con.btn_held[ArcadeConsole.B_UP] = (f % 63) < 14
+	con.btn_held[ArcadeConsole.B_DOWN] = (f % 37) < 9
+	update(delta)
+
+## The player sat down: stop playing to yourself.
+func take_over() -> void:
+	if not attract:
+		return
+	attract = false
+	for i in ArcadeConsole.BTN_COUNT:
+		con.btn_held[i] = false
+	go(S_MENU)
 
 func update(delta: float) -> void:
 	t += delta
@@ -88,7 +145,7 @@ func update(delta: float) -> void:
 		S_RUN:
 			if con.crashed:
 				go(S_CRASH)
-			elif _hit(ArcadeConsole.B_START) or _key_hit(KEY_ESCAPE):
+			elif not attract and (_hit(ArcadeConsole.B_START) or _key_hit(KEY_ESCAPE)):
 				pause_sel = 0
 				go(S_PAUSE)
 			else:
@@ -379,6 +436,15 @@ func _draw_preview(u, x: int, y: int, w: int, h: int) -> void:
 
 # --- in-game overlay ---------------------------------------------------
 func _draw_run_overlay(u) -> void:
+	if attract:
+		# a marquee line over the demo, blinking, like every cabinet ever
+		if int(total_t * 1.6) % 2 == 0:
+			PixelFont.draw_centered(u, "DEMO -- PRESS F TO PLAY", Pixel.UI_W / 2,
+				Pixel.UI_H - 22, Pixel.light(4), PixelFont.BOLD,
+				PixelFont.SHADOW, Pixel.BLACK)
+		PixelFont.draw(u, str(carts[sel].name) if sel < carts.size() else "",
+			8, 8, Pixel.hue(23))
+		return
 	# nothing over the top of a running game except a fading hint
 	if t < 2.0:
 		var blink := int(t * 3.0) % 2 == 0

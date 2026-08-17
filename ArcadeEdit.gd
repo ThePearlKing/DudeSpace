@@ -315,7 +315,7 @@ func _follow_caret() -> void:
 		scroll_c = cur_c - cols + 1
 
 func _code_rows() -> int:
-	return 18
+	return 20
 
 func _code_cols() -> int:
 	return 74

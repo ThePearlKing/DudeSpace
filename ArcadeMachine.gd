@@ -317,16 +317,14 @@ func _process(delta: float) -> void:
 	if _live != self:
 		return
 	_attract_t += delta
-	# 12fps up close, 5fps across the room. An attract loop does not need
-	# sixty.
-	var tick := 1.0 / (12.0 if d < 9.0 else 5.0)
+	# 18fps up close, 6fps across the room. An attract loop does not need
+	# sixty, and a game playing itself still reads at eighteen.
+	var tick := 1.0 / (18.0 if d < 9.0 else 6.0)
 	if _attract_t < tick:
 		return
 	var step := _attract_t
 	_attract_t = 0.0
-	if shell.state == ArcadeShell.S_BOOT and shell.t > 3.2:
-		shell.go(ArcadeShell.S_MENU)
-	shell.update(step)
+	shell.attract_step(step)
 	shell.draw()
 	_push_screen()
 	if _marquee:
@@ -375,6 +373,7 @@ func use() -> void:
 	if _open:
 		return
 	_open = true
+	shell.take_over()
 	var ui := ArcadeUI.new()
 	ui.con = con
 	ui.shell = shell
