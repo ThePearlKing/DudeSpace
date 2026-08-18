@@ -350,6 +350,7 @@ function _init()
   ship = {x = W/2, y = H - 40, cool = 0, hp = 3, inv = 0, pulses = 3}
   shots, foes, bits, pops = {}, {}, {}, {}
   score, wave, wave_t, shake, over, best = 0, 0, 0, 0, false, dget(0)
+  rift, rift_max, leak_t = 100, 100, 0
   stars = {}
   for i = 1, 70 do
     add_star(rnd(H))
@@ -367,6 +368,7 @@ function _update()
     return
   end
   shake = max(0, shake - 1)
+  leak_t = max(0, leak_t - 1)
   ship.inv = max(0, ship.inv - 1)
 
   -- stars keep falling whatever else is happening
@@ -421,8 +423,20 @@ function _update()
     f.t = f.t + 1
     f.y = f.y + f.vy
     f.x = f.x + sin(f.t / 18 + f.seed) * f.sway
+    if f.hunt > 0 then
+      f.x = f.x + mid(-1.3, (ship.x - f.x) * f.hunt, 1.3)
+    end
     if f.y > H + 10 then
+      -- whatever you let past tears at the rift you are stood over
       table.remove(foes, i)
+      rift = rift - 9
+      shake = 10
+      leak_t = 40
+      sfx(1)
+      if rift <= 0 then
+        over = true
+        if score > best then best = score dset(0, score) end
+      end
     else
       for j = #shots, 1, -1 do
         local s = shots[j]
@@ -465,6 +479,9 @@ function spawn_wave()
       x = x, y = -10 - i * 6, vy = 0.7 + wave * 0.05,
       sway = (kind == 1) and 1.4 or 0.4, seed = rnd(6), t = 0,
       r = (kind == 3) and 9 or 6, hp = (kind == 3) and 3 or 1,
+      -- every third wave HUNTS: it steers at wherever you have parked,
+      -- so sitting in a corner picking them off stops being a plan
+      hunt = (kind == 2) and (0.05 + wave * 0.004) or 0,
       c = 2 + (wave % 20) * 3
     }
   end
@@ -506,9 +523,10 @@ function _draw()
     local s = stars[i]
     pset(flr(s.x), flr(s.y), s.l == 3 and 1 or (s.l == 2 and 73 or 72))
   end
-  -- the rift you are defending
+  -- the rift you are defending, and how much of it is left
   rectfill(0, H - 6, W, H, 41)
   rectfill(0, H - 4, W, H, 44)
+  rectfill(0, H - 6, flr(W * max(0, rift) / rift_max), H - 4, 29)
 
   for i = 1, #foes do
     local f = foes[i]
@@ -543,6 +561,10 @@ function _draw()
     rectfill(W - 20 - i * 8, 15, W - 15 - i * 8, 20, 29)
   end
   print("WAVE " .. wave, W/2 - 20, 6, 32)
+  print("RIFT " .. max(0, flr(rift)) .. "%", W/2 - 20, 18, rift < 40 and 2 or 32)
+  if leak_t > 0 then
+    printc("SOMETHING GOT THROUGH", W/2, H - 22, 2, 1)
+  end
 
   if over then
     rectfill(0, H/2 - 30, W, H/2 + 26, 0)
@@ -1208,8 +1230,8 @@ end
 function seed_world(from)
   for i = 0, 40 do
     local x = from + 220 + i * 130 + rnd(60)
-    local w = 40 + rnd(70)
-    local h = 14 + rnd(46)
+    local w = 48 + rnd(64)
+    local h = 16 + flr(rnd(3)) * 16
     blocks[#blocks + 1] = {x = x, y = GROUND - h, w = w, h = h}
     if rnd(1) < 0.75 then
       coins[#coins + 1] = {x = x + w/2, y = GROUND - h - 22, got = false,
@@ -1269,7 +1291,7 @@ function _update()
   for i = 1, #blocks do
     local b = blocks[i]
     if p.x + 6 > b.x and p.x - 6 < b.x + b.w then
-      if p.vy >= 0 and p.y >= b.y - 2 and p.y <= b.y + 14 then
+      if p.vy >= 0 and p.y >= b.y - 3 and p.y <= b.y + 10 then
         p.y = b.y
         p.vy = 0
         p.on = true
@@ -1298,7 +1320,7 @@ function _update()
     if s.life <= 0 then table.remove(sparks, i) end
   end
 
-  cam = cam + (p.x - 120 - cam) * 0.12
+  cam = cam + (p.x - 120 - cam) * 0.09
   if p.x > dist then dist = p.x score = score + 1 end
   if p.x < cam - 30 then
     over = true
