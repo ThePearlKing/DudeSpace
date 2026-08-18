@@ -364,7 +364,7 @@ func _process(delta: float) -> void:
 		return
 	var step := _attract_t
 	_attract_t = 0.0
-	con.poll_buttons()
+	con.poll_buttons(step)
 	shell.attract_step(step)
 	shell.draw()
 	con.end_frame()

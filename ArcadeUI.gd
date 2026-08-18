@@ -113,7 +113,7 @@ func _process(delta: float) -> void:
 	_mouse_hit_latch = false
 	con.mouse_right_hit = _mouse_right_latch
 	_mouse_right_latch = false
-	con.poll_buttons()
+	con.poll_buttons(delta)
 	shell.update(delta)
 	shell.draw()
 	con.end_frame()
@@ -201,6 +201,7 @@ func _input(event: InputEvent) -> void:
 			con.btn_held[bi] = k.pressed
 			if k.pressed:
 				con.btn_latch[bi] = true      # never lose a tap
+				con.ui_latch[bi] = true
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion or event is InputEventMouseButton:
 		var pos: Vector2 = (event as InputEventMouse).position
@@ -239,6 +240,12 @@ func _physics_process(_d: float) -> void:
 		or Input.is_action_pressed("ui_up")
 	con.btn_held[ArcadeConsole.B_DOWN] = con.btn_held[ArcadeConsole.B_DOWN] \
 		or Input.is_action_pressed("ui_down")
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT \
+			or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		if con != null:
+			con.release_all()
 
 func close() -> void:
 	if machine != null and is_instance_valid(machine) \

@@ -82,12 +82,13 @@ var btn_held: Array = []
 ## between two steps has to be LATCHED or it is simply lost -- which is
 ## what made the arrow keys feel like they worked at random.
 var btn_hit: Array = []
-var btn_latch: Array = []
+var btn_latch: Array = []      # consumed by the next cartridge step
 var btn_prev: Array = []
 ## Edges seen by the SHELL, once per drawn frame. Menus want the press
 ## the moment it happens, not on the next cartridge tick.
 var ui_hit: Array = []
 var ui_prev: Array = []
+var ui_latch: Array = []       # consumed by the next drawn frame, always
 var mouse_x: int = 0
 var mouse_y: int = 0
 var mouse_down: bool = false
@@ -114,6 +115,7 @@ func _init() -> void:
 	btn_latch.resize(BTN_COUNT)
 	ui_hit.resize(BTN_COUNT)
 	ui_prev.resize(BTN_COUNT)
+	ui_latch.resize(BTN_COUNT)
 	for i in BTN_COUNT:
 		btn_held[i] = false
 		btn_hit[i] = false
@@ -121,6 +123,7 @@ func _init() -> void:
 		btn_latch[i] = false
 		ui_hit[i] = false
 		ui_prev[i] = false
+		ui_latch[i] = false
 	ui = Pixel.Layer.new(Pixel.UI_W, Pixel.UI_H, Pixel.CLEAR)
 	_set_res(1)
 	_pal_remap.resize(256)
@@ -138,6 +141,23 @@ func _set_res(mode: int) -> void:
 		bg.resize(game_w, game_h)
 		main.resize(game_w, game_h)
 	_target = main
+
+## Forget every held button and key. Windows that lose focus never send
+## the key-up, and a stuck "held" arrow is indistinguishable from a
+## broken menu.
+func release_all() -> void:
+	for i in BTN_COUNT:
+		btn_held[i] = false
+		btn_hit[i] = false
+		btn_latch[i] = false
+		ui_hit[i] = false
+		ui_latch[i] = false
+		ui_prev[i] = false
+		btn_prev[i] = false
+	key_held.clear()
+	key_hits.clear()
+	mouse_down = false
+	mouse_right = false
 
 func res_mode_name() -> String:
 	for i in RES_MODES.size():
@@ -195,19 +215,40 @@ func _crash(msg: String) -> void:
 ## menus just as much as a cartridge needs them in a game, and this used
 ## to happen inside step(), which only runs while a game is running.
 ## That is why nothing in the menus responded.
-func poll_buttons() -> void:
+var _hold_t := PackedFloat32Array()
+var _rep_t := PackedFloat32Array()
+const HOLD_DELAY := 0.36       # before a held direction starts repeating
+const HOLD_RATE := 0.07        # and how fast it repeats once it does
+
+func poll_buttons(delta: float = 0.0) -> void:
+	if _hold_t.size() != BTN_COUNT:
+		_hold_t.resize(BTN_COUNT)
+		_rep_t.resize(BTN_COUNT)
 	for i in BTN_COUNT:
-		ui_hit[i] = (btn_held[i] and not ui_prev[i]) or btn_latch[i]
+		var fresh: bool = (btn_held[i] and not ui_prev[i]) or ui_latch[i]
+		ui_hit[i] = fresh
+		# holding a direction should keep moving, the way every menu
+		# anybody has ever used behaves
+		if btn_held[i]:
+			_hold_t[i] += delta
+			if _hold_t[i] > HOLD_DELAY:
+				_rep_t[i] += delta
+				if _rep_t[i] >= HOLD_RATE:
+					_rep_t[i] = 0.0
+					ui_hit[i] = true
+		else:
+			_hold_t[i] = 0.0
+			_rep_t[i] = 0.0
 		ui_prev[i] = btn_held[i]
 
 ## Clear the one-frame input latches. The driver calls this after
 ## everything that wanted to read them has read them.
 func end_frame() -> void:
+	# the menus have had their look at this frame's presses: the UI latch
+	# dies here, every frame, running cartridge or not. Leaving it set
+	# was a held arrow firing forever and then jamming.
 	for i in BTN_COUNT:
-		# the shell has had its look; a latch only survives to the next
-		# cartridge step, never past it
-		if not running:
-			btn_latch[i] = false
+		ui_latch[i] = false
 	mouse_hit = false
 	mouse_right_hit = false
 	key_hits.clear()
