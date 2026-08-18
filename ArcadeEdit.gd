@@ -662,7 +662,7 @@ func _draw_status(u) -> void:
 			hint = "ENTER edit   ARROWS pick   %s" % (
 				"typing a name -- ENTER when done" if renaming else "ESC shelf")
 		T_SOUND:
-			hint = "SPACE PLAY   TAB PANEL   OCT %d   INST %d   %d/%d @ %d BPM" % [
+			hint = "SPACE PLAYS  SHIFT+SPACE STOPS  OCT %d  INST %d  %d/%d @ %dBPM" % [
 				trk_oct, trk_inst, song.sig_num if song else 4,
 				song.sig_den if song else 4, song.bpm if song else 120]
 		_:
@@ -924,7 +924,10 @@ func _update_sound() -> void:
 		var k := int(code)
 		match k:
 			KEY_SPACE:
-				_play_stop()
+				if con.key_held.has(KEY_SHIFT):
+					_stop_playing()
+				else:
+					_play_from_top()
 			KEY_UP:
 				trk_row = (trk_row - 1 + song.rows) % song.rows
 			KEY_DOWN:
@@ -968,8 +971,7 @@ func _update_sound() -> void:
 					sound.set_song(song)
 					sound.play_music(0)
 			KEY_F8:
-				if sound != null:
-					sound.stop_music()
+				_stop_playing()
 	_tracker_clicks()
 	# note entry: the keyboard is always the pattern grid
 	if not ctrl:
@@ -1000,21 +1002,33 @@ func _update_sound() -> void:
 					4: cell[4] = ((int(cell[4]) << 4) & 0xF0) | digit
 				song.set_cell(trk_pat, trk_row, trk_ch, cell)
 
-## Play or stop, from the spacebar or from the button. Both go through
-## here so they can never disagree.
-func _play_stop() -> void:
+## SPACE always PLAYS, from the top. It used to toggle, which meant that
+## if anything was already playing -- the attract loop, say -- your first
+## press stopped the machine and looked like nothing happened at all.
+func _play_from_top() -> void:
 	if sound == null:
 		sound = con.sound
 	if sound == null:
 		shell.note("no sound chip on this machine")
 		return
 	sound.set_song(song)
-	if sound.playing:
-		sound.stop_music()
-		shell.note("stopped")
+	sound.stop_music()
+	sound.play_music(0)
+	shell.note("PLAYING  %s  -  %d bpm" % [song.title, song.bpm])
+
+func _stop_playing() -> void:
+	if sound == null:
+		return
+	sound.stop_music()
+	shell.note("stopped")
+
+## The panel button still toggles, because a button with two states
+## should.
+func _play_stop() -> void:
+	if sound != null and sound.playing:
+		_stop_playing()
 	else:
-		sound.play_music(0)
-		shell.note("playing: " + song.title)
+		_play_from_top()
 
 ## Move to another song on this cartridge, saving the one you were on.
 func _song_switch(dir: int) -> void:

@@ -479,22 +479,29 @@ func _draw_run_overlay(u) -> void:
 			PixelFont.draw(u, "START = PAUSE", 8, Pixel.UI_H - 14, Pixel.dark(23))
 
 func _draw_pause(u) -> void:
-	# the game stays visible underneath; this is the console's own layer
-	var bx := Pixel.UI_W / 2 - 90
-	var by := 60
+	# the box is measured from what is IN it: the longest item sets the
+	# width, the number of items sets the height. A fixed box is how
+	# LEAVE CABINET ended up printed underneath its own menu.
+	var row_h := 15
+	var wid := 150
+	for it in MENU_ITEMS:
+		wid = maxi(wid, PixelFont.text_width(str(it), PixelFont.SYS) + 48)
+	var hgt := 26 + MENU_ITEMS.size() * row_h + 10
+	var bx := Pixel.UI_W / 2 - wid / 2
+	var by := Pixel.UI_H / 2 - hgt / 2
 	var pop := 1.0 - pow(1.0 - clampf(t / 0.18, 0.0, 1.0), 3.0)
-	var hh := int(120.0 * pop)
-	u.rectfill(bx, by, bx + 180, by + hh, Pixel.BLACK)
-	u.rect(bx, by, bx + 180, by + hh, Pixel.hue(9))
+	var hh := int(float(hgt) * pop)
+	u.rectfill(bx, by, bx + wid, by + hh, Pixel.BLACK)
+	u.rect(bx, by, bx + wid, by + hh, Pixel.hue(9))
 	if pop < 0.9:
 		return
-	PixelFont.draw_centered(u, "PAUSED", bx + 90, by + 8, Pixel.light(4),
+	PixelFont.draw_centered(u, "PAUSED", bx + wid / 2, by + 8, Pixel.light(4),
 		PixelFont.BOLD)
 	for i in MENU_ITEMS.size():
-		var yy := by + 26 + i * 15
+		var yy := by + 26 + i * row_h
 		var on := i == pause_sel
 		if on:
-			u.rectfill(bx + 6, yy - 3, bx + 174, yy + 9, Pixel.dark(11))
+			u.rectfill(bx + 6, yy - 3, bx + wid - 6, yy + 9, Pixel.dark(11))
 			PixelFont.draw(u, ">", bx + 10, yy, Pixel.light(4))
 		PixelFont.draw(u, str(MENU_ITEMS[i]), bx + 22, yy,
 			Pixel.WHITE if on else Pixel.GRAY)

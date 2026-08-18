@@ -10843,6 +10843,25 @@ function _draw() cls(0) drawall() end
 			ppeak = maxf(ppeak, absf(cab.sound._mix[i].x))
 	print("ARCADE tracker preview: voices=%d peak=%.3f (must be > 0)" % [
 		cab.sound.voices(), ppeak])
+	# --- SPACE in the tracker, through the editor, exactly as a player
+	# would press it
+	var sed: ArcadeEdit = cab.shell.edit
+	sed.open(cab.shell.carts[0])
+	sed.tab = ArcadeEdit.T_SOUND
+	sed.sound = cab.sound
+	cab.sound.stop_music()
+	cab.con.key_hits.clear()
+	cab.con.key_hits[KEY_SPACE] = true
+	sed.update(1.0 / 60.0)
+	cab.con.key_hits.clear()
+	var speak := 0.0
+	for b in 90:
+		cab.sound._block()
+		for i in ChipSound.BLK:
+			speak = maxf(speak, absf(cab.sound._mix[i].x))
+	print("ARCADE space in editor: playing=%s peak=%.3f song=%s insts=%d" % [
+		cab.sound.playing, speak, cab.sound.song.title,
+		cab.sound.song.insts.size()])
 	# --- the sound chip: does it make a noise, and can it keep up?
 	var snd: ChipSound = cab.sound
 	snd.set_song(ChipSound.demo_song())
