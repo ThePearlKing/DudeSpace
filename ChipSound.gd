@@ -478,10 +478,28 @@ func _ready() -> void:
 	add_child(_ply)
 	_ply.play()
 	_pb = _ply.get_stream_playback()
+	set_process(true)
 	_recalc_tempo()
 	_alive = true
 	_thread = Thread.new()
 	_thread.start(_loop, Thread.PRIORITY_NORMAL)
+
+## Keep hold of a live playback handle. get_stream_playback() can come
+## back null when it is asked in the same frame as play(), and a null
+## handle means the audio thread has nowhere to push -- the chip runs,
+## the meters move, and not a sound comes out. This notices and fixes it.
+func _process(_delta: float) -> void:
+	if _ply == null:
+		return
+	if not _ply.playing:
+		_ply.play()
+		_pb = null
+	if _pb == null:
+		var pb = _ply.get_stream_playback()
+		if pb != null:
+			_mx.lock()
+			_pb = pb
+			_mx.unlock()
 
 func _exit_tree() -> void:
 	_alive = false
