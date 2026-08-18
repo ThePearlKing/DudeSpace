@@ -20,7 +20,9 @@ var res_mode: int = 1                       # 0 small, 1 normal, 2 big
 var sheet := PackedByteArray()              # SHEET_W*SHEET_H palette indices
 var flags := PackedByteArray()              # 256 sprites x 8 bits
 var map_data := PackedByteArray()           # MAP_W*MAP_H tile ids
-var song: Dictionary = {}                   # ChipSong.to_dict()
+## Songs, plural. A cartridge holds as many as you write -- a title
+## theme, a level loop, a boss track, a jingle -- and music(n) picks one.
+var songs: Array = []
 var sfx: Array = []                         # little one-shot sounds
 var data: Dictionary = {}                   # dget/dset persistent memory
 var readonly: bool = false                  # the built-ins ship locked
@@ -135,7 +137,7 @@ func to_dict() -> Dictionary:
 		"sheet": rle_encode(sheet),
 		"flags": rle_encode(flags),
 		"map": rle_encode(map_data),
-		"song": song.duplicate(true),
+		"songs": songs.duplicate(true),
 		"sfx": sfx.duplicate(true),
 		"data": data.duplicate(true),
 	}
@@ -153,7 +155,14 @@ static func from_dict(d: Dictionary) -> ArcadeCart:
 	if d.has("map"):
 		c.map_data = rle_decode(str(d["map"]), MAP_W * MAP_H)
 	var sg = d.get("song", {})
-	c.song = (sg as Dictionary).duplicate(true) if sg is Dictionary else {}
+	c.songs = []
+	var sgs = d.get("songs", null)
+	if sgs is Array:
+		for one in (sgs as Array):
+			if one is Dictionary:
+				c.songs.append((one as Dictionary).duplicate(true))
+	elif sg is Dictionary and not (sg as Dictionary).is_empty():
+		c.songs.append((sg as Dictionary).duplicate(true))   # old one-song cart
 	var sx = d.get("sfx", [])
 	c.sfx = (sx as Array).duplicate(true) if sx is Array else []
 	var dd = d.get("data", {})

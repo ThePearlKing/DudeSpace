@@ -13,8 +13,8 @@ static var _shelf: Array = []
 static func shelf() -> Array:
 	if not _shelf.is_empty():
 		return _shelf
-	_shelf = [_voidwing(), _soulboard(), _neondrift(), _blockparty(),
-		_dudedash(), _demo()]
+	_shelf = [_enginekit(), _voidwing(), _soulboard(), _neondrift(),
+		_blockparty(), _dudedash(), _demo()]
 	for c in _shelf:
 		c.readonly = true
 	return _shelf
@@ -234,7 +234,108 @@ static func _cart(nm: String, author: String, code: String, res_mode: int = 1) -
 	c.code = code
 	c.res_mode = res_mode
 	_stock_art(c)
-	c.song = ChipSound.demo_song().to_dict()
+	c.songs = [ChipSound.demo_song().to_dict()]
+	return c
+
+
+# ---------------------------------------------------------------------
+## The one that shows the machine is an ENGINE and not a pixel buffer:
+## objects with hitboxes, gravity, tile collision, a camera that follows
+## and pickups -- and not one line of collision maths in the cartridge.
+static func _enginekit() -> ArcadeCart:
+	var c := _cart("ENGINE KIT", "the manual", """
+-- ENGINE KIT -- a platformer, and none of it is collision code.
+-- arrows move, Z jumps, X shows the hitboxes.
+
+function _init()
+  gravity(0.42)         -- how hard the world pulls
+  solidflag(0)          -- tiles with flag 0 are walls and floors
+  bounds(0, 0, 1024, 270)
+
+  -- the player: a box with a sprite on it. gravity and collision are
+  -- the machine's problem, not yours
+  p = add{x = 40, y = 60, w = 16, h = 16, spr = 4, tag = "player",
+          gravity = true, hitw = 10, hith = 15, ox = 3, maxvy = 8}
+  follow(p, 0.1)
+
+  -- three enemies that walk and turn round at ledges
+  for i = 1, 3 do
+    local e = add{x = 150 + i * 90, y = 100, w = 16, h = 16, spr = 1,
+                  tag = "foe", gravity = true, dir = 1}
+    e.on_hit = function(self, other) self.dir = -self.dir end
+  end
+
+  -- and coins to pick up
+  for i = 1, 8 do
+    add{x = 90 + i * 60, y = 120 - (i % 3) * 22, w = 16, h = 16, spr = 5,
+        tag = "coin", solid = false}
+  end
+  score, show_boxes = 0, false
+end
+
+function _update()
+  -- run and jump. That is the whole player controller.
+  p.vx = 0
+  if btn(0) then p.vx = -2.2 p.flip = true end
+  if btn(1) then p.vx = 2.2 p.flip = false end
+  if btnp(4) and p.grounded then
+    p.vy = -7
+    sfx(4)
+  end
+  if btnp(5) then show_boxes = not show_boxes end
+
+  -- enemies: walk, and turn at a wall or a ledge
+  each("foe", function(e)
+    e.vx = e.dir * 0.7
+    if touching(e, e.dir * 6, 0) or not touching(e, e.dir * 10, 12) then
+      e.dir = -e.dir
+    end
+  end)
+
+  -- pickups and damage, both one line
+  local got = overlap(p, "coin")
+  if got then
+    del(got)
+    score = score + 10
+    particles(got.x + 8, got.y + 8, 8, 14)
+    sfx(3)
+  end
+  local ouch = overlap(p, "foe")
+  if ouch then
+    p.x, p.y, p.vy = 40, 40, 0
+    score = max(0, score - 20)
+    sfx(1)
+  end
+end
+
+function _draw()
+  cls(41)
+  map(0, 0, 0, 0, 64, 17)
+  drawall()             -- every object, in layer order, camera applied
+  if show_boxes then hitboxes(2) end
+  camera(0, 0)
+  print("SCORE " .. score, 6, 6, 1)
+  print("coins " .. count("coin") .. " left", 6, 18, 71)
+  print("X shows hitboxes", 6, H() - 14, 71, 6)
+end
+
+function H() local w, h = res() return h end
+""")
+	# a floor with gaps, and the flags that make it solid
+	c.fset(6, 0, true)
+	c.fset(7, 0, true)
+	for x in 64:
+		if x % 17 == 12:
+			continue                      # a gap to fall down
+		c.mset(x, 12, 7)
+		c.mset(x, 13, 6)
+		c.mset(x, 14, 6)
+	for x in range(8, 12):
+		c.mset(x, 9, 6)
+	for x in range(24, 28):
+		c.mset(x, 8, 6)
+	for x in range(40, 45):
+		c.mset(x, 9, 6)
 	return c
 
 # ---------------------------------------------------------------------
@@ -1333,11 +1434,11 @@ function _draw()
     line(0, H/2, W, H/2, 71)
   else
     printc("TYPE", W/2, 6, 8, 5)
-    local names = {"SYS", "BOLD", "WIDE", "TALL", "SLANT", "HUGE"}
-    local y = 30
-    for i = 0, 5 do
+    local names = {"SYS", "BOLD", "WIDE", "TALL", "SLANT", "HUGE", "TINY", "ALIEN"}
+    local y = 22
+    for i = 0, 7 do
       print("Dude-16 " .. names[i+1], 20, y, 1, i)
-      y = y + 22
+      y = y + 20
     end
   end
   print("page " .. page .. "/" .. PAGES .. "   arrows: page   Z: font " .. fontn,

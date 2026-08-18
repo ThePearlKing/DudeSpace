@@ -197,7 +197,10 @@ func _input(event: InputEvent) -> void:
 		var typing: bool = shell != null and shell.edit != null \
 			and shell.state == ArcadeShell.S_EDIT and shell.edit.typing()
 		if not typing and KEY_MAP.has(code) and not k.echo:
-			con.btn_held[int(KEY_MAP[code])] = k.pressed
+			var bi := int(KEY_MAP[code])
+			con.btn_held[bi] = k.pressed
+			if k.pressed:
+				con.btn_latch[bi] = true      # never lose a tap
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion or event is InputEventMouseButton:
 		var pos: Vector2 = (event as InputEventMouse).position

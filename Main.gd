@@ -10708,6 +10708,33 @@ func _arcade_test() -> void:
 	print("ARCADE fonts: ", PixelFont.NAMES)
 	print("ARCADE resolutions: ", ArcadeConsole.RES_MODES.map(
 		func(m): return "%s %dx%d" % [m["name"], m["w"], m["h"]]))
+	# --- the ENGINE: does an object actually fall, land and collide?
+	var ek := ArcadeCart.blank("ENGTEST")
+	ek.fset(6, 0, true)
+	for mx2 in 20:
+		ek.mset(mx2, 8, 6)
+	ek.code = """
+function _init()
+  gravity(0.5) solidflag(0)
+  p = add{x=20, y=10, w=16, h=16, tag='player', gravity=true}
+  box = add{x=60, y=112, w=16, h=16, tag='wall', static=true}
+  coin = add{x=24, y=100, w=16, h=16, tag='coin', solid=false}
+  landed, got = false, false
+end
+function _update()
+  if p.grounded then landed = true end
+  if overlap(p, 'coin') then got = true end
+end
+function _draw() cls(0) drawall() end
+"""
+	var ekcon := ArcadeConsole.new()
+	ekcon.boot(ek)
+	for i in 120:
+		ekcon.step(1.0 / 60.0)
+	var pl = ekcon.vm.G.rawget("p")
+	print("ARCADE engine: fell to y=%.0f, landed=%s, picked up=%s, entities=%d" % [
+		ArcadeEngine.gf(pl, "y", -1.0), LuaVM.tostr(ekcon.vm.G.rawget("landed")),
+		LuaVM.tostr(ekcon.vm.G.rawget("got")), ekcon.eng.ents.size()])
 	# --- the tracker: notes go in, the song changes, slides exist
 	sh.edit.tab = ArcadeEdit.T_SOUND
 	sh.edit.sound = cab.sound
@@ -10729,7 +10756,7 @@ func _arcade_test() -> void:
 	sh.edit.song.sig_num = 3
 	sh.edit.song.rows_per_beat = 6
 	sh.edit.commit()
-	var round_trip := ChipSound.Song.from_dict(sh.edit.cart.song)
+	var round_trip := ChipSound.Song.from_dict(sh.edit.cart.songs[sh.edit.song_i])
 	print("ARCADE song round-trip: %d/%d at %d rows/beat, %d bpm, cell4=%s" % [
 		round_trip.sig_num, round_trip.sig_den, round_trip.rows_per_beat,
 		round_trip.bpm, str(round_trip.cell(0, 4, 0))])
@@ -10791,6 +10818,31 @@ func _arcade_test() -> void:
 		wrote, Inventory.floppy_data.size(),
 		str(Inventory.floppy_data[0].get("name", "?"))
 			if Inventory.floppy_data.size() > 0 else "-"])
+	# --- the TRACKER has to be audible: space to play, and previews
+	var ted: ArcadeEdit = cab.shell.edit
+	ted.tab = ArcadeEdit.T_SOUND
+	ted.sound = cab.sound
+	ted.song = ChipSound.demo_song()
+	cab.sound.set_song(ted.song)
+	cab.sound.toggle()
+	var tpeak := 0.0
+	for b in 120:
+		cab.sound._block()
+		for i in ChipSound.BLK:
+			tpeak = maxf(tpeak, absf(cab.sound._mix[i].x))
+	print("ARCADE tracker play: playing=%s peak=%.3f (must be > 0)" % [
+		cab.sound.playing, tpeak])
+	cab.sound.stop_music()
+	for b in 30:
+		cab.sound._block()
+	cab.sound.preview(0, 60.0)
+	var ppeak := 0.0
+	for b in 40:
+		cab.sound._block()
+		for i in ChipSound.BLK:
+			ppeak = maxf(ppeak, absf(cab.sound._mix[i].x))
+	print("ARCADE tracker preview: voices=%d peak=%.3f (must be > 0)" % [
+		cab.sound.voices(), ppeak])
 	# --- the sound chip: does it make a noise, and can it keep up?
 	var snd: ChipSound = cab.sound
 	snd.set_song(ChipSound.demo_song())

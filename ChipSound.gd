@@ -845,13 +845,34 @@ func _tick_fx() -> void:
 
 # =============================================================== the api
 
+## Every song on the cartridge, ready to be picked by music(n).
+var songs: Array = []
+var cur_song: int = 0
+
 func load_cart(cart: ArcadeCart) -> void:
 	_mx.lock()
-	if cart.song.is_empty():
-		song = demo_song()
-	else:
-		song = Song.from_dict(cart.song)
+	songs = []
+	for sd in cart.songs:
+		if sd is Dictionary:
+			songs.append(Song.from_dict(sd as Dictionary))
+	if songs.is_empty():
+		songs.append(demo_song())
+	cur_song = 0
+	song = songs[0]
 	cart_sfx = cart.sfx
+	_recalc_tempo()
+	_mx.unlock()
+
+## Switch the chip to song `i` of the cartridge's bank.
+func select_song(i: int) -> void:
+	if songs.is_empty():
+		return
+	_mx.lock()
+	cur_song = clampi(i, 0, songs.size() - 1)
+	song = songs[cur_song]
+	row = 0
+	tick = 0
+	order_i = 0
 	_recalc_tempo()
 	_mx.unlock()
 
@@ -861,7 +882,14 @@ func set_song(s: Song) -> void:
 	_recalc_tempo()
 	_mx.unlock()
 
-func play_music(from_order: int = 0, _fade: float = 0.0) -> void:
+## music(n) picks the song; music(-1) stops. A second argument starts it
+## part-way through the order.
+func play_music(which: int = 0, from_order: int = 0) -> void:
+	if which < 0:
+		stop_music()
+		return
+	if songs.size() > 1 or which > 0:
+		select_song(which)
 	_mx.lock()
 	order_i = clampi(from_order, 0, maxi(0, song.order.size() - 1))
 	row = 0
@@ -908,8 +936,11 @@ func play_note(ch: int, semi: float, vol: float, inst: int = 0) -> void:
 	_mx.unlock()
 
 ## Audition one note from the tracker, without disturbing playback.
+## Audition a note on the last voice this cabinet actually HAS. A stock
+## machine only runs four, so previewing on channel eight was previewing
+## into a voice that never gets mixed -- silence, every time.
 func preview(inst: int, semi: float) -> void:
-	play_note(CHANS - 1, semi, 0.8, inst)
+	play_note(voices() - 1, semi, 0.85, inst)
 
 func meters() -> Array:
 	var out: Array = []

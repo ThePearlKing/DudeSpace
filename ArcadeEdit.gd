@@ -52,12 +52,18 @@ var trk_pat: int = 0
 var trk_oct: int = 4
 var trk_step: int = 1
 var trk_inst: int = 0
-var trk_panel: int = 0          # 0 pattern, 1 instrument, 2 song
+## Immediate-mode widgets: the panel draws them and the click pass tests
+## against what was drawn. Nothing in here is modal -- the keyboard
+## always drives the pattern grid, the mouse always drives the panel.
+var _widgets: Array = []
+var inst_scroll: int = 0
+var param_scroll: int = 0
 var trk_ip: int = 0             # selected instrument parameter
 var _clip_row: Array = []
 var info_sel: int = 0
 var renaming: bool = false
 var song: ChipSound.Song = null
+var song_i: int = 0
 var sound = null                # the ChipSound node, set by the shell
 
 const NOTE_NAMES := ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#",
@@ -120,8 +126,10 @@ func _init(c: ArcadeConsole, s: ArcadeShell) -> void:
 
 func open(c: ArcadeCart) -> void:
 	cart = c
-	song = ChipSound.Song.from_dict(c.song) if not c.song.is_empty() \
-		else ChipSound.demo_song()
+	song_i = 0
+	if c.songs.is_empty():
+		c.songs = [ChipSound.demo_song().to_dict()]
+	song = ChipSound.Song.from_dict(c.songs[0])
 	lines = c.code.split("\n")
 	if lines.is_empty():
 		lines = [""]
@@ -141,7 +149,9 @@ func commit() -> void:
 		return
 	cart.code = "\n".join(lines)
 	if song != null:
-		cart.song = song.to_dict()
+		while cart.songs.size() <= song_i:
+			cart.songs.append({})
+		cart.songs[song_i] = song.to_dict()
 
 func wheel(mb: InputEventMouseButton) -> void:
 	if not mb.pressed:
@@ -160,6 +170,17 @@ func wheel(mb: InputEventMouseButton) -> void:
 			spr_sel = clampi(spr_sel + (1 if dir > 0 else -1), 0, 255)
 		T_MAP:
 			map_zoom = clampi(map_zoom + (1 if dir > 0 else -1), 4, 24)
+		T_SOUND:
+			if con.mouse_x > 300:
+				# over the panel: the lists scroll
+				if con.mouse_y < 176:
+					inst_scroll = clampi(inst_scroll + (1 if dir > 0 else -1),
+						0, maxi(0, (song.insts.size() if song else 1) - 5))
+				else:
+					param_scroll = clampi(param_scroll + (1 if dir > 0 else -1),
+						0, maxi(0, INST_PARAMS.size() - 6))
+			elif song != null:
+				trk_row = clampi(trk_row + dir * 2, 0, song.rows - 1)
 
 # ================================================================ update
 
@@ -186,12 +207,34 @@ func update(delta: float) -> void:
 		commit()
 		shell.go(ArcadeShell.S_MENU)
 		return
+	if _chrome_clicks():
+		return
 	match tab:
 		T_CODE: _update_code()
 		T_SPRITE: _update_sprite()
 		T_MAP: _update_map()
 		T_SOUND: _update_sound()
 		T_INFO: _update_info()
+
+## Did the mouse just click inside this rectangle?
+func _clicked(x: int, y: int, w: int, h: int) -> bool:
+	if not con.mouse_hit:
+		return false
+	return con.mouse_x >= x and con.mouse_x < x + w \
+		and con.mouse_y >= y and con.mouse_y < y + h
+
+## The tab bar and the RUN button are buttons: they should answer a
+## mouse, not just a function key.
+func _chrome_clicks() -> bool:
+	var tab_w := 60
+	for i in TABS.size():
+		if _clicked(8 + i * tab_w, 2, tab_w - 4, 20):
+			_set_tab(i)
+			return true
+	if _clicked(8 + TABS.size() * tab_w + 4, 6, 44, 14):
+		_run()
+		return true
+	return false
 
 func _set_tab(n: int) -> void:
 	if n == tab:
@@ -880,46 +923,27 @@ func _update_sound() -> void:
 	for code in con.key_hits.keys():
 		var k := int(code)
 		match k:
-			KEY_TAB:
-				trk_panel = (trk_panel + 1) % 3
 			KEY_SPACE:
-				if sound != null:
-					sound.set_song(song)
-					sound.toggle()
+				_play_stop()
 			KEY_UP:
-				if trk_panel == 1:
-					trk_ip = (trk_ip - 1 + INST_PARAMS.size()) % INST_PARAMS.size()
-				else:
-					trk_row = (trk_row - 1 + song.rows) % song.rows
+				trk_row = (trk_row - 1 + song.rows) % song.rows
 			KEY_DOWN:
-				if trk_panel == 1:
-					trk_ip = (trk_ip + 1) % INST_PARAMS.size()
-				else:
-					trk_row = (trk_row + 1) % song.rows
+				trk_row = (trk_row + 1) % song.rows
 			KEY_LEFT:
-				if trk_panel == 1:
-					_inst_nudge(-1, shift)
-				elif trk_panel == 2:
-					_song_nudge(-1, shift)
-				else:
-					trk_col -= 1
-					if trk_col < 0:
-						trk_col = 4
-						trk_ch = (trk_ch - 1 + voices) % voices
+				trk_col -= 1
+				if trk_col < 0:
+					trk_col = 4
+					trk_ch = (trk_ch - 1 + voices) % voices
 			KEY_RIGHT:
-				if trk_panel == 1:
-					_inst_nudge(1, shift)
-				elif trk_panel == 2:
-					_song_nudge(1, shift)
-				else:
-					trk_col += 1
-					if trk_col > 4:
-						trk_col = 0
-						trk_ch = (trk_ch + 1) % voices
+				trk_col += 1
+				if trk_col > 4:
+					trk_col = 0
+					trk_ch = (trk_ch + 1) % voices
 			KEY_PAGEUP:
 				trk_row = maxi(0, trk_row - song.rows_per_beat * song.sig_num)
 			KEY_PAGEDOWN:
-				trk_row = mini(song.rows - 1, trk_row + song.rows_per_beat * song.sig_num)
+				trk_row = mini(song.rows - 1,
+					trk_row + song.rows_per_beat * song.sig_num)
 			KEY_BRACKETLEFT:
 				trk_oct = maxi(0, trk_oct - 1)
 			KEY_BRACKETRIGHT:
@@ -932,6 +956,13 @@ func _update_sound() -> void:
 				if not _locked():
 					song.set_cell(trk_pat, trk_row, trk_ch, [0, 0, 0, 0, 0])
 					trk_row = (trk_row + trk_step) % song.rows
+			KEY_PERIOD:
+				_song_switch(1)
+			KEY_COMMA:
+				_song_switch(-1)
+			KEY_N:
+				if con.key_held.has(KEY_CTRL):
+					_song_new()
 			KEY_F7:
 				if sound != null:
 					sound.set_song(song)
@@ -939,14 +970,9 @@ func _update_sound() -> void:
 			KEY_F8:
 				if sound != null:
 					sound.stop_music()
-			KEY_1:
-				if trk_panel == 2:
-					song.sig_num = maxi(2, song.sig_num - 1)
-			KEY_2:
-				if trk_panel == 2:
-					song.sig_num = mini(12, song.sig_num + 1)
-	# note entry, when the pattern has focus
-	if trk_panel == 0 and not ctrl:
+	_tracker_clicks()
+	# note entry: the keyboard is always the pattern grid
+	if not ctrl:
 		for code in con.key_hits.keys():
 			var k2 := int(code)
 			if PIANO.has(k2) and not _locked():
@@ -974,6 +1000,111 @@ func _update_sound() -> void:
 					4: cell[4] = ((int(cell[4]) << 4) & 0xF0) | digit
 				song.set_cell(trk_pat, trk_row, trk_ch, cell)
 
+## Play or stop, from the spacebar or from the button. Both go through
+## here so they can never disagree.
+func _play_stop() -> void:
+	if sound == null:
+		sound = con.sound
+	if sound == null:
+		shell.note("no sound chip on this machine")
+		return
+	sound.set_song(song)
+	if sound.playing:
+		sound.stop_music()
+		shell.note("stopped")
+	else:
+		sound.play_music(0)
+		shell.note("playing: " + song.title)
+
+## Move to another song on this cartridge, saving the one you were on.
+func _song_switch(dir: int) -> void:
+	if cart == null:
+		return
+	commit()
+	song_i = clampi(song_i + dir, 0, maxi(0, cart.songs.size() - 1))
+	song = ChipSound.Song.from_dict(cart.songs[song_i])
+	if sound != null:
+		sound.set_song(song)
+	shell.note("song %d of %d: %s" % [song_i + 1, cart.songs.size(), song.title])
+
+## Start another one. A cartridge with a title theme, a level loop and a
+## boss track needs three, not one.
+func _song_new() -> void:
+	if cart == null or cart.readonly:
+		shell.note("this cartridge is a ROM -- copy it first")
+		return
+	commit()
+	var fresh := ChipSound.Song.new()
+	fresh.title = "SONG %d" % (cart.songs.size() + 1)
+	fresh.insts = ChipSound.default_bank()
+	fresh.pattern(0)
+	cart.songs.append(fresh.to_dict())
+	song_i = cart.songs.size() - 1
+	song = fresh
+	if sound != null:
+		sound.set_song(song)
+	shell.note("new song %d -- music(%d) plays it" % [song_i + 1, song_i])
+
+## The tracker answers the mouse: the panel header cycles panels, a row
+## in the instrument or song panel selects that row, and a cell in the
+## grid moves the cursor to it.
+func _tracker_clicks() -> void:
+	# widgets first: they were laid out by the last draw, and every one
+	# of them says what it does on its face
+	if con.mouse_hit:
+		for w in _widgets:
+			var r: Rect2i = w["r"]
+			if r.has_point(Vector2i(con.mouse_x, con.mouse_y)):
+				_widget_hit(str(w["id"]), int(w.get("n", 0)))
+				return
+	# then the grid: click a cell and the cursor goes there
+	var x0 := 6
+	var y0 := 46
+	var row_h := 9
+	var col_w := 46
+	var shown_ch := 6
+	var grid_w := 22 + shown_ch * col_w
+	var shown := 20
+	var first := clampi(trk_row - shown / 2, 0, maxi(0, song.rows - shown))
+	var first_ch := clampi(trk_ch - shown_ch / 2, 0,
+		maxi(0, ChipSound.CHANS - shown_ch))
+	if con.mouse_hit and con.mouse_x >= x0 + 22 and con.mouse_x < x0 + grid_w \
+			and con.mouse_y >= y0 and con.mouse_y < y0 + shown * row_h:
+		trk_row = clampi(first + (con.mouse_y - y0) / row_h, 0, song.rows - 1)
+		var ci := (con.mouse_x - x0 - 22) / col_w
+		trk_ch = clampi(first_ch + ci, 0, ChipSound.CHANS - 1)
+		var into := (con.mouse_x - x0 - 22) % col_w
+		trk_col = 0 if into < 20 else (1 if into < 27 else (2 if into < 34
+			else (3 if into < 41 else 4)))
+
+func _widget_hit(id: String, n: int) -> void:
+	match id:
+		"play": _play_stop()
+		"song_prev": _song_switch(-1)
+		"song_next": _song_switch(1)
+		"song_new": _song_new()
+		"bpm": song.bpm = clampi(song.bpm + n, 40, 300)
+		"speed": song.speed = clampi(song.speed + n, 1, 16)
+		"rpb": song.rows_per_beat = clampi(song.rows_per_beat + n, 1, 16)
+		"sig": song.sig_num = clampi(song.sig_num + n, 2, 12)
+		"inst":
+			trk_inst = clampi(n, 0, song.insts.size() - 1)
+			if sound != null:
+				sound.set_song(song)
+				sound.preview(trk_inst, float(trk_oct * 12))
+		"param":
+			trk_ip = clampi(n, 0, INST_PARAMS.size() - 1)
+		"param_dec": _param_step(n, -1)
+		"param_inc": _param_step(n, 1)
+	if id in ["bpm", "speed", "rpb", "sig"] and sound != null:
+		sound.set_song(song)
+		sound._recalc_tempo()
+
+## Nudge one parameter of the instrument you have selected.
+func _param_step(pi: int, dir: int) -> void:
+	trk_ip = clampi(pi, 0, INST_PARAMS.size() - 1)
+	_inst_nudge(dir, con.key_held.has(KEY_SHIFT))
+
 func _locked() -> bool:
 	return cart != null and cart.readonly
 
@@ -995,13 +1126,14 @@ func _inst_nudge(dir: int, big: bool) -> void:
 
 func _song_nudge(dir: int, big: bool) -> void:
 	var d := dir * (10 if big else 1)
-	match trk_ip % 6:
-		0: song.bpm = clampi(song.bpm + d, 40, 300)
-		1: song.speed = clampi(song.speed + dir, 1, 16)
-		2: song.rows_per_beat = clampi(song.rows_per_beat + dir, 1, 16)
-		3: song.sig_num = clampi(song.sig_num + dir, 2, 12)
-		4: song.delay_fb = clampf(song.delay_fb + float(dir) * 0.05, 0.0, 0.85)
-		5: song.room = clampf(song.room + float(dir) * 0.05, 0.0, 1.0)
+	match trk_ip % 7:
+		0: _song_switch(dir)
+		1: song.bpm = clampi(song.bpm + d, 40, 300)
+		2: song.speed = clampi(song.speed + dir, 1, 16)
+		3: song.rows_per_beat = clampi(song.rows_per_beat + dir, 1, 16)
+		4: song.sig_num = clampi(song.sig_num + dir, 2, 12)
+		5: song.delay_fb = clampf(song.delay_fb + float(dir) * 0.05, 0.0, 0.85)
+		6: song.room = clampf(song.room + float(dir) * 0.05, 0.0, 1.0)
 	if sound != null:
 		sound.set_song(song)
 		sound._recalc_tempo()
@@ -1098,66 +1230,77 @@ func _draw_sound(u) -> void:
 		PixelFont.draw(u, "<%d-%d of %d>" % [first_ch + 1,
 			first_ch + shown_ch, ChipSound.CHANS], x0 + 2, y0 + shown * row_h + 6,
 			Pixel.dark(23))
-	# --- right hand panel
+	# --- the panel: one column, nothing modal, everything clickable
 	var px := x0 + grid_w + 6
+	_widgets = []
 	u.rectfill(px, 26, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.BLACK)
 	u.rect(px, 26, Pixel.UI_W - 4, Pixel.UI_H - 18, Pixel.dark(9))
-	var titles := ["PATTERN", "INSTRUMENT", "SONG"]
-	PixelFont.draw(u, str(titles[trk_panel]), px + 6, 30, Pixel.light(4),
-		PixelFont.BOLD)
-	PixelFont.draw(u, "TAB switches panel", px + 6, 40, Pixel.dark(23))
-	if trk_panel == 1:
-		_draw_inst_panel(u, px, 52)
-	elif trk_panel == 2:
-		_draw_song_panel(u, px, 52)
-	else:
-		_draw_pattern_panel(u, px, 52)
-
-func _draw_pattern_panel(u, px: int, y: int) -> void:
-	var inst_name := "-"
-	if trk_inst < song.insts.size():
-		inst_name = str(song.insts[trk_inst].name)
-	var rows := [
-		"INST  %d %s" % [trk_inst, inst_name.substr(0, 11)],
-		"OCTAVE %d  [ ] change" % trk_oct,
-		"STEP  %d" % trk_step,
-		"PATTERN %d/%d" % [trk_pat, song.patterns.size()],
-		"",
-		"SPACE play or stop",
-		"ZSXDCV.. is the piano",
-		"Q2W3E.. octave above",
-		"'  note off",
-		"-/= pick instrument",
-		"",
-		"EFFECT COLUMN",
-		" 1xx slide up",
-		" 2xx slide down",
-		" 3xx glide to note",
-		" 0xy arpeggio",
-		" 8xx pan",
-		" Axy volume slide",
-		" Fxx speed",
-	]
-	for i in rows.size():
-		PixelFont.draw(u, str(rows[i]), px + 6, y + i * 10,
-			Pixel.hue(23) if i > 4 else Pixel.WHITE)
-
-func _draw_inst_panel(u, px: int, y: int) -> void:
-	if song.insts.is_empty():
-		return
-	var inst: ChipSound.Inst = song.insts[clampi(trk_inst, 0, song.insts.size() - 1)]
-	PixelFont.draw(u, "%d %s" % [trk_inst, inst.name], px + 6, y, Pixel.light(9))
-	PixelFont.draw(u, "arrows edit, shift x4", px + 6, y + 9, Pixel.dark(23))
-	var top := clampi(trk_ip - 8, 0, maxi(0, INST_PARAMS.size() - 17))
-	for i in mini(17, INST_PARAMS.size()):
-		var pi := top + i
+	var pw := Pixel.UI_W - 4 - px
+	var yy := 30
+	# transport + which song
+	var playing: bool = sound != null and sound.playing
+	_button(u, px + 4, yy, 40, 13, "STOP" if playing else "PLAY", "play", 0,
+		playing)
+	_button(u, px + 48, yy, 13, 13, "<", "song_prev", 0, false)
+	PixelFont.draw(u, "%d/%d" % [song_i + 1,
+		maxi(1, cart.songs.size() if cart else 1)], px + 64, yy + 3, Pixel.WHITE)
+	_button(u, px + 88, yy, 13, 13, ">", "song_next", 0, false)
+	_button(u, px + 104, yy, 26, 13, "NEW", "song_new", 0, false)
+	yy += 18
+	PixelFont.draw(u, song.title.substr(0, 26), px + 4, yy, Pixel.light(9))
+	yy += 12
+	# song settings, as steppers
+	_stepper(u, px + 4, yy, pw - 8, "BPM", str(song.bpm), "bpm", 1)
+	yy += 13
+	_stepper(u, px + 4, yy, pw - 8, "SPEED", "%d ticks" % song.speed, "speed", 1)
+	yy += 13
+	_stepper(u, px + 4, yy, pw - 8, "ROWS/BEAT", str(song.rows_per_beat), "rpb", 1)
+	yy += 13
+	_stepper(u, px + 4, yy, pw - 8, "SIGNATURE",
+		"%d/%d" % [song.sig_num, song.sig_den], "sig", 1)
+	yy += 17
+	# the instrument list: click one to work on it
+	u.hline(px + 4, Pixel.UI_W - 8, yy - 3, Pixel.dark(9))
+	PixelFont.draw(u, "INSTRUMENTS", px + 4, yy, Pixel.hue(4))
+	yy += 10
+	var list_rows := 5
+	inst_scroll = clampi(inst_scroll, 0,
+		maxi(0, song.insts.size() - list_rows))
+	if trk_inst < inst_scroll:
+		inst_scroll = trk_inst
+	if trk_inst >= inst_scroll + list_rows:
+		inst_scroll = trk_inst - list_rows + 1
+	for i in list_rows:
+		var ii := inst_scroll + i
+		if ii >= song.insts.size():
+			break
+		var on := ii == trk_inst
+		var r := Rect2i(px + 4, yy + i * 10, pw - 8, 10)
+		if on:
+			u.rectfill(r.position.x, r.position.y, r.position.x + r.size.x,
+				r.position.y + r.size.y - 1, Pixel.dark(11))
+		PixelFont.draw(u, "%2d %s" % [ii, str(song.insts[ii].name).substr(0, 14)],
+			px + 6, yy + i * 10 + 1, Pixel.WHITE if on else Pixel.hue(23))
+		_widgets.append({"r": r, "id": "inst", "n": ii})
+	if song.insts.size() > list_rows:
+		PixelFont.draw(u, "wheel scrolls", px + 4, yy + list_rows * 10,
+			Pixel.dark(23))
+	yy += list_rows * 10 + 10
+	# and its parameters, each with its own arrows
+	u.hline(px + 4, Pixel.UI_W - 8, yy - 3, Pixel.dark(9))
+	var inst: ChipSound.Inst = song.insts[clampi(trk_inst, 0,
+		maxi(0, song.insts.size() - 1))]
+	PixelFont.draw(u, "SOUND OF %s" % str(inst.name).substr(0, 12), px + 4, yy,
+		Pixel.hue(4))
+	yy += 10
+	var prows := 6
+	param_scroll = clampi(param_scroll, 0, maxi(0, INST_PARAMS.size() - prows))
+	for i in prows:
+		var pi := param_scroll + i
 		if pi >= INST_PARAMS.size():
 			break
 		var p: Array = INST_PARAMS[pi]
-		var yy := y + 22 + i * 10
-		var on := pi == trk_ip
-		if on:
-			u.rectfill(px + 4, yy - 1, Pixel.UI_W - 8, yy + 7, Pixel.dark(11))
+		var locked_p: bool = EXPAND_PARAMS.has(str(p[1])) and not con.can("expand")
 		var val := float(inst.get(str(p[1])))
 		var txt := ""
 		if str(p[1]) == "wave":
@@ -1165,40 +1308,42 @@ func _draw_inst_panel(u, px: int, y: int) -> void:
 				ChipSound.WAVE_NAMES.size() - 1)]
 		else:
 			txt = "%.2f" % val
-		var locked_p: bool = EXPAND_PARAMS.has(str(p[1])) and not con.can("expand")
-		PixelFont.draw(u, str(p[0]), px + 8, yy,
-			Pixel.dark(23) if locked_p else (Pixel.WHITE if on else Pixel.hue(23)))
-		PixelFont.draw(u, txt, px + 78, yy,
-			Pixel.dark(23) if locked_p else (Pixel.light(4) if on else Pixel.GRAY))
-		if locked_p:
-			PixelFont.draw(u, "x", px + 138, yy, Pixel.hue(0))
-		# a little bar so the value is readable at a glance
-		var frac := clampf((val - float(p[2])) / maxf(0.001,
-			float(p[3]) - float(p[2])), 0.0, 1.0)
-		u.rectfill(px + 112, yy + 2, px + 112 + int(frac * 22.0), yy + 5,
-			Pixel.hue(9))
+		_stepper(u, px + 4, yy + i * 12, pw - 8, str(p[0]), txt, "param", 1,
+			pi, locked_p)
+	PixelFont.draw(u, "click a value's arrows", px + 4, Pixel.UI_H - 30,
+		Pixel.dark(23))
+	PixelFont.draw(u, "keys play the grid", px + 4, Pixel.UI_H - 22,
+		Pixel.dark(23))
 
-func _draw_song_panel(u, px: int, y: int) -> void:
-	var rows := [
-		"BPM        %d" % song.bpm,
-		"SPEED      %d ticks/row" % song.speed,
-		"ROWS/BEAT  %d" % song.rows_per_beat,
-		"SIGNATURE  %d/%d" % [song.sig_num, song.sig_den],
-		"DELAY FB   %.2f" % song.delay_fb,
-		"ROOM       %.2f" % song.room,
-	]
-	for i in rows.size():
-		var yy := y + i * 12
-		var on := (trk_ip % 6) == i
-		if on:
-			u.rectfill(px + 4, yy - 1, Pixel.UI_W - 8, yy + 8, Pixel.dark(11))
-		PixelFont.draw(u, str(rows[i]), px + 8, yy,
-			Pixel.WHITE if on else Pixel.hue(23))
-	PixelFont.draw(u, "up/down pick a row,", px + 6, y + 80, Pixel.dark(23))
-	PixelFont.draw(u, "left/right change it", px + 6, y + 90, Pixel.dark(23))
-	PixelFont.draw(u, "a bar = %d rows" % [song.rows_per_beat * song.sig_num],
-		px + 6, y + 106, Pixel.hue(9))
-	PixelFont.draw(u, "F7 play  F8 stop", px + 6, y + 120, Pixel.hue(23))
+## A button that looks like one and registers itself for clicking.
+func _button(u, x: int, y: int, w: int, h: int, label: String, id: String,
+		n: int = 0, lit: bool = false) -> void:
+	var hover: bool = con.mouse_x >= x and con.mouse_x < x + w \
+		and con.mouse_y >= y and con.mouse_y < y + h
+	u.rectfill(x, y, x + w, y + h, Pixel.dark(11) if (lit or hover)
+		else Pixel.dark(22))
+	u.rect(x, y, x + w, y + h, Pixel.hue(4) if hover else Pixel.dark(9))
+	PixelFont.draw_centered(u, label, x + w / 2, y + (h - 7) / 2 + 1,
+		Pixel.WHITE if (lit or hover) else Pixel.hue(23))
+	_widgets.append({"r": Rect2i(x, y, w, h), "id": id, "n": n})
+
+## LABEL  < value >  -- the only way to change a number in here, and it
+## is visible, clickable and says which direction it goes.
+func _stepper(u, x: int, y: int, w: int, label: String, value: String,
+		id: String, step: int, n: int = 0, locked: bool = false) -> void:
+	var col := Pixel.dark(23) if locked else Pixel.hue(23)
+	PixelFont.draw(u, label.substr(0, 12), x, y + 2, col)
+	if locked:
+		PixelFont.draw(u, "needs board", x + 74, y + 2, Pixel.dark(0))
+		return
+	var bx := x + w - 62
+	_button(u, bx, y, 11, 11, "<", id + ("_dec" if id == "param" else ""),
+		n if id == "param" else -step)
+	PixelFont.draw_centered(u, value, bx + 26, y + 2, Pixel.light(9))
+	_button(u, bx + 40, y, 11, 11, ">", id + ("_inc" if id == "param" else ""),
+		n if id == "param" else step)
+	if id == "param":
+		_widgets.append({"r": Rect2i(x, y, w - 64, 11), "id": "param", "n": n})
 
 func _draw_info(u) -> void:
 	if cart == null:
@@ -1253,9 +1398,10 @@ func _draw_info(u) -> void:
 		if cart.map_data[i] != 0:
 			used_tiles += 1
 	var song_rows := "none"
-	if not cart.song.is_empty():
-		song_rows = "%s, %d patterns" % [str(cart.song.get("title", "?")),
-			(cart.song.get("patterns", []) as Array).size()]
+	if not cart.songs.is_empty():
+		var s0: Dictionary = cart.songs[0]
+		song_rows = "%d: %s +%d more" % [cart.songs.size(),
+			str(s0.get("title", "?")), maxi(0, cart.songs.size() - 1)]
 	var lines2 := [
 		"CODE     %d lines" % (cart.code.count("\n") + 1),
 		"SPRITES  %d of 256 drawn" % used_spr,

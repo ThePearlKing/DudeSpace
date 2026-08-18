@@ -194,7 +194,7 @@ func _any_start() -> bool:
 		or _key_hit(KEY_ENTER) or _key_hit(KEY_SPACE)
 
 func _hit(b: int) -> bool:
-	return con.btn_hit[b]
+	return con.ui_hit[b]
 
 func _key_hit(k: int) -> bool:
 	return con.key_hits.has(k)
@@ -451,7 +451,8 @@ func _draw_preview(u, x: int, y: int, w: int, h: int) -> void:
 	var lines := [
 		"CANVAS  %s" % str(ArcadeConsole.RES_MODES[c.res_mode]["name"]),
 		"CODE    %d lines" % (c.code.count("\n") + 1),
-		"MUSIC   %s" % ("yes" if not c.song.is_empty() else "none"),
+		"MUSIC   %s" % ("%d songs" % c.songs.size() if not c.songs.is_empty()
+			else "none"),
 		"WRITE   %s" % ("locked (ROM)" if c.readonly else "editable"),
 	]
 	for i in lines.size():
@@ -630,6 +631,10 @@ func _read_disc(i: int) -> void:
 				note("script loaded into the code editor")
 		"song":
 			if edit != null:
+				# a song off a floppy joins the cartridge's bank
+				if sel < carts.size() and not carts[sel].readonly:
+					carts[sel].songs.append(d.duplicate(true))
+					edit.song_i = carts[sel].songs.size() - 1
 				edit.song = ChipSound.Song.from_dict(d)
 				edit.commit()
 				if con.sound != null:
@@ -666,7 +671,8 @@ func _write_disc(kind: String) -> void:
 			payload = ArcadeDisc.make("script", c.name + " CODE", {"code": c.code})
 		"song":
 			var sd: Dictionary = edit.song.to_dict() if (edit != null
-				and edit.song != null) else c.song
+				and edit.song != null) else (c.songs[0] if not c.songs.is_empty()
+				else {})
 			if sd.is_empty():
 				note("this cartridge has no song on it")
 				return

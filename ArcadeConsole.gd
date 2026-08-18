@@ -56,6 +56,10 @@ const BTN_COUNT := 10
 
 var cart: ArcadeCart = null
 var vm: LuaVM = null
+## The engine layer: entities, hitboxes, gravity, collision, camera,
+## timers, tweens. A cartridge can ignore all of it and paint pixels, or
+## lean on it and never write a collision routine again.
+var eng: ArcadeEngine = null
 
 var bg: Pixel.Layer = null
 var main: Pixel.Layer = null
@@ -73,8 +77,17 @@ var log_lines: Array = []
 
 ## Buttons currently held, and the ones that went down this frame.
 var btn_held: Array = []
+## Edges seen by a CARTRIDGE (btnp). A cartridge steps at a fixed sixty
+## a second while the host may draw at any rate, so a press that happens
+## between two steps has to be LATCHED or it is simply lost -- which is
+## what made the arrow keys feel like they worked at random.
 var btn_hit: Array = []
+var btn_latch: Array = []
 var btn_prev: Array = []
+## Edges seen by the SHELL, once per drawn frame. Menus want the press
+## the moment it happens, not on the next cartridge tick.
+var ui_hit: Array = []
+var ui_prev: Array = []
 var mouse_x: int = 0
 var mouse_y: int = 0
 var mouse_down: bool = false
@@ -98,10 +111,16 @@ func _init() -> void:
 	btn_held.resize(BTN_COUNT)
 	btn_hit.resize(BTN_COUNT)
 	btn_prev.resize(BTN_COUNT)
+	btn_latch.resize(BTN_COUNT)
+	ui_hit.resize(BTN_COUNT)
+	ui_prev.resize(BTN_COUNT)
 	for i in BTN_COUNT:
 		btn_held[i] = false
 		btn_hit[i] = false
 		btn_prev[i] = false
+		btn_latch[i] = false
+		ui_hit[i] = false
+		ui_prev[i] = false
 	ui = Pixel.Layer.new(Pixel.UI_W, Pixel.UI_H, Pixel.CLEAR)
 	_set_res(1)
 	_pal_remap.resize(256)
@@ -145,6 +164,8 @@ func boot(c: ArcadeCart) -> void:
 	main.reset_pal()
 	vm = LuaVM.new()
 	vm.open_libs()
+	eng = ArcadeEngine.new()
+	eng.setup(self, vm)
 	_bind_api()
 	vm.budget = 6000000
 	if not vm.load_src(c.code):
@@ -176,12 +197,17 @@ func _crash(msg: String) -> void:
 ## That is why nothing in the menus responded.
 func poll_buttons() -> void:
 	for i in BTN_COUNT:
-		btn_hit[i] = btn_held[i] and not btn_prev[i]
-		btn_prev[i] = btn_held[i]
+		ui_hit[i] = (btn_held[i] and not ui_prev[i]) or btn_latch[i]
+		ui_prev[i] = btn_held[i]
 
 ## Clear the one-frame input latches. The driver calls this after
 ## everything that wanted to read them has read them.
 func end_frame() -> void:
+	for i in BTN_COUNT:
+		# the shell has had its look; a latch only survives to the next
+		# cartridge step, never past it
+		if not running:
+			btn_latch[i] = false
 	mouse_hit = false
 	mouse_right_hit = false
 	key_hits.clear()
@@ -193,12 +219,21 @@ func step(delta: float) -> void:
 		return
 	run_time += delta
 	frame += 1
+	# a press that landed between two steps still counts on this one
+	for i in BTN_COUNT:
+		btn_hit[i] = (btn_held[i] and not btn_prev[i]) or btn_latch[i]
+		btn_prev[i] = btn_held[i]
+		btn_latch[i] = false
+	if eng != null:
+		eng.pre_update(delta)
 	vm.steps = 0
 	if vm.has_fn("_update"):
 		vm.call_global("_update")
 		if vm.err != "":
 			_crash(vm.err)
 			return
+	if eng != null:
+		eng.post_update(delta)
 	if vm.has_fn("_draw"):
 		vm.steps = 0
 		_target = main
@@ -265,11 +300,36 @@ func _bind_api() -> void:
 	# --- sound
 	g.rawset("sfx", Callable(self, "_api_sfx"))
 	g.rawset("music", Callable(self, "_api_music"))
+	g.rawset("songs", Callable(self, "_api_songs"))
 	g.rawset("note", Callable(self, "_api_note"))
+	# --- the engine: objects with hitboxes, and the world they live in
+	g.rawset("add", Callable(self, "_api_add"))
+	g.rawset("del", Callable(self, "_api_del"))
+	g.rawset("each", Callable(self, "_api_each"))
+	g.rawset("count", Callable(self, "_api_count"))
+	g.rawset("first", Callable(self, "_api_first"))
+	g.rawset("hit", Callable(self, "_api_hit"))
+	g.rawset("overlap", Callable(self, "_api_overlap"))
+	g.rawset("touching", Callable(self, "_api_touching"))
+	g.rawset("gravity", Callable(self, "_api_gravity"))
+	g.rawset("solidflag", Callable(self, "_api_solidflag"))
+	g.rawset("follow", Callable(self, "_api_follow"))
+	g.rawset("bounds", Callable(self, "_api_bounds"))
+	g.rawset("drawall", Callable(self, "_api_drawall"))
+	g.rawset("hitboxes", Callable(self, "_api_hitboxes"))
+	g.rawset("after", Callable(self, "_api_after"))
+	g.rawset("every", Callable(self, "_api_every"))
+	g.rawset("tween", Callable(self, "_api_tween"))
+	g.rawset("particles", Callable(self, "_api_particles"))
+	g.rawset("clearall", Callable(self, "_api_clearall"))
 	# --- memory that survives the power going off
 	g.rawset("dget", Callable(self, "_api_dget"))
 	g.rawset("dset", Callable(self, "_api_dset"))
 	g.rawset("log", Callable(self, "_api_log"))
+
+## One argument, whatever it is.
+func _a(a: Array, i: int):
+	return a[i] if i < a.size() else null
 
 func _n(a: Array, i: int, d: float = 0.0) -> float:
 	if i >= a.size():
@@ -532,13 +592,21 @@ func _api_sfx(a: Array) -> Array:
 		sound.play_sfx(_i(a, 0), _i(a, 1, -1))
 	return []
 
+## music(n) plays song n off this cartridge; music(-1) stops; a second
+## argument starts it part-way through the order.
 func _api_music(a: Array) -> Array:
 	if sound != null and sound.has_method("play_music"):
-		sound.play_music(_i(a, 0, 0), _n(a, 1, 0.0))
+		sound.play_music(_i(a, 0, 0), _i(a, 1, 0))
 	return []
 
 ## note(channel, semitone, volume, [instrument]) -- live, one note, for
 ## cartridges that would rather drive the sound chip themselves.
+## How many songs this cartridge is carrying.
+func _api_songs(_a: Array) -> Array:
+	if sound != null and "songs" in sound:
+		return [float((sound.songs as Array).size())]
+	return [0.0]
+
 func _api_note(a: Array) -> Array:
 	if sound != null and sound.has_method("play_note"):
 		sound.play_note(_i(a, 0), _n(a, 1, 24.0), _n(a, 2, 1.0), _i(a, 3, 0))
@@ -553,6 +621,173 @@ func _api_dget(a: Array) -> Array:
 func _api_dset(a: Array) -> Array:
 	if cart != null:
 		cart.data[str(_i(a, 0))] = _n(a, 1)
+	return []
+
+# --- the engine ---------------------------------------------------------
+## add{...} -- put an object in the world. Everything is optional except
+## where it is: x, y, w, h, spr, tag, gravity, solid, static, and any
+## field of your own you care to hang on it.
+func _api_add(a: Array) -> Array:
+	var t = _a(a, 0)
+	if not (t is LuaVM.Table):
+		t = LuaVM.Table.new()
+	var tab: LuaVM.Table = t
+	if tab.rawget("w") == null:
+		tab.rawset("w", 8.0)
+	if tab.rawget("h") == null:
+		tab.rawset("h", 8.0)
+	if tab.rawget("alive") == null:
+		tab.rawset("alive", true)
+	if tab.rawget("visible") == null:
+		tab.rawset("visible", true)
+	eng.ents.append(tab)
+	return [tab]
+
+func _api_del(a: Array) -> Array:
+	var t = _a(a, 0)
+	if t is LuaVM.Table:
+		(t as LuaVM.Table).rawset("alive", false)
+	return []
+
+func _api_clearall(_a: Array) -> Array:
+	eng.reset()
+	return []
+
+## each("enemy", function(e) ... end) -- walk every object with that tag.
+func _api_each(a: Array) -> Array:
+	var tag := LuaVM.tostr(_a(a, 0))
+	var fn = _a(a, 1)
+	for e in eng.ents.duplicate():
+		if not (e is LuaVM.Table):
+			continue
+		if tag != "" and ArcadeEngine.gs(e, "tag", "") != tag:
+			continue
+		if not ArcadeEngine.gb(e, "alive", true):
+			continue
+		vm.call_value(fn, [e])
+	return []
+
+func _api_count(a: Array) -> Array:
+	var tag := LuaVM.tostr(_a(a, 0))
+	var n := 0
+	for e in eng.ents:
+		if e is LuaVM.Table and ArcadeEngine.gb(e, "alive", true) \
+				and (tag == "" or ArcadeEngine.gs(e, "tag", "") == tag):
+			n += 1
+	return [float(n)]
+
+func _api_first(a: Array) -> Array:
+	var tag := LuaVM.tostr(_a(a, 0))
+	for e in eng.ents:
+		if e is LuaVM.Table and ArcadeEngine.gb(e, "alive", true) \
+				and ArcadeEngine.gs(e, "tag", "") == tag:
+			return [e]
+	return [null]
+
+## hit(a, b) -- do these two hitboxes overlap?
+func _api_hit(a: Array) -> Array:
+	var x = _a(a, 0)
+	var y = _a(a, 1)
+	if not (x is LuaVM.Table) or not (y is LuaVM.Table):
+		return [false]
+	return [ArcadeEngine.box(x).intersects(ArcadeEngine.box(y))]
+
+## overlap(obj, "tag") -- the first thing with that tag that this object
+## is inside, or nil.
+func _api_overlap(a: Array) -> Array:
+	var o = _a(a, 0)
+	if not (o is LuaVM.Table):
+		return [null]
+	var tag := LuaVM.tostr(_a(a, 1))
+	var b := ArcadeEngine.box(o)
+	for e in eng.ents:
+		if e == o or not (e is LuaVM.Table):
+			continue
+		if not ArcadeEngine.gb(e, "alive", true):
+			continue
+		if tag != "" and ArcadeEngine.gs(e, "tag", "") != tag:
+			continue
+		if b.intersects(ArcadeEngine.box(e)):
+			return [e]
+	return [null]
+
+## touching(obj, dx, dy) -- would it be blocked if it moved that way?
+## Ledge checks and wall tests without writing any of the maths.
+func _api_touching(a: Array) -> Array:
+	var o = _a(a, 0)
+	if not (o is LuaVM.Table):
+		return [false]
+	var ox := ArcadeEngine.gf(o, "x", 0.0)
+	var oy := ArcadeEngine.gf(o, "y", 0.0)
+	ArcadeEngine.sf(o, "x", ox + _n(a, 1, 0.0))
+	ArcadeEngine.sf(o, "y", oy + _n(a, 2, 0.0))
+	var blocked = eng._blocked(o)
+	ArcadeEngine.sf(o, "x", ox)
+	ArcadeEngine.sf(o, "y", oy)
+	return [blocked != null]
+
+func _api_gravity(a: Array) -> Array:
+	eng.gravity = _n(a, 0, 0.0)
+	if a.size() > 1:
+		eng.drag = _n(a, 1, 1.0)
+	return []
+
+## Which sprite flag marks a tile as solid. Paint the flag in the sprite
+## editor and the map becomes a collision map.
+func _api_solidflag(a: Array) -> Array:
+	eng.solid_flag = _i(a, 0, 0)
+	return []
+
+func _api_follow(a: Array) -> Array:
+	eng.cam_target = _a(a, 0)
+	eng.cam_lerp = _n(a, 1, 0.12)
+	return []
+
+func _api_bounds(a: Array) -> Array:
+	eng.cam_bx0 = _n(a, 0, -1e9)
+	eng.cam_by0 = _n(a, 1, -1e9)
+	eng.cam_bx1 = _n(a, 2, 1e9)
+	eng.cam_by1 = _n(a, 3, 1e9)
+	return []
+
+func _api_drawall(_a: Array) -> Array:
+	eng.draw_all()
+	return []
+
+## Every hitbox, outlined. Debugging collision by eye instead of by
+## guesswork.
+func _api_hitboxes(a: Array) -> Array:
+	eng.draw_boxes(_i(a, 0, 2))
+	return []
+
+func _api_after(a: Array) -> Array:
+	eng.timers.append({"t": _n(a, 0, 1.0), "fn": _a(a, 1), "repeat": false})
+	return []
+
+func _api_every(a: Array) -> Array:
+	eng.timers.append({"t": _n(a, 0, 1.0), "every": _n(a, 0, 1.0),
+		"fn": _a(a, 1), "repeat": true})
+	return []
+
+## tween(obj, "y", to, seconds) -- move a field smoothly, no maths.
+func _api_tween(a: Array) -> Array:
+	var o = _a(a, 0)
+	if not (o is LuaVM.Table):
+		return []
+	var key := LuaVM.tostr(_a(a, 1))
+	eng.tweens.append({"obj": o, "key": key,
+		"from": ArcadeEngine.gf(o, key, 0.0), "to": _n(a, 2, 0.0),
+		"dur": _n(a, 3, 0.5), "t": 0.0})
+	return []
+
+func _api_particles(a: Array) -> Array:
+	var n := _i(a, 2, 8)
+	for i in n:
+		eng.parts.append({"x": _n(a, 0), "y": _n(a, 1),
+			"vx": (_rng.randf() - 0.5) * _n(a, 4, 2.0),
+			"vy": (_rng.randf() - 0.5) * _n(a, 4, 2.0),
+			"g": _n(a, 5, 0.08), "life": _n(a, 6, 24.0),
+			"c": float(_i(a, 3, 14))})
 	return []
 
 func _api_log(a: Array) -> Array:
