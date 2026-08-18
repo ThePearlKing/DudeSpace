@@ -13,11 +13,12 @@ extends RefCounted
 const FIRST := 32
 const LAST := 126
 
-## THE RUNES. Not a cipher of our letters -- a script: angular strokes
-## with a mark hung under each one, the way the icosahedron colonies
-## write. It maps onto ASCII so any string can be rendered in it, and
-## nothing in it is a hexagon.
-const ALIEN_HEX := "000000000000000404040404000e0a0a0a000000000a1f0a1f0a0404040e140e050e04110204040408110c120c1213110f040404000000000204080808040208040202020408150e1f0e15000404041f041f0404000004040800000000001f0000000000040e04000001020404040810040a1111110a040404040404040404040404040e04040e04040e0404110a04040404041f04040404041f04040e150e04041f01020408101f0a110a040a110a040a150e150a04040000040000040400040004080002040810080402001f0000001f00080402010204080e1102040004000e11161516100e110a0404040a111014121112141004040e150e0404111b15151111111f04040404041f04040605060404120c0404040c1211111b151b1111040a1504150a04010204081008041214181018141210101010101214111b1515151b1111131519111111040a1111110a041c12121c101010040e15150e040a1c121c14121110070c180403061c1f04040404040411111111110a04110a0a04040404111515151b1100110a040e040a11110a04040e04041f02040e08101f0e08080808080e100804040402010e02020202020e040a11000000000000000000001f08040000000000110a0404040a111014121112141004040e150e0404111b15151111111f04040404041f04040605060404120c0404040c1211111b151b1111040a1504150a04010204081008041214181018141210101010101214111b1515151b1111131519111111040a1111110a041c12121c101010040e15150e040a1c121c14121110070c180403061c1f04040404040411111111110a04110a0a04040404111515151b1100110a040e040a11110a04040e04041f02040e08101f02040408040402040404040404040804040204040800000c13020000"
+## THE ICOSAHEDRON SCRIPT. Not our letters in a costume: every glyph is
+## an enclosed sigil -- a box, a diamond, a wedge, an arch, a vessel or a
+## ladder -- with ticks set inside it and a foot or a hook attached. No
+## glyph shares a skeleton with any letter of ours, which is the whole
+## point: you can see that it says something, and you cannot read it.
+const ALIEN_HEX := "00000000000000040004000400040a0a00000000000a1f0a1f0a0000180e0a0e0a0e001c0a1115110a0418040a151f000004040000000000060808080808060c02020202020c150e1f0e15000004041f041f0000000000000408000000001f0000000000000400000001020408100000040a1911130a04000e0a0a0a0e00000a0e0a0e0a04000a1115110e04001f0a0e0a0a0400040e151f000e040a1315190a0e180e0a0a0a0e00180a0e0a0e0a00030a1111110e000004000004000000040004080000040e0a0a0a0e00001f001f001f0004040a111f00000e110600040000040a1911130e00040a1515150a0400040a111f000e040a1315190e00030a0e0e0e0a00001f0a0e0a0a00040a1115110a04000a0e0e0e0a041c0a111f110a04000a0e0e0e0a0e030a111f110e00180e0a0e0a0e00030e0e0e0e0e0000040a111f0000000a1911130e0e000e0a0e0a0e04000e0a0e0a0e04041f0e0e0e0a0018040a151f0000181f0a0a0a0a0000040a1f1f0000041f0a0a0a0a001c0a1111110a04000a1515150e0e030a0e0e0e0a00001f0a0e0a0a0e04040a151f0000040a1315190a0e00040a151f000e001f0a0e0a0a0e000a1315190e0e000a0e0e0e0a0e000e0a0a0a0e0e040a1515150a0400040a111f000e040a1315190e00030a0e0e0e0a00001f0a0e0a0a00040a1115110a04000a0e0e0e0a041c0a111f110a04000a0e0e0e0a0e030a111f110e00180e0a0e0a0e00030e0e0e0e0e0000040a111f0000000a1911130e0e000e0a0e0a0e04000e0a0e0a0e04041f0e0e0e0a0018040a151f0000181f0a0a0a0a0000040a1f1f0000041f0a0a0a0a001c0a1111110a04000a1515150e0e030a0e0e0e0a00001f0a0e0a0a0e04040a151f0000041f0e0e0e0a00040a1515150e00040a0e0e0e0a00040e0a0e0a0e00"
 
 ## DUDE TINY, authored at three by five rather than squeezed down from
 ## the master: at this size a squeezed glyph is mush, and a drawn one
@@ -56,6 +57,53 @@ class Face extends RefCounted:
 		if code < FIRST or code > LAST:
 			code = 63           # '?'
 		return (code - FIRST) * w * h
+
+## THE ALIEN SCRIPT IS NOT A CIPHER. A one-glyph-per-letter face still
+## reads as English in a costume: same word shapes, same letter count,
+## same spacing. So this script behaves like a script -- each rune has
+## three contextual forms and which one appears depends on where it sits
+## in the word and what it follows, certain pairs fuse into a single
+## wider rune so the letter count stops matching, and runes inside a word
+## are joined by a spine. Two different words that use the same letters
+## do not come out looking the same.
+static var _alien_forms: Array = []
+
+static func alien_forms() -> Array:
+	if not _alien_forms.is_empty():
+		return _alien_forms
+	var base := _from_hex(ALIEN_HEX, 5, 7, 6, 9)
+	_alien_forms = [base, _alien_variant(base, 1), _alien_variant(base, 2)]
+	return _alien_forms
+
+## A second and third form of every rune: the same hand, writing the same
+## sound in a different position. Not noise -- the stem stays, the
+## strokes move.
+static func _alien_variant(src: Face, which: int) -> Face:
+	var f := Face.new()
+	f.w = src.w
+	f.h = src.h
+	f.adv = src.adv
+	f.line_h = src.line_h
+	var n := (LAST - FIRST + 1)
+	f.mask.resize(n * f.w * f.h)
+	for gi in n:
+		for y in src.h:
+			for x in src.w:
+				if src.mask[gi * src.w * src.h + y * src.w + x] == 0:
+					continue
+				var ty := y
+				var tx := x
+				if which == 1:
+					ty = src.h - 1 - y            # written upside down
+				else:
+					tx = src.w - 1 - x            # written mirrored
+				f.mask[gi * f.w * f.h + ty * f.w + tx] = 1
+		# and a mark that only this form carries
+		if which == 1:
+			f.mask[gi * f.w * f.h + 0 * f.w + 0] = 1
+		else:
+			f.mask[gi * f.w * f.h + (src.h - 1) * f.w + (src.w - 1)] = 1
+	return f
 
 static func faces() -> Array:
 	if _faces.size() > 0:
@@ -188,6 +236,24 @@ static func _shear(src: Face) -> Face:
 
 static func text_width(txt: String, face_id: int = SYS, tracking: int = 0) -> int:
 	var f := face(face_id)
+	if face_id == ALIEN:
+		# fused pairs make alien text shorter than its letter count
+		var wdt := 0
+		var i := 0
+		while i < txt.length():
+			var code := txt.unicode_at(i)
+			var nxt := txt.unicode_at(i + 1) if i + 1 < txt.length() else 0
+			if code == 32:
+				wdt += 5 + tracking
+				i += 1
+				continue
+			if nxt > 32 and ((code * 7 + nxt * 3) % 5 == 0):
+				wdt += f.adv + 2 + tracking
+				i += 2
+				continue
+			wdt += f.adv + tracking
+			i += 1
+		return wdt
 	return txt.length() * (f.adv + tracking)
 
 static func line_height(face_id: int = SYS) -> int:
@@ -200,6 +266,8 @@ static func line_height(face_id: int = SYS) -> int:
 static func draw(layer, txt: String, x: int, y: int, col: int,
 		face_id: int = SYS, style: int = PLAIN, style_col: int = 0,
 		tracking: int = 0, wave: float = 0.0, wave_t: float = 0.0) -> int:
+	if face_id == ALIEN:
+		return _draw_alien(layer, txt, x, y, col, tracking)
 	var f := face(face_id)
 	var pen := x
 	for i in txt.length():
@@ -219,6 +287,51 @@ static func draw(layer, txt: String, x: int, y: int, col: int,
 			_glyph(layer, f, code, pen + 1, y + oy + 1, style_col)
 		_glyph(layer, f, code, pen, y + oy, col)
 		pen += f.adv + tracking
+	return pen - x
+
+## Writing, rather than substituting. Runes take their form from where
+## they sit, some pairs fuse, and a word is joined along a spine.
+static func _draw_alien(layer, txt: String, x: int, y: int, col: int,
+		tracking: int) -> int:
+	var forms := alien_forms()
+	var pen := x
+	var i := 0
+	var word_pos := 0
+	var prev := 0
+	while i < txt.length():
+		var code := txt.unicode_at(i)
+		if code == 10:
+			pen = x
+			y += 10
+			word_pos = 0
+			prev = 0
+			i += 1
+			continue
+		if code == 32:
+			pen += 5 + tracking
+			word_pos = 0
+			prev = 0
+			i += 1
+			continue
+		var nxt := txt.unicode_at(i + 1) if i + 1 < txt.length() else 0
+		# a pair that fuses: one rune carries both sounds, so the word
+		# stops having the same number of marks as the English did
+		var fused: bool = nxt > 32 and ((code * 7 + nxt * 3) % 5 == 0)
+		var form: int = (code + word_pos * 2 + prev) % 3
+		var fa: Face = forms[form]
+		_glyph(layer, fa, code, pen, y, col)
+		if fused:
+			var fb: Face = forms[(form + 1) % 3]
+			_glyph(layer, fb, nxt, pen + 2, y + 1, col)
+			i += 1
+		# the spine: runes inside a word are written joined
+		if word_pos > 0:
+			layer.pset(pen - 1, y + 3, col)
+			layer.pset(pen - 2, y + 3, col)
+		pen += fa.adv + (2 if fused else 0) + tracking
+		word_pos += 1
+		prev = code
+		i += 1
 	return pen - x
 
 static func _glyph(layer, f: Face, code: int, x: int, y: int, col: int) -> void:
