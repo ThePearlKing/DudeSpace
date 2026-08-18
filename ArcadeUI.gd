@@ -111,8 +111,12 @@ func _process(delta: float) -> void:
 		return
 	con.mouse_hit = _mouse_hit_latch
 	_mouse_hit_latch = false
+	con.mouse_right_hit = _mouse_right_latch
+	_mouse_right_latch = false
+	con.poll_buttons()
 	shell.update(delta)
 	shell.draw()
+	con.end_frame()
 	_upload()
 	if shell.quit_requested:
 		close()
@@ -164,6 +168,7 @@ const KEY_MAP := {
 }
 
 var _mouse_hit_latch: bool = false
+var _mouse_right_latch: bool = false
 
 func _input(event: InputEvent) -> void:
 	if con == null:
@@ -171,17 +176,27 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k: InputEventKey = event
 		var code := k.keycode
-		if k.pressed and not k.echo:
+		# CTRL+ESC always gets you out of the machine, whatever the
+		# console is doing -- a menu that will not let go is a trap
+		if k.pressed and code == KEY_ESCAPE and k.ctrl_pressed:
+			close()
+			get_viewport().set_input_as_handled()
+			return
+		if k.pressed:
+			# AUTO-REPEAT COUNTS. Holding backspace, an arrow or a letter
+			# has to keep going -- the editor is a text editor. Only the
+			# gamepad mapping below ignores repeats, so a held button in
+			# a game is still one press.
 			con.key_hits[code] = true
 			con.key_held[code] = true
 			if k.unicode >= 32 and k.unicode < 127:
 				con.text_typed += char(k.unicode)
-		elif not k.pressed:
+		else:
 			con.key_held.erase(code)
 		# an editor that is typing must not also be steering a d-pad
 		var typing: bool = shell != null and shell.edit != null \
 			and shell.state == ArcadeShell.S_EDIT and shell.edit.typing()
-		if not typing and KEY_MAP.has(code):
+		if not typing and KEY_MAP.has(code) and not k.echo:
 			con.btn_held[int(KEY_MAP[code])] = k.pressed
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion or event is InputEventMouseButton:
@@ -195,6 +210,10 @@ func _input(event: InputEvent) -> void:
 				con.mouse_down = mb.pressed
 				if mb.pressed:
 					_mouse_hit_latch = true
+			elif mb.button_index == MOUSE_BUTTON_RIGHT:
+				con.mouse_right = mb.pressed
+				if mb.pressed:
+					_mouse_right_latch = true
 			if shell != null and shell.edit != null \
 					and shell.state == ArcadeShell.S_EDIT:
 				shell.edit.wheel(mb)

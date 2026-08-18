@@ -502,7 +502,7 @@ end
 
 function update_them()
   ptime = ptime + 1
-  local sp = 2
+  local sp = 1.5
   if btn(0) then soul.x = soul.x - sp end
   if btn(1) then soul.x = soul.x + sp end
   if btn(2) then soul.y = soul.y - sp end
@@ -516,21 +516,21 @@ function update_them()
     -- rain from the top of the board
     for i = 1, 3 do
       local x = BX + 10 + rnd(BW - 20)
-      shots[#shots+1] = {x = x, y = BY - 4, vx = 0, vy = 1.7, r = 3, c = 53}
+      shots[#shots+1] = {x = x, y = BY - 4, vx = 0, vy = 1.1, r = 3, c = 53}
     end
   elseif kind == 1 and ptime % 20 == 0 then
     -- a spiral out of the middle
     for i = 0, 5 do
       local a = ptime * 0.08 + i * 1.05
       shots[#shots+1] = {x = BX + BW/2, y = BY + BH/2,
-        vx = cos(a) * 1.5, vy = sin(a) * 1.5, r = 3, c = 44}
+        vx = cos(a) * 0.95, vy = sin(a) * 0.95, r = 3, c = 44}
     end
   elseif kind == 2 and ptime % 26 == 0 then
     -- a wall with a gap you have to find
-    local gap = 20 + rnd(BW - 60)
+    local gap = 20 + rnd(BW - 70)
     for x = 4, BW - 4, 10 do
       if x < gap or x > gap + 34 then
-        shots[#shots+1] = {x = BX + x, y = BY - 4, vx = 0, vy = 2.2, r = 3, c = 29}
+        shots[#shots+1] = {x = BX + x, y = BY - 4, vx = 0, vy = 1.35, r = 3, c = 29}
       end
     end
   end
@@ -1123,11 +1123,11 @@ function _update()
     return
   end
   -- run: hold a direction to build speed, let go and it bleeds off
-  local acc = 0.42
+  local acc = 0.3
   if btn(1) then p.vx = p.vx + acc p.face = 1
   elseif btn(0) then p.vx = p.vx - acc p.face = -1
-  else p.vx = p.vx * 0.92 end
-  p.vx = mid(-7.5, p.vx, 7.5)
+  else p.vx = p.vx * 0.9 end
+  p.vx = mid(-5.2, p.vx, 5.2)
 
   -- jump with a real hold window, so a tap is a hop
   if btnp(4) and p.on then
@@ -1146,12 +1146,12 @@ function _update()
   p.dash_cd = max(0, p.dash_cd - 1)
   if btnp(5) and p.dash_cd <= 0 then
     p.dash = 10
-    p.dash_cd = 40
+    p.dash_cd = 50
     sfx(2)
   end
   if p.dash > 0 then
     p.dash = p.dash - 1
-    p.vx = p.face * 9
+    p.vx = p.face * 7
     for i = 1, 2 do
       sparks[#sparks + 1] = {x = p.x, y = p.y - rnd(12), vx = -p.face * rnd(2),
         vy = rnd(2) - 1, life = 14, c = 29}
@@ -1232,14 +1232,14 @@ function _draw()
   cls(255)
   camera(flr(cam), 0)
   for gx = flr(cam / 16) * 16, flr(cam) + W, 16 do
-    spr(7, gx, GROUND + 10)
-    spr(7, gx, GROUND + 26)
+    spr(7, gx, GROUND)
+    spr(7, gx, GROUND + 16)
   end
   for i = 1, #blocks do
     local b = blocks[i]
     if b.x > cam - 100 and b.x < cam + W + 40 then
-      -- crates stacked to the ground, sixteen pixels at a time
-      for ky = b.y, GROUND + 4, 16 do
+      -- crates stacked down to the ground line, sixteen at a time
+      for ky = b.y, GROUND - 8, 16 do
         for kx = b.x, b.x + b.w - 8, 16 do
           spr(6, flr(kx), flr(ky))
         end

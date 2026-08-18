@@ -10588,6 +10588,30 @@ func _arcade_test() -> void:
 	await get_tree().create_timer(0.6).timeout
 	print("ARCADE cabinet: parts=", cab.get_child_count(),
 		" needs_power=", cab.buf_cap > 0.0, " shelf=", cab.shell.carts.size())
+	# --- the menus have to answer the buttons. They did not: presses
+	# were only edge-detected inside a running cartridge.
+	cab.shell.take_over()
+	cab.shell._enter(ArcadeShell.S_MENU)
+	var before := cab.shell.sel
+	for i in 3:
+		cab.con.btn_held[ArcadeConsole.B_DOWN] = true
+		cab.con.poll_buttons()
+		cab.shell.update(1.0 / 60.0)
+		cab.con.end_frame()
+		cab.con.btn_held[ArcadeConsole.B_DOWN] = false
+		cab.con.poll_buttons()
+		cab.shell.update(1.0 / 60.0)
+		cab.con.end_frame()
+	print("ARCADE menu buttons: sel %d -> %d after three DOWN presses" % [
+		before, cab.shell.sel])
+	cab.con.btn_held[ArcadeConsole.B_A] = true
+	cab.con.poll_buttons()
+	cab.shell.update(1.0 / 60.0)
+	cab.con.end_frame()
+	cab.con.btn_held[ArcadeConsole.B_A] = false
+	for i in 20:
+		cab.shell.update(1.0 / 60.0)
+	print("ARCADE A on the shelf: state=%d (2 = it booted the cart)" % cab.shell.state)
 	# --- the attract loop plays the games to an empty room
 	for i in 30:
 		cab.shell.attract_step(0.08)
@@ -10916,6 +10940,16 @@ func _arcade_shots() -> void:
 	cab.install_board("expand")
 	await get_tree().create_timer(1.0).timeout
 	var dir := "res://docs/shots/"
+	# --- the pause menu: its text must stay inside its own panel
+	var pm := PauseMenu.new()
+	add_child(pm)
+	await get_tree().create_timer(0.4).timeout
+	if pm.has_method("_toggle"):
+		pm._toggle()
+	await get_tree().create_timer(0.5).timeout
+	await _shot(dir + "menu_pause.png")
+	pm.queue_free()
+	await get_tree().create_timer(0.3).timeout
 	# let the attract loop get into a game before the photograph
 	for i in 60:
 		cab.shell.attract_step(0.25)

@@ -24,6 +24,7 @@ Inventory="*res://Inventory.gd"
 Game="*res://Game.gd"
 Save="*res://Save.gd"
 Net="*res://Net.gd"
+UIGuard="*res://UIGuard.gd"
 
 [display]
 

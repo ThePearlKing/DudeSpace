@@ -79,6 +79,9 @@ var mouse_x: int = 0
 var mouse_y: int = 0
 var mouse_down: bool = false
 var mouse_hit: bool = false
+## Right button, tracked separately: in the editors it erases.
+var mouse_right: bool = false
+var mouse_right_hit: bool = false
 var key_hits: Dictionary = {}          # keycode -> true, one frame
 var key_held: Dictionary = {}
 var text_typed: String = ""            # unicode typed this frame
@@ -166,15 +169,30 @@ func _crash(msg: String) -> void:
 	crash_msg = msg
 	log_lines.append("!! " + msg)
 
+## Edge-detect the buttons for THIS frame. Called once a frame by
+## whatever is driving the console -- the shell needs presses in its
+## menus just as much as a cartridge needs them in a game, and this used
+## to happen inside step(), which only runs while a game is running.
+## That is why nothing in the menus responded.
+func poll_buttons() -> void:
+	for i in BTN_COUNT:
+		btn_hit[i] = btn_held[i] and not btn_prev[i]
+		btn_prev[i] = btn_held[i]
+
+## Clear the one-frame input latches. The driver calls this after
+## everything that wanted to read them has read them.
+func end_frame() -> void:
+	mouse_hit = false
+	mouse_right_hit = false
+	key_hits.clear()
+	text_typed = ""
+
 ## One frame of the cartridge: _update then _draw, both fenced.
 func step(delta: float) -> void:
 	if not running or crashed or vm == null:
 		return
 	run_time += delta
 	frame += 1
-	for i in BTN_COUNT:
-		btn_hit[i] = btn_held[i] and not btn_prev[i]
-		btn_prev[i] = btn_held[i]
 	vm.steps = 0
 	if vm.has_fn("_update"):
 		vm.call_global("_update")
@@ -188,9 +206,6 @@ func step(delta: float) -> void:
 		if vm.err != "":
 			_crash(vm.err)
 			return
-	mouse_hit = false
-	key_hits.clear()
-	text_typed = ""
 
 # ============================================================ the api
 ## Everything below is what a cartridge can call. The names are short on
@@ -469,8 +484,13 @@ func _api_btnp(a: Array) -> Array:
 	var i2 := _i(a, 0)
 	return [i2 >= 0 and i2 < BTN_COUNT and btn_hit[i2]]
 
+## The mouse, in the cartridge's own pixels. The console UI is always
+## 480x270; a game may not be, and handing it UI coordinates puts the
+## pointer somewhere the game never drew.
 func _api_mouse(a: Array) -> Array:
-	return [float(mouse_x), float(mouse_y), mouse_down, mouse_hit]
+	var gx := int(round(float(mouse_x) * float(game_w) / float(Pixel.UI_W)))
+	var gy := int(round(float(mouse_y) * float(game_h) / float(Pixel.UI_H)))
+	return [float(gx), float(gy), mouse_down, mouse_hit]
 
 func _api_key(a: Array) -> Array:
 	var k := LuaVM.tostr(a[0]) if a.size() > 0 else ""

@@ -59,7 +59,13 @@ func _init(c: ArcadeConsole) -> void:
 ## without this, a state that asks to leave every frame (the boot screen
 ## does) restarts its own wipe forever and never actually goes anywhere.
 func go(s: int) -> void:
-	if _wipe_dir != 0:
+	if _wipe_dir == 1:
+		# a wipe is already closing: take the newer destination rather
+		# than restarting the wipe (which never finishes) or dropping the
+		# request (which leaves you pressing buttons at a dead menu)
+		_next_state = s
+		return
+	if _wipe_dir == -1 and _next_state == s:
 		return
 	_next_state = s
 	_wipe_dir = 1
@@ -149,7 +155,7 @@ func update(delta: float) -> void:
 				pause_sel = 0
 				go(S_PAUSE)
 			else:
-				con.step(delta)
+				_run_cart(delta)
 		S_PAUSE:
 			_update_pause()
 		S_CRASH:
@@ -162,6 +168,26 @@ func update(delta: float) -> void:
 		S_EDIT:
 			if edit != null:
 				edit.update(delta)
+
+## A cartridge is written against sixty frames a second, so it gets
+## sixty frames a second whatever the host is running at. Stepping it
+## once per host frame made every game run at the monitor's speed --
+## on a fast machine that is nearly three times too fast, which is
+## exactly what it looked like.
+const CART_HZ := 60.0
+var _cart_acc: float = 0.0
+
+func _run_cart(delta: float) -> void:
+	_cart_acc += delta
+	var stepped := 0
+	while _cart_acc >= 1.0 / CART_HZ and stepped < 4:
+		_cart_acc -= 1.0 / CART_HZ
+		con.step(1.0 / CART_HZ)
+		stepped += 1
+		if con.crashed:
+			break
+	if _cart_acc > 0.5:
+		_cart_acc = 0.0          # a long stall does not become fast-forward
 
 func _any_start() -> bool:
 	return _hit(ArcadeConsole.B_A) or _hit(ArcadeConsole.B_START) \

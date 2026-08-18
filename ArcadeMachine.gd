@@ -364,8 +364,10 @@ func _process(delta: float) -> void:
 		return
 	var step := _attract_t
 	_attract_t = 0.0
+	con.poll_buttons()
 	shell.attract_step(step)
 	shell.draw()
+	con.end_frame()
 	_push_screen()
 	if _marquee:
 		var m := _marquee.material_override as StandardMaterial3D

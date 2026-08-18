@@ -177,9 +177,9 @@ func update(delta: float) -> void:
 		_set_tab(T_MAP)
 	if con.key_hits.has(KEY_F4):
 		_set_tab(T_SOUND)
-	if con.key_hits.has(KEY_F6):
-		_set_tab(T_INFO)
 	if con.key_hits.has(KEY_F5):
+		_set_tab(T_INFO)
+	if con.key_hits.has(KEY_F6):
 		_run()
 		return
 	if con.key_hits.has(KEY_ESCAPE):
@@ -367,6 +367,12 @@ func _sprite_mouse() -> void:
 		return
 	var px := (mx - r.position.x) / spr_zoom
 	var py := (my - r.position.y) / spr_zoom
+	# right button rubs pixels out, whatever tool is selected
+	if con.mouse_right:
+		if con.mouse_right_hit:
+			_push_undo()
+		_spr_set(px, py, 0)
+		return
 	if not con.mouse_down:
 		if _spr_drag and spr_tool == 2 and _line_from.x >= 0:
 			_stroke_line(_line_from, Vector2i(px, py))
@@ -473,10 +479,10 @@ func _update_map() -> void:
 		return
 	var r := _map_rect()
 	var mp := Vector2i(con.mouse_x, con.mouse_y)
-	if con.mouse_down and r.has_point(mp):
+	if r.has_point(mp) and (con.mouse_down or con.mouse_right):
 		var tx := map_cam.x + (mp.x - r.position.x) / map_zoom
 		var ty := map_cam.y + (mp.y - r.position.y) / map_zoom
-		cart.mset(tx, ty, map_tile)
+		cart.mset(tx, ty, 0 if con.mouse_right else map_tile)
 	var gr := _sheet_rect()
 	if con.mouse_down and gr.has_point(mp):
 		map_tile = clampi(((mp.y - gr.position.y) / 11) * 16
@@ -574,8 +580,8 @@ func _draw_frame(u) -> void:
 	var glide := int(round(_tab_glide * float(tab_w)))
 	u.rectfill(8 + glide, 2, 8 + glide + tab_w - 4, 19, Pixel.dark(11))
 	u.hline(8 + glide, 8 + glide + tab_w - 4, 20, Pixel.hue(4))
-	# F5 is RUN, so the tabs are F1-F4 and F6
-	var keys := ["F1", "F2", "F3", "F4", "F6"]
+	# one function key per tab, in order, and RUN takes the next one
+	var keys := ["F1", "F2", "F3", "F4", "F5"]
 	for i in TABS.size():
 		var x := 8 + i * tab_w
 		var on := i == tab
@@ -583,7 +589,7 @@ func _draw_frame(u) -> void:
 			Pixel.WHITE if on else Pixel.hue(23),
 			PixelFont.BOLD if on else PixelFont.SYS)
 		PixelFont.draw(u, str(keys[i]), x + 8, 15, Pixel.dark(23))
-	PixelFont.draw(u, "F5 RUN", 8 + TABS.size() * tab_w + 6, 11,
+	PixelFont.draw(u, "F6 RUN", 8 + TABS.size() * tab_w + 6, 11,
 		Pixel.light(4) if fmod(t, 1.2) < 0.6 else Pixel.hue(4))
 	# running highlight
 	var sweep := int(fmod(t * 90.0, float(Pixel.UI_W)))
@@ -601,13 +607,13 @@ func _draw_status(u) -> void:
 	var hint := ""
 	match tab:
 		T_CODE:
-			hint = "F5 RUN   ESC SHELF   ln %d/%d  col %d" % [cur_l + 1,
+			hint = "F6 RUN   ESC SHELF   ln %d/%d  col %d" % [cur_l + 1,
 				lines.size(), cur_c + 1]
 		T_SPRITE:
-			hint = "1-4 TOOL (%s)   CTRL+Z UNDO   SPRITE %d   COLOUR %d" % [
+			hint = "1-4 TOOL (%s)   RIGHT-CLICK ERASES   CTRL+Z UNDO   SPR %d   COL %d" % [
 				TOOLS[spr_tool], spr_sel, spr_color]
 		T_MAP:
-			hint = "DRAG TO PAINT   ARROWS SCROLL   TILE %d   %d,%d" % [
+			hint = "DRAG PAINTS, RIGHT-CLICK CLEARS   ARROWS SCROLL   TILE %d   %d,%d" % [
 				map_tile, map_cam.x, map_cam.y]
 		T_INFO:
 			hint = "ENTER edit   ARROWS pick   %s" % (
@@ -1265,4 +1271,4 @@ func _draw_info(u) -> void:
 	for i in 8:
 		u.blit(cart.sheet, ArcadeCart.SHEET_W, ArcadeCart.spr_x(i),
 			ArcadeCart.spr_y(i), 16, 16, px + 8 + i * 20, 168)
-	PixelFont.draw(u, "F5 runs it, ESC goes back", px + 8, 200, Pixel.dark(23))
+	PixelFont.draw(u, "F6 runs it, ESC goes back", px + 8, 200, Pixel.dark(23))
