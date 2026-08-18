@@ -35,6 +35,20 @@ func apply_scale(k: float) -> void:
 	BOUNDARY = 95000.0 * k
 
 func _ready() -> void:
+	# OPT-IN quiet runs: CTD_QUIET=1 puts the window small, cornered and
+	# unfocusable from the first frame -- autoloads run before the first
+	# scene, so it covers the loading screen too. Without the variable
+	# nothing here happens and the game launches exactly as always.
+	if OS.get_environment("CTD_QUIET") != "":
+		var qw := get_window()
+		if qw != null:
+			qw.mode = Window.MODE_WINDOWED
+			qw.size = Vector2i(960, 540)
+			var sc := DisplayServer.screen_get_size()
+			qw.position = Vector2i(maxi(0, sc.x - 980), maxi(0, sc.y - 620))
+			qw.unfocusable = true
+			qw.always_on_top = false
+			qw.set_flag(Window.FLAG_NO_FOCUS, true)
 	_def("Yorox",    Vector3(-6500, 5200, -7000), 380.0, 25.0, "sun",    Color("#ffdd55"))
 	_def("Home",     Vector3(0, 0, 0),           46.0,  5.0,  "home",    Color("#3a1d6e"))
 	_def("Circuitia",Vector3(0, 0, 4200),        95.0,  9.0,  "circuit", Color("#0e3b2e"))

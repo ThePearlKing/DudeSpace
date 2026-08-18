@@ -158,11 +158,14 @@ func _step_ent(e, _dt: float) -> void:
 	vx = clampf(vx, -mx, mx)
 	vy = clampf(vy, -my, my)
 	sf(e, "grounded", false)
+	# the new velocity goes ON the object BEFORE it moves: writing it back
+	# afterwards read the old value and wrote it straight back, which
+	# threw gravity away every frame and left everything drifting
+	sf(e, "vx", vx)
+	sf(e, "vy", vy)
 	# move on each axis separately, so a slide along a wall still slides
 	_move_axis(e, vx, 0.0)
-	_move_axis(e, 0.0, vy)
-	sf(e, "vx", gf(e, "vx", vx))
-	sf(e, "vy", gf(e, "vy", vy))
+	_move_axis(e, 0.0, gf(e, "vy", vy))
 
 func _move_axis(e, dx: float, dy: float) -> void:
 	if dx == 0.0 and dy == 0.0:

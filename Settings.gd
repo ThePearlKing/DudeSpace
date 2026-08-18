@@ -55,6 +55,19 @@ func sfx_db() -> float:
 	return linear_to_db(clampf(sfx_vol, 0.0005, 1.0))
 
 func _ready() -> void:
+	# A test run must never take the screen. Autoloads run before the
+	# first scene, so this lands ahead of the loading screen instead of
+	# after it: small, in a corner, behind whatever you are watching.
+	if OS.get_environment("CTD_TEST") != "":
+		var w := get_window()
+		if w != null:
+			w.mode = Window.MODE_WINDOWED
+			w.size = Vector2i(960, 540)
+			var sc := DisplayServer.screen_get_size()
+			w.position = Vector2i(maxi(0, sc.x - 980), maxi(0, sc.y - 620))
+			w.unfocusable = true
+			w.always_on_top = false
+			w.set_flag(Window.FLAG_NO_FOCUS, true)
 	var cf := ConfigFile.new()
 	if cf.load(CFG_PATH) == OK:
 		mouse_sensitivity = float(cf.get_value("opts", "sens", mouse_sensitivity))

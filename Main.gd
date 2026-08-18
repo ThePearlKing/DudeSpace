@@ -288,7 +288,8 @@ func _boot() -> void:
 	_monolith_snap()
 	# deterministic world-gen: same save, same Earth, every single time
 	seed(Game.world_seed)
-	if OS.get_environment("CTD_TEST") != "":
+	if OS.get_environment("CTD_QUIET") != "":
+		_quiet_test_window()
 		Save.ephemeral = true   # test rigs NEVER touch real saves again
 	if OS.get_environment("CTD_TEST") == "1":
 		_self_test()
@@ -10708,6 +10709,17 @@ func _arcade_test() -> void:
 	print("ARCADE fonts: ", PixelFont.NAMES)
 	print("ARCADE resolutions: ", ArcadeConsole.RES_MODES.map(
 		func(m): return "%s %dx%d" % [m["name"], m["w"], m["h"]]))
+	# --- ENGINE KIT: is the player where the player should be?
+	var kit: ArcadeCart = ArcadeCarts.shelf()[0]
+	var kcon := ArcadeConsole.new()
+	kcon.boot(kit)
+	for i in 90:
+		kcon.step(1.0 / 60.0)
+	var kp = kcon.vm.G.rawget("p")
+	print("ARCADE kit player: x=%.0f y=%.0f spr=%.0f grounded=%s ents=%d crash=%s" % [
+		ArcadeEngine.gf(kp, "x", -1), ArcadeEngine.gf(kp, "y", -1),
+		ArcadeEngine.gf(kp, "spr", -1), LuaVM.tostr(ArcadeEngine.gb(kp, "grounded", false)),
+		kcon.eng.ents.size(), kcon.crash_msg])
 	# --- the ENGINE: does an object actually fall, land and collide?
 	var ek := ArcadeCart.blank("ENGTEST")
 	ek.fset(6, 0, true)
@@ -11011,16 +11023,9 @@ func _arcade_shots() -> void:
 	cab.install_board("expand")
 	await get_tree().create_timer(1.0).timeout
 	var dir := "res://docs/shots/"
-	# --- the pause menu: its text must stay inside its own panel
-	var pm := PauseMenu.new()
-	add_child(pm)
-	await get_tree().create_timer(0.4).timeout
-	if pm.has_method("_toggle"):
-		pm._toggle()
-	await get_tree().create_timer(0.5).timeout
-	await _shot(dir + "menu_pause.png")
-	pm.queue_free()
-	await get_tree().create_timer(0.3).timeout
+	# (the game's own pause menu is NOT opened here: toggling it pauses
+	# the tree, which stops the arcade updating and photographs a blank
+	# screen -- that cost an hour once already)
 	# let the attract loop get into a game before the photograph
 	for i in 60:
 		cab.shell.attract_step(0.25)
@@ -11157,3 +11162,20 @@ func _deep_parts(n: Node) -> int:
 			c += 1
 		c += _deep_parts(ch)
 	return c
+
+
+## OPT-IN, never automatic: launch with CTD_QUIET=1 and the window goes
+## in a corner, small, and refuses focus -- for running probes while
+## somebody is watching something else on the same screen. Without the
+## variable the game launches exactly as it always did.
+func _quiet_test_window() -> void:
+	var w := get_window()
+	if w == null:
+		return
+	w.mode = Window.MODE_WINDOWED
+	w.size = Vector2i(960, 540)
+	var screen := DisplayServer.screen_get_size()
+	w.position = Vector2i(maxi(0, screen.x - 980), maxi(0, screen.y - 600))
+	w.set_flag(Window.FLAG_NO_FOCUS, true)
+	w.always_on_top = false
+	w.unfocusable = true

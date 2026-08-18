@@ -470,7 +470,7 @@ func _draw_run_overlay(u) -> void:
 				Pixel.UI_H - 22, Pixel.light(4), PixelFont.BOLD,
 				PixelFont.SHADOW, Pixel.BLACK)
 		PixelFont.draw(u, str(carts[sel].name) if sel < carts.size() else "",
-			8, 8, Pixel.hue(23))
+			8, Pixel.UI_H - 32, Pixel.hue(23))
 		return
 	# nothing over the top of a running game except a fading hint
 	if t < 2.0:

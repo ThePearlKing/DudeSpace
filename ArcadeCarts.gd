@@ -341,25 +341,24 @@ function H() local w, h = res() return h end
 # ---------------------------------------------------------------------
 static func _voidwing() -> ArcadeCart:
 	return _cart("VOIDWING", "hangar 7", """
--- VOIDWING -- hold the line over the rift.
--- arrows move, Z fires, X drops a pulse (three of them, use them well)
+-- VOIDWING -- five stages, a boss at the end of each, and a gun that
+-- runs hot. Arrows fly, Z fires (tap it), X spends a pulse.
 
 W, H = res()
 
 function _init()
-  ship = {x = W/2, y = H - 40, cool = 0, hp = 3, inv = 0, pulses = 3}
-  shots, foes, bits, pops = {}, {}, {}, {}
-  score, wave, wave_t, shake, over, best = 0, 0, 0, 0, false, dget(0)
-  rift, rift_max, leak_t = 100, 100, 0
+  ship = {x = W/2, y = H - 40, cool = 0, hp = 3, inv = 0, pulses = 3, gun = 1}
+  shots, foes, bits, pops, ebullets, drops = {}, {}, {}, {}, {}, {}
+  score, best, over = 0, dget(0), false
+  stage, wave, wave_t, waves_left = 1, 0, 90, 4
+  boss, shake, banner, banner_t = nil, 0, "STAGE 1", 120
+  heat, locked, extra_at = 0, 0, 5000
   stars = {}
-  for i = 1, 70 do
-    add_star(rnd(H))
-  end
+  for i = 1, 70 do add_star(rnd(H)) end
 end
 
 function add_star(y)
-  local layer = flr(rnd(3)) + 1
-  stars[#stars + 1] = {x = rnd(W), y = y, l = layer}
+  stars[#stars + 1] = {x = rnd(W), y = y, l = flr(rnd(3)) + 1}
 end
 
 function _update()
@@ -368,17 +367,32 @@ function _update()
     return
   end
   shake = max(0, shake - 1)
-  leak_t = max(0, leak_t - 1)
+  banner_t = max(0, banner_t - 1)
   ship.inv = max(0, ship.inv - 1)
-
-  -- stars keep falling whatever else is happening
   for i = 1, #stars do
     local s = stars[i]
     s.y = s.y + s.l * 0.6
     if s.y > H then s.y = 0 s.x = rnd(W) end
   end
 
-  -- flying
+  fly()
+  gun()
+  run_shots()
+  run_wave()
+  run_foes()
+  if boss then run_boss() end
+  run_ebullets()
+  run_drops()
+  run_bits()
+
+  if score >= extra_at then
+    extra_at = extra_at + 5000
+    ship.hp = min(5, ship.hp + 1)
+    sfx(7)
+  end
+end
+
+function fly()
   local sp = 2.4
   if btn(0) then ship.x = ship.x - sp end
   if btn(1) then ship.x = ship.x + sp end
@@ -386,57 +400,114 @@ function _update()
   if btn(3) then ship.y = ship.y + sp end
   ship.x = mid(8, ship.x, W - 8)
   ship.y = mid(20, ship.y, H - 10)
+end
 
-  -- guns
+-- THE GUN RUNS HOT. Held down it locks; tapped, it never does.
+function gun()
   ship.cool = max(0, ship.cool - 1)
-  if btn(4) and ship.cool <= 0 then
-    ship.cool = 6
-    shots[#shots + 1] = {x = ship.x - 5, y = ship.y - 6, vy = -6}
-    shots[#shots + 1] = {x = ship.x + 5, y = ship.y - 6, vy = -6}
+  locked = max(0, locked - 1)
+  if btn(4) and ship.cool <= 0 and locked <= 0 then
+    ship.cool = 6 - min(2, ship.gun)
+    if ship.gun >= 1 then
+      shots[#shots+1] = {x = ship.x - 5, y = ship.y - 6, vx = 0, vy = -6}
+      shots[#shots+1] = {x = ship.x + 5, y = ship.y - 6, vx = 0, vy = -6}
+    end
+    if ship.gun >= 2 then
+      shots[#shots+1] = {x = ship.x, y = ship.y - 10, vx = 0, vy = -7}
+    end
+    if ship.gun >= 3 then
+      shots[#shots+1] = {x = ship.x - 7, y = ship.y - 4, vx = -1.6, vy = -5.4}
+      shots[#shots+1] = {x = ship.x + 7, y = ship.y - 4, vx = 1.6, vy = -5.4}
+    end
+    heat = heat + 0.075
     sfx(0)
+    if heat >= 1 then heat, locked = 1, 70 sfx(2) end
+  else
+    heat = max(0, heat - (locked > 0 and 0.014 or 0.009))
   end
   if btnp(5) and ship.pulses > 0 then
     ship.pulses = ship.pulses - 1
     shake = 12
-    for i = #foes, 1, -1 do
-      kill_foe(i, false)
-    end
+    for i = #foes, 1, -1 do kill_foe(i, false) end
+    ebullets, heat, locked = {}, 0, 0
+    if boss then boss.hp = boss.hp - 40 end
     sfx(2)
   end
+end
 
+function run_shots()
   for i = #shots, 1, -1 do
     local s = shots[i]
+    s.x = s.x + s.vx
     s.y = s.y + s.vy
-    if s.y < -4 then table.remove(shots, i) end
+    if s.y < -4 or s.x < -4 or s.x > W + 4 then
+      table.remove(shots, i)
+    elseif boss and abs(s.x - boss.x) < boss.r and abs(s.y - boss.y) < boss.r then
+      table.remove(shots, i)
+      boss.hp = boss.hp - 1
+      boss.flash = 3
+      if boss.hp <= 0 then beat_boss() end
+    end
   end
+end
 
-  -- waves arrive on a timer that tightens as you survive
+-- stages: four waves, then whatever is guarding the way out
+function run_wave()
+  if boss then return end
   wave_t = wave_t - 1
-  if wave_t <= 0 then
-    wave = wave + 1
-    wave_t = max(30, 90 - wave * 3)
-    spawn_wave()
+  if wave_t > 0 then return end
+  if waves_left <= 0 then
+    spawn_boss()
+    return
   end
+  waves_left = waves_left - 1
+  wave = wave + 1
+  wave_t = max(50, 110 - stage * 8)
+  local shape = wave % 4
+  local n = 3 + stage
+  for i = 1, n do
+    local x, y, vy, sway = 0, 0, 0.7 + stage * 0.1, 0.4
+    if shape == 0 then                 -- a line, straight down
+      x, y = (W / (n + 1)) * i, -10 - i * 8
+    elseif shape == 1 then             -- a V, so the middle is not safe
+      x = W/2 + (i - (n + 1) / 2) * 26
+      y = -10 - abs(i - (n + 1) / 2) * 12
+      sway = 1.1
+    elseif shape == 2 then             -- in from the left, curving down
+      x, y = -10 - i * 18, 30 + i * 12
+      sway = 2.2
+    else                               -- in from the right
+      x, y = W + 10 + i * 18, 30 + i * 12
+      sway = -2.2
+    end
+    foes[#foes+1] = {x = x, y = y, vy = vy, sway = sway, seed = rnd(6), t = 0,
+      r = 7, hp = 1 + flr(stage / 3), c = 2 + ((stage + i) % 20) * 3,
+      side = (shape >= 2), fuse = 60 + rnd(80) - stage * 4}
+  end
+end
 
+function run_foes()
   for i = #foes, 1, -1 do
     local f = foes[i]
     f.t = f.t + 1
-    f.y = f.y + f.vy
-    f.x = f.x + sin(f.t / 18 + f.seed) * f.sway
-    if f.hunt > 0 then
-      f.x = f.x + mid(-1.3, (ship.x - f.x) * f.hunt, 1.3)
-    end
-    if f.y > H + 10 then
-      -- whatever you let past tears at the rift you are stood over
-      table.remove(foes, i)
-      rift = rift - 9
-      shake = 10
-      leak_t = 40
-      sfx(1)
-      if rift <= 0 then
-        over = true
-        if score > best then best = score dset(0, score) end
+    if f.side then
+      -- side entries fly in, then turn and dive
+      f.x = f.x + f.sway
+      f.y = f.y + f.vy * 0.4
+      if (f.sway > 0 and f.x > W * 0.35) or (f.sway < 0 and f.x < W * 0.65) then
+        f.side = false
       end
+    else
+      f.y = f.y + f.vy
+      f.x = f.x + sin(f.t / 18 + f.seed) * f.sway
+    end
+    f.fuse = f.fuse - 1
+    if f.fuse <= 0 and f.y > 0 and f.y < H - 60 then
+      f.fuse = 70 + rnd(70) - stage * 5
+      shoot_at(f.x, f.y + f.r, 1.4 + stage * 0.12)
+    end
+    if f.y > H + 12 or f.x < -40 or f.x > W + 40 then
+      table.remove(foes, i)
     else
       for j = #shots, 1, -1 do
         local s = shots[j]
@@ -453,7 +524,51 @@ function _update()
       end
     end
   end
+end
 
+function shoot_at(x, y, sp)
+  local dx, dy = ship.x - x, ship.y - y
+  local d = max(1, sqrt(dx*dx + dy*dy))
+  ebullets[#ebullets+1] = {x = x, y = y, vx = dx/d*sp, vy = dy/d*sp}
+  sfx(6)
+end
+
+function run_ebullets()
+  for i = #ebullets, 1, -1 do
+    local b = ebullets[i]
+    b.x = b.x + b.vx
+    b.y = b.y + b.vy
+    if b.x < -6 or b.x > W + 6 or b.y < -6 or b.y > H + 6 then
+      table.remove(ebullets, i)
+    elseif ship.inv <= 0 and abs(b.x - ship.x) < 6 and abs(b.y - ship.y) < 7 then
+      table.remove(ebullets, i)
+      hurt()
+    end
+  end
+end
+
+-- guns get better by picking things up, and worse when you are hit
+function run_drops()
+  for i = #drops, 1, -1 do
+    local d = drops[i]
+    d.y = d.y + 1.1
+    d.t = d.t + 1
+    if d.y > H + 8 then
+      table.remove(drops, i)
+    elseif abs(d.x - ship.x) < 10 and abs(d.y - ship.y) < 10 then
+      table.remove(drops, i)
+      if d.kind == 1 then
+        ship.gun = min(3, ship.gun + 1)
+      else
+        ship.pulses = min(5, ship.pulses + 1)
+      end
+      score = score + 50
+      sfx(3)
+    end
+  end
+end
+
+function run_bits()
   for i = #bits, 1, -1 do
     local b = bits[i]
     b.x = b.x + b.vx
@@ -469,44 +584,85 @@ function _update()
   end
 end
 
-function spawn_wave()
-  local n = 3 + flr(wave / 2)
-  if n > 9 then n = 9 end
-  local kind = wave % 4
-  for i = 1, n do
-    local x = (W / (n + 1)) * i
-    foes[#foes + 1] = {
-      x = x, y = -10 - i * 6, vy = 0.7 + wave * 0.05,
-      sway = (kind == 1) and 1.4 or 0.4, seed = rnd(6), t = 0,
-      r = (kind == 3) and 9 or 6, hp = (kind == 3) and 3 or 1,
-      -- every third wave HUNTS: it steers at wherever you have parked,
-      -- so sitting in a corner picking them off stops being a plan
-      hunt = (kind == 2) and (0.05 + wave * 0.004) or 0,
-      c = 2 + (wave % 20) * 3
-    }
+function kill_foe(i, scored)
+  local f = foes[i]
+  for k = 1, 8 do
+    bits[#bits+1] = {x = f.x, y = f.y, vx = rnd(4) - 2, vy = rnd(3) - 2,
+      life = 20 + rnd(10), c = f.c}
+  end
+  pops[#pops+1] = {x = f.x, y = f.y, r = 2, life = 8}
+  table.remove(foes, i)
+  if scored then
+    score = score + 10 * stage
+    if rnd(1) < 0.12 then
+      drops[#drops+1] = {x = f.x, y = f.y, t = 0, kind = rnd(1) < 0.7 and 1 or 2}
+    end
+  end
+  sfx(1)
+end
+
+-- the thing at the end of a stage
+function spawn_boss()
+  boss = {x = W/2, y = 46, r = 22, hp = 60 + stage * 40, max = 60 + stage * 40,
+    t = 0, flash = 0, phase = 1}
+  banner, banner_t = "SOMETHING BIG", 90
+  sfx(2)
+end
+
+function run_boss()
+  boss.t = boss.t + 1
+  boss.flash = max(0, boss.flash - 1)
+  boss.phase = boss.hp < boss.max * 0.4 and 2 or 1
+  boss.x = W/2 + sin(boss.t / (boss.phase == 2 and 26 or 44)) * (W * 0.32)
+  boss.y = 46 + sin(boss.t / 37) * 12
+  -- phase one aims at you; phase two sprays as well
+  if boss.t % max(14, 34 - stage * 3) == 0 then
+    shoot_at(boss.x, boss.y + boss.r, 1.6 + stage * 0.1)
+  end
+  if boss.phase == 2 and boss.t % 50 == 0 then
+    for a = 0, 7 do
+      local ang = a * 0.78 + boss.t * 0.01
+      ebullets[#ebullets+1] = {x = boss.x, y = boss.y,
+        vx = cos(ang) * 1.5, vy = sin(ang) * 1.5}
+    end
+  end
+  if boss.t % 90 == 0 then
+    foes[#foes+1] = {x = boss.x, y = boss.y + 20, vy = 1.2, sway = 1.0,
+      seed = rnd(6), t = 0, r = 7, hp = 1, c = 47, side = false,
+      fuse = 50 + rnd(40)}
+  end
+  if ship.inv <= 0 and abs(ship.x - boss.x) < boss.r
+      and abs(ship.y - boss.y) < boss.r then
+    hurt()
   end
 end
 
-function kill_foe(i, scored)
-  local f = foes[i]
-  if scored then
-    score = score + 10 * f.r
+function beat_boss()
+  for k = 1, 40 do
+    bits[#bits+1] = {x = boss.x, y = boss.y, vx = rnd(8) - 4, vy = rnd(8) - 4,
+      life = 30 + rnd(20), c = 2 + flr(rnd(20)) * 3}
   end
-  for k = 1, 8 do
-    bits[#bits + 1] = {x = f.x, y = f.y, vx = rnd(4) - 2, vy = rnd(3) - 2,
-      life = 20 + rnd(10), c = f.c}
+  score = score + 500 * stage
+  boss = nil
+  stage = stage + 1
+  waves_left = 4
+  wave_t = 120
+  ship.pulses = min(5, ship.pulses + 1)
+  banner, banner_t = "STAGE " .. stage, 110
+  ebullets = {}
+  sfx(7)
+  if stage > 5 then
+    over = true
+    if score > best then best = score dset(0, score) end
   end
-  pops[#pops + 1] = {x = f.x, y = f.y, r = 2, life = 8}
-  table.remove(foes, i)
-  score = score + 10
-  sfx(1)
 end
 
 function hurt()
   ship.hp = ship.hp - 1
   ship.inv = 90
+  ship.gun = max(1, ship.gun - 1)
   shake = 16
-  sfx(3)
+  sfx(5)
   if ship.hp <= 0 then
     over = true
     if score > best then best = score dset(0, score) end
@@ -518,57 +674,60 @@ function _draw()
   if shake > 0 then ox = rnd(shake) - shake/2 oy = rnd(shake) - shake/2 end
   camera(flr(ox), flr(oy))
   cls(0)
-  -- starfield, three depths, three greys
   for i = 1, #stars do
     local s = stars[i]
     pset(flr(s.x), flr(s.y), s.l == 3 and 1 or (s.l == 2 and 73 or 72))
   end
-  -- the rift you are defending, and how much of it is left
   rectfill(0, H - 6, W, H, 41)
   rectfill(0, H - 4, W, H, 44)
-  rectfill(0, H - 6, flr(W * max(0, rift) / rift_max), H - 4, 29)
 
+  if boss then draw_boss() end
   for i = 1, #foes do
     local f = foes[i]
-    local x, y = flr(f.x), flr(f.y)
-    -- the hulks are the big ones; everything else flies a fighter
-    spr(f.hp > 1 and 2 or 1, x - 8, y - 8)
+    spr(f.hp > 1 and 2 or 1, flr(f.x) - 8, flr(f.y) - 8)
+  end
+  for i = 1, #drops do
+    local d = drops[i]
+    local c = d.kind == 1 and 20 or 29
+    circfill(flr(d.x), flr(d.y), 5, c)
+    circfill(flr(d.x), flr(d.y), 3, 1)
+    print(d.kind == 1 and "G" or "P", flr(d.x) - 2, flr(d.y) - 3, 0)
+  end
+  for i = 1, #ebullets do
+    local b = ebullets[i]
+    circfill(flr(b.x), flr(b.y), 2, 53)
+    pset(flr(b.x), flr(b.y), 1)
   end
   for i = 1, #shots do
     local s = shots[i]
     rectfill(flr(s.x), flr(s.y), flr(s.x) + 1, flr(s.y) + 4, 14)
-    pset(flr(s.x), flr(s.y) - 1, 1)
   end
   for i = 1, #bits do
-    local b = bits[i]
-    pset(flr(b.x), flr(b.y), b.c)
+    pset(flr(bits[i].x), flr(bits[i].y), bits[i].c)
   end
   for i = 1, #pops do
-    local o = pops[i]
-    if o.life > 4 then spr(3, flr(o.x) - 8, flr(o.y) - 8) end
-    circ(flr(o.x), flr(o.y), o.r, 1)
+    circ(flr(pops[i].x), flr(pops[i].y), pops[i].r, 1)
   end
-
   if ship.inv <= 0 or frames() % 6 < 3 then draw_ship() end
 
   camera(0, 0)
   print("SCORE " .. score, 6, 6, 1)
-  print("BEST " .. best, W - 80, 6, 71)
-  for i = 1, ship.hp do
-    circfill(8 + i * 10, 18, 3, 2)
+  print("BEST " .. best, W - 82, 6, 71)
+  print("STAGE " .. min(stage, 5) .. "-" .. (4 - waves_left), W/2 - 26, 6, 32)
+  for i = 1, ship.hp do circfill(10 + i * 10, 20, 3, 2) end
+  for i = 1, ship.pulses do rectfill(W - 18 - i * 8, 16, W - 14 - i * 8, 24, 29) end
+  print("GUN " .. ship.gun, 6, 30, 20)
+  rect(W/2 - 22, 16, W/2 + 22, 22, 71)
+  rectfill(W/2 - 21, 17, W/2 - 21 + flr(42 * heat), 21,
+    locked > 0 and 2 or (heat > 0.7 and 8 or 29))
+  if locked > 0 then printc("OVERHEATED", W/2, 26, 2, 1) end
+  if banner_t > 0 then
+    printc(banner, W/2, H/2 - 30, 14, 5)
   end
-  for i = 1, ship.pulses do
-    rectfill(W - 20 - i * 8, 15, W - 15 - i * 8, 20, 29)
-  end
-  print("WAVE " .. wave, W/2 - 20, 6, 32)
-  print("RIFT " .. max(0, flr(rift)) .. "%", W/2 - 20, 18, rift < 40 and 2 or 32)
-  if leak_t > 0 then
-    printc("SOMETHING GOT THROUGH", W/2, H - 22, 2, 1)
-  end
-
   if over then
     rectfill(0, H/2 - 30, W, H/2 + 26, 0)
-    printc("THE RIFT TAKES IT", W/2, H/2 - 22, 2, 5)
+    printc(stage > 5 and "THE RIFT CLOSES" or "THE RIFT TAKES IT",
+      W/2, H/2 - 22, stage > 5 and 20 or 2, 5)
     printc("score " .. score, W/2, H/2 + 2, 1, 1)
     if frames() % 60 < 34 then
       printc("Z TO FLY AGAIN", W/2, H/2 + 14, 14, 0)
@@ -576,16 +735,30 @@ function _draw()
   end
 end
 
+function draw_boss()
+  local x, y = flr(boss.x), flr(boss.y)
+  local c = boss.flash > 0 and 1 or 47
+  circfill(x, y, boss.r, c)
+  circfill(x, y, boss.r - 6, boss.phase == 2 and 2 or 44)
+  for a = 0, 5 do
+    local ang = a * 1.05 + boss.t * 0.02
+    circfill(flr(x + cos(ang) * (boss.r + 5)), flr(y + sin(ang) * (boss.r + 5)),
+      3, 49)
+  end
+  circfill(x - 7, y - 4, 3, 1)
+  circfill(x + 7, y - 4, 3, 1)
+  rect(W/2 - 60, 34, W/2 + 60, 40, 71)
+  rectfill(W/2 - 59, 35, W/2 - 59 + flr(118 * max(0, boss.hp) / boss.max), 39, 2)
+end
+
 function draw_ship()
   local x, y = flr(ship.x), flr(ship.y)
   spr(0, x - 8, y - 8)
-  -- engine flare, flickering, drawn under the hull
   local f = 3 + flr(rnd(3))
   tri(x - 3, y + 6, x + 3, y + 6, x, y + 6 + f, 8)
   tri(x - 1, y + 6, x + 1, y + 6, x, y + 6 + f + 2, 14)
 end
 """)
-
 
 # ---------------------------------------------------------------------
 static func _soulboard() -> ArcadeCart:
