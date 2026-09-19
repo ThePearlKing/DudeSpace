@@ -22,7 +22,60 @@ var _lights: Array = []
 var _panels: Array = []
 var _t: float = 0.0
 
+## WHICH STATION THIS IS. Sloom has its own, and it is not this one
+## moved -- it is shorter, dirtier and greener, built by whoever was
+## out there rather than by whoever built this. Same bones, so you know
+## what it is; nothing else the same, so you know where you are.
+var variant: String = "milky"
+var n_mod: int = N_MOD
+var _hull_a := Color("#d8dce4")
+var _hull_b := Color("#b9c2cc")
+var _trim := Color("#8f98a4")
+var _rail := Color("#f2b13c")
+var _glass := Color("#ffe9a8")
+var _accent := Color("#7be8ff")
+var _wings: int = 4
+var _title := "NEXUS STATION"
+var _sub := "zero g · deep-space relay · claim a frequency"
+
+## Where a visitor stands on arrival, relative to the station's origin:
+## just off the docking port at the foot of the spine, clear of the
+## petals. Static, because the jump has to know where it is putting you
+## in a galaxy whose station does not exist yet.
+static func dock_offset(v: String) -> Vector3:
+	var nm := 4 if v == "sloom" else N_MOD
+	return Vector3(0, -(float(nm) * H_MOD + float(nm - 1) * H_COLLAR) * 0.5
+		- 4.1, 0)
+
+## The colour this station answers to: beacon, sign, jump console.
+func accent() -> Color:
+	return _accent
+
+## Y of the docking deck, in station space. Anything bolted to the dock
+## (the jump console) is placed off this rather than a magic number.
+func deck_y() -> float:
+	return -(float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5 - 1.9
+
+func _apply_variant() -> void:
+	if variant != "sloom":
+		return
+	# SLOOM RELAY. Four modules, not five. Hull gone green at the seams
+	# from thirty years of somebody else's weather, rails in cold white
+	# instead of hazard amber, three wings because the fourth is a stub,
+	# and lamps that burn the colour of the star it sits under.
+	n_mod = 4
+	_hull_a = Color("#b6c0ae")
+	_hull_b = Color("#93a189")
+	_trim = Color("#6f7d68")
+	_rail = Color("#d6e2cf")
+	_glass = Color("#ffd2a0")
+	_accent = Color("#a8e83a")
+	_wings = 3
+	_title = "SLOOM RELAY"
+	_sub = "zero g · far side of the jump · nobody answers"
+
 func _ready() -> void:
+	_apply_variant()
 	add_to_group("nexus")
 	add_to_group("nexus_station")
 	collision_layer = 1
@@ -83,11 +136,11 @@ func _col_box(size: Vector3, pos: Vector3, rot := Vector3.ZERO) -> void:
 ## Five pressurised modules stacked nose to tail, collared together,
 ## ribbed like real hull sections and lit from inside.
 func _build_spine() -> void:
-	var total := float(N_MOD) * H_MOD + float(N_MOD - 1) * H_COLLAR
+	var total := float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR
 	var y := -total * 0.5 + H_MOD * 0.5
-	for i in N_MOD:
+	for i in n_mod:
 		var pale: bool = i % 2 == 0
-		var hull := Color("#d8dce4") if pale else Color("#b9c2cc")
+		var hull: Color = _hull_a if pale else _hull_b
 		_cyl(R_CORE, H_MOD, Vector3(0, y, 0), hull, 0.06)
 		_col_cyl(R_CORE, H_MOD, Vector3(0, y, 0))
 		# hull ribs: raised bands every couple of metres
@@ -98,12 +151,12 @@ func _build_spine() -> void:
 			rib.outer_radius = R_CORE + 0.22
 			rib.rings = 8
 			rib.ring_segments = 20
-			_mi(rib, Vector3(0, ry, 0), Color("#8f98a4"), 0.05)
+			_mi(rib, Vector3(0, ry, 0), _trim, 0.05)
 		# a run of windows round the middle of each module
 		for k in 8:
 			var a := TAU * float(k) / 8.0
 			var wpos := Vector3(cos(a) * (R_CORE + 0.06), y + 0.4, sin(a) * (R_CORE + 0.06))
-			var w := _bx(Vector3(0.9, 0.5, 0.12), wpos, Color("#ffe9a8"), 2.2,
+			var w := _bx(Vector3(0.9, 0.5, 0.12), wpos, _glass, 2.2,
 				Vector3(0, -rad_to_deg(a), 0))
 			_lights.append(w)
 			# a frame around the glass so it is not a glowing sticker
@@ -116,9 +169,9 @@ func _build_spine() -> void:
 				_bx(Vector3(0.12, 0.5, 0.12),
 					Vector3(cos(ha) * (R_CORE + 0.3),
 						y - H_MOD * 0.5 + 1.0 + float(step) * 1.8,
-						sin(ha) * (R_CORE + 0.3)), Color("#f2b13c"), 0.15)
+						sin(ha) * (R_CORE + 0.3)), _rail, 0.15)
 		# the collar to the next module up
-		if i < N_MOD - 1:
+		if i < n_mod - 1:
 			var cy := y + H_MOD * 0.5 + H_COLLAR * 0.5
 			_cyl(R_COLLAR, H_COLLAR, Vector3(0, cy, 0), Color("#6c7480"), 0.05)
 			_col_cyl(R_COLLAR, H_COLLAR, Vector3(0, cy, 0))
@@ -132,8 +185,8 @@ func _build_spine() -> void:
 ## Four wings on booms, at ninety degrees, ISS style: a lattice arm and
 ## a gold-backed cell array that tracks nothing but looks like it might.
 func _build_wings() -> void:
-	for i in 4:
-		var a := TAU * float(i) / 4.0
+	for i in _wings:
+		var a := TAU * float(i) / float(_wings)
 		var dir := Vector3(cos(a), 0, sin(a))
 		var deg := -rad_to_deg(a)
 		# the boom: a lattice, not a stick
@@ -174,7 +227,7 @@ func _build_wings() -> void:
 
 ## The comms truss: this is the whole reason the station exists.
 func _build_truss() -> void:
-	var top := (float(N_MOD) * H_MOD + float(N_MOD - 1) * H_COLLAR) * 0.5
+	var top := (float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5
 	_cyl(1.1, 6.0, Vector3(0, top + 3.0, 0), Color("#8f98a4"), 0.06)
 	_col_cyl(1.2, 6.0, Vector3(0, top + 3.0, 0))
 	for k in 3:
@@ -210,7 +263,8 @@ func _build_truss() -> void:
 	var beacon := SphereMesh.new()
 	beacon.radius = 0.45
 	beacon.height = 0.9
-	_lights.append(_mi(beacon, Vector3(0, top + 13.2, 0), Color("#ff3a2a"), 3.0))
+	_lights.append(_mi(beacon, Vector3(0, top + 13.2, 0),
+		Color("#ff3a2a") if variant != "sloom" else _accent, 3.0))
 
 ## One parabolic antenna: reflector, rim, ribbed back, feed horn on a
 ## three-strut tripod, and a yoke and pedestal it steers in.
@@ -276,7 +330,7 @@ func _dish(base: Vector3, aim: float, rad: float) -> void:
 
 ## The bottom end: utility module, tanks, and a collar to dock against.
 func _build_dock() -> void:
-	var bot := -(float(N_MOD) * H_MOD + float(N_MOD - 1) * H_COLLAR) * 0.5
+	var bot := -(float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5
 	_cyl(R_CORE + 0.6, 1.6, Vector3(0, bot - 0.8, 0), Color("#6c7480"), 0.05)
 	_col_cyl(R_CORE + 0.6, 1.6, Vector3(0, bot - 0.8, 0))
 	# docking petals round the port
@@ -284,7 +338,7 @@ func _build_dock() -> void:
 		var a := TAU * float(k) / 8.0
 		_bx(Vector3(0.7, 0.5, 0.25),
 			Vector3(cos(a) * (R_CORE * 0.55), bot - 1.7, sin(a) * (R_CORE * 0.55)),
-			Color("#f2b13c"), 0.25, Vector3(0, -rad_to_deg(a), 0))
+			_rail, 0.25, Vector3(0, -rad_to_deg(a), 0))
 	_cyl(1.5, 0.7, Vector3(0, bot - 1.9, 0), Color("#2a3038"), 0.04)
 	# propellant and water tanks strapped to the outside
 	for k in 4:
@@ -306,12 +360,12 @@ func _build_dock() -> void:
 		_col_box(Vector3(9.0, 0.3, 3.4), rp, Vector3(0, -rad_to_deg(a3), 0))
 
 func _build_sign() -> void:
-	var top := (float(N_MOD) * H_MOD + float(N_MOD - 1) * H_COLLAR) * 0.5
+	var top := (float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5
 	var lbl := Label3D.new()
-	lbl.text = "NEXUS STATION"
+	lbl.text = _title
 	lbl.font_size = 180
 	lbl.pixel_size = 0.02
-	lbl.modulate = Color("#7be8ff")
+	lbl.modulate = _accent
 	lbl.outline_size = 24
 	lbl.outline_modulate = Color(0, 0, 0, 0.9)
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -319,7 +373,7 @@ func _build_sign() -> void:
 	lbl.no_depth_test = true
 	add_child(lbl)
 	var sub := Label3D.new()
-	sub.text = "zero g · deep-space relay · claim a frequency"
+	sub.text = _sub
 	sub.font_size = 80
 	sub.pixel_size = 0.02
 	sub.modulate = Color(1, 1, 1, 0.7)

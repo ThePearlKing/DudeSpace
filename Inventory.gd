@@ -92,6 +92,10 @@ var armors: Dictionary = {
 	"ultima_chest":  {"name": "Ultima Chestplate", "slot": "chest", "def": 24, "color": Color("#7df9ff")},
 	"ultima_legs":   {"name": "Ultima Leggings","slot": "legs",  "def": 18, "color": Color("#7df9ff")},
 	"ultima_boots":  {"name": "Ultima Boots",  "slot": "boots", "def": 10, "color": Color("#7df9ff")},
+	# SLIME BOOTS. The armour value is nearly an afterthought: what they
+	# are for is Eughe, where the ground is alive and hungry and bare
+	# feet get chewed. Wearing these, a slime continent is just ground.
+	"slime_boots":  {"name": "Slime Boots",  "slot": "boots", "def": 6, "color": Color("#9ede2a")},
 }
 var equip: Dictionary = {"head": "", "chest": "", "legs": "", "boots": "", "charm": ""}
 
@@ -255,6 +259,7 @@ var items: Dictionary = {
 	"modsynth3":   {"name": "Modular Synthesizer Mk3", "color": Color("#b388ff")},
 	"catfood":    {"name": "Cat Food",         "color": Color("#e8956a")},
 	"boots":      {"name": "Grav Boots",       "color": Color("#888899")},
+	"slime_boots":{"name": "Slime Boots",      "color": Color("#9ede2a")},
 	"magnet":     {"name": "Coin Magnet",      "color": Color("#ffcc22")},
 	"orbitwand":  {"name": "Orbit Wand",       "color": Color("#9a6bff")},
 	"teleporter": {"name": "Warp Pad",         "color": Color("#1a2a4a")},
@@ -355,6 +360,7 @@ func _ready() -> void:
 		{"id": "prism_chest","tab": "Armor",   "name": "Prism Chestplate","cost": {"prism": 75, "irid": 36},"desc": "CHEST. 28% damage off. Shader-forged."},
 		{"id": "prism_legs","tab": "Armor",    "name": "Prism Leggings", "cost": {"prism": 66, "irid": 30},  "desc": "LEGS. 21% damage off. Shader-forged."},
 		{"id": "prism_boots","tab": "Armor",   "name": "Prism Boots",    "cost": {"prism": 54, "irid": 18},   "desc": "FEET. 12% damage off. Shader-forged."},
+		{"id": "slime_boots","tab": "Armor",   "name": "Slime Boots",    "cost": {"coins": 650, "ultima": 2},   "desc": "FEET. 6% damage off — and the slime of Eughe stops eating you. Without these it takes hold and pulls."},
 		{"id": "backpack2", "tab": "Gear",     "name": "Prism Backpack", "cost": {"prism": 8, "irid": 6, "coins": 400}, "desc": "Its OWN 40-slot bag. Right-click to open."},
 		{"id": "ubackpack", "tab": "Gear",     "name": "Universe Backpack", "cost": {"ultima": 30, "prism": 20, "coins": 8000}, "desc": "20 slots that exist OUTSIDE SPACE. Every universe backpack opens the same storage."},
 		{"id": "locator",   "tab": "Gear",     "name": "Locator",        "cost": {"ultima": 4, "irid": 12}, "desc": "Right-click: cycle target (invaders / shadow temple / UFO / rifts / mines) + green ping through walls."},

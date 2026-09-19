@@ -159,6 +159,13 @@ var permadead: bool = false
 var zone: String = ""        # "" radial | "flat" fixed down | "zero" none
 var zone_g: float = 9.0
 
+## WHICH SKY YOU ARE UNDER. Not a coordinate -- a whole universe. The
+## Nexus swaps it, and with it every body, every building and every
+## saved object: the two galaxies keep separate worlds in the same save
+## and neither can see the other. Survives a respawn on purpose; dying
+## in Sloom must not wake you in the Milky Way.
+var galaxy: String = "milky"
+
 var timewarp: float = 1.0    # rocket time acceleration (1/2/3x; 5/10x coasting)
 var board_lock: float = 0.0  # playtime before which re-boarding is blocked
 

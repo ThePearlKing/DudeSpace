@@ -564,7 +564,7 @@ func _open_tp() -> void:
 	# Resolved off the live station so it follows Main.NEXUS_POS; the
 	# literal is only the fallback for a world that has not built it yet.
 	var nxb := Button.new()
-	nxb.text = "Nexus Station"
+	nxb.text = "Nexus Station (this galaxy)"
 	nxb.custom_minimum_size = Vector2(250, 38)
 	nxb.pressed.connect(func() -> void:
 		var nx = get_tree().get_first_node_in_group("nexus")
@@ -572,7 +572,7 @@ func _open_tp() -> void:
 			else Vector3(600.0, 9200.0, -33000.0)
 		# just off the docking port at the foot of the spine, clear of
 		# the petals -- it is zero g out there, so you arrive floating
-		_tp_pos(at + Vector3(0, -31.0, 0), "", 9.0))
+		_tp_pos(at + NexusStation.dock_offset(Game.galaxy), "", 9.0))
 	list.add_child(nxb)
 	# places that aren't planets
 	var pois := [
@@ -594,6 +594,10 @@ func _open_tp() -> void:
 
 func _tp_to(body) -> void:
 	var r: float = body.major + body.radius if body.kind == "torus" else body.radius
+	if body.kind == "slime":
+		# a continent is a slab: its top is nowhere near a sphere's
+		# radius out, and aiming for one dropped you into open sky
+		r = body.radius * Universe.SLIME_SQUASH
 	_tp_pos(body.center + Vector3.UP * (r + 3.0), "", 9.0)
 
 func _tp_pos(target: Vector3, zone: String, zone_g: float) -> void:

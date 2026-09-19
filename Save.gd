@@ -202,6 +202,9 @@ func build_player_blob() -> Dictionary:
 ## Ephemeral -- this machine's disk is never touched.
 func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
 	ephemeral = true
+	Game.galaxy = "milky"   # LAN sessions live in one sky; the jump is
+							# refused while a session is up
+
 	current_slot = 99
 	_progress = {
 		"world": snap.get("world", []),
@@ -225,8 +228,60 @@ func begin_guest_session(snap: Dictionary, blob: Dictionary) -> void:
 	_progress["character"] = character
 	save_name = Net.my_name()
 
+## --------------------------------------------------------- GALAXIES
+## One save, two universes. The Milky Way keeps the keys it always had
+## ("world", "spawn") so every existing save still loads; any other
+## galaxy hangs its own copies off a suffix. Nothing is ever migrated
+## and nothing is ever overwritten across the two -- jumping back finds
+## your base exactly where you left it.
+func galaxy_key(base: String, g: String = "") -> String:
+	var gg := g if g != "" else Game.galaxy
+	return base if gg == "milky" else "%s_%s" % [base, gg]
+
+## Which sky this slot was saved under. Read by Main BEFORE the bodies
+## are built, so the right universe exists from the first frame.
+func saved_galaxy() -> String:
+	return str(_progress.get("galaxy", "milky"))
+
+## The saved world of any galaxy, this one or the other one.
+func world_for(g: String) -> Array:
+	var w = _progress.get(galaxy_key("world", g), [])
+	return (w as Array).duplicate() if w is Array else []
+
+## Has this galaxy ever been stood in? A first arrival needs a spawn
+## point out there; a return must not overwrite the one you set.
+func has_spawn_in(g: String) -> bool:
+	var sp = _progress.get(galaxy_key("spawn", g), null)
+	return sp is Array and sp.size() == 3
+
+## COMMIT A JUMP. The world being left is written under its own key, the
+## world being entered is put in place as the live one, and the spawn
+## point of the galaxy we are leaving is filed with it. Called with
+## Game.galaxy ALREADY set to the destination, because everything past
+## this point -- including the reload -- has to agree on where we are.
+func commit_jump(leaving: String, entering: String, here: Array,
+		there: Array) -> void:
+	_progress[galaxy_key("world", leaving)] = here
+	_progress[galaxy_key("spawn", leaving)] = \
+		[_jump_spawn.x, _jump_spawn.y, _jump_spawn.z]
+	_progress[galaxy_key("spawn_up", leaving)] = \
+		[_jump_spawn_up.x, _jump_spawn_up.y, _jump_spawn_up.z]
+	_progress[galaxy_key("world", entering)] = there
+	_progress["galaxy"] = entering
+	world_objs = there
+	_world_set = true
+
+## The spawn point as it stood before the jump rewrote it -- filed with
+## the galaxy being left, so walking back through finds your bed.
+var _jump_spawn := Vector3.ZERO
+var _jump_spawn_up := Vector3.UP
+
+func mark_jump_spawn() -> void:
+	_jump_spawn = Game.spawn_pos
+	_jump_spawn_up = Game.spawn_up
+
 func saved_world() -> Array:
-	var w = _progress.get("world", [])
+	var w = _progress.get(galaxy_key("world"), [])
 	return w if w is Array else []
 
 ## Push saved run progress into the live Inventory/Game (called by Main).
@@ -249,9 +304,10 @@ func apply_progress() -> void:
 	if eq is Dictionary:
 		for k in ["head", "chest", "legs", "boots", "charm"]:
 			Inventory.equip[k] = str(eq.get(k, ""))
-	var svp = _progress.get("spawn", null)
+	Game.galaxy = saved_galaxy()
+	var svp = _progress.get(galaxy_key("spawn"), null)
 	if svp is Array and svp.size() == 3:
-		var svu = _progress.get("spawn_up", [0, 1, 0])
+		var svu = _progress.get(galaxy_key("spawn_up"), [0, 1, 0])
 		Game.set_spawn(Vector3(float(svp[0]), float(svp[1]), float(svp[2])),
 			Vector3(float(svu[0]), float(svu[1]), float(svu[2])).normalized())
 		Game.has_saved_spawn = true
@@ -355,6 +411,17 @@ func saved_pos() -> Variant:
 
 func save_progress() -> void:
 	# (player pos supplied by Main via set_player_pos)
+	# THE OTHER GALAXY RIDES ALONG. save_progress rebuilds the whole
+	# dictionary from the live game, and the live game only knows the
+	# sky it is standing under -- so every key belonging to a galaxy we
+	# are not in is copied off the old dictionary first and put back
+	# below. Without this, one jump erased the world you came from.
+	var carry := {}
+	for k in _progress.keys():
+		var ks := str(k)
+		if ks.begins_with("world_") or ks.begins_with("spawn_") \
+				or ks == "world" or ks == "spawn" or ks == "spawn_up":
+			carry[ks] = _progress[k]
 	_progress = {
 		"character": character,
 		"name": save_name,
@@ -371,8 +438,6 @@ func save_progress() -> void:
 		"enchant": Inventory.enchant,
 		"hyper_rockets": Inventory.hyper_rockets,
 		"equip": Inventory.equip,
-		"spawn": [Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z],
-		"spawn_up": [Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z],
 		"tut_done": Game.tutorial_done,
 		"god_cycles": Game.god_cycles,
 		"wseed": Game.world_seed,
@@ -415,7 +480,7 @@ func save_progress() -> void:
 		"zone_g": Game.zone_g,
 		"playtime": Game.playtime,
 		"snaps": snaps,
-		"world": world_objs if _world_set else _progress.get("world", []),
+		"galaxy": Game.galaxy,
 		"caged": Inventory.caged_data,
 		"floppies": Inventory.floppy_data,
 		"floppy_blanks": Inventory.floppy_blanks,
@@ -433,6 +498,16 @@ func save_progress() -> void:
 		"hyper_charge": _last_hyperq,
 		"pet": _last_pet,
 	}
+	# every galaxy's saved world and spawn, the one we are standing in
+	# written fresh over the top
+	for ck in carry.keys():
+		_progress[ck] = carry[ck]
+	_progress[galaxy_key("world")] = world_objs if _world_set \
+		else carry.get(galaxy_key("world"), [])
+	_progress[galaxy_key("spawn")] = \
+		[Game.spawn_pos.x, Game.spawn_pos.y, Game.spawn_pos.z]
+	_progress[galaxy_key("spawn_up")] = \
+		[Game.spawn_up.x, Game.spawn_up.y, Game.spawn_up.z]
 	_write(current_slot, _progress)
 
 var _last_pos: Array = []

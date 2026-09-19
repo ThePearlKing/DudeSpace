@@ -462,10 +462,16 @@ func _process(delta: float) -> void:
 func _refresh() -> void:
 	if not is_inside_tree():
 		return
-	_stats.text = "COINS  %d   BANK  %d   ZB  %d\nSCORE  %d      %s %s%s" % [
+	# WHICH SKY. Only stated when it is not the one you started under --
+	# in the Milky Way the line would be noise, and out here it is the
+	# single most important fact on the screen.
+	var sky := ""
+	if Game.galaxy != "milky":
+		sky = "  ·  %s" % Universe.galaxy_label(Game.galaxy)
+	_stats.text = "COINS  %d   BANK  %d   ZB  %d\nSCORE  %d      %s %s%s%s" % [
 		Inventory.coins, Inventory.bank_coins, Inventory.zeptobux, Game.score,
 		Game.date_text(), Game.clock_text(),
-		"  ·  UFO IN SYSTEM" if Game.is_ufo_day() else ""]
+		"  ·  UFO IN SYSTEM" if Game.is_ufo_day() else "", sky]
 	var hp := Game.health / Game.HEALTH_MAX
 	_health_fill.size.x = 356.0 * hp
 	_health_fill.color = Color(1.0 - hp, hp, 0.2)
