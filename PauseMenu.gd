@@ -594,10 +594,6 @@ func _open_tp() -> void:
 
 func _tp_to(body) -> void:
 	var r: float = body.major + body.radius if body.kind == "torus" else body.radius
-	if body.kind == "slime":
-		# a continent is a slab: its top is nowhere near a sphere's
-		# radius out, and aiming for one dropped you into open sky
-		r = body.radius * Universe.SLIME_SQUASH
 	_tp_pos(body.center + Vector3.UP * (r + 3.0), "", 9.0)
 
 func _tp_pos(target: Vector3, zone: String, zone_g: float) -> void:

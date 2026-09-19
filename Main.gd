@@ -280,6 +280,9 @@ func _boot() -> void:
 		_bgm_gap = randf_range(20.0, 60.0)   # the FIRST song finds you quickly
 
 	await _load_set(0.9, "interface")
+	_tree_ref = get_tree()
+	if not _tree_ref.root.tree_exiting.is_connected(_drop_static_caches):
+		_tree_ref.root.tree_exiting.connect(_drop_static_caches)
 	_hud = HUD.new()
 	add_child(_hud)
 	add_child(InventoryUI.new())
@@ -437,6 +440,8 @@ func _boot() -> void:
 		_sloom_test()
 	if OS.get_environment("CTD_TEST") == "59":
 		_slime_test()
+	if OS.get_environment("CTD_TEST") == "60":
+		_eughe_shots()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -3058,6 +3063,36 @@ func _do_respawn() -> void:
 
 var _refocus_capture := false
 
+## STATIC CACHES HOLD RENDER RESOURCES PAST TEARDOWN, which is the wall
+## of "leaked at exit" warnings. Dropping them used to be wired only to
+## the window's close button, so every other way out of the game -- a
+## headless run ending, quit() from a menu, a test rig hitting its frame
+## limit -- still leaked and still warned. It is hung off the root's
+## tree_exiting now, which fires on all of them and never on an ordinary
+## scene change.
+var _tree_ref: SceneTree = null
+
+func _drop_static_caches() -> void:
+	Surfaces.shutdown()
+	Eughe.shutdown()   # the slime shader is held statically too
+	# by the time the root is exiting this node may already be out of
+	# the tree, so get_tree() is null -- the reference is kept from when
+	# the signal was hooked up
+	if _tree_ref != null:
+		IconLib.shutdown(_tree_ref)
+	Human._prism_mat = null
+	ShaderLib._fx_shader = null
+	RadioLib._music_cache.clear()
+	RadioLib._static_wav = null
+	RadioLib._eerie_wav = null
+	RadioLib._rick_wav = null
+	RadioLib._varn_wav = null
+	RadioLib._bh_presence_wav = null
+	RadioLib._ice_wav = null
+	RadioLib._custom.clear()
+	RadioLib._custom_loaded = false
+	EarthHuman._faces.clear()   # face textures held past teardown
+
 func _notification(what: int) -> void:
 	# window loses focus (alt-tab, click away): free the mouse so it is
 	# never stuck in a windowed game; recapture on the way back in
@@ -3075,23 +3110,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		Game.quitting = true   # cooked audio mid-flight must NOT land in
 		# freed nodes -- that was the heap-corruption abort on exit
-		# static caches held render resources past teardown -> the wall
-		# of "leaked at exit" warnings on quit. Drop them first.
-		Surfaces.shutdown()
-		Eughe.shutdown()   # the slime shader is held statically too
-		IconLib.shutdown(get_tree())
-		Human._prism_mat = null
-		ShaderLib._fx_shader = null
-		RadioLib._music_cache.clear()
-		RadioLib._static_wav = null
-		RadioLib._eerie_wav = null
-		RadioLib._rick_wav = null
-		RadioLib._varn_wav = null
-		RadioLib._bh_presence_wav = null
-		RadioLib._ice_wav = null
-		RadioLib._custom.clear()
-		RadioLib._custom_loaded = false
-		EarthHuman._faces.clear()   # face textures held past teardown
+		_drop_static_caches()
 		var petc = get_tree().get_first_node_in_group("pet")
 		if petc != null and is_instance_valid(petc):
 			Save.set_pet(true, petc.genome, petc.staying)
@@ -3464,11 +3483,12 @@ func _setup_environment() -> void:
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	# SLOOM sits under a red star and looks it: the dark out there is
-	# warm instead of blue, and everything in it is lit by Ogrek.
-	env.ambient_light_color = Color("#5a2e28") if Game.galaxy == "sloom" \
+	# and the fill stays near neutral for the same reason: a warm ambient
+	# on top of a warm key leaves nothing in the galaxy reading as the
+	# colour it actually is
+	env.ambient_light_color = Color("#454049") if Game.galaxy == "sloom" \
 		else Color("#404058")
-	env.ambient_light_energy = 0.55 if Game.galaxy == "sloom" else 0.5
+	env.ambient_light_energy = 0.5
 	env.glow_enabled = true
 	env.glow_intensity = 0.8
 	env.glow_bloom = 0.25
@@ -3479,10 +3499,11 @@ func _setup_light() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -40, 0)
 	sun.light_energy = 1.0
-	# whichever star this galaxy runs on. Ogrek is red and burns deeper
-	# and oranger than the shader sun ever did, and nothing under it
-	# gets to look like it did back home.
-	sun.light_color = Color("#ff7a3a") if Game.galaxy == "sloom" \
+	# Ogrek is a red star and you can SEE that it is -- the disc is red,
+	# the horizon light is warm. But the lamp itself stays close to
+	# white, because a saturated orange light multiplies into every
+	# albedo in the galaxy and Eughe's grey core came out orange.
+	sun.light_color = Color("#fff1e8") if Game.galaxy == "sloom" \
 		else Color("#ffe6f2")
 	add_child(sun)
 
@@ -3550,9 +3571,6 @@ var _eughe: Eughe = null
 func _build_body(b) -> void:
 	if b.kind == "torus":
 		_build_torus(b)
-		return
-	if b.kind == "slime":
-		_build_slime_continent(b)
 		return
 	var p := StaticBody3D.new()
 	var mi := MeshInstance3D.new()
@@ -4020,34 +4038,26 @@ func _mesh_from_faces(faces: PackedVector3Array) -> ArrayMesh:
 		st.add_vertex(v)
 	return st.commit()
 
-## EUGHE, dressed. The bodies themselves are built by the ordinary body
-## loop; this is everything standing on them.
+## EUGHE, dressed. The core, the continents and the moon are built by
+## the ordinary body loop; this is everything standing on them.
 ##
-## On the cold core: ice. Fields of it, spires growing out of rainbow
-## ground that changes colour under them, and one spike sharper and
-## taller than the rest with an Echegel on the end of it. He came off a
-## continent edge about a mile up and his trajectory ended here, and the
-## precision of it has never sat right with anybody.
+## The ice is the whole point of the core. Grey rock, and growing out of
+## it a forest of rainbow scapes big enough to be weather: giants taller
+## than the planet is wide, a canopy of mid spires under them and drifts
+## of small ones across the ground, so that standing down there the sky
+## is not sky -- it is ice, breathing, changing colour, all the way up.
 ##
-## On the continents: Echegels, swimming in the stuff.
-##
-## On Ex23 Florgus: nothing. One corpse. That is the whole moon.
+## And one spike sharper and taller than any of them, with an Echegel on
+## the end of it. He came off a continent edge about a mile up and his
+## trajectory ended here, and the precision has never sat right.
 func _build_eughe() -> void:
 	var core = Universe.body_named("Eughe")
 	if core != null:
 		_build_ice_scape(core)
-	for b in Universe.bodies:
-		if b.kind != "slime":
-			continue
-		var n := 4 + randi() % 4
-		for i in n:
-			var e := Echegel.new()
-			e.setup(str(b.name), i)
-			add_child(e)
-			var d := _surface_dir()
-			# squashed body: put them on the skin, not on a sphere
-			e.global_position = b.center + Vector3(d.x,
-				d.y * Universe.SLIME_SQUASH, d.z) * (b.radius + 0.6)
+	# the continents are Eughe's terrain, so Eughe builds them -- they
+	# are not in the body list for the planet loop to find
+	for sh in Universe.eughe_shelves:
+		_build_slime_continent(sh)
 	var moon = Universe.body_named("Ex23 Florgus")
 	if moon != null:
 		# THE CORPSE. Nothing else is out here and nothing else ever was.
@@ -4056,67 +4066,144 @@ func _build_eughe() -> void:
 		corpse.setup("Ex23 Florgus", 99)
 		add_child(corpse)
 		var md := Vector3(0.24, 0.86, 0.45).normalized()
-		corpse.global_position = moon.center + md * (moon.radius + 0.45)
-		corpse.look_at_from_position(corpse.global_position,
-			corpse.global_position + md.cross(Vector3.RIGHT).normalized(), md)
+		corpse.global_transform = Transform3D(_basis_from_up(md),
+			moon.center + md * (moon.radius + 0.45))
 
-## THE ICE SCAPES. Spires and sheets of clear ice standing on rainbow
-## ground -- the calm part of Eughe, and the part everybody who has been
-## there talks about. They are also spikes, and one of them is the
-## sharpest thing on the planet.
+## THE ICE SCAPES. Three tiers of them, dense enough to close over the
+## sky, all sharing one breathing rainbow material.
 func _build_ice_scape(b) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90210
-	var ice := StandardMaterial3D.new()
-	ice.albedo_color = Color(0.82, 0.93, 1.0, 0.72)
-	ice.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	ice.roughness = 0.08
-	ice.specular = 1.0
-	ice.emission_enabled = true
-	ice.emission = Color("#9fd8ff")
-	ice.emission_energy_multiplier = 0.25
-	for i in 220:
-		var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1),
-			rng.randf_range(-1, 1)).normalized()
-		var h := rng.randf_range(3.0, 11.0)
-		var spike := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.04
-		cm.bottom_radius = rng.randf_range(0.7, 1.9)
-		cm.height = h
-		cm.radial_segments = 6
-		spike.mesh = cm
-		spike.material_override = ice
-		add_child(spike)
-		spike.global_transform = Transform3D(_basis_from_up(d),
-			b.center + d * (b.radius + h * 0.42))
-		spike.rotate_object_local(Vector3.RIGHT, rng.randf_range(-0.18, 0.18))
-		var sb := StaticBody3D.new()
-		var cs := CollisionShape3D.new()
-		var shp := CylinderShape3D.new()
-		shp.radius = cm.bottom_radius * 0.8
-		shp.height = h
-		cs.shape = shp
-		sb.add_child(cs)
-		spike.add_child(sb)
-	# THE SHARPEST ONE. Taller than anything near it, and occupied.
+	var ice := Eughe.ice_material()
+	# [count, min height, max height, base radius as a fraction of height]
+	#
+	# PROPORTION. Four hundred and ninety-six of these at up to 96m on a
+	# 58m planet, a tenth as wide as they were tall, turned Eughe into a
+	# sea urchin -- and at ground level they were packed tightly enough
+	# that the camera stood INSIDE one and the whole screen went the
+	# colour of that crystal. A third as many, half as tall and three
+	# times as thick: formations you walk among and look up through,
+	# with ground between them.
+	#
+	# EVERY tier gets a collider. The small ones were left out to save
+	# nodes and they are exactly the ones at head height, so the ice you
+	# actually walk into was the ice you walked through.
+	# GROUND COVERAGE IS THE CONSTRAINT, and it is easy to get wrong on a
+	# world this small: Eughe's whole surface is about 42,000 square
+	# metres. Eighteen giants at a 21m base carpet 60% of that on their
+	# own, and the mid tier covered the rest -- there was nowhere to
+	# stand that was not inside a crystal, which is why the ground view
+	# was one flat sheet of whatever colour you were standing in.
+	#
+	# Ten giants at an 8m base cover about 5%. They are 1:6 tall to
+	# wide, so they are shards rather than needles, and a fifty-metre
+	# one twenty metres away still fills the sky -- which is the point.
+	# Ninety percent of the ground stays walkable.
+	# TALL AND MANY, ON SMALL FEET. What fills the sky from the ground is
+	# how many crystal BODIES are overhead; what makes the place
+	# unwalkable is how much of the ground their BASES take. Those are
+	# different numbers, and the first version got them confused: 18
+	# giants on 21m feet covered 60% of the planet. Thirty-two giants on
+	# 8m feet cover 15%, and from down there it is a forest.
+	var tiers := [[32, 42.0, 64.0, 0.16],
+		[40, 14.0, 28.0, 0.20],
+		[70, 3.0, 9.0, 0.28]]
+	for tier in tiers:
+		for i in int(tier[0]):
+			var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1),
+				rng.randf_range(-1, 1)).normalized()
+			var h: float = rng.randf_range(float(tier[1]), float(tier[2]))
+			var spike := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			# A CRYSTAL IS A PRISM. Six flat faces, a blunt faceted cap,
+			# and sides that barely taper -- tapering to a point makes a
+			# spine, and a planet covered in those is a sea urchin
+			# whatever size you draw them.
+			var br: float = h * float(tier[3]) * rng.randf_range(0.8, 1.2)
+			cm.bottom_radius = br
+			cm.top_radius = br * rng.randf_range(0.42, 0.72)
+			cm.height = h
+			cm.radial_segments = 6
+			spike.mesh = cm
+			spike.material_override = ice
+			add_child(spike)
+			# ITS OWN COLOUR. Per-instance phase, so this crystal is a
+			# different solid hue from the one beside it, and each of
+			# them keeps shifting at its own pace.
+			spike.set_instance_shader_parameter("hue_off", rng.randf())
+			spike.set_instance_shader_parameter("hue_rate",
+				rng.randf_range(0.5, 1.7))
+			spike.global_transform = Transform3D(_basis_from_up(d),
+				b.center + d * (b.radius + h * 0.44))
+			spike.rotate_object_local(Vector3.RIGHT,
+				rng.randf_range(-0.16, 0.16))
+			spike.rotate_object_local(Vector3.FORWARD,
+				rng.randf_range(-0.16, 0.16))
+			# A FORMATION, NOT A SPIRE. Crystals grow in clusters: two to
+			# four shorter prisms leaning out of the same root, each its
+			# own colour, so what you walk up to is an outcrop.
+			if h > 8.0:
+				for k in 2 + rng.randi() % 3:
+					var sh2 := MeshInstance3D.new()
+					var cm2 := CylinderMesh.new()
+					var h2: float = h * rng.randf_range(0.3, 0.7)
+					var br2: float = br * rng.randf_range(0.28, 0.48)
+					cm2.bottom_radius = br2
+					cm2.top_radius = br2 * rng.randf_range(0.45, 0.75)
+					cm2.height = h2
+					cm2.radial_segments = 6
+					sh2.mesh = cm2
+					sh2.material_override = ice
+					spike.add_child(sh2)
+					sh2.set_instance_shader_parameter("hue_off", rng.randf())
+					sh2.set_instance_shader_parameter("hue_rate",
+						rng.randf_range(0.5, 1.7))
+					var bsb := StaticBody3D.new()
+					var bcs := CollisionShape3D.new()
+					var bshp := CylinderShape3D.new()
+					bshp.radius = cm2.bottom_radius * 0.7
+					bshp.height = h2
+					bcs.shape = bshp
+					bsb.add_child(bcs)
+					sh2.add_child(bsb)
+					var a2 := TAU * rng.randf()
+					# HUGGING the parent. Blades thrown out to 1.5 trunk radii
+					# with their own radius on top were the real ground
+					# cover -- three per crystal, and together they took
+					# more of the planet than every trunk put together.
+					sh2.position = Vector3(cos(a2) * br * rng.randf_range(0.5, 0.9),
+						-h * 0.5 + h2 * 0.44, sin(a2) * br * rng.randf_range(0.5, 0.9))
+					sh2.rotation_degrees = Vector3(
+						cos(a2) * rng.randf_range(6, 26), rng.randf_range(0, 60),
+						-sin(a2) * rng.randf_range(6, 26))
+			var sb := StaticBody3D.new()
+			var cs := CollisionShape3D.new()
+			var shp := CylinderShape3D.new()
+			shp.radius = cm.bottom_radius * 0.65
+			shp.height = h
+			cs.shape = shp
+			sb.add_child(cs)
+			spike.add_child(sb)
+	# THE SHARPEST ONE, and what is on it.
 	var sd := Vector3(0.42, 0.7, -0.58).normalized()
 	var tall := MeshInstance3D.new()
 	var tm := CylinderMesh.new()
-	tm.top_radius = 0.02
-	tm.bottom_radius = 2.6
-	tm.height = 26.0
-	tm.radial_segments = 7
+	tm.top_radius = 0.04
+	tm.bottom_radius = 9.0
+	tm.height = 84.0
+	tm.radial_segments = 9
 	tall.mesh = tm
 	tall.material_override = ice
 	add_child(tall)
+	tall.set_instance_shader_parameter("hue_off", 0.12)
+	tall.set_instance_shader_parameter("hue_rate", 0.7)
 	tall.global_transform = Transform3D(_basis_from_up(sd),
-		b.center + sd * (b.radius + 12.0))
+		b.center + sd * (b.radius + 39.0))
 	var tsb := StaticBody3D.new()
 	var tcs := CollisionShape3D.new()
 	var tshp := CylinderShape3D.new()
-	tshp.radius = 1.9
-	tshp.height = 26.0
+	tshp.radius = 6.0
+	tshp.height = 84.0
 	tcs.shape = tshp
 	tsb.add_child(tcs)
 	tall.add_child(tsb)
@@ -4125,39 +4212,45 @@ func _build_ice_scape(b) -> void:
 	stuck.setup("Eughe", 7)
 	add_child(stuck)
 	stuck.global_transform = Transform3D(_basis_from_up(sd),
-		b.center + sd * (b.radius + 24.2))
+		b.center + sd * (b.radius + 80.0))
 
-## A SLIME CONTINENT. Not a sphere with a green texture -- a squashed,
-## lobed slab with its own collider, hanging free in Eughe's sky and
-## moving the whole time. The mesh is deterministic off its name, so the
-## same continent is the same shape every time the save is opened.
+## A SLIME CONTINENT. Not a sphere with a green texture and not a slab:
+## a piece of shell that curves around Eughe, generated in the core's
+## own frame, so its node sits AT the core and simply turns. That is
+## what makes a landmass hug the planet instead of flying off on a
+## tangent, and it is why anyone standing on it rotates rather than
+## slides.
 func _build_slime_continent(b) -> void:
-	var faces: PackedVector3Array = Eughe.continent_mesh(b)[0]
+	var built: Array = Eughe.build_continent(b)
+	var host = Universe.body_named("Eughe")
 	var p := StaticBody3D.new()
 	p.add_to_group("slime_continent")
 	var mi := MeshInstance3D.new()
-	mi.mesh = Eughe.build_mesh(faces)
+	mi.mesh = built[0]
 	mi.material_override = Eughe.slime_material()
 	p.add_child(mi)
-	# SOLID, not a shell. A continent is a slab moving sideways at eight
-	# metres a second, and a triangle-soup collider on a thing like that
-	# is a sheet of paper: anything falling onto it went straight
-	# through and ended up inside the continent. A convex hull of the
-	# same lumps is a volume -- you land on it, and if the slab ever
-	# does move into you it pushes you out instead of swallowing you.
-	# The lobes only ever bulge outward, so the hull is the shape.
-	var col := CollisionShape3D.new()
-	var hull := ConvexPolygonShape3D.new()
-	var coarse: PackedVector3Array = Eughe.continent_mesh(b, 20, 12)[0]
-	hull.points = coarse
-	col.shape = hull
-	p.add_child(col)
+	for hull in built[1]:
+		var col := CollisionShape3D.new()
+		col.shape = hull
+		p.add_child(col)
 	add_child(p)
-	p.global_position = b.center
+	p.global_position = host.center if host != null else b.center
 	b.node = p
 	_register_planet_lod(b, mi)
 	if _eughe != null:
 		_eughe.register_continent(b, p)
+	# the locals ride their own continent: parented, so they swing with
+	# it and nothing has to carry them by hand
+	# a couple per continent: there are twenty-eight of these now, and
+	# five apiece was eighty-six of them wandering about
+	for i in 1 + randi() % 2:
+		var e := Echegel.new()
+		e.setup(str(b.name), i)
+		p.add_child(e)
+		var ld: Vector3 = built[2][randi() % maxi(1, built[2].size())] \
+			if not built[2].is_empty() else b.dir0
+		e.global_position = (host.center if host != null else b.center) \
+			+ ld * (b.orbit_r + b.thick * 0.5 + 1.0)
 
 func _build_torus(b) -> void:
 	var p := StaticBody3D.new()
@@ -4323,7 +4416,8 @@ void fragment(){
 func _planet_material(kind: String, color: Color, pname: String = "") -> Material:
 	match kind:
 		"eughe":
-			# the cold core: rainbow ice, breathing
+			# the cold core: grey rock under old frost. The rainbow is
+			# in the ice standing on it, never in the planet.
 			return Eughe.core_material()
 		"florgus":
 			# Ex23 Florgus is the same stuff as the continents, drier
@@ -10104,11 +10198,12 @@ func _sloom_test() -> void:
 		print("SLOOM continents=", conts, " echegels=", eggs,
 			" player %.1fm from station" % d,
 			" world=", collect_world().size())
-		# do the continents actually MOVE?
-		var c0 = Universe.body_named("Grelm")
+		# do the continents actually MOVE? (a shelf has no name to look
+		# up any more -- it is terrain, not a body)
+		var c0 = Universe.eughe_shelves[0]
 		var was: Vector3 = c0.center
 		await get_tree().create_timer(1.5).timeout
-		print("SLOOM Grelm moved %.2fm in 1.5s" % was.distance_to(c0.center))
+		print("SLOOM a shelf moved %.2fm in 1.5s" % was.distance_to(c0.center))
 		print("SLOOM echegel speaks: ", Echegel.sentence(
 			RandomNumberGenerator.new()))
 		Engine.set_meta("sloomtest", 2)
@@ -10126,68 +10221,192 @@ func _sloom_test() -> void:
 	print("SLOOM RESULT: ", "PASS" if ok else "FAIL")
 	get_tree().quit()
 
-## CTD_TEST=59 (with CTD_GALAXY=sloom) -- THE SLIME. Stand on a
-## continent barefoot and it should take hold, pull, and cost you
-## health; put slime boots on and the same ground should be ground.
-## Also checks a continent holds you up at all, which is the part the
-## squashed-body maths exists for.
+## CTD_TEST=59 (with CTD_GALAXY=sloom) -- EUGHE, checked where numbers
+## can check it: the continents curve, the planet holds you rather than
+## they do, and the slime behaves like quicksand -- you sink, you slow
+## down, it drains you, and struggling gets you back out.
 func _slime_test() -> void:
 	await get_tree().create_timer(2.0).timeout
-	var cont = Universe.body_named("Grelm")
+	var core = Universe.body_named("Eughe")
+	var cont = Universe.eughe_shelves[0] \
+		if not Universe.eughe_shelves.is_empty() else null
 	var eug = get_tree().get_first_node_in_group("eughe")
-	print("SLIME continent=", cont != null, " orchestrator=", eug != null)
-	var high: Vector3 = cont.center \
-		+ Vector3(0, cont.radius * Universe.SLIME_SQUASH + 20.0, 0)
-	print("SLIME altitude up there: %.2f  (sphere maths would say %.2f)"
-		% [Universe.altitude(cont, high),
-		high.distance_to(cont.center) - cont.radius])
-	print("SLIME gravity there: %.2f m/s^2"
-		% Universe.gravity_at(high).length())
+	print("SLIME core=", core != null, " continent=", cont != null,
+		" orchestrator=", eug != null,
+		" continents=", get_tree().get_nodes_in_group("slime_continent").size())
 
-	# --- LAND ON IT, booted. The slab is moving at eight metres a
-	# second, so the only way to be sure of a landing is to drop and
-	# then follow it down: a probe that teleports and waits is testing
-	# whether it can hit a moving target, not whether the ground holds.
-	Inventory.equip["boots"] = "slime_boots"
+	# IT CURVES: centre and coast sit at the same distance from the core
+	var mid: Vector3 = core.center + cont.dir * cont.orbit_r
+	var side: Vector3 = cont.orbit_up.cross(cont.dir).normalized()
+	var edge: Vector3 = core.center + (cont.dir * cos(cont.arc_u * 0.8)
+		+ side * sin(cont.arc_u * 0.8)) * cont.orbit_r
+	print("SLIME shell radius mid %.1f edge %.1f (a plate would sag %.1fm)"
+		% [mid.distance_to(core.center), edge.distance_to(core.center),
+		cont.orbit_r - cont.orbit_r * cos(cont.arc_u * 0.8)])
+
+	# EVEN COVER: slime overhead wherever you stand on the core
+	var covered := 0
+	for i in 24:
+		var d := Vector3(sin(float(i) * 2.399), cos(float(i) * 1.7),
+			sin(float(i) * 1.13)).normalized()
+		for b in Universe.eughe_shelves:
+			if Universe.slime_contains(b, core.center + d * 300.0):
+				covered += 1
+				break
+	# cloud cover, which means both things: slime overhead from most of
+	# the planet, and open sky from a good deal of it too
+	print("SLIME sky covered at %d of 24 directions (want roughly 8-19)"
+		% covered)
+
+	# GRAVITY IS THE PLANET'S
+	var stand: Vector3 = core.center + cont.dir \
+		* (cont.orbit_r + cont.thick * 0.5 + 1.0)
+	var g: Vector3 = Universe.gravity_at(stand)
+	var toward: float = g.normalized().dot((core.center - stand).normalized())
+	print("SLIME gravity up there %.2f m/s^2, aimed at the core %.3f"
+		% [g.length(), toward])
+
+	# LAND ON IT
 	Game.health = Game.HEALTH_MAX
+	Game.godmode = true
 	var landed := false
-	for i in 90:
-		if eug.standing_on(_player) != null and _player.is_on_floor():
+	for i in 140:
+		if eug.standing_on(_player) != null:
 			landed = true
 			break
-		# ride down with it: drop a little, keep over the same spot
-		_player.global_position = cont.center + Vector3(0,
-			cont.radius * Universe.SLIME_SQUASH + 20.0 - float(i) * 0.6, 0)
+		_player.global_position = core.center + cont.dir \
+			* (cont.orbit_r + cont.thick * 0.5 + 16.0 - float(i) * 0.3)
 		await get_tree().create_timer(0.1).timeout
-	await get_tree().create_timer(4.0).timeout
-	var booted := Game.health
-	var on_b: bool = eug.standing_on(_player) != null
-	var a1 := Universe.altitude(cont, _player.global_position)
-	print("SLIME booted: landed=", landed, " on slime=", on_b,
-		" health %.1f, alt %.2f" % [booted, a1])
+	print("SLIME landed=", landed)
+	Game.godmode = false
 
-	# --- SAME SPOT, boots off. Nothing moves but the boots.
-	Inventory.equip["boots"] = ""
+	# STAND STILL: it should take you down, slow you and drain you
 	Game.health = Game.HEALTH_MAX
-	await get_tree().create_timer(5.0).timeout
-	var bare := Game.health
-	print("SLIME barefoot after 5s: health %.1f, on slime=%s, dead=%s"
-		% [bare, str(eug.standing_on(_player) != null), str(Game.dead)])
-	await get_tree().create_timer(7.0).timeout
-	print("SLIME barefoot after 12s: dead=", Game.dead,
-		" cause='", Game.death_cause, "' health %.1f" % Game.health)
-	var swallowed: bool = Game.dead and Game.death_cause.contains("slime")
+	var held = eug.standing_on(_player)
+	var a0 := Universe.altitude(held, _player.global_position)
+	var mire1 := 0.0
+	for i in 40:
+		await get_tree().create_timer(0.1).timeout
+		mire1 = maxf(mire1, _player.mire)
+	var a1 := Universe.altitude(held, _player.global_position)
+	var hp1 := Game.health
+	print("SLIME stood still 4s: alt %.2f -> %.2f, mire %.2f, health %.1f, dead=%s"
+		% [a0, a1, mire1, hp1, str(Game.dead)])
+
+	# STRUGGLE by holding a direction, the way a player does. Setting
+	# velocity by hand tested nothing: the slime reads INTENT now, so
+	# the probe has to press the key.
+	var kev := InputEventKey.new()
+	kev.keycode = KEY_W
+	kev.physical_keycode = KEY_W
+	kev.pressed = true
+	Input.parse_input_event(kev)
+	await get_tree().create_timer(0.3).timeout
+	print("SLIME  key seen by Input: ", Input.is_key_pressed(KEY_W),
+		"   player says a UI is open: ", _player._ui_open(),
+		"   dead: ", Game.dead)
+	var mire2 := 1.0
+	for i in 40:
+		await get_tree().create_timer(0.1).timeout
+		mire2 = minf(mire2, _player.mire)
+	var kup := InputEventKey.new()
+	kup.keycode = KEY_W
+	kup.physical_keycode = KEY_W
+	kup.pressed = false
+	Input.parse_input_event(kup)
+	print("SLIME struggled 4s: mire %.2f -> %.2f (wish %.2f)"
+		% [mire1, mire2, _player.wish_len])
 
 	var eggs := get_tree().get_nodes_in_group("echegel").size()
-	var rng9 := RandomNumberGenerator.new()
-	rng9.seed = 4242
-	for i in 4:
-		print("SLIME echegel says: ", Echegel.sentence(rng9))
-	print("SLIME echegels alive: ", eggs)
-	var ok := landed and on_b and booted >= Game.HEALTH_MAX - 0.01 \
-		and a1 > -3.0 and bare < Game.HEALTH_MAX - 3.0 and swallowed \
-		and eggs > 0
+	print("SLIME echegels=", eggs,
+		"  named continents on the map: ", _named_continents())
+	var ok := landed and toward > 0.98 and g.length() > 3.0 \
+		and absf(mid.distance_to(core.center) - edge.distance_to(core.center)) < 1.0 \
+		and covered >= 7 and covered <= 20 and a1 < a0 - 0.5 and mire1 > 0.3 \
+		and hp1 < Game.HEALTH_MAX - 3.0 and not Game.dead \
+		and mire2 < mire1 and eggs > 0 and _named_continents() == 0
 	print("SLIME RESULT: ", "PASS" if ok else "FAIL")
+	get_tree().quit()
+
+## How many continents would show up anywhere a player reads names.
+func _named_continents() -> int:
+	var n := 0
+	for b in Universe.bodies:
+		if b.kind == "slime" and not b.hidden:
+			n += 1
+	return n
+
+## CTD_TEST=60 (with CTD_GALAXY=sloom) -- LOOK AT IT. Eughe has been
+## wrong on screen in ways no numeric probe could catch: an orange core
+## under an orange lamp, yellow slime, continents built inside out. This
+## renders the views that matter and writes them out.
+func _eughe_shots() -> void:
+	await get_tree().create_timer(3.0).timeout
+	var core = Universe.body_named("Eughe")
+	var cont = Universe.eughe_shelves[0] \
+		if not Universe.eughe_shelves.is_empty() else null
+	var cam := Camera3D.new()
+	cam.far = 900000.0
+	cam.fov = 75.0
+	add_child(cam)
+	cam.current = true
+	var dir := OS.get_environment("CTD_SHOT_DIR")
+	if dir == "":
+		dir = "user://shots"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var shot := func(name: String, at: Vector3, look: Vector3,
+			up: Vector3) -> void:
+		cam.global_position = at
+		cam.look_at(look, up)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		await get_tree().create_timer(0.35).timeout
+		var img := get_viewport().get_texture().get_image()
+		img.save_png("%s/%s.png" % [dir, name])
+		print("SHOT ", name)
+	# 1. the core from orbit: is it GREY, and is the ice on it coloured
+	await shot.call("eughe_core", core.center + Vector3(0, 0, 1).normalized()
+		* (core.radius * 3.4), core.center, Vector3.UP)
+	# 2. standing on the core looking up: the ice should close over the
+	# sky like weather, with the continents above that
+	# STAND WHERE YOU COULD ACTUALLY STAND. The camera ignores collision,
+	# so a fixed spot put it inside a crystal and the whole frame went
+	# that crystal's colour -- which says nothing about what a player
+	# sees, because a player is stopped by the same crystal.
+	var gdir := Vector3(0.3, 0.8, 0.5).normalized()
+	var space2 := get_world_3d().direct_space_state
+	var probe := PhysicsShapeQueryParameters3D.new()
+	var psh := SphereShape3D.new()
+	psh.radius = 1.2
+	probe.shape = psh
+	for tryi in 60:
+		var cand := Vector3(sin(float(tryi) * 2.399), cos(float(tryi) * 1.71),
+			sin(float(tryi) * 1.13)).normalized()
+		probe.transform = Transform3D(Basis(),
+			core.center + cand * (core.radius + 2.0))
+		if space2.intersect_shape(probe, 1).is_empty():
+			gdir = cand
+			break
+	print("SHOT ground clearance dir ", gdir)
+	var ground: Vector3 = core.center + gdir * (core.radius + 2.0)
+	await shot.call("eughe_ground", ground,
+		ground + gdir * 40.0 + gdir.cross(Vector3.UP).normalized() * 26.0,
+		gdir)
+	# 3. a crystal field close up: every crystal its own solid colour
+	await shot.call("eughe_ice", core.center + Vector3(0.3, 0.8, 0.5).normalized()
+		* (core.radius + 95.0) + Vector3(70, 0, 0), core.center
+		+ Vector3(0.3, 0.8, 0.5).normalized() * (core.radius + 40.0),
+		Vector3(0.3, 0.8, 0.5).normalized())
+	# 4. a continent from outside: lime, solid, and facing you
+	var cdir: Vector3 = cont.dir
+	await shot.call("eughe_continent",
+		core.center + cdir * (cont.orbit_r + 130.0)
+		+ cont.orbit_up.cross(cdir).normalized() * 90.0,
+		core.center + cdir * cont.orbit_r, cdir)
+	# 5. the whole planet, continents and all
+	await shot.call("eughe_system", core.center + Vector3(0.4, 0.5, 1.0)
+		.normalized() * 1100.0, core.center, Vector3.UP)
+	print("SHOTS written to ", ProjectSettings.globalize_path(dir))
 	get_tree().quit()
 
 func _reload_test() -> void:

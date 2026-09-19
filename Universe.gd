@@ -11,6 +11,12 @@ class Body:
 	var kind: String     # home / circuit / logic / pi / torus / ...
 	var color: Color
 	var hidden: bool = false   # off the map, off the locator. it exists anyway
+	## HOW FAR THIS WORLD REACHES. Normally a planet's pull dies off as
+	## an inverse square and is nothing a few radii out. Eughe does not
+	## work like that: its continents float hundreds of metres up and
+	## are still its ground, so it holds on out there almost as hard as
+	## it does at the core. Zero means the ordinary law.
+	var heavy_r: float = 0.0
 	var node: Node3D = null   # the built visual/collider root (movers need it)
 	# MOVERS. A body with orbit_of set is not parked: its centre is
 	# recomputed every frame and its built node is dragged with it.
@@ -21,6 +27,17 @@ class Body:
 	var orbit_up: Vector3 = Vector3.UP
 	var orbit_phase: float = 0.0
 	var orbit_speed: float = 0.0
+	# A SLIME CONTINENT IS NOT A BLOB AND IT IS NOT A PLATE. It is a
+	# piece of shell: a continent lifted off a globe and floated out,
+	# still curving around the world it came from. So it is described
+	# the way a continent on a map is -- a direction it sits in, how far
+	# out it floats, how much sky it covers each way, and how deep it
+	# is -- and never as a radius.
+	var dir: Vector3 = Vector3.UP     # where it is now, from the core
+	var dir0: Vector3 = Vector3.UP    # where it started
+	var arc_u: float = 0.5            # angular half-extent, one way
+	var arc_v: float = 0.3            # and the other: continents are long
+	var thick: float = 18.0
 	func gm() -> float:
 		return g_surf * radius * radius
 
@@ -41,7 +58,12 @@ func apply_scale(k: float) -> void:
 		b.center *= f
 		b.radius *= f
 		b.major *= f
-		b.orbit_r *= f   # movers swing wider on a stretched world too
+		b.heavy_r *= f
+	for sh in eughe_shelves:
+		sh.center *= f
+		sh.radius *= f
+		sh.orbit_r *= f
+		sh.thick *= f
 	BOUNDARY = 95000.0 * k
 
 func _ready() -> void:
@@ -68,6 +90,15 @@ func _ready() -> void:
 ## you were under simply stops existing and another one is there.
 var galaxy: String = "milky"
 
+## EUGHE'S SHELVES. These are NOT in `bodies` and never were meant to
+## be. A floating continent is a piece of Eughe -- terrain, like a
+## mountain range -- and being a Body made it a little planet of its
+## own with a name, a slot in every loop that walks the sky, an entry
+## wherever the game says what world you are near, and its own answer to
+## "which way is up". It gets none of that now. It is a shape, hanging
+## off the planet it belongs to, and the planet does the rest.
+var eughe_shelves: Array = []
+
 const GALAXIES := {
 	"milky": "THE MILKY WAY",
 	"sloom": "SLOOM",
@@ -84,6 +115,7 @@ func enter_galaxy(g: String) -> void:
 	world_scale = 1.0
 	BOUNDARY = 95000.0
 	bodies = []
+	eughe_shelves = []
 	_full_bodies = []
 	match g:
 		"sloom":
@@ -186,44 +218,85 @@ func _build_milky() -> void:
 ## every gravity sum treat them as the places they are.
 const SLOOM_C := Vector3(0, 4000, -38000)       # Ogrek's seat
 const EUGHE_C := Vector3(2400, 3400, -36500)    # the cold core
-## Where each slime continent starts, how big it is, and how fast it
-## swings round the core. Eughe's geography is a timetable.
-const SLIME_CONTS := [
-	{"n": "Grelm",        "r": 46.0, "orb": 268.0, "tilt": Vector3(0.12, 1.0, 0.05), "ph": 0.0,  "sp": 0.030},
-	{"n": "Vosh",         "r": 39.0, "orb": 322.0, "tilt": Vector3(0.9, 0.3, -0.25), "ph": 2.1,  "sp": -0.024},
-	{"n": "Ohlem",        "r": 52.0, "orb": 395.0, "tilt": Vector3(-0.4, 0.75, 0.6), "ph": 4.0,  "sp": 0.019},
-	{"n": "Trugh",        "r": 34.0, "orb": 232.0, "tilt": Vector3(0.35, 0.4, 0.85), "ph": 1.2,  "sp": -0.038},
-	{"n": "Q9 Bruun",     "r": 43.0, "orb": 448.0, "tilt": Vector3(-0.8, 0.55, 0.1), "ph": 5.3,  "sp": 0.016},
-]
+## HOW FAR EUGHE HOLDS ON. Its continents float hundreds of metres over
+## the ice and are still its ground, so the planet's reach goes out past
+## the furthest of them.
+const EUGHE_REACH := 420.0
+## THE CONTINENTS. Sixteen of them, and they are NOT places -- they are
+## Eughe's terrain, the way a mountain range is terrain. They have no
+## names anybody says, they are not on the chart, you cannot warp to one
+## any more than you can warp to a hillside, and nothing they do is
+## announced to a player on the other side of the galaxy.
+##
+## They are laid out on a Fibonacci sphere so the cover is EVEN: from
+## anywhere on the core there is slime overhead, the way there is
+## always cloud overhead. They used to be hand-placed and clustered,
+## which left one hemisphere with an empty sky.
+## HOW MANY, AND HOW HIGH. Cloud cover means clouds AND sky: at
+## twenty-eight wide ones there was no sky left at all.
+##
+## And there is ONE LAYER. Spreading them from 168 to 344 stacked them
+## into decks you could count from the ground, which is not what a sky
+## full of continents looks like -- they all float at the same height,
+## and the only variation is the few metres that keeps them from
+## looking stamped out.
+const SLIME_COUNT := 14
+const SLIME_R_MIN := 236.0
+const SLIME_R_MAX := 252.0
 
 func _build_sloom() -> void:
 	# a RED star. Oranger and deeper than the shader sun, which next to
 	# this thing reads like a streetlight.
 	_def("Ogrek",  SLOOM_C, 300.0, 22.0, "sun", Color("#ff4410"))
-	# the cold core. Earth is 62 across in this universe; Eughe is 58,
-	# and barely smaller is the whole point.
-	_def("Eughe",  EUGHE_C, 58.0, 9.0, "eughe", Color("#bfe6ff"))
-	# the continents. Detached, enormous, and never where you left them.
-	for sc in SLIME_CONTS:
-		var up: Vector3 = (sc["tilt"] as Vector3).normalized()
-		var side := up.cross(Vector3(0, 0, 1))
-		if side.length() < 0.2:
-			side = up.cross(Vector3(1, 0, 0))
-		side = side.normalized()
-		var fwd := up.cross(side).normalized()
-		var ph: float = float(sc["ph"])
-		var start: Vector3 = EUGHE_C + (side * cos(ph) + fwd * sin(ph)) \
-			* float(sc["orb"])
-		var cb := _def_ret(str(sc["n"]), start, float(sc["r"]), 3.2,
-			"slime", Color("#9ede2a"))
+	# THE COLD CORE. Grey, and it stays grey -- the colour on Eughe is
+	# in the ice standing on it, not in the rock. Earth is 62 across in
+	# this universe; Eughe is 58, and barely smaller is the point.
+	var eu := _def_ret("Eughe", EUGHE_C, 58.0, 9.0, "eughe", Color("#8e949c"))
+	eu.heavy_r = EUGHE_REACH
+	# the continents. Enormous, lime, curving round the core, evenly
+	# spread over it, and part of the planet rather than places of their
+	# own -- so their ids are internal and never shown to anybody.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5514
+	var ga := PI * (3.0 - sqrt(5.0))   # golden angle
+	for i in SLIME_COUNT:
+		var y := 1.0 - 2.0 * (float(i) + 0.5) / float(SLIME_COUNT)
+		var rr := sqrt(maxf(0.0, 1.0 - y * y))
+		var th := ga * float(i)
+		var d0 := Vector3(cos(th) * rr, y, sin(th) * rr).normalized()
+		# the axis it swings on is perpendicular to where it sits, so it
+		# sweeps a great circle through its own patch and the cover stays
+		# even however long you watch
+		var pick := Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1),
+			rng.randf_range(-1, 1))
+		var axis := d0.cross(pick)
+		if axis.length() < 0.15:
+			axis = d0.cross(Vector3(1, 0, 0))
+		axis = axis.normalized()
+		# a shape, not a world: built by hand and kept out of `bodies`
+		var cb := Body.new()
+		cb.name = "eughe_shelf_%d" % i
+		cb.kind = "slime"
+		cb.color = Color("#39c24a")
+		cb.hidden = true
+		cb.g_surf = 0.0
 		cb.orbit_of = "Eughe"
-		cb.orbit_r = float(sc["orb"])
-		cb.orbit_up = up
-		cb.orbit_phase = ph
-		cb.orbit_speed = float(sc["sp"])
+		cb.orbit_r = rng.randf_range(SLIME_R_MIN, SLIME_R_MAX)
+		cb.radius = cb.orbit_r * 0.5
+		cb.center = EUGHE_C + d0 * cb.orbit_r
+		cb.orbit_up = axis
+		cb.orbit_phase = 0.0
+		cb.orbit_speed = rng.randf_range(0.006, 0.019) \
+			* (1.0 if rng.randf() < 0.5 else -1.0)
+		cb.dir = d0
+		cb.dir0 = d0
+		cb.arc_u = rng.randf_range(0.34, 0.66)
+		cb.arc_v = rng.randf_range(0.20, 0.40)
+		cb.thick = rng.randf_range(14.0, 30.0)
+		eughe_shelves.append(cb)
 	# the moon, which is also slime, and which has one thing on it.
 	_def("Ex23 Florgus", EUGHE_C + Vector3(1350.0, 260.0, -880.0), 21.0, 2.6,
-		"florgus", Color("#8fd026"))
+		"florgus", Color("#9ee02c"))
 
 ## Tutorial universe: ONLY the tutorial planet + its moon exist. The real
 ## body list is stashed and put back when the title screen returns.
@@ -247,21 +320,16 @@ func restore_full_universe() -> void:
 ## then drags each body's built node to its new centre. Eughe's slime
 ## continents are on this: their geography has a clock, not an address.
 func advance_orbits(dt: float) -> void:
-	for b in bodies:
-		if b.orbit_of == "":
-			continue
+	for b in eughe_shelves:
 		var host := body_named(b.orbit_of)
 		if host == null:
 			continue
 		b.orbit_phase = fposmod(b.orbit_phase + b.orbit_speed * dt, TAU)
-		var up: Vector3 = b.orbit_up.normalized()
-		var side := up.cross(Vector3(0, 0, 1))
-		if side.length() < 0.2:
-			side = up.cross(Vector3(1, 0, 0))
-		side = side.normalized()
-		var fwd := up.cross(side).normalized()
-		b.center = host.center \
-			+ (side * cos(b.orbit_phase) + fwd * sin(b.orbit_phase)) * b.orbit_r
+		# it SWINGS round the world it belongs to, keeping its face to
+		# the core the whole way -- which is why a continent stays a
+		# continent instead of tumbling
+		b.dir = b.dir0.rotated(b.orbit_up.normalized(), b.orbit_phase)
+		b.center = host.center + b.dir * b.orbit_r
 
 func _def(n: String, c: Vector3, r: float, g: float, k: String, col: Color) -> void:
 	_def_ret(n, c, r, g, k, col)
@@ -285,27 +353,63 @@ func torus_delta(b: Body, pos: Vector3) -> Vector3:
 		flat = Vector3(1, 0, 0)
 	return pos - (b.center + flat.normalized() * b.major)
 
-## HOW FLAT A CONTINENT IS. Eughe's slime masses are squashed on their
-## own Y by this much: they lie flat, the way a continent does. Every
-## piece of maths that treats a body as a sphere has to know.
-const SLIME_SQUASH := 0.52
-
-## Height above a body's SURFACE (spheres, the torus, and the squashed
-## slime continents). Measuring a flattened slab as if it were a ball
-## says you are twenty metres underground while you stand on top of it.
+## Height above a body's SURFACE (spheres, the torus, and the slime
+## continents). Measuring a flat plate as if it were a ball says you are
+## twenty metres underground while you stand on top of it.
 func altitude(b: Body, pos: Vector3) -> float:
 	if b.kind == "torus":
 		return torus_delta(b, pos).length() - b.radius
 	if b.kind == "slime":
-		var v := pos - b.center
-		# un-squash the sample, measure against the sphere it came from,
-		# then scale the answer back into real metres
-		var u := Vector3(v.x, v.y / SLIME_SQUASH, v.z)
-		var ul := u.length()
-		if ul < 0.001:
-			return -b.radius
-		return (ul - b.radius) * (v.length() / ul)
+		return _shell_altitude(b, pos)
 	return pos.distance_to(b.center) - b.radius
+
+## How far you are off a continent. Inside its footprint that is simply
+## how high above the top skin you are, measured out from the core it
+## curves around; outside the footprint it is how far you would have to
+## travel sideways to be over it at all. Both in metres, so `nearest`
+## can still compare it against every other body in the sky.
+func _shell_altitude(b: Body, pos: Vector3) -> float:
+	var host := body_named(b.orbit_of)
+	var origin: Vector3 = host.center if host != null else Vector3.ZERO
+	var v := pos - origin
+	var r := v.length()
+	if r < 0.001:
+		return b.orbit_r
+	var ang := acos(clampf(v.normalized().dot(b.dir), -1.0, 1.0))
+	var over := maxf(0.0, ang - _arc_at(b, v.normalized()))
+	var lateral := over * r
+	var vertical := r - (b.orbit_r + b.thick * 0.5)
+	if lateral <= 0.0:
+		return vertical
+	if vertical <= 0.0:
+		return lateral
+	return sqrt(lateral * lateral + vertical * vertical)
+
+## The footprint is not a circle: a continent is long one way. This is
+## its angular half-extent in whatever direction the sample lies.
+func _arc_at(b: Body, n: Vector3) -> float:
+	var side := b.orbit_up.cross(b.dir)
+	if side.length() < 0.05:
+		side = b.dir.cross(Vector3(1, 0, 0))
+	side = side.normalized()
+	var fwd := b.dir.cross(side).normalized()
+	var du := n.dot(side)
+	var dv := n.dot(fwd)
+	var m := sqrt(du * du + dv * dv)
+	if m < 0.0001:
+		return maxf(b.arc_u, b.arc_v)
+	du /= m
+	dv /= m
+	return 1.0 / sqrt((du / b.arc_u) * (du / b.arc_u)
+		+ (dv / b.arc_v) * (dv / b.arc_v))
+
+## Is this point over the continent at all (rather than out past its
+## coast)? Used by anything that must not walk off the edge.
+func slime_contains(b: Body, pos: Vector3) -> bool:
+	var host := body_named(b.orbit_of)
+	var origin: Vector3 = host.center if host != null else Vector3.ZERO
+	var n := (pos - origin).normalized()
+	return acos(clampf(n.dot(b.dir), -1.0, 1.0)) < _arc_at(b, n)
 
 ## Local "up" off a body's surface at pos. On a squashed continent that
 ## is the ellipsoid normal, not the line back to the middle -- otherwise
@@ -313,30 +417,19 @@ func altitude(b: Body, pos: Vector3) -> float:
 func surface_up(b: Body, pos: Vector3) -> Vector3:
 	if b.kind == "torus":
 		return torus_delta(b, pos).normalized()
-	var v := pos - b.center
 	if b.kind == "slime":
-		var n := Vector3(v.x, v.y / (SLIME_SQUASH * SLIME_SQUASH), v.z)
-		if n.length() > 0.001:
-			return n.normalized()
-	return v.normalized()
+		# up on a continent is up off the WORLD it curves around: stand
+		# on one and the core is under your feet, which is the whole
+		# reason it reads as a landmass and not a raft
+		var host := body_named(b.orbit_of)
+		if host != null:
+			return (pos - host.center).normalized()
+	return (pos - b.center).normalized()
 
 ## Summed gravitational acceleration at a world point.
 func gravity_at(pos: Vector3) -> Vector3:
 	var a := Vector3.ZERO
 	for b in bodies:
-		if b.kind == "slime":
-			# a continent is a slab, not a ball: full surface gravity at
-			# the skin whichever face you are on, tapering inside it
-			var alt := altitude(b, pos)
-			var pull2: float = b.g_surf
-			if alt < 0.0:
-				pull2 = b.g_surf * clampf(1.0 + alt / b.radius, 0.0, 1.0)
-			elif alt > 0.0:
-				var rr: float = b.radius + alt
-				pull2 = b.gm() / (rr * rr)
-			if pull2 > 0.0004:
-				a += -surface_up(b, pos) * pull2
-			continue
 		if b.kind == "torus":
 			# pull toward the nearest point on the RING
 			var td := torus_delta(b, pos)
@@ -351,7 +444,10 @@ func gravity_at(pos: Vector3) -> Vector3:
 		# skipping them skips a sqrt + normalize per body per call --
 		# this function runs 240x per frame under the map's trajectory
 		var rsq: float = d.length_squared()
-		if rsq < 1.0 or b.gm() / rsq < 0.0004:
+		if rsq < 1.0:
+			continue
+		if b.gm() / rsq < 0.0004 \
+				and not (b.heavy_r > 0.0 and rsq < b.heavy_r * b.heavy_r):
 			continue
 		var r: float = sqrt(rsq)
 		var pull: float = b.gm() / rsq
@@ -360,6 +456,16 @@ func gravity_at(pos: Vector3) -> Vector3:
 		# and hit hundreds of m/s^2 near the planetary core.
 		if r < b.radius:
 			pull = b.g_surf * (r / b.radius)
+		elif b.heavy_r > b.radius and r < b.heavy_r:
+			# a HEAVY RANGE: the pull eases from full surface gravity to
+			# half of it across the whole reach instead of collapsing in
+			# the first few radii, so everything floating inside that
+			# reach is still standing on this planet
+			pull = lerpf(b.g_surf, b.g_surf * 0.5,
+				(r - b.radius) / (b.heavy_r - b.radius))
+		elif b.heavy_r > b.radius:
+			var edge: float = b.g_surf * 0.5 * b.heavy_r * b.heavy_r
+			pull = edge / rsq
 		a += d / r * pull
 	return a
 
@@ -367,8 +473,8 @@ func gravity_at(pos: Vector3) -> Vector3:
 ## Computer facility, mine shafts. No rockets or machines down there.
 func inside_body(pos: Vector3) -> bool:
 	for b in bodies:
-		if b.kind == "torus" or b.kind == "slime":
-			continue   # nothing is ever "inside" a slab of slime
+		if b.kind == "torus":
+			continue
 		if pos.distance_to(b.center) < b.radius - 0.5:
 			return true
 	return false

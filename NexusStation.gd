@@ -56,17 +56,19 @@ func accent() -> Color:
 func _apply_variant() -> void:
 	if variant != "sloom":
 		return
-	# SLOOM RELAY. Four modules, not five. Hull gone green at the seams
-	# from thirty years of somebody else's weather, rails in cold white
-	# instead of hazard amber, three wings because the fourth is a stub,
-	# and lamps that burn the colour of the star it sits under.
+	# SLOOM RELAY. Four modules, not five; three wings because the
+	# fourth is a stub. Bone and iron, scoured, with pale amber lamps --
+	# the colours of a station that has sat under a red star for a long
+	# time. It used to be lime and green, which was theming a whole
+	# galaxy after one planet in it: Eughe is somewhere you go in Sloom,
+	# not what Sloom is about.
 	n_mod = 4
-	_hull_a = Color("#b6c0ae")
-	_hull_b = Color("#93a189")
-	_trim = Color("#6f7d68")
-	_rail = Color("#d6e2cf")
-	_glass = Color("#ffd2a0")
-	_accent = Color("#a8e83a")
+	_hull_a = Color("#c9c0ae")
+	_hull_b = Color("#a1968a")
+	_trim = Color("#5c554c")
+	_rail = Color("#e9e3d7")
+	_glass = Color("#ffdcb4")
+	_accent = Color("#ffab52")
 	_wings = 3
 	_title = "SLOOM RELAY"
 

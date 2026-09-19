@@ -361,6 +361,13 @@ func _unhandled_input(event: InputEvent) -> void:
 					else:
 						Inventory.select_slot((Inventory.selected + 4) % 5)
 
+## How deep something thick has you, 0..1. Written by whatever has hold
+## of you (Eughe's slime is the only thing so far) and read by the walk.
+var mire: float = 0.0
+## 1 while a direction is held, 0 otherwise -- read by whatever has hold
+## of you to tell struggling from standing still.
+var wish_len: float = 0.0
+
 func jetting() -> bool:
 	return _jetting
 
@@ -1321,6 +1328,11 @@ func _physics_process(delta: float) -> void:
 	var wish := b.x * input.x + b.z * input.z
 	wish = wish - up * wish.dot(up)
 	wish = wish.normalized() if wish.length() > 0.01 else Vector3.ZERO
+	# ARE YOU TRYING TO MOVE? Not "are you moving" -- something that has
+	# hold of your legs has already taken the speed away, and asking the
+	# velocity whether you are fighting it means the harder it grips the
+	# less it believes you are struggling. That is a trap with no exit.
+	wish_len = wish.length()
 
 	var can_input := not _ui_open() and not Game.dead
 	var jet_ok := _jetting and Inventory.has_jetpack and Inventory.jet_fuel > 0.0 and can_input
@@ -1342,7 +1354,13 @@ func _physics_process(delta: float) -> void:
 		if can_input and Input.is_key_pressed(KEY_SPACE):
 			v_up = JUMP_VEL              # fixed launch -> low gravity jumps higher
 		v_up -= _g * delta
-		var spd9 := WALK_SPEED * _buff_mult()
+		# MIRED: something thick has hold of your legs. Eughe's slime
+		# sets this, 0 when you are on top of it and climbing toward 1
+		# as you go under, and wading is the difference between a
+		# hazard you can feel and a damage number with no cause.
+		var spd9 := WALK_SPEED * _buff_mult() * (1.0 - 0.62 * mire)
+		if mire > 0.05:
+			v_up = minf(v_up, JUMP_VEL * (1.0 - mire))   # no clean hop out
 		velocity = wish * spd9 + up * v_up
 	elif Game.underwater:
 		# SWIMMING: the water carries you. Heavy drag, a slow sink,
