@@ -36,25 +36,22 @@ var _glass := Color("#ffe9a8")
 var _accent := Color("#7be8ff")
 var _wings: int = 4
 var _title := "NEXUS STATION"
-var _sub := "zero g · deep-space relay · claim a frequency"
 
 ## Where a visitor stands on arrival, relative to the station's origin:
-## just off the docking port at the foot of the spine, clear of the
-## petals. Static, because the jump has to know where it is putting you
-## in a galaxy whose station does not exist yet.
+## on the dock deck, on the marked hatch, beside the jump console.
+## Static, because the jump has to know where it is putting you in a
+## galaxy whose station does not exist yet.
 static func dock_offset(v: String) -> Vector3:
 	var nm := 4 if v == "sloom" else N_MOD
-	return Vector3(0, -(float(nm) * H_MOD + float(nm - 1) * H_COLLAR) * 0.5
-		- 4.1, 0)
+	var top := -(float(nm) * H_MOD + float(nm - 1) * H_COLLAR) * 0.5 \
+		- DECK_DROP + DECK_T * 0.5
+	# on the hatch, a little clear of the console, feet just above the
+	# plate so nothing spawns embedded in it
+	return Vector3(-1.6, top + 1.3, 0)
 
 ## The colour this station answers to: beacon, sign, jump console.
 func accent() -> Color:
 	return _accent
-
-## Y of the docking deck, in station space. Anything bolted to the dock
-## (the jump console) is placed off this rather than a magic number.
-func deck_y() -> float:
-	return -(float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5 - 1.9
 
 func _apply_variant() -> void:
 	if variant != "sloom":
@@ -72,7 +69,6 @@ func _apply_variant() -> void:
 	_accent = Color("#a8e83a")
 	_wings = 3
 	_title = "SLOOM RELAY"
-	_sub = "zero g · far side of the jump · nobody answers"
 
 func _ready() -> void:
 	_apply_variant()
@@ -84,6 +80,7 @@ func _ready() -> void:
 	_build_wings()
 	_build_truss()
 	_build_dock()
+	_build_deck()
 	_build_sign()
 
 # ------------------------------------------------------------- helpers
@@ -359,6 +356,97 @@ func _build_dock() -> void:
 				Vector3(0, -rad_to_deg(a3), 0))
 		_col_box(Vector3(9.0, 0.3, 3.4), rp, Vector3(0, -rad_to_deg(a3), 0))
 
+## THE DOCK DECK. A floor. Visitors arrive here and the jump console
+## stands on it, and before this there was nothing under either of them
+## -- the console was bolted to vacuum four metres below the port.
+##
+## Grated plate on I-beams, hung off the utility module on four struts,
+## with a rail round it and hazard trim on the lip. Somewhere people
+## stand, built like somewhere people stand.
+const R_DECK := 7.0
+const DECK_DROP := 5.2       # below the bottom of the spine
+const DECK_T := 0.3
+
+func deck_top() -> float:
+	return -(float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5 \
+		- DECK_DROP + DECK_T * 0.5
+
+func _build_deck() -> void:
+	var bot := -(float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5
+	var dy := bot - DECK_DROP
+	var top := dy + DECK_T * 0.5
+	# the plate
+	_cyl(R_DECK, DECK_T, Vector3(0, dy, 0), Color("#39414b"), 0.05)
+	_col_cyl(R_DECK, DECK_T, Vector3(0, dy, 0))
+	# GRATING: radial bars and two concentric rings, standing proud of
+	# the plate, so it is a walked-on floor and not a painted disc
+	for k in 16:
+		var a := TAU * float(k) / 16.0
+		_bx(Vector3(R_DECK * 1.94, 0.06, 0.16), Vector3(0, top + 0.02, 0),
+			_trim, 0.05, Vector3(0, -rad_to_deg(a), 0))
+	for rr in [2.6, 4.6, 6.4]:
+		var ring := TorusMesh.new()
+		ring.inner_radius = float(rr) - 0.07
+		ring.outer_radius = float(rr) + 0.07
+		ring.rings = 6
+		ring.ring_segments = 28
+		_mi(ring, Vector3(0, top + 0.03, 0), _trim, 0.05)
+	# I-beams under it, crossing
+	for k in 3:
+		var a2 := PI * float(k) / 3.0
+		_bx(Vector3(R_DECK * 1.96, 0.36, 0.22),
+			Vector3(0, dy - 0.3, 0), Color("#4a515c"), 0.04,
+			Vector3(0, -rad_to_deg(a2), 0))
+	# the four struts back up to the utility module
+	for k in 4:
+		var a3 := TAU * float(k) / 4.0 + PI * 0.25
+		var foot := Vector3(cos(a3) * (R_DECK - 1.2), dy + 0.2,
+			sin(a3) * (R_DECK - 1.2))
+		var head := Vector3(cos(a3) * (R_CORE + 0.4), bot - 0.8,
+			sin(a3) * (R_CORE + 0.4))
+		var mid := (foot + head) * 0.5
+		var st := _bx(Vector3(0.22, foot.distance_to(head), 0.22), mid,
+			Color("#8f98a4"), 0.05)
+		st.look_at_from_position(mid, head, Vector3.UP)
+		st.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	# RAIL round the edge, because it is a long way down in every
+	# direction and there is no down
+	for k in 16:
+		var a4 := TAU * float(k) / 16.0
+		_bx(Vector3(0.12, 1.15, 0.12),
+			Vector3(cos(a4) * (R_DECK - 0.3), top + 0.57,
+				sin(a4) * (R_DECK - 0.3)), _trim, 0.06)
+	for h in [0.6, 1.12]:
+		var rail := TorusMesh.new()
+		rail.inner_radius = R_DECK - 0.42
+		rail.outer_radius = R_DECK - 0.22
+		rail.rings = 6
+		rail.ring_segments = 32
+		_mi(rail, Vector3(0, top + float(h), 0), _rail, 0.2)
+	# hazard trim on the lip
+	for k in 24:
+		var a5 := TAU * float(k) / 24.0
+		_bx(Vector3(0.9, 0.09, 0.26),
+			Vector3(cos(a5) * (R_DECK - 0.05), top - 0.04,
+				sin(a5) * (R_DECK - 0.05)),
+			_rail if k % 2 == 0 else Color("#1a1f26"), 0.12,
+			Vector3(0, -rad_to_deg(a5) + 90.0, 0))
+	# edge lighting, so the deck reads from a long way out
+	for k in 8:
+		var a6 := TAU * float(k) / 8.0 + 0.2
+		_lights.append(_bx(Vector3(0.5, 0.07, 0.18),
+			Vector3(cos(a6) * (R_DECK - 0.9), top + 0.05,
+				sin(a6) * (R_DECK - 0.9)), _accent, 2.0,
+			Vector3(0, -rad_to_deg(a6) + 90.0, 0)))
+	# the hatch under the port: a marked square you arrive onto
+	_bx(Vector3(2.2, 0.05, 2.2), Vector3(0, top + 0.05, 0),
+		Color("#2a3038"), 0.06)
+	for k in 4:
+		var a7 := TAU * float(k) / 4.0
+		_bx(Vector3(1.0, 0.07, 0.1),
+			Vector3(cos(a7) * 1.05, top + 0.08, sin(a7) * 1.05),
+			_rail, 0.3, Vector3(0, -rad_to_deg(a7), 0))
+
 func _build_sign() -> void:
 	var top := (float(n_mod) * H_MOD + float(n_mod - 1) * H_COLLAR) * 0.5
 	var lbl := Label3D.new()
@@ -372,16 +460,9 @@ func _build_sign() -> void:
 	lbl.position = Vector3(0, top + 17.0, 0)
 	lbl.no_depth_test = true
 	add_child(lbl)
-	var sub := Label3D.new()
-	sub.text = _sub
-	sub.font_size = 80
-	sub.pixel_size = 0.02
-	sub.modulate = Color(1, 1, 1, 0.7)
-	sub.outline_size = 16
-	sub.outline_modulate = Color(0, 0, 0, 0.9)
-	sub.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sub.position = Vector3(0, top + 15.4, 0)
-	add_child(sub)
+	# and nothing under it. It used to read "zero g · deep-space relay ·
+	# claim a frequency", which is three things you can see for
+	# yourself from where you are standing when you read it.
 
 func _process(delta: float) -> void:
 	_t += delta

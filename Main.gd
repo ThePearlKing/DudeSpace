@@ -7102,9 +7102,10 @@ func _build_nexus() -> void:
 	var jmp := GalaxyJump.new()
 	jmp.accent = nx.accent()
 	add_child(jmp)
-	jmp.global_position = NEXUS_POS + NexusStation.dock_offset(Game.galaxy) \
-		+ Vector3(3.2, -0.9, 0)
-	jmp.look_at(NEXUS_POS + NexusStation.dock_offset(Game.galaxy), Vector3.UP)
+	# standing ON the deck plate, facing the hatch you arrive on
+	var dtop := NEXUS_POS + Vector3(0, nx.deck_top(), 0)
+	jmp.global_position = dtop + Vector3(2.4, 0, 0)
+	jmp.look_at(dtop, Vector3.UP)
 
 func _register_crates(b, count: int, value: int) -> void:
 	count = _n(count)
@@ -10031,7 +10032,7 @@ func _nexustp_test() -> void:
 	pm._open_tp()
 	var btn: Button = null
 	for b in pm._tp.find_children("*", "Button", true, false):
-		if (b as Button).text == "Nexus Station":
+		if (b as Button).text.begins_with("Nexus Station"):
 			btn = b
 			break
 	print("NEXUSTP button found=", btn != null)
@@ -10042,7 +10043,28 @@ func _nexustp_test() -> void:
 	await get_tree().process_frame
 	var d: float = _player.global_position.distance_to(NEXUS_POS)
 	print("NEXUSTP player now ", _player.global_position, " dist to station %.1f" % d)
-	print("NEXUSTP RESULT: ", "PASS" if d < 60.0 and Game.cheated else "FAIL")
+	# IS THERE A FLOOR? The arrival point and the jump console both used
+	# to hang in vacuum below the docking port. Both must have the deck
+	# plate under them, within a stride.
+	var space := get_world_3d().direct_space_state
+	var floor_under := func(at: Vector3) -> float:
+		var q := PhysicsRayQueryParameters3D.create(at + Vector3(0, 0.6, 0),
+			at + Vector3(0, -3.0, 0))
+		var h := space.intersect_ray(q)
+		return -1.0 if h.is_empty() else at.y + 0.6 - (h["position"] as Vector3).y
+	var arrive: Vector3 = NEXUS_POS + NexusStation.dock_offset(Game.galaxy)
+	var jm = get_tree().get_first_node_in_group("galaxy_jump")
+	print("NEXUSTP floor under arrival: %.2fm" % floor_under.call(arrive))
+	print("NEXUSTP floor under console: %.2fm"
+		% floor_under.call(jm.global_position))
+	print("NEXUSTP console %.1fm from arrival (F reaches 8m)"
+		% jm.global_position.distance_to(arrive))
+	var deck_ok: bool = floor_under.call(arrive) > 0.0 \
+		and floor_under.call(arrive) < 2.6 \
+		and floor_under.call(jm.global_position) > 0.0 \
+		and floor_under.call(jm.global_position) < 1.2
+	print("NEXUSTP RESULT: ",
+		"PASS" if d < 60.0 and Game.cheated and deck_ok else "FAIL")
 	get_tree().quit()
 
 
