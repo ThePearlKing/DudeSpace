@@ -397,6 +397,10 @@ func _boot() -> void:
 		_harold_test()
 	if OS.get_environment("CTD_TEST") == "34":
 		_riddle_shot()
+	if OS.get_environment("CTD_TEST") == "56":
+		_death_test()
+	if OS.get_environment("CTD_TEST") == "57":
+		_nexustp_test()
 	# the interactive tutorial lives ONLY in the dedicated tutorial world
 	if Game.tutorial_session and OS.get_environment("CTD_TEST") == "" \
 			and OS.get_environment("CTD_NET") == "":
@@ -3005,6 +3009,16 @@ func _do_respawn() -> void:
 				_player.respawn_at(Game.spawn_pos + Game.spawn_up * 1.5,
 					Game.spawn_up)
 				_player.restore_jet()
+			# dying freed the cursor; being alive takes it back. Without
+			# this the camera would not turn after a respawn and the run
+			# felt stuck behind a menu that was not there.
+			var ui_up := false
+			for ui in get_tree().get_nodes_in_group("closable_ui"):
+				if ui.visible:
+					ui_up = true
+					break
+			if not ui_up:
+				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 var _refocus_capture := false
 
@@ -9768,6 +9782,58 @@ func _chem_test() -> void:
 ## CTD_TEST=44 -- "I rejoined and my main voice is silent". Build a real
 ## patch, run it, save it, load it into a fresh engine, and compare what
 ## is still making sound module by module.
+## CTD_TEST=56 -- DEATH AND BACK. Kill the player, read the death screen,
+## respawn, and check that the screen actually came down: the in-place
+## respawn keeps the same HUD, so KILLED BY ... used to stay painted on
+## a living player and the cursor stayed loose behind it.
+func _death_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var over: Label = _hud._over
+	print("DEATH before: dead=", Game.dead, " overlay=", over.visible)
+	Game.hurt(Game.HEALTH_MAX * 2.0, true, "shader sun")
+	await get_tree().process_frame
+	print("DEATH killed: dead=", Game.dead, " overlay=", over.visible,
+		" cause=", Game.death_cause, " text=", over.text.split("\n")[0])
+	var died_ok := Game.dead and over.visible \
+		and over.text.begins_with("KILLED BY SHADER SUN")
+	_do_respawn()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("DEATH respawned: dead=", Game.dead, " overlay=", over.visible,
+		" cause='", Game.death_cause, "' mouse=", Input.mouse_mode)
+	var back_ok := not Game.dead and not over.visible and Game.death_cause == ""
+	print("DEATH RESULT: died=", died_ok, " cleared=", back_ok,
+		"  ", "PASS" if died_ok and back_ok else "FAIL")
+	get_tree().quit()
+
+## CTD_TEST=57 -- the cheat menu's new NEXUS STATION destination. The
+## station is out past the shader system with no map pin on it, so this
+## button is the only way there that is not a rocket ride.
+func _nexustp_test() -> void:
+	await get_tree().create_timer(1.5).timeout
+	var pm: PauseMenu = null
+	for c in get_children():
+		if c is PauseMenu:
+			pm = c
+			break
+	pm._open_cheats()
+	pm._open_tp()
+	var btn: Button = null
+	for b in pm._tp.find_children("*", "Button", true, false):
+		if (b as Button).text == "Nexus Station":
+			btn = b
+			break
+	print("NEXUSTP button found=", btn != null)
+	var nx = get_tree().get_first_node_in_group("nexus")
+	print("NEXUSTP station built=", nx != null, " at ",
+		nx.global_position if nx else "-")
+	btn.pressed.emit()
+	await get_tree().process_frame
+	var d: float = _player.global_position.distance_to(NEXUS_POS)
+	print("NEXUSTP player now ", _player.global_position, " dist to station %.1f" % d)
+	print("NEXUSTP RESULT: ", "PASS" if d < 60.0 and Game.cheated else "FAIL")
+	get_tree().quit()
+
 func _reload_test() -> void:
 	await get_tree().create_timer(1.5).timeout
 	var e := SynthEngine.new()

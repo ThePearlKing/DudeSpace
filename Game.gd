@@ -437,6 +437,7 @@ func reset() -> void:
 	wrath = 0.0
 	health = HEALTH_MAX
 	dead = false
+	death_cause = ""
 	trapped = false
 	permadead = false
 	dilation = 1.0

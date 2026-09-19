@@ -393,6 +393,13 @@ func flash(msg: String) -> void:
 	_flash_t = 3.0
 
 func _process(delta: float) -> void:
+	# THE DEATH SCREEN BELONGS TO DEATH. Respawning is in-place now --
+	# same HUD node, no scene rebuild -- so nothing was ever putting
+	# this label back down, and KILLED BY ... stayed painted over a
+	# perfectly alive player.
+	if _over.visible and not Game.dead:
+		_over.visible = false
+
 	# fire overlay: holds while dead, melts away after respawn
 	if _fire_a > 0.0:
 		_ensure_fire()
